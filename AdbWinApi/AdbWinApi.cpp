@@ -80,7 +80,7 @@ class CAdbWinApiModule : public CAtlDllModuleT< CAdbWinApiModule > {
     // We require that AdbWinUsbApi.dll is located in the same folder
     // where AdbWinApi.dll and adb.exe are located, so by Windows
     // conventions we can pass just module name, and not the full path.
-    adbwinusbapi_handle_ = LoadLibrary(L"AdbWinUsbApi.dll");
+    adbwinusbapi_handle_ = LoadLibrary(L"AdbWinUsbApiEx.dll");
     if (NULL != adbwinusbapi_handle_) {
       InstantiateWinUsbInterface = reinterpret_cast<PFN_INSTWINUSBINTERFACE>
           (GetProcAddress(adbwinusbapi_handle_, "InstantiateWinUsbInterface"));
