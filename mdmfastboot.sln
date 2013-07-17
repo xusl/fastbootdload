@@ -8,11 +8,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mdmfastboot", "mdmfastboot\
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AdbWinApi", "AdbWinApi\AdbWinApi.vcproj", "{684F913D-4714-42EA-B3DC-802600048316}"
-	ProjectSection(ProjectDependencies) = postProject
-		{BA9608A3-AAE5-45B9-874B-15971CA5926F} = {BA9608A3-AAE5-45B9-874B-15971CA5926F}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AdbWinUsbApi", "AdbWinUsbApi\AdbWinUsbApi.vcproj", "{BA9608A3-AAE5-45B9-874B-15971CA5926F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{684F913D-4714-42EA-B3DC-802600048316} = {684F913D-4714-42EA-B3DC-802600048316}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
