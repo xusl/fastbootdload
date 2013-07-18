@@ -69,7 +69,7 @@ const char * basename(const char * f_name);
 void get_my_path(char *s, size_t maxLen);
 CString GetAppPath(CString & sPath );
 void sleep(int seconds);
-double now();
+long now(void);
 PCHAR WideStrToMultiStr(PWCHAR WideStr);
 
 #endif /* _ADB_UTILS_H */

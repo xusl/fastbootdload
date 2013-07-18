@@ -213,10 +213,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\adb\file_sync_client.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\logging\log.cpp"
 				>
 			</File>

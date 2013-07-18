@@ -205,11 +205,11 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
   return 0;
 }
 
-double now()
+long now(void)
 {
 	struct timeval tv;
     gettimeofday(&tv, NULL);
-    return (double)tv.tv_sec + (double)tv.tv_usec / 1000000;
+    return tv.tv_sec + tv.tv_usec / 1000000;
 }
 
 // called from fastboot.c

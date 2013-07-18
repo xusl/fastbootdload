@@ -39,24 +39,15 @@ typedef unsigned short mode_t;
 static unsigned total_bytes;
 static long long start_time;
 
-static long long NOW()
-{
-   // struct timeval tv;
-   // gettimeofday(&tv, 0);
-   // return ((long long) tv.tv_usec) +
-   //     1000000LL * ((long long) tv.tv_sec);
-	return 0;
-}
-
-static void BEGIN()
+ void BEGIN()
 {
     total_bytes = 0;
-    start_time = NOW();
+    start_time = now();
 }
 
 static void END()
 {
-    long long t = NOW() - start_time;
+    long long t =/* NOW() -*/ start_time;
     if(total_bytes == 0) return;
 
     if (t == 0)  /* prevent division by 0 :-) */
@@ -118,13 +109,7 @@ fail:
     return -1;
 }
 
-typedef struct syncsendbuf syncsendbuf;
 
-struct syncsendbuf {
-    unsigned id;
-    unsigned size;
-    char data[SYNC_DATA_MAX];
-};
 
 static syncsendbuf send_buffer;
 
@@ -274,30 +259,6 @@ static int write_data_buffer(int fd, char* file_buffer, int size, syncsendbuf *s
     return err;
 }
 
-#ifdef HAVE_SYMLINKS
-static int write_data_link(int fd, const char *path, syncsendbuf *sbuf)
-{
-    int len, ret;
-
-    len = readlink(path, sbuf->data, SYNC_DATA_MAX-1);
-    if(len < 0) {
-        fprintf(stderr, "error reading link '%s': %s\n", path, strerror(errno));
-        return -1;
-    }
-    sbuf->data[len] = '\0';
-
-    sbuf->size = htoll(len + 1);
-    sbuf->id = ID_DATA;
-
-    ret = writex(fd, sbuf, sizeof(unsigned) * 2 + len + 1);
-    if(ret)
-        return -1;
-
-    total_bytes += len + 1;
-
-    return 0;
-}
-#endif
 
 static int sync_send(int fd, const char *lpath, const char *rpath,
                      unsigned mtime, mode_t mode, int verifyApk)

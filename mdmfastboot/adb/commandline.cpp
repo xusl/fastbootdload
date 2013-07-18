@@ -937,6 +937,7 @@ top:
         return 0;
     }
 
+#if ND
     /* do_sync_*() commands */
 
     if(!strcmp(argv[0], "ls")) {
@@ -958,6 +959,7 @@ top:
             return usage();
         }
     }
+#endif
 
     if(!strcmp(argv[0], "install")) {
         if (argc < 2) return usage();
@@ -969,6 +971,7 @@ top:
         return uninstall_app(ttype, serial, argc, argv);
     }
 
+#ifdef ND
     if(!strcmp(argv[0], "sync")) {
         char *srcarg, *android_srcpath, *data_srcpath;
         int listonly = 0;
@@ -1002,6 +1005,7 @@ top:
         free(data_srcpath);
         return ret;
     }
+#endif
 
     /* passthrough commands */
 
@@ -1228,12 +1232,14 @@ int install_app(transport_type transport, char* serial, int argc, char** argv)
         return 1;
     }
 
+#if ND
     if (!(err = do_sync_push(filename, to, 1 /* verify APK */))) {
         /* file in place; tell the Package Manager to install it */
         argv[argc - 1] = to;       /* destination name, not source location */
         pm_command(transport, serial, argc, argv);
         delete_file(transport, serial, to);
     }
+#endif
 
     return err;
 }

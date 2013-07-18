@@ -11,12 +11,32 @@ when        who          what
 #include "StdAfx.h"
 
 #include "adbhost.h"
+
 #define   TRACE_TAG  TRACE_TRANSPORT
 
+
 #if ADB_TRACE
-static void  dump_hex( const unsigned char*  ptr, size_t  len )
+static void dump_packet( const char*  tag, apacket* const p)
 {
+   unsigned  command = p->msg.command;
+   int       len     = p->msg.data_length;
+   char      cmd[5];
+   int       n;
    int  nn, len2 = len;
+   const unsigned char* ptr = p->data;
+
+   for (n = 0; n < 4; n++) {
+      int  b = (command >> (n*8)) & 255;
+      if (b >= 32 && b < 127)
+         cmd[n] = (char)b;
+      else
+         cmd[n] = '.';
+   }
+   cmd[4] = 0;
+
+   D("%s:  [%08x %s] %08x %08x (%d) ",
+     tag, command, cmd, p->msg.arg0, p->msg.arg1, len);
+
    //char* buffer = (char*)malloc (len * sizeof(char) * 4);
 
    //if (buffer == NULL)
@@ -47,7 +67,7 @@ adbhost::adbhost(usb_handle *usb, unsigned address):
 {
    //t = (atransport *)calloc(1, sizeof(atransport));
    memset(&this->t, 0 ,sizeof(atransport));
-   init_usb_transport(&this->t, usb,  CS_OFFLINE);
+   init_usb_transport(&this->t, usb, CS_OFFLINE);
 
 }
 
@@ -72,23 +92,7 @@ int adbhost::read_packet(atransport *t, apacket** ppacket)
 #if ADB_TRACE
    if (ADB_TRACING)
    {
-      unsigned  command = (*ppacket)->msg.command;
-      int       len     = (*ppacket)->msg.data_length;
-      char      cmd[5];
-      int       n;
-
-      for (n = 0; n < 4; n++) {
-         int  b = (command >> (n*8)) & 255;
-         if (b >= 32 && b < 127)
-            cmd[n] = (char)b;
-         else
-            cmd[n] = '.';
-      }
-      cmd[4] = 0;
-
-      D("read_packet:  [%08x %s] %08x %08x (%d) ",
-        command, cmd, (*ppacket)->msg.arg0, (*ppacket)->msg.arg1, len);
-      dump_hex((*ppacket)->data, len);
+      dump_packet("read_packet", *ppacket);
    }
 #endif
    return 0;
@@ -102,23 +106,7 @@ int adbhost::write_packet(apacket** ppacket)
 #if ADB_TRACE
    if (ADB_TRACING)
    {
-      unsigned  command = (*ppacket)->msg.command;
-      int       len     = (*ppacket)->msg.data_length;
-      char      cmd[5];
-      int       n;
-
-      for (n = 0; n < 4; n++) {
-         int  b = (command >> (n*8)) & 255;
-         if (b >= 32 && b < 127)
-            cmd[n] = (char)b;
-         else
-            cmd[n] = '.';
-      }
-      cmd[4] = 0;
-
-      D("write_packet:  [%08x %s] %08x %08x (%d) ",
-        command, cmd, (*ppacket)->msg.arg0, (*ppacket)->msg.arg1, len);
-      dump_hex((*ppacket)->data, len);
+	   dump_packet("write_packet", *ppacket);
    }
 #endif
 
@@ -209,9 +197,6 @@ void adbhost::open_service(const char *destination)
    put_apacket(p);
 }
 
-int adbhost::command() {
-   return 0;
-}
 
 int adbhost::enqueue_command(apacket *p)
 {
@@ -363,6 +348,7 @@ void adbhost::process() {
       return;
    }
 
+#if 0
    // 3. if we receive connect message from remote, do open
    open_service("shell:cat build.prop");
    //todo:: we should receive : OKAY(send_ready), mean success,
@@ -371,12 +357,784 @@ void adbhost::process() {
       return;
    }
    handle_command_response();
-
+#endif
    // 4. do write what we want to do.
+
+//need close service now?
+//or do not need close , util connection close?
+do_sync_pull("/build.prop", ".");
+
 
    // 5. close
    close_remote();
 }
+
+
+
+int adbhost::do_sync_pull(const char *rpath, const char *lpath)
+{
+    unsigned mode;
+    struct stat st;
+	int  tmplen;
+	char *tmp;
+    int fd = 999;
+
+    open_service("sync:");
+    if(!handle_open_response()) {
+        fprintf(stderr,"error: open sync failed\n");
+        return 1;
+    }
+
+    if(sync_readmode(fd, rpath, &mode)) {
+        return 1;
+    }
+    if(mode == 0) {
+        fprintf(stderr,"remote object '%s' does not exist\n", rpath);
+        return 1;
+    }
+
+    if(S_ISREG(mode) || S_ISLNK(mode) || S_ISCHR(mode) || S_ISBLK(mode)) {
+        if(stat(lpath, &st) == 0) {
+            if(S_ISDIR(st.st_mode)) {
+                    /* if we're copying a remote file to a local directory,
+                    ** we *really* want to copy to localdir + "/" + remotefilename
+                    */
+                const char *name = adb_dirstop(rpath);
+                if(name == 0) {
+                    name = rpath;
+                } else {
+                    name++;
+                }
+                tmplen = strlen(name) + strlen(lpath) + 2;
+                tmp = (char *)malloc(tmplen);
+                if(tmp == 0) return 1;
+                snprintf(tmp, tmplen, "%s/%s", lpath, name);
+                lpath = tmp;
+            }
+        }
+        BEGIN();
+        if(sync_recv(fd, rpath, lpath)) {
+            return 1;
+        } else {
+            END();
+            sync_quit();
+            return 0;
+        }
+    } else if(S_ISDIR(mode)) {
+        BEGIN();
+        if (copy_remote_dir_local(fd, rpath, lpath, 0)) {
+            return 1;
+        } else {
+            END();
+            sync_quit();
+            return 0;
+        }
+    } else {
+        fprintf(stderr,"remote object '%s' not a file or directory\n", rpath);
+        return 1;
+    }
+}
+
+int adbhost::sync_send(int fd, const char *lpath, const char *rpath,
+                     unsigned mtime, mode_t mode)
+{
+    syncmsg msg;
+    int len, r;
+    syncsendbuf *sbuf = &send_buffer;
+    char* file_buffer = NULL;
+    int size = 0;
+    char tmp[64];
+
+    len = strlen(rpath);
+    if(len > 1024) goto fail;
+
+    snprintf(tmp, sizeof(tmp), ",%d", mode);
+    r = strlen(tmp);
+
+    msg.req.id = ID_SEND;
+    msg.req.namelen = htoll(len + r);
+
+    if(writex(fd, &msg.req, sizeof(msg.req)) ||
+       writex(fd, rpath, len) || writex(fd, tmp, r)) {
+        free(file_buffer);
+        goto fail;
+    }
+
+    if (file_buffer) {
+        write_data_buffer(fd, file_buffer, size, sbuf);
+        free(file_buffer);
+    } else if (S_ISREG(mode))
+        write_data_file(fd, lpath, sbuf);
+#ifdef HAVE_SYMLINKS
+    else if (S_ISLNK(mode))
+        write_data_link(fd, lpath, sbuf);
+#endif
+    else
+        goto fail;
+
+    msg.data.id = ID_DONE;
+    msg.data.size = htoll(mtime);
+    if(writex(fd, &msg.data, sizeof(msg.data)))
+        goto fail;
+
+    if(readx(fd, &msg.status, sizeof(msg.status)))
+        return -1;
+
+    if(msg.status.id != ID_OKAY) {
+        if(msg.status.id == ID_FAIL) {
+            len = ltohl(msg.status.msglen);
+            if(len > 256) len = 256;
+            if(readx(fd, sbuf->data, len)) {
+                return -1;
+            }
+            sbuf->data[len] = 0;
+        } else
+            strcpy(sbuf->data, "unknown reason");
+
+        fprintf(stderr,"failed to copy '%s' to '%s': %s\n", lpath, rpath, sbuf->data);
+        return -1;
+    }
+
+    return 0;
+
+fail:
+    fprintf(stderr,"protocol failure\n");
+    adb_close(fd);
+    return -1;
+}
+
+
+int adbhost::sync_recv(int fd, const char *rpath, const char *lpath)
+{
+    syncmsg msg;
+    int len;
+    int lfd = -1;
+    char *buffer = send_buffer.data;
+    unsigned id;
+
+    len = strlen(rpath);
+    if(len > 1024) return -1;
+
+    msg.req.id = ID_RECV;
+    msg.req.namelen = htoll(len);
+    if(writex(fd, &msg.req, sizeof(msg.req)) ||
+       writex(fd, rpath, len)) {
+        return -1;
+    }
+
+    if(readx(fd, &msg.data, sizeof(msg.data))) {
+        return -1;
+    }
+    id = msg.data.id;
+
+    if((id == ID_DATA) || (id == ID_DONE)) {
+        adb_unlink(lpath);
+        mkdirs((char *)lpath);
+        lfd = adb_creat(lpath, 0644);
+        if(lfd < 0) {
+            fprintf(stderr,"cannot create '%s': %s\n", lpath, strerror(errno));
+            return -1;
+        }
+        goto handle_data;
+    } else {
+        goto remote_error;
+    }
+
+    for(;;) {
+        if(readx(fd, &msg.data, sizeof(msg.data))) {
+            return -1;
+        }
+        id = msg.data.id;
+
+    handle_data:
+        len = ltohl(msg.data.size);
+        if(id == ID_DONE) break;
+        if(id != ID_DATA) goto remote_error;
+        if(len > SYNC_DATA_MAX) {
+            fprintf(stderr,"data overrun\n");
+            adb_close(lfd);
+            return -1;
+        }
+
+        if(readx(fd, buffer, len)) {
+            adb_close(lfd);
+            return -1;
+        }
+
+        if(writex(lfd, buffer, len)) {
+            fprintf(stderr,"cannot write '%s': %s\n", rpath, strerror(errno));
+            adb_close(lfd);
+            return -1;
+        }
+
+        total_bytes += len;
+    }
+
+    adb_close(lfd);
+    return 0;
+
+remote_error:
+    adb_close(lfd);
+    adb_unlink(lpath);
+
+    if(id == ID_FAIL) {
+        len = ltohl(msg.data.size);
+        if(len > 256) len = 256;
+        if(readx(fd, buffer, len)) {
+            return -1;
+        }
+        buffer[len] = 0;
+    } else {
+        memcpy(buffer, &id, 4);
+        buffer[4] = 0;
+//        strcpy(buffer,"unknown reason");
+    }
+    fprintf(stderr,"failed to copy '%s' to '%s': %s\n", rpath, lpath, buffer);
+    return 0;
+}
+
+int adbhost::sync_readmode(int fd, const char *path, unsigned *mode)
+{
+    syncmsg msg;
+    int len = strlen(path);
+
+    msg.req.id = ID_STAT;
+    msg.req.namelen = htoll(len);
+
+    if(writex(fd, &msg.req, sizeof(msg.req)) ||
+       writex(fd, path, len)) {
+        return -1;
+    }
+
+    if(readx(fd, &msg.stat, sizeof(msg.stat))) {
+        return -1;
+    }
+
+    if(msg.stat.id != ID_STAT) {
+        return -1;
+    }
+
+    *mode = ltohl(msg.stat.mode);
+    return 0;
+}
+
+
+int adbhost::copy_local_dir_remote(int fd, const char *lpath, const char *rpath,
+	int checktimestamps, int listonly)
+{
+    copyinfo *filelist = 0;
+    copyinfo *ci, *next;
+    int pushed = 0;
+    int skipped = 0;
+
+    if((lpath[0] == 0) || (rpath[0] == 0)) return -1;
+    if(lpath[strlen(lpath) - 1] != '/') {
+        int  tmplen = strlen(lpath)+2;
+        char *tmp = (char *)malloc(tmplen);
+        if(tmp == 0) return -1;
+        snprintf(tmp, tmplen, "%s/",lpath);
+        lpath = tmp;
+    }
+    if(rpath[strlen(rpath) - 1] != '/') {
+        int tmplen = strlen(rpath)+2;
+        char *tmp = (char *)malloc(tmplen);
+        if(tmp == 0) return -1;
+        snprintf(tmp, tmplen, "%s/",rpath);
+        rpath = tmp;
+    }
+
+    if(local_build_list(&filelist, lpath, rpath)) {
+        return -1;
+    }
+
+    if(checktimestamps){
+        for(ci = filelist; ci != 0; ci = ci->next) {
+            if(sync_start_readtime(fd, ci->dst)) {
+                return 1;
+            }
+        }
+        for(ci = filelist; ci != 0; ci = ci->next) {
+            unsigned int timestamp, mode, size;
+            if(sync_finish_readtime(fd, &timestamp, &mode, &size))
+                return 1;
+            if(size == ci->size) {
+                /* for links, we cannot update the atime/mtime */
+                if((S_ISREG(ci->mode & mode) && timestamp == ci->time) ||
+                    (S_ISLNK(ci->mode & mode) && timestamp >= ci->time))
+                    ci->flag = 1;
+            }
+        }
+    }
+    for(ci = filelist; ci != 0; ci = next) {
+        next = ci->next;
+        if(ci->flag == 0) {
+            fprintf(stderr,"%spush: %s -> %s\n", listonly ? "would " : "", ci->src, ci->dst);
+            if(!listonly &&
+               sync_send(fd, ci->src, ci->dst, ci->time, ci->mode)){
+                return 1;
+            }
+            pushed++;
+        } else {
+            skipped++;
+        }
+        free(ci);
+    }
+
+    fprintf(stderr,"%d file%s pushed. %d file%s skipped.\n",
+            pushed, (pushed == 1) ? "" : "s",
+            skipped, (skipped == 1) ? "" : "s");
+
+    return 0;
+}
+
+
+int adbhost::copy_remote_dir_local(int fd, const char *rpath, const char *lpath,
+                                 int checktimestamps)
+{
+    copyinfo *filelist = 0;
+    copyinfo *ci, *next;
+    int pulled = 0;
+    int skipped = 0;
+
+    /* Make sure that both directory paths end in a slash. */
+    if (rpath[0] == 0 || lpath[0] == 0) return -1;
+    if (rpath[strlen(rpath) - 1] != '/') {
+        int  tmplen = strlen(rpath) + 2;
+        char *tmp = (char *)malloc(tmplen);
+        if (tmp == 0) return -1;
+        snprintf(tmp, tmplen, "%s/", rpath);
+        rpath = tmp;
+    }
+    if (lpath[strlen(lpath) - 1] != '/') {
+        int  tmplen = strlen(lpath) + 2;
+        char *tmp = (char *)malloc(tmplen);
+        if (tmp == 0) return -1;
+        snprintf(tmp, tmplen, "%s/", lpath);
+        lpath = tmp;
+    }
+
+    fprintf(stderr, "pull: building file list...\n");
+    /* Recursively build the list of files to copy. */
+    if (remote_build_list(fd, &filelist, rpath, lpath)) {
+        return -1;
+    }
+
+#if 0
+    if (checktimestamps) {
+        for (ci = filelist; ci != 0; ci = ci->next) {
+            if (sync_start_readtime(fd, ci->dst)) {
+                return 1;
+            }
+        }
+        for (ci = filelist; ci != 0; ci = ci->next) {
+            unsigned int timestamp, mode, size;
+            if (sync_finish_readtime(fd, &timestamp, &mode, &size))
+                return 1;
+            if (size == ci->size) {
+                /* for links, we cannot update the atime/mtime */
+                if ((S_ISREG(ci->mode & mode) && timestamp == ci->time) ||
+                    (S_ISLNK(ci->mode & mode) && timestamp >= ci->time))
+                    ci->flag = 1;
+            }
+        }
+    }
+#endif
+    for (ci = filelist; ci != 0; ci = next) {
+        next = ci->next;
+        if (ci->flag == 0) {
+            fprintf(stderr, "pull: %s -> %s\n", ci->src, ci->dst);
+            if (sync_recv(fd, ci->src, ci->dst)) {
+                return 1;
+            }
+            pulled++;
+        } else {
+            skipped++;
+        }
+        free(ci);
+    }
+
+    fprintf(stderr, "%d file%s pulled. %d file%s skipped.\n",
+            pulled, (pulled == 1) ? "" : "s",
+            skipped, (skipped == 1) ? "" : "s");
+
+    return 0;
+}
+
+void
+adbhost::sync_ls_build_list_cb(unsigned mode, unsigned size, unsigned time,
+                      const char *name, void *cookie)
+{
+    sync_ls_build_list_cb_args *args = (sync_ls_build_list_cb_args *)cookie;
+    copyinfo *ci;
+
+    if (S_ISDIR(mode)) {
+        copyinfo **dirlist = args->dirlist;
+
+        /* Don't try recursing down "." or ".." */
+        if (name[0] == '.') {
+            if (name[1] == '\0') return;
+            if ((name[1] == '.') && (name[2] == '\0')) return;
+        }
+
+        ci = mkcopyinfo(args->rpath, args->lpath, name, 1);
+        ci->next = *dirlist;
+        *dirlist = ci;
+    } else if (S_ISREG(mode) || S_ISLNK(mode)) {
+        copyinfo **filelist = args->filelist;
+
+        ci = mkcopyinfo(args->rpath, args->lpath, name, 0);
+        ci->time = time;
+        ci->mode = mode;
+        ci->size = size;
+        ci->next = *filelist;
+        *filelist = ci;
+    } else {
+        fprintf(stderr, "skipping special file '%s'\n", name);
+    }
+}
+
+int adbhost::remote_build_list(int syncfd, copyinfo **filelist,
+                             const char *rpath, const char *lpath)
+{
+    copyinfo *dirlist = NULL;
+    sync_ls_build_list_cb_args args;
+
+    args.filelist = filelist;
+    args.dirlist = &dirlist;
+    args.rpath = rpath;
+    args.lpath = lpath;
+
+    /* Put the files/dirs in rpath on the lists. */
+    if (sync_ls(syncfd, rpath, //sync_ls_build_list_cb,
+		(void *)&args)) {
+        return 1;
+    }
+
+    /* Recurse into each directory we found. */
+    while (dirlist != NULL) {
+        copyinfo *next = dirlist->next;
+        if (remote_build_list(syncfd, filelist, dirlist->src, dirlist->dst)) {
+            return 1;
+        }
+        free(dirlist);
+        dirlist = next;
+    }
+
+    return 0;
+}
+
+int adbhost::sync_ls(int fd, const char *path, //sync_ls_cb func,
+	void *cookie)
+{
+    syncmsg msg;
+    char buf[257];
+    int len;
+
+    len = strlen(path);
+    if(len > 1024) goto fail;
+
+    msg.req.id = ID_LIST;
+    msg.req.namelen = htoll(len);
+
+    if(writex(fd, &msg.req, sizeof(msg.req)) ||
+       writex(fd, path, len)) {
+        goto fail;
+    }
+
+    for(;;) {
+        if(readx(fd, &msg.dent, sizeof(msg.dent))) break;
+        if(msg.dent.id == ID_DONE) return 0;
+        if(msg.dent.id != ID_DENT) break;
+
+        len = ltohl(msg.dent.namelen);
+        if(len > 256) break;
+
+        if(readx(fd, buf, len)) break;
+        buf[len] = 0;
+
+       // func
+		sync_ls_build_list_cb(ltohl(msg.dent.mode),
+             ltohl(msg.dent.size),
+             ltohl(msg.dent.time),
+             buf, cookie);
+    }
+
+fail:
+    adb_close(fd);
+    return -1;
+}
+
+int adbhost::write_data_file(int fd, const char *path, syncsendbuf *sbuf)
+{
+    int lfd, err = 0;
+
+    lfd = adb_open(path, O_RDONLY);
+    if(lfd < 0) {
+        fprintf(stderr,"cannot open '%s': %s\n", path, strerror(errno));
+        return -1;
+    }
+
+    sbuf->id = ID_DATA;
+    for(;;) {
+        int ret;
+
+        ret = adb_read(lfd, sbuf->data, SYNC_DATA_MAX);
+        if(!ret)
+            break;
+
+        if(ret < 0) {
+            if(errno == EINTR)
+                continue;
+            fprintf(stderr,"cannot read '%s': %s\n", path, strerror(errno));
+            break;
+        }
+
+        sbuf->size = htoll(ret);
+        if(writex(fd, sbuf, sizeof(unsigned) * 2 + ret)){
+            err = -1;
+            break;
+        }
+        total_bytes += ret;
+    }
+
+    adb_close(lfd);
+    return err;
+}
+
+int adbhost::write_data_buffer(int fd, char* file_buffer, int size, syncsendbuf *sbuf)
+{
+    int err = 0;
+    int total = 0;
+
+    sbuf->id = ID_DATA;
+    while (total < size) {
+        int count = size - total;
+        if (count > SYNC_DATA_MAX) {
+            count = SYNC_DATA_MAX;
+        }
+
+        memcpy(sbuf->data, &file_buffer[total], count);
+        sbuf->size = htoll(count);
+        if(writex(fd, sbuf, sizeof(unsigned) * 2 + count)){
+            err = -1;
+            break;
+        }
+        total += count;
+        total_bytes += count;
+    }
+
+    return err;
+}
+
+void adbhost::sync_quit(void)
+{
+ //  int len = strlen(destination) + 1;
+    syncmsg msg;
+
+    msg.req.id = ID_QUIT;
+    msg.req.namelen = 0;
+
+    writex(0, &msg.req, sizeof(msg.req));
+}
+
+int adbhost::readx(int fd, void *ptr, size_t len) {
+   apacket *p = get_apacket();
+
+	read_packet(&t, &p);
+
+	DEBUG("command [0x%x]", p->msg.command);
+
+	if (len < p->msg.data_length) {
+		ERROR("Buffer is not enough.");
+		return 0;
+	}
+	memcpy(ptr, p->data, p->msg.data_length);
+
+   put_apacket(p);
+   return 0;
+}
+
+int adbhost::writex(int fd, const void *ptr, size_t len){
+   apacket *p = get_apacket();
+   p->len = len;
+	memcpy(p->data, ptr, len);
+	enqueue_command(p);
+   put_apacket(p);
+   return 0;
+}
+int adbhost::local_build_list(copyinfo **filelist,
+                            const char *lpath, const char *rpath)
+{
+    DIR *d;
+    struct dirent *de;
+    struct stat st;
+    copyinfo *dirlist = 0;
+    copyinfo *ci, *next;
+
+//    fprintf(stderr,"local_build_list('%s','%s')\n", lpath, rpath);
+
+    d = opendir(lpath);
+    if(d == 0) {
+        fprintf(stderr,"cannot open '%s': %s\n", lpath, strerror(errno));
+        return -1;
+    }
+
+    while((de = readdir(d))) {
+        char stat_path[PATH_MAX];
+        char *name = de->d_name;
+
+        if(name[0] == '.') {
+            if(name[1] == 0) continue;
+            if((name[1] == '.') && (name[2] == 0)) continue;
+        }
+
+        /*
+         * We could use d_type if HAVE_DIRENT_D_TYPE is defined, but reiserfs
+         * always returns DT_UNKNOWN, so we just use stat() for all cases.
+         */
+        if (strlen(lpath) + strlen(de->d_name) + 1 > sizeof(stat_path))
+            continue;
+        strcpy(stat_path, lpath);
+        strcat(stat_path, de->d_name);
+        stat(stat_path, &st);
+
+        if (S_ISDIR(st.st_mode)) {
+            ci = mkcopyinfo(lpath, rpath, name, 1);
+            ci->next = dirlist;
+            dirlist = ci;
+        } else {
+            ci = mkcopyinfo(lpath, rpath, name, 0);
+            if(lstat(ci->src, &st)) {
+                closedir(d);
+                fprintf(stderr,"cannot stat '%s': %s\n", ci->src, strerror(errno));
+                return -1;
+            }
+            if(!S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) {
+                fprintf(stderr, "skipping special file '%s'\n", ci->src);
+                free(ci);
+            } else {
+                ci->time = st.st_mtime;
+                ci->mode = st.st_mode;
+                ci->size = st.st_size;
+                ci->next = *filelist;
+                *filelist = ci;
+            }
+        }
+    }
+
+    closedir(d);
+
+    for(ci = dirlist; ci != 0; ci = next) {
+        next = ci->next;
+        local_build_list(filelist, ci->src, ci->dst);
+        free(ci);
+    }
+
+    return 0;
+}
+
+copyinfo *adbhost::mkcopyinfo(const char *spath, const char *dpath,
+                     const char *name, int isdir)
+{
+    int slen = strlen(spath);
+    int dlen = strlen(dpath);
+    int nlen = strlen(name);
+    int ssize = slen + nlen + 2;
+    int dsize = dlen + nlen + 2;
+
+    copyinfo *ci = (copyinfo *)malloc(sizeof(copyinfo) + ssize + dsize);
+    if(ci == 0) {
+        fprintf(stderr,"out of memory\n");
+        abort();
+    }
+
+    ci->next = 0;
+    ci->time = 0;
+    ci->mode = 0;
+    ci->size = 0;
+    ci->flag = 0;
+    ci->src = (const char*)(ci + 1);
+    ci->dst = ci->src + ssize;
+    snprintf((char*) ci->src, ssize, isdir ? "%s%s/" : "%s%s", spath, name);
+    snprintf((char*) ci->dst, dsize, isdir ? "%s%s/" : "%s%s", dpath, name);
+
+//    fprintf(stderr,"mkcopyinfo('%s','%s')\n", ci->src, ci->dst);
+    return ci;
+}
+
+int adbhost::mkdirs(char *name)
+{
+    int ret;
+    char *x = name + 1;
+
+    for(;;) {
+        x = (char *)adb_dirstart(x);
+        if(x == 0) return 0;
+        *x = 0;
+        ret = adb_mkdir(name, 0775);
+        *x = OS_PATH_SEPARATOR;
+        if((ret < 0) && (errno != EEXIST)) {
+            return ret;
+        }
+        x++;
+    }
+    return 0;
+}
+
+
+int adbhost::sync_start_readtime(int fd, const char *path)
+{
+    syncmsg msg;
+    int len = strlen(path);
+
+    msg.req.id = ID_STAT;
+    msg.req.namelen = htoll(len);
+
+    if(writex(fd, &msg.req, sizeof(msg.req)) ||
+       writex(fd, path, len)) {
+        return -1;
+    }
+
+    return 0;
+}
+
+int adbhost::sync_finish_readtime(int fd, unsigned int *timestamp,
+                                unsigned int *mode, unsigned int *size)
+{
+    syncmsg msg;
+
+    if(readx(fd, &msg.stat, sizeof(msg.stat)))
+        return -1;
+
+    if(msg.stat.id != ID_STAT)
+        return -1;
+
+    *timestamp = ltohl(msg.stat.time);
+    *mode = ltohl(msg.stat.mode);
+    *size = ltohl(msg.stat.size);
+
+    return 0;
+}
+
+ void adbhost::BEGIN()
+{
+    total_bytes = 0;
+    start_time = now();
+}
+
+ void adbhost::END()
+{
+    long  t = now() - start_time;
+    if(total_bytes == 0) return;
+
+    if (t == 0)  /* prevent division by 0 :-) */
+        t = 1000000;
+
+    fprintf(stderr,"%lld KB/s (%d bytes in %lld.%03llds)\n",
+            ((((long ) total_bytes) * 1000000LL) / t) / 1024LL,
+            total_bytes, (t / 1000000LL), (t % 1000000LL) / 1000LL);
+}
+
 
 #if TRACE_PACKETS
 #define DUMPMAX 32
