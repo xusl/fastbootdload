@@ -67,6 +67,7 @@ class adbhost
 		bool handle_command_response (void);
 
 		int do_sync_pull(const char *rpath, const char *lpath);
+		int do_sync_push(const char *lpath, const char *rpath);
 		void sync_quit(void);
 
 		int sync_send(int fd, const char *lpath, const char *rpath,

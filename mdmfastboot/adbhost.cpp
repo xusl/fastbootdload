@@ -60,7 +60,7 @@ static void dump_packet( const char*  tag, apacket* const p)
    }
    //D("\n");
    buffer[nn] = '\0';
-   D("%s", buffer);
+   D("%s\n", buffer);
 
    fflush(stdout);
    free(buffer);
@@ -363,7 +363,20 @@ void adbhost::process() {
 
    //need close service now?
    //or do not need close , util connection close?
-   do_sync_pull("/build.prop", ".");
+   connect(&this->t);
+   // receive connect from remote
+   if (!handle_connect_response()) {
+      return;
+   }
+   do_sync_push("./ReadMe.txt", "/usr");
+    close_remote();
+
+   connect(&this->t);
+   // receive connect from remote
+   if (!handle_connect_response()) {
+      return;
+   }
+   do_sync_pull("/usr/ReadMe.txt", "..");
    // 5. close
    close_remote();
 }
@@ -432,6 +445,68 @@ int adbhost::do_sync_pull(const char *rpath, const char *lpath)
         fprintf(stderr,"remote object '%s' not a file or directory\n", rpath);
         return 1;
     }
+}
+
+
+int adbhost::do_sync_push(const char *lpath, const char *rpath)
+{
+    struct stat st;
+    unsigned mode;
+    int fd = 1;
+	int  tmplen;
+	char *tmp;
+
+    open_service("sync:");
+    if(!handle_open_response()) {
+        //fprintf(stderr,"error: %s\n", adb_error());
+        return 1;
+    }
+
+    if(stat(lpath, &st)) {
+        fprintf(stderr,"cannot stat local file '%s'\n", lpath);
+        sync_quit();
+        return 1;
+    }
+
+    if(S_ISDIR(st.st_mode)) {
+        BEGIN();
+        if(copy_local_dir_remote(fd, lpath, rpath, 0, 0)) {
+            return 1;
+        } else {
+            END();
+            sync_quit();
+        }
+    } else {
+        if(sync_readmode(fd, rpath, &mode)) {
+            return 1;
+        }
+        if((mode != 0) && S_ISDIR(mode)) {
+                /* if we're copying a local file to a remote directory,
+                ** we *really* want to copy to remotedir + "/" + localfilename
+                */
+            const char *name = adb_dirstop(lpath);
+            if(name == 0) {
+                name = lpath;
+            } else {
+                name++;
+            }
+            tmplen = strlen(name) + strlen(rpath) + 2;
+            tmp = (char *)malloc(strlen(name) + strlen(rpath) + 2);
+            if(tmp == 0) return 1;
+            snprintf(tmp, tmplen, "%s/%s", rpath, name);
+            rpath = tmp;
+        }
+        BEGIN();
+        if(sync_send(fd, lpath, rpath, st.st_mtime, st.st_mode)) {
+            return 1;
+        } else {
+            END();
+            sync_quit();
+            return 0;
+        }
+    }
+
+    return 0;
 }
 
 int adbhost::sync_send(int fd, const char *lpath, const char *rpath,
@@ -850,7 +925,7 @@ int adbhost::sync_ls(int fd, const char *path, //sync_ls_cb func,
         if(readx(fd, buf, len)) break;
         buf[len] = 0;
 
-       // func
+       // func TODO::
 		sync_ls_build_list_cb(ltohl(msg.dent.mode),
              ltohl(msg.dent.size),
              ltohl(msg.dent.time),
@@ -867,7 +942,7 @@ int adbhost::write_data_file(int fd, const char *path, syncsendbuf *sbuf)
     int err = 0;
 	FILE* lfd;
 
-    lfd = adb_open(path, O_RDONLY);
+    lfd = adb_open(path, "rb");
     if(lfd < 0) {
         fprintf(stderr,"cannot open '%s': %s\n", path, strerror(errno));
         return -1;
@@ -963,7 +1038,6 @@ int adbhost::readx(int fd, void *ptr, size_t len) {
    if (len > p->msg.data_length) {
       ERROR("ERROR");
       return 1;
-      //data = p->msg.data_length;
    }
    memcpy(ptr, p->data, len);
 
@@ -1061,24 +1135,22 @@ int adbhost::local_build_list(copyinfo **filelist,
 
 int adbhost::adb_read(FILE* fd, void *ptr, size_t len)
 {
-    char *p = (char *)ptr;
     int r;
 
-    D("readx: %d %p %d\n", fd, ptr, (int)len);
-    while(len > 0) {
-        r = fread(p, 1, len, fd);
-        if(r > 0) {
-            len -= r;
-            p += r;
-        } else {
-            D("readx: %d %d %s\n", fd, r, strerror(errno));
-            if((r < 0) && (errno == EINTR)) continue;
-            return -1;
-        }
+    if (feof(fd)) {
+        D("adb_read: reach end of file.\n", fd);
+        return 0;
     }
 
+    D("adb_read: %d %p %d\n", fd, ptr, (int)len);
+    r = fread(ptr, 1, len, fd);
 
-    return 0;
+    if(r < 0) {
+        D("adb_read: %d %d , errno :%s, ferror %d\n", fd, r, strerror(errno), ferror(fd));
+        return -1;
+    }
+
+    return r;
 }
 
 int adbhost::adb_write(FILE* fd, const void *ptr, size_t len)
@@ -1092,13 +1164,13 @@ int adbhost::adb_write(FILE* fd, const void *ptr, size_t len)
             len -= r;
             p += r;
         } else {
-            D("writex: %d %d %s\n", fd, r, strerror(errno));
+            D("adb_write: %d %d %s\n", fd, r, strerror(errno));
             if((r < 0) && (errno == EINTR)) continue;
             return -1;
         }
     }
 
-    D("writex: %d ok\n", fd);
+    D("adb_write: %d ok\n", fd);
     return 0;
 }
 
@@ -1106,9 +1178,9 @@ FILE* adbhost::adb_open(const char *path, const char *mode){
 	return fopen(path, mode);
 
 }
- FILE*  adbhost::adb_creat(const char*  path, int  mode)
+ FILE* adbhost::adb_creat(const char*  path, int  mode)
 {
- 	return  fopen(path, "w+");
+ 	return fopen(path, "w+");
 }
 
 int adbhost::adb_close(FILE* fd) {
