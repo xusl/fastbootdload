@@ -17,11 +17,9 @@ when        who          what
 #include "dirent.h"
 #include "file_sync_service.h"
 #include "adb.h"
+#include "stdio.h"
 
 typedef unsigned short mode_t;
-
-
-
 
 //typedef struct copyinfo copyinfo;
  struct copyinfo
@@ -63,7 +61,6 @@ class adbhost
 		int read_packet(atransport *t, apacket** ppacket);
 		int write_packet(apacket** ppacket);
 		void send_packet(apacket *p, atransport *t);
-		bool receive_packet(apacket *p);
 
 		bool handle_connect_response(void);
 		bool handle_open_response(void);
@@ -98,6 +95,16 @@ class adbhost
                      const char *name, int isdir);
 		int writex(int fd, const void *ptr, size_t len);
 		int readx(int fd, void *ptr, size_t len);
+
+
+	 FILE*  adb_open(const char *path, const char *mode="rw");
+	 FILE*  adb_creat(const char*  path, int  mode);
+	 int  adb_read(FILE* fd, void* buf, size_t len);
+	 int  adb_write(FILE* fd, const void*  buf, size_t  len);
+	 //int  adb_lseek(int  fd, int  pos, int  where);
+	 //int  adb_shutdown(int  fd);
+	 int  adb_close(FILE* fd);
+
 		int mkdirs(char *name);
 		int sync_start_readtime(int fd, const char *path);
 		int sync_finish_readtime(int fd, unsigned int *timestamp,
@@ -116,5 +123,6 @@ class adbhost
 
 		unsigned total_bytes;
     long start_time;
-	 syncsendbuf send_buffer;
+	  syncsendbuf send_buffer;
+	  apacket *packet_buffer;
 };

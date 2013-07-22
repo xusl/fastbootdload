@@ -37,28 +37,33 @@ static void dump_packet( const char*  tag, apacket* const p)
    D("%s:  [%08x %s] %08x %08x (%d) ",
      tag, command, cmd, p->msg.arg0, p->msg.arg1, len);
 
-   //char* buffer = (char*)malloc (len * sizeof(char) * 4);
 
-   //if (buffer == NULL)
-   //	return;
+   if (len2 > 128) len2 = 128;
+   char* buffer = (char*)malloc (len2 * sizeof(char) * 2 + 1);
 
-   //memset(buffer, 0, len * sizeof(char) * 4);
+   if (buffer == NULL)
+   	return;
+   memset(buffer, 0, len2 * sizeof(char) * 2 + 1);
 
-   //if (len2 > 16) len2 = 16;
 
    for (nn = 0; nn < len2; nn++)
-      D("%02x", ptr[nn]);
-   D("  \n");
+      snprintf(buffer+(nn<<1), 2, "%02x", ptr[nn]);
+   buffer[2*nn] = '\0';
+   D("%s  ", buffer);
 
    for (nn = 0; nn < len2; nn++) {
       int  c = ptr[nn];
       if (c < 32 || c > 127)
          c = '.';
-      D("%c", c);
+      //D("%c", c);
+	  snprintf(buffer+nn,1,"%c", c);
    }
-   D("\n");
+   //D("\n");
+   buffer[nn] = '\0';
+   D("%s", buffer);
+
    fflush(stdout);
-   //free(buffer);
+   free(buffer);
 }
 #endif
 
@@ -68,11 +73,14 @@ adbhost::adbhost(usb_handle *usb, unsigned address):
    //t = (atransport *)calloc(1, sizeof(atransport));
    memset(&this->t, 0 ,sizeof(atransport));
    init_usb_transport(&this->t, usb, CS_OFFLINE);
-
+   packet_buffer = NULL;
 }
 
 adbhost::~adbhost(void)
 {
+if (packet_buffer != NULL)
+   put_apacket(packet_buffer);
+
    kick_transport(&this->t);
    //    transport_unref(&this->t);
    if (this->t.product != NULL)
@@ -112,23 +120,6 @@ int adbhost::write_packet(apacket** ppacket)
 
    t.write_to_remote(*ppacket, &t);
    return 0;
-}
-
-bool adbhost::receive_packet(apacket *p)
-{
-   int i=0;
-   for(; ;){
-      if(read_packet(&t, &p)){
-         D("failed to read packet from usb\n");
-         if (i++ < 3)
-            sleep(1);
-         else
-            break;
-      } else {
-         return true;
-      }
-   }
-   return false;
 }
 
 void adbhost::send_packet(apacket *p, atransport *t)
@@ -202,19 +193,22 @@ int adbhost::enqueue_command(apacket *p)
 {
    D("Calling remote_socket_enqueue\n");
    p->msg.command = A_WRTE;
-   p->msg.arg0 = this->peer_id;
-   p->msg.arg1 = this->id;
+   p->msg.arg0 = this->id;
+   p->msg.arg1 = this->peer_id;
    p->msg.data_length = p->len;
    send_packet(p, &this->t);
    return 1;
 }
 
-void adbhost::notify_ready_to_remote()
+void adbhost::notify_ready_to_remote(void)
 {
    apacket *p = get_apacket();
+
+   //memset(p, 0, sizeof(apacket));
+
    p->msg.command = A_OKAY;
-   p->msg.arg0 = this->peer_id;
-   p->msg.arg1 = this->id;
+   p->msg.arg0 = this->id;
+   p->msg.arg1 = this->peer_id;
    D("Calling remote_socket_ready\n");
    send_packet(p, &this->t);
    put_apacket(p);
@@ -261,7 +255,8 @@ bool adbhost::handle_open_response (void) {
    if (p == NULL)
       return false;
 
-   receive_packet(p);
+//   receive_packet(p);
+   read_packet(&t, &p);
 
    if ( p->msg.command == A_CLSE) {
       close_remote();
@@ -276,6 +271,7 @@ bool adbhost::handle_open_response (void) {
       } else {
          this->peer_id = p->msg.arg0;
       }
+	   //notify_ready_to_remote(p);
    }
    put_apacket(p);
    return result;
@@ -287,7 +283,8 @@ bool adbhost::handle_connect_response(void)
    apacket *p = get_apacket();
    char * banner;
 
-   receive_packet(p);
+//   receive_packet(p);
+   read_packet(&t, &p);
 
    if (p == NULL || p->msg.command != A_CNXN)
       return false;
@@ -330,8 +327,8 @@ bool adbhost::handle_connect_response(void)
       t.connection_state = CS_RECOVERY;
    }
 
+
    put_apacket( p);
-   //	notify_ready_to_remote();
 
    return true;
 }
@@ -363,8 +360,6 @@ void adbhost::process() {
 //need close service now?
 //or do not need close , util connection close?
 do_sync_pull("/build.prop", ".");
-
-
    // 5. close
    close_remote();
 }
@@ -499,7 +494,7 @@ int adbhost::sync_send(int fd, const char *lpath, const char *rpath,
 
 fail:
     fprintf(stderr,"protocol failure\n");
-    adb_close(fd);
+//    adb_close(fd);
     return -1;
 }
 
@@ -508,7 +503,7 @@ int adbhost::sync_recv(int fd, const char *rpath, const char *lpath)
 {
     syncmsg msg;
     int len;
-    int lfd = -1;
+    FILE* lfd = NULL;
     char *buffer = send_buffer.data;
     unsigned id;
 
@@ -561,7 +556,7 @@ int adbhost::sync_recv(int fd, const char *rpath, const char *lpath)
             return -1;
         }
 
-        if(writex(lfd, buffer, len)) {
+        if(adb_write(lfd, buffer, len)) {
             fprintf(stderr,"cannot write '%s': %s\n", rpath, strerror(errno));
             adb_close(lfd);
             return -1;
@@ -860,13 +855,14 @@ int adbhost::sync_ls(int fd, const char *path, //sync_ls_cb func,
     }
 
 fail:
-    adb_close(fd);
+//    adb_close(fd);
     return -1;
 }
 
 int adbhost::write_data_file(int fd, const char *path, syncsendbuf *sbuf)
 {
-    int lfd, err = 0;
+    int err = 0;
+	FILE* lfd;
 
     lfd = adb_open(path, O_RDONLY);
     if(lfd < 0) {
@@ -928,7 +924,6 @@ int adbhost::write_data_buffer(int fd, char* file_buffer, int size, syncsendbuf 
 
 void adbhost::sync_quit(void)
 {
- //  int len = strlen(destination) + 1;
     syncmsg msg;
 
     msg.req.id = ID_QUIT;
@@ -938,17 +933,44 @@ void adbhost::sync_quit(void)
 }
 
 int adbhost::readx(int fd, void *ptr, size_t len) {
-   apacket *p = get_apacket();
+   apacket *p = NULL;
 
-	read_packet(&t, &p);
+   if (packet_buffer == NULL)
+   	{
+   	p = get_apacket();
+   for (;;)
+   	{
+      read_packet(&t, &p);
 
-	DEBUG("command [0x%x]", p->msg.command);
+      if (p->msg.command == A_OKAY) {
+         memset(p, 0, sizeof(apacket));
+      } else if (p->msg.command == A_WRTE) {
+	   notify_ready_to_remote();
+	   break;
+      } else {
+      ERROR("COMMAND ERROR");
+	  return 1;
+      	}
+   }
+   } else {
+    p = packet_buffer;
+	packet_buffer = NULL;
+   	}
 
-	if (len < p->msg.data_length) {
-		ERROR("Buffer is not enough.");
-		return 0;
-	}
-	memcpy(ptr, p->data, p->msg.data_length);
+         if (len > p->msg.data_length) {
+            ERROR("ERROR");
+			return 1;
+			//data = p->msg.data_length;
+         }
+         memcpy(ptr, p->data, len);
+
+		 if (len < p->msg.data_length)
+		 {
+		 packet_buffer = get_apacket();
+		 packet_buffer->msg.command = p->msg.command;
+		 packet_buffer->msg.data_length = p->msg.data_length - len;
+		 memcpy(packet_buffer->data, p->data + len, packet_buffer->msg.data_length);
+		 }
 
    put_apacket(p);
    return 0;
@@ -1031,6 +1053,63 @@ int adbhost::local_build_list(copyinfo **filelist,
     }
 
     return 0;
+}
+
+
+int adbhost::adb_read(FILE* fd, void *ptr, size_t len)
+{
+    char *p = (char *)ptr;
+    int r;
+
+    D("readx: %d %p %d\n", fd, ptr, (int)len);
+    while(len > 0) {
+        r = fread(p, 1, len, fd);
+        if(r > 0) {
+            len -= r;
+            p += r;
+        } else {
+            D("readx: %d %d %s\n", fd, r, strerror(errno));
+            if((r < 0) && (errno == EINTR)) continue;
+            return -1;
+        }
+    }
+
+
+    return 0;
+}
+
+int adbhost::adb_write(FILE* fd, const void *ptr, size_t len)
+{
+    char *p = (char*) ptr;
+    int r;
+
+    while(len > 0) {
+        r = fwrite(p, 1, len, fd);
+        if(r > 0) {
+            len -= r;
+            p += r;
+        } else {
+            D("writex: %d %d %s\n", fd, r, strerror(errno));
+            if((r < 0) && (errno == EINTR)) continue;
+            return -1;
+        }
+    }
+
+    D("writex: %d ok\n", fd);
+    return 0;
+}
+
+FILE* adbhost::adb_open(const char *path, const char *mode){
+	return fopen(path, mode);
+
+}
+ FILE*  adbhost::adb_creat(const char*  path, int  mode)
+{
+ 	return  fopen(path, "w+");
+}
+
+int adbhost::adb_close(FILE* fd) {
+	return fclose(fd);
 }
 
 copyinfo *adbhost::mkcopyinfo(const char *spath, const char *dpath,
