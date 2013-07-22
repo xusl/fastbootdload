@@ -87,9 +87,9 @@ if (packet_buffer != NULL)
       free(this->t.product);
 }
 
-int adbhost::read_packet(atransport *t, apacket** ppacket)
+int adbhost::read_packet( apacket** ppacket)
 {
-   if(t->read_from_remote(*ppacket, t) == 0){
+   if(t.read_from_remote(*ppacket, &t) == 0){
       D("from_remote: received remote packet, sending to transport %p\n",
         t);
    } else {
@@ -220,12 +220,24 @@ void adbhost::close_remote(void)
 
    p->msg.command = A_CLSE;
    p->msg.arg1 = this->id;
-   D("Calling remote_socket_close\n");
    send_packet(p, &this->t);
    D("RS(%d): closed\n", this->id);
 
    // remove_transport_disconnect( s->transport, &((aremotesocket*)s)->disconnect );
    // free(s);
+	for (;;)
+   	{
+      read_packet(&p);
+
+      if (p->msg.command == A_OKAY) {
+         memset(p, 0, sizeof(apacket));
+      } else if (p->msg.command == A_CLSE) {
+		break;
+      } else {
+      ERROR("COMMAND ERROR");
+      }
+   }
+
    put_apacket(p);
 }
 
@@ -237,7 +249,7 @@ bool adbhost::handle_command_response (void) {
    for (;;) {
       memset(p, 0, sizeof(apacket));
       p->msg.data_length = MAX_PAYLOAD;
-      if(read_packet(&t, &p)){
+      if(read_packet(&p)){
       } else {
          break;
       }
@@ -256,7 +268,7 @@ bool adbhost::handle_open_response (void) {
       return false;
 
 //   receive_packet(p);
-   read_packet(&t, &p);
+   read_packet(&p);
 
    if ( p->msg.command == A_CLSE) {
       close_remote();
@@ -284,7 +296,7 @@ bool adbhost::handle_connect_response(void)
    char * banner;
 
 //   receive_packet(p);
-   read_packet(&t, &p);
+   read_packet(&p);
 
    if (p == NULL || p->msg.command != A_CNXN)
       return false;
@@ -940,7 +952,7 @@ int adbhost::readx(int fd, void *ptr, size_t len) {
    	p = get_apacket();
    for (;;)
    	{
-      read_packet(&t, &p);
+      read_packet(&p);
 
       if (p->msg.command == A_OKAY) {
          memset(p, 0, sizeof(apacket));

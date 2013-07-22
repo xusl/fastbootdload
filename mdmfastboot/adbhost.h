@@ -58,7 +58,7 @@ class adbhost
 		void open_service(const char *destination);
 		void connect(atransport *t);
 
-		int read_packet(atransport *t, apacket** ppacket);
+		int read_packet(apacket** ppacket);
 		int write_packet(apacket** ppacket);
 		void send_packet(apacket *p, atransport *t);
 
