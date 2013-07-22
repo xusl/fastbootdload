@@ -78,8 +78,8 @@ adbhost::adbhost(usb_handle *usb, unsigned address):
 
 adbhost::~adbhost(void)
 {
-if (packet_buffer != NULL)
-   put_apacket(packet_buffer);
+   if (packet_buffer != NULL)
+      put_apacket(packet_buffer);
 
    kick_transport(&this->t);
    //    transport_unref(&this->t);
@@ -181,7 +181,7 @@ void adbhost::open_service(const char *destination)
 
    D("LS(%d): connect('%s')\n", id, destination);
    p->msg.command = A_OPEN;
-   p->msg.arg0 = this->id;//s->id;
+   p->msg.arg0 = this->id;
    p->msg.data_length = len;
    strcpy((char*) p->data, destination);
    send_packet(p, &this->t);
@@ -204,8 +204,6 @@ void adbhost::notify_ready_to_remote(void)
 {
    apacket *p = get_apacket();
 
-   //memset(p, 0, sizeof(apacket));
-
    p->msg.command = A_OKAY;
    p->msg.arg0 = this->id;
    p->msg.arg1 = this->peer_id;
@@ -223,18 +221,15 @@ void adbhost::close_remote(void)
    send_packet(p, &this->t);
    D("RS(%d): closed\n", this->id);
 
-   // remove_transport_disconnect( s->transport, &((aremotesocket*)s)->disconnect );
-   // free(s);
-	for (;;)
-   	{
+   for (;;) {
       read_packet(&p);
 
       if (p->msg.command == A_OKAY) {
          memset(p, 0, sizeof(apacket));
       } else if (p->msg.command == A_CLSE) {
-		break;
+         break;
       } else {
-      ERROR("COMMAND ERROR");
+         ERROR("COMMAND ERROR");
       }
    }
 
@@ -267,7 +262,6 @@ bool adbhost::handle_open_response (void) {
    if (p == NULL)
       return false;
 
-//   receive_packet(p);
    read_packet(&p);
 
    if ( p->msg.command == A_CLSE) {
@@ -283,7 +277,6 @@ bool adbhost::handle_open_response (void) {
       } else {
          this->peer_id = p->msg.arg0;
       }
-	   //notify_ready_to_remote(p);
    }
    put_apacket(p);
    return result;
@@ -295,7 +288,6 @@ bool adbhost::handle_connect_response(void)
    apacket *p = get_apacket();
    char * banner;
 
-//   receive_packet(p);
    read_packet(&p);
 
    if (p == NULL || p->msg.command != A_CNXN)
@@ -369,9 +361,9 @@ void adbhost::process() {
 #endif
    // 4. do write what we want to do.
 
-//need close service now?
-//or do not need close , util connection close?
-do_sync_pull("/build.prop", ".");
+   //need close service now?
+   //or do not need close , util connection close?
+   do_sync_pull("/build.prop", ".");
    // 5. close
    close_remote();
 }
@@ -506,7 +498,6 @@ int adbhost::sync_send(int fd, const char *lpath, const char *rpath,
 
 fail:
     fprintf(stderr,"protocol failure\n");
-//    adb_close(fd);
     return -1;
 }
 
@@ -948,41 +939,41 @@ int adbhost::readx(int fd, void *ptr, size_t len) {
    apacket *p = NULL;
 
    if (packet_buffer == NULL)
-   	{
-   	p = get_apacket();
-   for (;;)
-   	{
-      read_packet(&p);
+   {
+      p = get_apacket();
+      for (;;)
+      {
+         read_packet(&p);
 
-      if (p->msg.command == A_OKAY) {
-         memset(p, 0, sizeof(apacket));
-      } else if (p->msg.command == A_WRTE) {
-	   notify_ready_to_remote();
-	   break;
-      } else {
-      ERROR("COMMAND ERROR");
-	  return 1;
-      	}
-   }
-   } else {
-    p = packet_buffer;
-	packet_buffer = NULL;
-   	}
-
-         if (len > p->msg.data_length) {
-            ERROR("ERROR");
-			return 1;
-			//data = p->msg.data_length;
+         if (p->msg.command == A_OKAY) {
+            memset(p, 0, sizeof(apacket));
+         } else if (p->msg.command == A_WRTE) {
+            notify_ready_to_remote();
+            break;
+         } else {
+            ERROR("COMMAND ERROR");
+            return 1;
          }
-         memcpy(ptr, p->data, len);
+      }
+   } else {
+      p = packet_buffer;
+      packet_buffer = NULL;
+   }
 
-		 if (len < p->msg.data_length)
-		 {
-		 packet_buffer = get_apacket();
-		 packet_buffer->msg.command = p->msg.command;
-		 packet_buffer->msg.data_length = p->msg.data_length - len;
-		 memcpy(packet_buffer->data, p->data + len, packet_buffer->msg.data_length);
-		 }
+   if (len > p->msg.data_length) {
+      ERROR("ERROR");
+      return 1;
+      //data = p->msg.data_length;
+   }
+   memcpy(ptr, p->data, len);
+
+   if (len < p->msg.data_length)
+   {
+      packet_buffer = get_apacket();
+      packet_buffer->msg.command = p->msg.command;
+      packet_buffer->msg.data_length = p->msg.data_length - len;
+      memcpy(packet_buffer->data, p->data + len, packet_buffer->msg.data_length);
+   }
 
    put_apacket(p);
    return 0;
@@ -991,80 +982,80 @@ int adbhost::readx(int fd, void *ptr, size_t len) {
 int adbhost::writex(int fd, const void *ptr, size_t len){
    apacket *p = get_apacket();
    p->len = len;
-	memcpy(p->data, ptr, len);
-	enqueue_command(p);
+   memcpy(p->data, ptr, len);
+   enqueue_command(p);
    put_apacket(p);
    return 0;
 }
 int adbhost::local_build_list(copyinfo **filelist,
                             const char *lpath, const char *rpath)
 {
-    DIR *d;
-    struct dirent *de;
-    struct stat st;
-    copyinfo *dirlist = 0;
-    copyinfo *ci, *next;
+   DIR *d;
+   struct dirent *de;
+   struct stat st;
+   copyinfo *dirlist = 0;
+   copyinfo *ci, *next;
 
-//    fprintf(stderr,"local_build_list('%s','%s')\n", lpath, rpath);
+   //    fprintf(stderr,"local_build_list('%s','%s')\n", lpath, rpath);
 
-    d = opendir(lpath);
-    if(d == 0) {
-        fprintf(stderr,"cannot open '%s': %s\n", lpath, strerror(errno));
-        return -1;
-    }
+   d = opendir(lpath);
+   if(d == 0) {
+      fprintf(stderr,"cannot open '%s': %s\n", lpath, strerror(errno));
+      return -1;
+   }
 
-    while((de = readdir(d))) {
-        char stat_path[PATH_MAX];
-        char *name = de->d_name;
+   while((de = readdir(d))) {
+      char stat_path[PATH_MAX];
+      char *name = de->d_name;
 
-        if(name[0] == '.') {
-            if(name[1] == 0) continue;
-            if((name[1] == '.') && (name[2] == 0)) continue;
-        }
+      if(name[0] == '.') {
+         if(name[1] == 0) continue;
+         if((name[1] == '.') && (name[2] == 0)) continue;
+      }
 
-        /*
-         * We could use d_type if HAVE_DIRENT_D_TYPE is defined, but reiserfs
-         * always returns DT_UNKNOWN, so we just use stat() for all cases.
-         */
-        if (strlen(lpath) + strlen(de->d_name) + 1 > sizeof(stat_path))
-            continue;
-        strcpy(stat_path, lpath);
-        strcat(stat_path, de->d_name);
-        stat(stat_path, &st);
+      /*
+       * We could use d_type if HAVE_DIRENT_D_TYPE is defined, but reiserfs
+       * always returns DT_UNKNOWN, so we just use stat() for all cases.
+       */
+      if (strlen(lpath) + strlen(de->d_name) + 1 > sizeof(stat_path))
+         continue;
+      strcpy(stat_path, lpath);
+      strcat(stat_path, de->d_name);
+      stat(stat_path, &st);
 
-        if (S_ISDIR(st.st_mode)) {
-            ci = mkcopyinfo(lpath, rpath, name, 1);
-            ci->next = dirlist;
-            dirlist = ci;
-        } else {
-            ci = mkcopyinfo(lpath, rpath, name, 0);
-            if(lstat(ci->src, &st)) {
-                closedir(d);
-                fprintf(stderr,"cannot stat '%s': %s\n", ci->src, strerror(errno));
-                return -1;
-            }
-            if(!S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) {
-                fprintf(stderr, "skipping special file '%s'\n", ci->src);
-                free(ci);
-            } else {
-                ci->time = st.st_mtime;
-                ci->mode = st.st_mode;
-                ci->size = st.st_size;
-                ci->next = *filelist;
-                *filelist = ci;
-            }
-        }
-    }
+      if (S_ISDIR(st.st_mode)) {
+         ci = mkcopyinfo(lpath, rpath, name, 1);
+         ci->next = dirlist;
+         dirlist = ci;
+      } else {
+         ci = mkcopyinfo(lpath, rpath, name, 0);
+         if(lstat(ci->src, &st)) {
+            closedir(d);
+            fprintf(stderr,"cannot stat '%s': %s\n", ci->src, strerror(errno));
+            return -1;
+         }
+         if(!S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) {
+            fprintf(stderr, "skipping special file '%s'\n", ci->src);
+            free(ci);
+         } else {
+            ci->time = st.st_mtime;
+            ci->mode = st.st_mode;
+            ci->size = st.st_size;
+            ci->next = *filelist;
+            *filelist = ci;
+         }
+      }
+   }
 
-    closedir(d);
+   closedir(d);
 
-    for(ci = dirlist; ci != 0; ci = next) {
-        next = ci->next;
-        local_build_list(filelist, ci->src, ci->dst);
-        free(ci);
-    }
+   for(ci = dirlist; ci != 0; ci = next) {
+      next = ci->next;
+      local_build_list(filelist, ci->src, ci->dst);
+      free(ci);
+   }
 
-    return 0;
+   return 0;
 }
 
 
