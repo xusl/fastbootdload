@@ -64,7 +64,7 @@ class adbhost
 
 		bool handle_connect_response(void);
 		bool handle_open_response(void);
-		bool handle_command_response (void);
+		bool handle_shell_response (void);
 
 		int do_sync_pull(const char *rpath, const char *lpath);
 		int do_sync_push(const char *lpath, const char *rpath);

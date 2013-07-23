@@ -229,27 +229,36 @@ void adbhost::close_remote(void)
       } else if (p->msg.command == A_CLSE) {
          break;
       } else {
-         ERROR("COMMAND ERROR");
+         ERROR("COMMAND ERROR 0x%x", p->msg.command);
       }
    }
 
    put_apacket(p);
 }
 
-bool adbhost::handle_command_response (void) {
+bool adbhost::handle_shell_response (void) {
    apacket *p = get_apacket();
    if (p == NULL)
       return false;
 
-   for (;;) {
+     for (;;)
+      {
       memset(p, 0, sizeof(apacket));
-      p->msg.data_length = MAX_PAYLOAD;
-      if(read_packet(&p)){
-      } else {
-         break;
-      }
+         read_packet(&p);
 
-   }
+         if (p->msg.command == A_OKAY) {
+
+         } else if (p->msg.command == A_WRTE) {
+            D("shell return:: %s", p->data);
+            notify_ready_to_remote();
+           // break;
+         } else if (p->msg.command == A_CLSE) {
+            ERROR("shell return close ");
+            notify_ready_to_remote();
+            break;
+         }
+
+      }
 
    put_apacket(p);
    return true;
@@ -349,17 +358,18 @@ void adbhost::process() {
       return;
    }
 
-#if 0
    // 3. if we receive connect message from remote, do open
-   open_service("shell:cat build.prop");
+   open_service("shell:ls /");//("shell:cat build.prop");
    //todo:: we should receive : OKAY(send_ready), mean success,
    //                    or CLOSE(send_ready), which means failure.
    if (!handle_open_response()) {
       return;
    }
-   handle_command_response();
-#endif
    // 4. do write what we want to do.
+   handle_shell_response();
+    // 5. close
+   //close_remote();
+
 
    //need close service now?
    //or do not need close , util connection close?
