@@ -42,10 +42,10 @@ UINT fbeventServerThread(LPVOID pParam) {
 //	 adb_trace_init();
     adb_sysdeps_init();
 
-	adb_set_transport(kTransportUsb, NULL);
-    adb_set_tcp_specifics(DEFAULT_ADB_PORT);
+	//adb_set_transport(kTransportUsb, NULL);
+    //adb_set_tcp_specifics(DEFAULT_ADB_PORT);
 
-	 init_transport_registration(); // INIT fbevent.
+	// init_transport_registration(); // INIT fbevent.
 	//adb_main(is_daemon, server_port);
 
 	usb_vendors_init();

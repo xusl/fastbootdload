@@ -193,19 +193,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\adb\adb.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\adb\adb_client.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\adbhost.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\adb\commandline.cpp"
 				>
 			</File>
 			<File
@@ -226,14 +214,6 @@
 			</File>
 			<File
 				RelativePath=".\PortStateUI.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\adb\services.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\adb\sockets.cpp"
 				>
 			</File>
 			<File
@@ -262,10 +242,6 @@
 			</File>
 			<File
 				RelativePath=".\adb\transport.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\adb\transport_local.cpp"
 				>
 			</File>
 			<File

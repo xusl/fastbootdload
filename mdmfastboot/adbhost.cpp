@@ -1299,6 +1299,18 @@ int adbhost::sync_finish_readtime(int fd, unsigned int *timestamp,
             total_bytes, (t / 1000000LL), (t % 1000000LL) / 1000LL);
 }
 
+apacket *get_apacket(void)
+{
+    apacket *p = (apacket *)malloc(sizeof(apacket));
+    if(p == 0) fatal("failed to allocate an apacket");
+    memset(p, 0, sizeof(apacket) - MAX_PAYLOAD);
+    return p;
+}
+
+void put_apacket(apacket *p)
+{
+    free(p);
+}
 
 #if TRACE_PACKETS
 #define DUMPMAX 32

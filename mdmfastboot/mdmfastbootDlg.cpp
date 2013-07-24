@@ -15,6 +15,12 @@
 #pragma	 comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")
 
+static const GUID usb_class_id[] = {
+	//ANDROID_USB_CLASS_ID, adb and fastboot
+	{0xf72fe0d4, 0xcbcb, 0x407d, {0x88, 0x14, 0x9e, 0xd6, 0x73, 0xd0, 0xdd, 0x6b}},
+	//usb A5DCBF10-6530-11D2-901F-00C04FB951ED  GUID_DEVINTERFACE_USB_DEVICE
+	//{0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED}},
+};
 
 extern UINT do_nothing(void);
 
@@ -191,12 +197,7 @@ HCURSOR CmdmfastbootDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-static const GUID usb_class_id[] = {
-	//ANDROID_USB_CLASS_ID, adb and fastboot
-	{0xf72fe0d4, 0xcbcb, 0x407d, {0x88, 0x14, 0x9e, 0xd6, 0x73, 0xd0, 0xdd, 0x6b}},
-	//usb A5DCBF10-6530-11D2-901F-00C04FB951ED  GUID_DEVINTERFACE_USB_DEVICE
-	//{0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED}},
-};
+
 
 BOOL CmdmfastbootDlg::RegisterAdbDeviceNotification(void) {
    //注册插拔事件
@@ -223,24 +224,22 @@ BOOL CmdmfastbootDlg::RegisterAdbDeviceNotification(void) {
 
 BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 {
-	//DEBUG( "OnDeviceChange, EventType: 0x%x", nEventType);
-	if (dwData == 0)
-	{
-		return FALSE;
-	}
+   if (dwData == 0)
+   {
+      WARN("OnDeviceChange, dwData == 0");
+      return FALSE;
+   }
 
-	BOOL bSrchDevice = FALSE;
-	DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
-	//unsigned short devtype = DEVTYPE_NONE;
-//	uint16 devevt  = DEVEVT_UNKNOWN;
+   BOOL bSrchDevice = FALSE;
+   DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
 
-	DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
-		nEventType, phdr->dbch_devicetype);
+   DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
+         nEventType, phdr->dbch_devicetype);
 
-	if (nEventType == DBT_DEVICEARRIVAL)
-	{
-		//devevt = DEVEVT_ARRIVAL;
-		switch( phdr->dbch_devicetype )
+   if (nEventType == DBT_DEVICEARRIVAL)
+   {
+      //devevt = DEVEVT_ARRIVAL;
+      switch( phdr->dbch_devicetype )
       {
       case DBT_DEVTYP_VOLUME:
          {
@@ -258,41 +257,40 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       case DBT_DEVTYP_DEVICEINTERFACE:
          {
             PDEV_BROADCAST_DEVICEINTERFACE pDevInf =
-				(PDEV_BROADCAST_DEVICEINTERFACE)phdr;
+               (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
             UpdateDevice(pDevInf, dwData);
-			find_devices();
-			do_nothing();
-
+            find_devices();
+            do_nothing();
             break;
          }
       }
-	}
-	else if (nEventType == DBT_DEVICEREMOVECOMPLETE)
-	{
-//		devevt = DEVEVT_REMOVECOMPLETE;
-		if (phdr->dbch_devicetype == DBT_DEVTYP_PORT)
-		{
-			/* enumerate device and check if the port
-			* composite should be removed
-			*/
+   }
+   else if (nEventType == DBT_DEVICEREMOVECOMPLETE)
+   {
+      //		devevt = DEVEVT_REMOVECOMPLETE;
+      if (phdr->dbch_devicetype == DBT_DEVTYP_PORT)
+      {
+         /* enumerate device and check if the port
+          * composite should be removed
+          */
 
-		}
-	}
-	else
-	{
+      }
+   }
+   else
+   {
 
-	}
+   }
 
-//	if (bSrchDevice)
-	{
-		/* Launch a thread to search for devices, pass in
-		 * device type to be searched.
-		*/
-//		uint32 wParam = ((devevt & 0xFFFF) << 16) | (devtype & 0xFFFF);
-//		AfxBeginThread(SrchDevThread, (void*)wParam);
-	}
+   //	if (bSrchDevice)
+   {
+      /* Launch a thread to search for devices, pass in
+       * device type to be searched.
+       */
+      //		uint32 wParam = ((devevt & 0xFFFF) << 16) | (devtype & 0xFFFF);
+      //		AfxBeginThread(SrchDevThread, (void*)wParam);
+   }
 
-	return TRUE;
+   return TRUE;
 }
 
 void CmdmfastbootDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
@@ -346,26 +344,27 @@ void CmdmfastbootDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARA
       {
          // device found
          if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
-                                               SPDRP_LOCATION_INFORMATION, &DataT, (PBYTE)buf, sizeof(buf), &nSize) ) {
-			DEBUG("LOCATEION %S(datatype %d)", buf,DataT);
+                                               SPDRP_LOCATION_INFORMATION,
+                                               &DataT, (PBYTE)buf, sizeof(buf), &nSize) ) {
+            DEBUG("LOCATEION %S(datatype %d)", buf,DataT);
             // do nothing
          }
-		 if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
-                                                      SPDRP_ADDRESS, &DataT, (PBYTE)buf, sizeof(buf), &nSize) ) {
-			DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
-            // do nothing
+         if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
+                                               SPDRP_ADDRESS, &DataT,
+                                               (PBYTE)buf, sizeof(buf), &nSize) ) {
+            DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
+
          }
-		 if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
-                                                      SPDRP_BUSNUMBER, &DataT, (PBYTE)buf, sizeof(buf), &nSize) ) {
-			DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
-            // do nothing
+         if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
+                                               SPDRP_BUSNUMBER, &DataT,
+                                               (PBYTE)buf, sizeof(buf), &nSize) ) {
+            DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
+
          }
-				 else {
+         else {
             lstrcpy(buf, _T("Unknown"));
          }
          // update UI
-         // .....
-         // .....
          break;
       }
    }
@@ -377,50 +376,49 @@ void CmdmfastbootDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARA
    SetupDiDestroyDeviceInfoList(hDevInfo);
 }
 
-void SetupDiGetInterfaceDeviceDetail(HDEVINFO hDevInfoSet)
-	{
-	//HDEVINFO hDevInfoSet;
-	BOOL bResult;
-	PSP_DEVICE_INTERFACE_DETAIL_DATA   pDetail   =NULL;
-	SP_DEVICE_INTERFACE_DATA   ifdata;
-	char ch[MAX_PATH];
-	int i;
-	ULONG predictedLength = 0;
-	ULONG requiredLength = 0;
+void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet)
+{
+   BOOL bResult;
+   PSP_DEVICE_INTERFACE_DETAIL_DATA   pDetail   =NULL;
+   SP_DEVICE_INTERFACE_DATA   ifdata;
+   char ch[MAX_PATH];
+   int i;
+   ULONG predictedLength = 0;
+   ULONG requiredLength = 0;
 
-	 ifdata.cbSize = sizeof(ifdata);
+   ifdata.cbSize = sizeof(ifdata);
 
-	//   取得该设备接口的细节(设备路径)
-	bResult = SetupDiGetInterfaceDeviceDetail(
-	    hDevInfoSet,   /*设备信息集句柄*/
-	    &ifdata,   /*设备接口信息*/
-	    NULL,   /*设备接口细节(设备路径)*/
-	    0,   /*输出缓冲区大小*/
-	    &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
-	    NULL);   /*不需额外的设备描述*/
-	/*   取得该设备接口的细节(设备路径)*/
-	predictedLength=requiredLength;
+   //   取得该设备接口的细节(设备路径)
+   bResult = SetupDiGetInterfaceDeviceDetail(
+                                             hDevInfoSet,   /*设备信息集句柄*/
+                                             &ifdata,   /*设备接口信息*/
+                                             NULL,   /*设备接口细节(设备路径)*/
+                                             0,   /*输出缓冲区大小*/
+                                             &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
+                                             NULL);   /*不需额外的设备描述*/
+   /*   取得该设备接口的细节(设备路径)*/
+   predictedLength=requiredLength;
 
-	pDetail = (PSP_INTERFACE_DEVICE_DETAIL_DATA)GlobalAlloc(LMEM_ZEROINIT,   predictedLength);
-	pDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
-	bResult = SetupDiGetInterfaceDeviceDetail(
-	    hDevInfoSet,   /*设备信息集句柄*/
-	    &ifdata,   /*设备接口信息*/
-	    pDetail,   /*设备接口细节(设备路径)*/
-	    predictedLength,   /*输出缓冲区大小*/
-	    &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
-	    NULL);   /*不需额外的设备描述*/
+   pDetail = (PSP_INTERFACE_DEVICE_DETAIL_DATA)GlobalAlloc(LMEM_ZEROINIT,   predictedLength);
+   pDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+   bResult = SetupDiGetInterfaceDeviceDetail(
+                                             hDevInfoSet,   /*设备信息集句柄*/
+                                             &ifdata,   /*设备接口信息*/
+                                             pDetail,   /*设备接口细节(设备路径)*/
+                                             predictedLength,   /*输出缓冲区大小*/
+                                             &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
+                                             NULL);   /*不需额外的设备描述*/
 
-	if(bResult)
-	{
-	    memset(ch, 0, MAX_PATH);
-	    /*复制设备路径到输出缓冲区*/
-	    for(i=0; i<requiredLength; i++)
-	    {
-	        ch[i]=*(pDetail->DevicePath+8+i);
-	    }
-	    printf("%s\r\n", ch);
-	}
+   if(bResult)
+   {
+      memset(ch, 0, MAX_PATH);
+      /*复制设备路径到输出缓冲区*/
+      for(i=0; i<requiredLength; i++)
+      {
+         ch[i]=*(pDetail->DevicePath+8+i);
+      }
+      printf("%s\r\n", ch);
+   }
 }
 
 void CmdmfastbootDlg::OnBnClickedButtonStop()
