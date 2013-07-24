@@ -92,7 +92,7 @@ run_transport_disconnects(atransport*  t)
         dis = next;
     }
 }
-
+#if 0
 static int
 read_packet(int  fd, apacket** ppacket)
 {
@@ -179,7 +179,7 @@ write_packet(int  fd, apacket** ppacket)
     return 0;
 }
 
-#if 0
+
 static void transport_socket_events(int fd, unsigned events, void *_t)
 {
     if(events & FDE_READ){
@@ -191,7 +191,7 @@ static void transport_socket_events(int fd, unsigned events, void *_t)
         }
     }
 }
-#endif
+
 
 void send_packet(apacket *p, atransport *t)
 {
@@ -220,7 +220,7 @@ void send_packet(apacket *p, atransport *t)
         fatal_errno("cannot enqueue packet on transport socket");
     }
 }
-#if 0
+
 /* The transport is opened by transport_register_func before
 ** the input and output threads are started.
 **
@@ -487,7 +487,7 @@ void  update_transports(void)
         tracker = next;
     }
 }
-
+#if 0
 
 typedef struct tmsg tmsg;
 struct tmsg
@@ -540,7 +540,7 @@ transport_write_action(int  fd, struct tmsg*  m)
     return 0;
 }
 
-#if 0
+
 static void transport_registration_func(int _fd, unsigned ev, void *data)
 {
     tmsg m;
@@ -649,7 +649,7 @@ void init_transport_registration(void)
 
     fdevent_set(&transport_registration_fde, FDE_READ);
 }
-#endif
+
 
 /* the fdevent select pump is single threaded */
 static void register_transport(atransport *transport)
@@ -698,7 +698,7 @@ void transport_unref(atransport *t)
         adb_mutex_unlock(&transport_lock);
     }
 }
-
+#endif
 void add_transport_disconnect(atransport*  t, adisconnect*  dis)
 {
     adb_mutex_lock(&transport_lock);
@@ -843,20 +843,22 @@ int list_transports(char *buf, size_t  bufsize)
 #endif // ADB_HOST
 
 //deprecated
+#if 0
 void register_socket_transport(int s, const char *serial, int port, int local)
 {
     atransport *t = (atransport *)calloc(1, sizeof(atransport));
     D("transport: %p init'ing for socket %d, on port %d\n", t, s, port);
-  //  if ( init_socket_transport(t, s, port, local) < 0 ) {
-  //      adb_close(s);
-  //      free(t);
-  //      return;
-   // }
+    if ( init_socket_transport(t, s, port, local) < 0 ) {
+        adb_close(s);
+        free(t);
+        return;
+    }
     if(serial) {
         t->serial = strdup(serial);
     }
     register_transport(t);
 }
+
 
 #if ADB_HOST
 atransport *find_transport(const char *serial)
@@ -940,6 +942,7 @@ void unregister_usb_transport(usb_handle *usb)
     adb_mutex_unlock(&transport_lock);
 }
 
+
 #undef TRACE_TAG
 #define TRACE_TAG  TRACE_RWX
 
@@ -994,7 +997,7 @@ int writex(int fd, const void *ptr, size_t len)
     D("writex: %d ok\n", fd);
     return 0;
 }
-
+#endif
 int check_header(apacket *p)
 {
     if(p->msg.magic != (p->msg.command ^ 0xffffffff)) {

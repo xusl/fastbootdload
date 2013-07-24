@@ -97,7 +97,7 @@ void *load_file(const char *fn, unsigned *_sz)
     return  data;
 }
 
-
+#if 0
 
 /**************************************************************************/
 /**************************************************************************/
@@ -153,7 +153,7 @@ typedef struct FHRec_
 
 #define  WIN32_MAX_FHS    128
 
-static adb_mutex_t   _win32_lock;
+
 static  FHRec        _win32_fhs[ WIN32_MAX_FHS ];
 static  int          _win32_fh_count;
 
@@ -1996,8 +1996,9 @@ static void  _fh_socketpair_hook( FH  fh, int  events, EventHook  hook )
     hook->start   = _event_socketpair_start;
     hook->peek    = _event_socketpair_peek;
 }
+#endif
 
-
+static adb_mutex_t   _win32_lock;
 void
 adb_sysdeps_init( void )
 {

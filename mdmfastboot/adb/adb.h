@@ -181,9 +181,6 @@ struct asocket {
 };
 
 
-
-
-
 /* A listener is an entity which binds to a local port
 ** and, upon receiving a connection on that port, creates
 ** an asocket to connect the new local connection to a
@@ -207,36 +204,17 @@ struct alistener
     adisconnect  disconnect;
 };
 
-void local_init(int port);
-int  local_connect(int  port);
-int  local_connect_arbitrary_ports(int console_port, int adb_port);
 
-asocket *find_local_socket(unsigned id);
-void install_local_socket(asocket *s);
-void remove_socket(asocket *s);
-void close_all_sockets(atransport *t);
 
 #define  LOCAL_CLIENT_PREFIX  "emulator-"
 
-asocket *create_local_socket(int fd);
-asocket *create_local_service_socket(const char *destination);
-
-asocket *create_remote_socket(unsigned id, atransport *t);
-void connect_to_remote(asocket *s, const char *destination);
-void connect_to_smartsocket(asocket *s);
-
-
-void handle_packet(apacket *p, atransport *t);
 void send_packet(apacket *p, atransport *t);
-
-int launch_server(int server_port);
-int adb_main(int is_daemon, int server_port);
 
 
 /* transports are ref-counted
 ** get_device_transport does an acquire on your behalf before returning
 */
-void init_transport_registration(void);
+
 int  list_transports(char *buf, size_t  bufsize);
 void update_transports(void);
 
@@ -254,7 +232,6 @@ void   run_transport_disconnects( atransport*  t );
 void   kick_transport( atransport*  t );
 
 /* initialize a transport object's func pointers and state */
-int  init_socket_transport(atransport *t, int s, int port, int local);
 void init_usb_transport(atransport *t, usb_handle *usb, int state);
 
 
