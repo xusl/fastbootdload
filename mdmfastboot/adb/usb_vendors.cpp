@@ -21,7 +21,7 @@
 #  define WIN32_LEAN_AND_MEAN
 #  include "windows.h"
 #  include "shlobj.h"
-#include "win32std.h"
+#include "limits.h"
 
 
 #include "sysdeps.h"

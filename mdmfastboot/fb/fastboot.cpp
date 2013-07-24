@@ -35,7 +35,7 @@
 #include <limits.h>
 #include <ctype.h>
 #ifdef _WIN32
-#include "win32std.h"
+#include "limits.h"
 #else
 #include <sys/time.h>
 #include <unistd.h>

@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef _WIN32
-#include "win32std.h"
+#include "limits.h"
 #else
 #include <unistd.h>
 #endif
