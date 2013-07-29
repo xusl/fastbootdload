@@ -4,7 +4,7 @@ DESC:
 CHANGE HISTORY:
 when        who        what
 ----------  ---------  --------------------------------------------------------
-2009-04-10  dawang.xu  Add memory dump function call.
+2013-07-10  xusl       Reimplement All API.
 2009-04-01  dawang.xu  Add FEATURE_LOG_SYS for log printing functions body;
                        log caller function name if compiler version supports.
 2009-03-26  dawang.xu  Change printed filename from 16 to 20 chars
@@ -137,7 +137,7 @@ void RedirectStdIO(wchar_t *filename)
 
     stdout[0] = flog[0];
     stderr[0] = flog[0];
-    fprintf(stderr,"--- adb starting (pid %d) ---\n", getpid());
+    fprintf(stderr,"\n\n--- adb starting (pid %d) ---\n", getpid());
 
 }
 
@@ -177,7 +177,7 @@ void CLog::StartLogging
 	unsigned int mask
 )
 {
-//	loc = std::locale::global(std::locale(""));
+	loc = std::locale::global(std::locale(""));
 
 
 #ifdef FEATURE_LOG_FILE

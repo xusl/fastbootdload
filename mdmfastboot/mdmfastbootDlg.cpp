@@ -90,9 +90,10 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 	//注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
 	RegisterAdbDeviceNotification();
 	usb_vendors_init();
-	find_devices();
+	//find_devices();
+	//do_nothing();
 
-	do_nothing();
+    TransverseDevice(6, usb_class_id[0]);
 
 	// 将“关于...”菜单项添加到系统菜单中。
 
@@ -226,48 +227,42 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 {
    if (dwData == 0)
    {
-      WARN("OnDeviceChange, dwData == 0");
+      WARN("OnDeviceChange, dwData == 0 .EventType: 0x%x",
+         nEventType);
       return FALSE;
    }
 
-   BOOL bSrchDevice = FALSE;
    DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
+   PDEV_BROADCAST_DEVICEINTERFACE pDevInf =
+               (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
 
    DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
          nEventType, phdr->dbch_devicetype);
 
    if (nEventType == DBT_DEVICEARRIVAL)
    {
-      //devevt = DEVEVT_ARRIVAL;
       switch( phdr->dbch_devicetype )
       {
+      case DBT_DEVTYP_DEVNODE:
+        WARN("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
+        break;
       case DBT_DEVTYP_VOLUME:
          {
             /* enumerate devices and shiftdevice
             */
             break;
          }
-      case DBT_DEVTYP_PORT:
-         {
-            /* enumerate devices and check if the port
-             * composite should be added
-             */
-            break;
-         }
       case DBT_DEVTYP_DEVICEINTERFACE:
          {
-            PDEV_BROADCAST_DEVICEINTERFACE pDevInf =
-               (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
             UpdateDevice(pDevInf, dwData);
-            find_devices();
-            do_nothing();
+            //find_devices();
+            //do_nothing();
             break;
          }
       }
    }
    else if (nEventType == DBT_DEVICEREMOVECOMPLETE)
    {
-      //		devevt = DEVEVT_REMOVECOMPLETE;
       if (phdr->dbch_devicetype == DBT_DEVTYP_PORT)
       {
          /* enumerate device and check if the port
@@ -275,19 +270,6 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
           */
 
       }
-   }
-   else
-   {
-
-   }
-
-   //	if (bSrchDevice)
-   {
-      /* Launch a thread to search for devices, pass in
-       * device type to be searched.
-       */
-      //		uint32 wParam = ((devevt & 0xFFFF) << 16) | (devtype & 0xFFFF);
-      //		AfxBeginThread(SrchDevThread, (void*)wParam);
    }
 
    return TRUE;
@@ -376,49 +358,47 @@ void CmdmfastbootDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARA
    SetupDiDestroyDeviceInfoList(hDevInfo);
 }
 
-void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet)
-{
-   BOOL bResult;
-   PSP_DEVICE_INTERFACE_DETAIL_DATA   pDetail   =NULL;
-   SP_DEVICE_INTERFACE_DATA   ifdata;
-   char ch[MAX_PATH];
-   int i;
-   ULONG predictedLength = 0;
-   ULONG requiredLength = 0;
+void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet) {
+  BOOL bResult;
+  PSP_DEVICE_INTERFACE_DETAIL_DATA   pDetail   =NULL;
+  SP_DEVICE_INTERFACE_DATA   ifdata;
+  char ch[MAX_PATH];
+  int i;
+  ULONG predictedLength = 0;
+  ULONG requiredLength = 0;
 
-   ifdata.cbSize = sizeof(ifdata);
+  ifdata.cbSize = sizeof(ifdata);
 
-   //   取得该设备接口的细节(设备路径)
-   bResult = SetupDiGetInterfaceDeviceDetail(
-                                             hDevInfoSet,   /*设备信息集句柄*/
-                                             &ifdata,   /*设备接口信息*/
-                                             NULL,   /*设备接口细节(设备路径)*/
-                                             0,   /*输出缓冲区大小*/
-                                             &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
-                                             NULL);   /*不需额外的设备描述*/
-   /*   取得该设备接口的细节(设备路径)*/
-   predictedLength=requiredLength;
+  //   取得该设备接口的细节(设备路径)
+  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
+                                            &ifdata,   /*设备接口信息*/
+                                            NULL,   /*设备接口细节(设备路径)*/
+                                            0,   /*输出缓冲区大小*/
+                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
+                                            NULL);   /*不需额外的设备描述*/
+  /*   取得该设备接口的细节(设备路径)*/
+  predictedLength=requiredLength;
 
-   pDetail = (PSP_INTERFACE_DEVICE_DETAIL_DATA)GlobalAlloc(LMEM_ZEROINIT,   predictedLength);
-   pDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
-   bResult = SetupDiGetInterfaceDeviceDetail(
-                                             hDevInfoSet,   /*设备信息集句柄*/
-                                             &ifdata,   /*设备接口信息*/
-                                             pDetail,   /*设备接口细节(设备路径)*/
-                                             predictedLength,   /*输出缓冲区大小*/
-                                             &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
-                                             NULL);   /*不需额外的设备描述*/
+  pDetail = (PSP_INTERFACE_DEVICE_DETAIL_DATA)GlobalAlloc(LMEM_ZEROINIT, predictedLength);
+  pDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
+                                            &ifdata,   /*设备接口信息*/
+                                            pDetail,   /*设备接口细节(设备路径)*/
+                                            predictedLength,   /*输出缓冲区大小*/
+                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
+                                            NULL);   /*不需额外的设备描述*/
 
-   if(bResult)
-   {
-      memset(ch, 0, MAX_PATH);
-      /*复制设备路径到输出缓冲区*/
-      for(i=0; i<requiredLength; i++)
-      {
-         ch[i]=*(pDetail->DevicePath+8+i);
-      }
-      printf("%s\r\n", ch);
-   }
+  if(bResult)
+  {
+    memset(ch, 0, MAX_PATH);
+    /*复制设备路径到输出缓冲区*/
+    for(i=0; i<requiredLength; i++)
+    {
+      ch[i]=*(pDetail->DevicePath+8+i);
+    }
+    printf("%s\r\n", ch);
+  }
+//  GlobalFree
 }
 
 void CmdmfastbootDlg::OnBnClickedButtonStop()

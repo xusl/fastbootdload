@@ -88,9 +88,16 @@ extern "C" {
 // products for VENDOR_ID_QUALCOMM
 #define PRODUCT_ID_QUALCOMM     0x9018  // Qualcomm bootloader
 
+#define ANDROID_PATH            ".android"
+#define ANDROID_ADB_INI         "adb_usb.ini"
 
-extern int vendorIds[];
-extern unsigned  vendorIdCount;
+typedef struct usbid_t {
+    int vid;
+    int pid;
+} usbid_t;
+
+extern usbid_t   gUSBIds[];
+extern unsigned  gUSBIdCount;
 
 void usb_vendors_init(void);
 #ifdef __cplusplus

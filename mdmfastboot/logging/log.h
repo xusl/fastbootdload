@@ -109,8 +109,8 @@ private:
 #endif
 
 	unsigned int     mask;
-	int   adb_trace_mask;
-//	std::locale		 loc;
+	unsigned int     adb_trace_mask;
+	std::locale		   loc;
 };
 
 extern CLog* g_pLogInstance;
