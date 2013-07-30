@@ -78,8 +78,32 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_BN_CLICKED(IDC_BTN_STOP, &CmdmfastbootDlg::OnBnClickedButtonStop)
 	ON_WM_SIZE()
 	ON_WM_GETMINMAXINFO()
+	ON_MESSAGE(UI_MESSAGE_UPDATE_PROGRESS_INFO, OnUpdateProgressInfo)
 END_MESSAGE_MAP()
 
+UINT __cdecl DownloadThread( LPVOID pParam )
+{
+	TranseInfo *info = (TranseInfo*)pParam;
+	int iProcess = 0;
+	sleep(info->portUI->iID*2);
+	UIInfo uiInfoV;
+	UIInfo uiInfoS;
+	while (1)
+	{
+		iProcess++;
+		uiInfoV.infoType = PROGRESS_VAL;
+		uiInfoV.iVal = iProcess%100;
+		::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoV);
+
+		uiInfoS.infoType = PROGRESS_STR;
+		uiInfoS.sVal = uiInfoV.iVal<30?"初始化":"下载中";
+		::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
+
+		Sleep(50);
+	}
+	AfxEndThread(0);
+	return 0;
+}
 
 // CmdmfastbootDlg 消息处理程序
 
@@ -122,28 +146,44 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 	PortStateUI1.Create(IDD_PORT_STATE, this);
 	PortStateUI1.ShowWindow(1);
 	PortStateUI1.SetTitle(L"端口 1");
-	PortStateUI1.SetProgress(25);
-	PortStateUI1.SetInfo(L"下载中...");
+	//PortStateUI1.SetProgress(25);
+	//PortStateUI1.SetInfo(L"下载中...");
+	PortStateUI1.iID = PORT_UI_ID_FIRST;
 
 	PortStateUI2.Create(IDD_PORT_STATE, this);
 	PortStateUI2.ShowWindow(1);
 	PortStateUI2.SetTitle(L"端口 2");
-	PortStateUI2.SetProgress(75);
-	PortStateUI2.SetInfo(L"下载中...");
+	//PortStateUI2.SetProgress(75);
+	//PortStateUI2.SetInfo(L"下载中...");
+	PortStateUI2.iID = PORT_UI_ID_SECOND;
 
 	PortStateUI3.Create(IDD_PORT_STATE, this);
 	PortStateUI3.ShowWindow(1);
 	PortStateUI3.SetTitle(L"端口 3");
-	PortStateUI3.SetProgress(5);
-	PortStateUI3.SetInfo(L"初始化...");
+	//PortStateUI3.SetProgress(5);
+	//PortStateUI3.SetInfo(L"初始化...");
+	PortStateUI3.iID = PORT_UI_ID_THIRD;
 
 	PortStateUI4.Create(IDD_PORT_STATE, this);
 	PortStateUI4.ShowWindow(1);
 	PortStateUI4.SetTitle(L"端口 4");
-	PortStateUI4.SetProgress(100);
-	PortStateUI4.SetInfo(L"下载完毕...");
+	//PortStateUI4.SetProgress(100);
+	//PortStateUI4.SetInfo(L"下载完毕...");
+	PortStateUI4.iID = PORT_UI_ID_FOURTH;
 
 	ShowWindow(SW_MAXIMIZE);
+	TranseInfo1.dlgMain = this;
+	TranseInfo1.portUI = &PortStateUI1;
+	AfxBeginThread(DownloadThread, &TranseInfo1);
+	TranseInfo2.dlgMain = this;
+	TranseInfo2.portUI = &PortStateUI2;
+	AfxBeginThread(DownloadThread, &TranseInfo2);
+	TranseInfo3.dlgMain = this;
+	TranseInfo3.portUI = &PortStateUI3;
+	AfxBeginThread(DownloadThread, &TranseInfo3);
+	TranseInfo4.dlgMain = this;
+	TranseInfo4.portUI = &PortStateUI4;
+	AfxBeginThread(DownloadThread, &TranseInfo4);
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -461,4 +501,49 @@ void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 	lpMMI->ptMinTrackSize.x   = 800 ;
 	lpMMI->ptMinTrackSize.y   = 600  ;
 	CDialog::OnGetMinMaxInfo(lpMMI);
+}
+
+LRESULT CmdmfastbootDlg::OnUpdateProgressInfo(WPARAM wParam, LPARAM lParam)
+{
+	int iUiSerial = (int)wParam;
+	UIInfo* uiInfo = (UIInfo*)lParam;
+	switch(iUiSerial)
+	{
+	case 1:
+		UpdatePortUI(PortStateUI1, uiInfo);
+		break;
+	case 2:
+		UpdatePortUI(PortStateUI2, uiInfo);
+		break;
+	case 3:
+		UpdatePortUI(PortStateUI3, uiInfo);
+		break;
+	case 4:
+		UpdatePortUI(PortStateUI4, uiInfo);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+void CmdmfastbootDlg::UpdatePortUI(CPortStateUI& portUI, UIInfo* uiInfo)
+{
+	switch(uiInfo->infoType)
+	{
+	case PROGRESS_VAL:
+		portUI.SetProgress(uiInfo->iVal);
+			break;
+	case PROGRESS_STR:
+		portUI.SetInfo(uiInfo->sVal);
+			break;
+	case FIRMWARE_VER:
+			break;
+	case QCN_VER:
+			break;
+	case LINUX_VER:
+			break;
+	default:
+		break;
+	}
 }

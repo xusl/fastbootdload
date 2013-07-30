@@ -13,7 +13,7 @@ IMPLEMENT_DYNAMIC(CPortStateUI, CDialog)
 CPortStateUI::CPortStateUI(CWnd* pParent /*=NULL*/)
 	: CDialog(CPortStateUI::IDD, pParent)
 {
-
+	iID = 0;
 }
 
 CPortStateUI::~CPortStateUI()
@@ -61,5 +61,5 @@ void CPortStateUI::OnSize(UINT nType, int cx, int cy)
 	GetDlgItem(IDC_STATIC)->SetWindowPos(0, space, cy-8*rect.bottom, cx-2*space, rect.bottom, 0);
 	GetDlgItem(IDC_PROGRESS1)->GetClientRect(&rect);
 	GetDlgItem(IDC_PROGRESS1)->SetWindowPos(0, space, cy-3*rect.bottom, cx-2*space, rect.bottom, 0);
-	GetDlgItem(IDC_DL_INFO)->SetWindowPos(0, space, cy-1*rect.bottom, cx-2*space, rect.bottom, 0);
+	GetDlgItem(IDC_DL_INFO)->SetWindowPos(0, space, cy-1*rect.bottom, cx-2*space, rect.bottom-10, 0);
 }
