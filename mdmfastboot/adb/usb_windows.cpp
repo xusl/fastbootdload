@@ -32,6 +32,17 @@
  adbhost* device[MAX_ADB_DEVICE]={0,};
 static int device_count = 0;
 
+typedef enum {
+    DEVICE_UNKNOW = 0,
+    //DEVICE_PLUGIN,
+    DEVICE_CHECK,//ADB,
+    //DEVICE_SWITCH,
+    DEVICE_FLASH,//FASTBOOT,
+    DEVICE_CONFIGURE,
+    DEVICE_REMOVE,
+    DEVICE_MAX
+}usb_dev_t;
+
 /** Structure usb_handle describes our connection to the usb device via
   AdbWinApi.dll. This structure is returned from usb_open() routine and
   is expected in each subsequent call that is accessing the device.
@@ -56,20 +67,35 @@ struct usb_handle {
   wchar_t*         interface_name;
 
   int interface_protocol;
+  usb_dev_t status;
+  long usb_sn;
 
   /// Mask for determining when to use zero length packets
   unsigned zero_mask;
 };
 
+typedef struct dev_switch_t {
+  dev_switch_t *prev;
+  dev_switch_t *next;
+    long        usb_sn;
+    usb_dev_t   status;
+    long        time;
+} dev_switch_t;
+
 /// Class ID assigned to the device by androidusb.sys
 static const GUID usb_class_id = ANDROID_USB_CLASS_ID;
-static volatile bool exist = false;
+//static volatile bool exist = false;
 /// List of opened usb handles
 static usb_handle handle_list = {
   //.prev = &handle_list,
   //.next = &handle_list,
   &handle_list,
   &handle_list,
+};
+
+static dev_switch_t switch_list = {
+  &switch_list,
+  &switch_list,
 };
 
 /// Locker for the list of opened usb handles
@@ -87,18 +113,6 @@ int register_new_device(usb_handle* handle);
 
 /// Checks if interface (device) matches certain criteria
 int recognized_device(usb_handle* handle);
-
-
-
-/// Entry point for thread that polls (every second) for new usb interfaces.
-/// This routine calls find_devices in infinite loop.
-unsigned int device_poll_thread(void* unused);
-
-/// Initializes this module
-void usb_init();
-
-/// Cleans up this module
-void usb_cleanup();
 
 /// Opens usb interface (device) by interface (device) name.
 usb_handle* do_usb_open(const wchar_t* interface_name);
@@ -119,7 +133,91 @@ void usb_kick(usb_handle* handle);
 int usb_close(usb_handle* handle);
 
 /// Gets interface (device) name for an opened usb handle
-const char *usb_name(usb_handle* handle);
+const wchar_t *usb_name(usb_handle* handle);
+
+UINT run(LPVOID data);
+
+// \\?\usb#vid_18d1&pid_d00d#5&10cd67f3&0&4#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b}
+// convert to
+// 10cd67f3
+long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
+  wchar_t * snb, *sne, * sn;
+
+  size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
+  if(wcsnicmp(L"\\\\?\\usb#",dev_name,8) || len < 26 + 40)
+    return 0;
+
+  snb = (wchar_t*)wcschr(dev_name + 26, L'&');
+  if (snb == NULL || snb - dev_name >= len)
+    return 0;
+
+  snb++;
+  sne = wcschr(snb , L'&');
+  if (sne == NULL || sne - dev_name >= len)
+    return 0;
+
+  len = sne - snb;
+  if (len <= 0)
+    return 0;
+
+  if (psn) {
+    sn = (wchar_t*) malloc((len + 1) * sizeof(wchar_t));
+    if (sn == NULL) {
+      ERROR("NO memory");
+    } else {
+      wcsncpy(sn, snb , len);
+      *(sn + len) = L'\0';
+    }
+    *psn = sn;
+  }
+
+  return wcstol(snb, &sne, 16);
+}
+
+
+int add_switch_device(usb_handle* handle) {
+  dev_switch_t* dev = (dev_switch_t*)malloc(sizeof(dev_switch_t));
+
+  dev->usb_sn = handle->usb_sn;
+  dev->status = handle->status;
+  dev->time = now();
+
+    // Not in the list. Add this handle to the list.
+  dev->next = &switch_list;
+  dev->prev = switch_list.prev;
+  dev->prev->next = dev;
+  dev->next->prev = dev;
+
+  return 0;
+}
+
+/*
+* return 0: success, 1 failed.
+*/
+int known_switch_device(usb_handle* handle) {
+  dev_switch_t* dev;
+
+  // Iterate through the list looking for the name match.
+  for(dev = switch_list.next; dev != &switch_list; dev = dev->next) {
+    if (handle->usb_sn != dev->usb_sn)
+      continue;
+
+    handle->status = dev->status;
+
+    if ((dev->next != dev) && (dev->prev != dev)) {
+      //link the next node and previous node
+      dev->next->prev = dev->prev;
+      dev->prev->next = dev->next;
+      //unlink self from the list
+      dev->prev = dev;
+      dev->next = dev;
+    }
+
+    free(dev);
+    return 1;
+  }
+  return 0;
+}
 
 int known_device_locked(const wchar_t* dev_name) {
   usb_handle* usb;
@@ -150,16 +248,39 @@ int known_device(const wchar_t* dev_name) {
   return ret;
 }
 
+
 int register_new_device(usb_handle* handle) {
+  int ret = 0;
+  int protocol;
+
   if (NULL == handle)
-    return 0;
+    return ret;
+
+  protocol = handle->interface_protocol;
 
   adb_mutex_lock(&usb_lock);
 
   // Check if device is already in the list
   if (known_device_locked(handle->interface_name)) {
-    adb_mutex_unlock(&usb_lock);
-    return 0;
+    goto register_new_device_out;
+  }
+
+  if (known_switch_device(handle)) {
+    if(handle->status == DEVICE_CHECK && protocol == FB_PROTOCOL) {
+        handle->status = DEVICE_FLASH;
+    } else if (handle->status == DEVICE_FLASH && protocol == ADB_PROTOCOL) {
+        handle->status = DEVICE_CONFIGURE;
+    } else {
+        ERROR("Device status switch error, \n"
+        "Do not know how to switch from status %d with new protocol %d"
+        handle->status, protocol);
+        goto register_new_device_out;
+    }
+  } else if (protocol == ADB_PROTOCOL) {
+    handle->status = DEVICE_CHECK;
+  } else if (protocol == FB_PROTOCOL) {
+    ERROR("We do not permit fastboot as the first device status!");
+    goto register_new_device_out;
   }
 
   // Not in the list. Add this handle to the list.
@@ -167,34 +288,15 @@ int register_new_device(usb_handle* handle) {
   handle->prev = handle_list.prev;
   handle->prev->next = handle;
   handle->next->prev = handle;
+  ret = 1;
 
+register_new_device_out:
   adb_mutex_unlock(&usb_lock);
 
-  return 1;
+  return ret;
 }
 
-unsigned int device_poll_thread(void* unused) {
-  D("Created device thread\n");
 
-  while(!exist) {
-    find_devices();
-    adb_sleep_ms(1000);
-  }
-
-  return 0;
-}
-
-void usb_init() {
-  adb_thread_t tid;
-
-  if(adb_thread_create(&tid, device_poll_thread, NULL)) {
-    fatal_errno("cannot create input thread");
-  }
-}
-
-void usb_cleanup() {
-	exist = true;
-}
 /// Opens usb interface (device) by interface (device) name.
 usb_handle* do_usb_open(const wchar_t* interface_name) {
   // Allocate our handle
@@ -236,16 +338,16 @@ usb_handle* do_usb_open(const wchar_t* interface_name) {
       AdbGetInterfaceName(ret->adb_interface,
                           NULL,
                           &name_len,
-                          true);
+                          false/*true*/);
       if (0 != name_len) {
         ret->interface_name = (wchar_t*)malloc(sizeof (wchar_t) * name_len);
 
         if (NULL != ret->interface_name) {
-          // Now save the name
+          // Now save the name, generally, ret->interface_name is equal to interface_name
           if (AdbGetInterfaceName(ret->adb_interface,
                                   ret->interface_name,
                                   &name_len,
-                                  true)) {
+                                   false/*true*/)) {
             // We're done at this point
             return ret;
           }
@@ -463,14 +565,14 @@ int usb_close(usb_handle* handle) {
   return 0;
 }
 
-const char *usb_name(usb_handle* handle) {
+const wchar_t *usb_name(usb_handle* handle) {
   if (NULL == handle) {
     SetLastError(ERROR_INVALID_HANDLE);
     errno = ERROR_INVALID_HANDLE;
     return NULL;
   }
 
-  return (const char*)handle->interface_name;
+  return handle->interface_name;
 }
 
 int recognized_device(usb_handle* handle) {
@@ -479,6 +581,16 @@ int recognized_device(usb_handle* handle) {
 
   if (NULL == handle)
     return 0;
+
+    long sn = usb_host_sn(handle->interface_name, NULL);
+   if (sn != 0) {
+  //DEBUG("%S serial number %x", interface_name, sn);
+ }  else {
+ //if we do not support multiple, sn is not from host allocation.
+ // todo:: add a judge?
+ DEBUG("%S serial number %x", handle->interface_name, sn);
+ return 0;
+    }
 
   // Check vendor and product id first
 
@@ -542,7 +654,7 @@ void find_devices() {
     if (!known_device(next_interface->device_name)) {
       // This seems to be a new device. Open it!
         handle = do_usb_open(next_interface->device_name);
-        if (NULL != handle) {
+        if (NULL == handle) continue;
         // Lets see if this interface (device) belongs to us
         if (recognized_device(handle)) {
           char serial_number[512];
@@ -554,14 +666,7 @@ void find_devices() {
                                 true)) {
             // Lets make sure that we don't duplicate this device
             if (register_new_device(handle)) {
-             // register_usb_transport(handle, serial_number, 1);
-				//todo ::::
-				if (handle->interface_protocol == ADB_PROTOCOL) {
-					 ;//device[device_count] = new adbhost(handle, device_count ++);
-				} else if (handle->interface_protocol == FB_PROTOCOL) {
-				  D("nothing to do for fastboot now!");
-				}
-
+             AfxBeginThread(run, (void*)handle);
             } else {
               D("register_new_device failed for %s\n", next_interface->device_name);
               usb_cleanup_handle(handle);
@@ -576,7 +681,6 @@ void find_devices() {
           usb_cleanup_handle(handle);
           free(handle);
         }
-      }
     }
 
     entry_buffer_size = sizeof(entry_buffer);
@@ -585,18 +689,23 @@ void find_devices() {
   AdbCloseHandle(enum_handle);
 }
 
-UINT run(LPVOID handle) {
-	adbhost adb((usb_handle*)handle , 0xbeef);
-	adb.process();
-	return 0;
+UINT run(LPVOID data) {
+  usb_handle * handle = (usb_handle*)data;
+
+  if (handle->status == DEVICE_CHECK) {
+    adbhost adb(handle , handle->usb_sn);
+    adb.process();
+  } else {
+  }
+  return 0;
 }
 
 UINT do_nothing() {
-	usb_handle* usb;
-    // Iterate through the list looking for the name match.
-    for(usb = handle_list.next; usb != &handle_list; usb = usb->next) {
-		AfxBeginThread(run, (void*)usb);
-    }
+  usb_handle* usb;
 
-	return 0;
+  for(usb = handle_list.next; usb != &handle_list; usb = usb->next) {
+
+  }
+
+  return 0;
 }

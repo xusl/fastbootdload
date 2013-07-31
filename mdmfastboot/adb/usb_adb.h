@@ -46,8 +46,6 @@ struct adb_deivce {
 void find_devices();
 
 /* usb host/client interface */
-void usb_init();
-void usb_cleanup();
 int usb_write(usb_handle *h, const void *data, int len);
 int usb_read(usb_handle *h, void *data, int len);
 int usb_close(usb_handle *h);

@@ -34,44 +34,6 @@ CmdmfastbootApp::CmdmfastbootApp()
 
 CmdmfastbootApp theApp;
 
-UINT fbeventServerThread(LPVOID pParam) {
-#if 1
-	char local_name[30];
-	//int server_port = DEFAULT_ADB_PORT;
-		//start adb host server
-//	 adb_trace_init();
-    adb_sysdeps_init();
-
-	//adb_set_transport(kTransportUsb, NULL);
-    //adb_set_tcp_specifics(DEFAULT_ADB_PORT);
-
-	// init_transport_registration(); // INIT fbevent.
-	//adb_main(is_daemon, server_port);
-
-	usb_vendors_init();
-    //usb_init();
-    //local_init(DEFAULT_ADB_LOCAL_TRANSPORT_PORT);
-
-   // build_local_name(local_name, sizeof(local_name), server_port);
-   // if(install_listener(local_name, "*smartsocket*", NULL)) {
-   //     exit(1);
-   // }
-
-	 //start_logging();
-
-    //fdevent_loop();
-
-    usb_cleanup();
-#endif
-	return TRUE;
-}
-
-UINT adb_init() {
-
-	//adb_connect("host:start-server");
-	AfxBeginThread(fbeventServerThread, (void*)NULL);
-	return TRUE;
-}
 
 // CmdmfastbootApp 初始化
 
@@ -111,7 +73,7 @@ BOOL CmdmfastbootApp::InitInstance()
 	{
 		// TODO: 在此放置处理何时用
 		//  “确定”来关闭对话框的代码
-		usb_cleanup(); //退出usb poll thread
+
 		StopLogging();
 	}
 	else if (nResponse == IDCANCEL)
