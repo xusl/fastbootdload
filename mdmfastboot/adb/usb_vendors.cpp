@@ -36,6 +36,7 @@ usbid_t builtInIds[] = {
 
     //VENDOR_ID_QUALCOMM
     {VENDOR_ID_ALCATEL, 0x0192},  //9x15 adb
+    {VENDOR_ID_ALCATEL, 0x007b},  //9x15 adb only
     {VENDOR_ID_GOOGLE,0xd00d},    //fastboot
 };
 
@@ -170,6 +171,7 @@ void check_regedit_usbflags(usbid_t USBIds[], unsigned count){
       szValue = 1;
       dwCount = sizeof(szValue);
       lResult = reg.SetBinaryValue(szName, &szValue, dwCount);
+      //TODO:: Notify USER to remove usb device. for assign id.
       //DEBUG("SetBinaryValue lResult %d" , lResult);
     }
   }
