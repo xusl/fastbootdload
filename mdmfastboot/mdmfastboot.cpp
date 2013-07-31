@@ -37,7 +37,7 @@ CmdmfastbootApp theApp;
 UINT fbeventServerThread(LPVOID pParam) {
 #if 1
 	char local_name[30];
-	int server_port = DEFAULT_ADB_PORT;
+	//int server_port = DEFAULT_ADB_PORT;
 		//start adb host server
 //	 adb_trace_init();
     adb_sysdeps_init();

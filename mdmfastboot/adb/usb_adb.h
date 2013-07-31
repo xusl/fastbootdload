@@ -1,7 +1,6 @@
 #ifndef _USB_ADB_H
 #define _USB_ADB_H
 
-
 #define MAX_PAYLOAD 4096
 
 #define A_SYNC 0x434e5953
@@ -18,10 +17,8 @@
 
 #define ADB_SERVER_VERSION    26    // Increment this when we want to force users to start a new adb server
 
-
-
-#define DEFAULT_ADB_PORT 5037
-#define DEFAULT_ADB_LOCAL_TRANSPORT_PORT 5555
+//#define DEFAULT_ADB_PORT 5037
+//#define DEFAULT_ADB_LOCAL_TRANSPORT_PORT 5555
 
 #define ADB_CLASS              0xff
 #define ADB_SUBCLASS           0x42
@@ -33,8 +30,6 @@
 #define OP_COMMAND    2
 #define OP_QUERY      3
 #define OP_NOTICE     4
-
-
 
 typedef struct usb_handle usb_handle;
 typedef struct adb_deivce adb_deivce;
@@ -57,10 +52,5 @@ int usb_write(usb_handle *h, const void *data, int len);
 int usb_read(usb_handle *h, void *data, int len);
 int usb_close(usb_handle *h);
 void usb_kick(usb_handle *h);
-
-void register_usb_transport(usb_handle *h, const char *serial, unsigned writeable);
-
-/* this should only be used for transports with connection_state == CS_NOPERM */
-void unregister_usb_transport(usb_handle *usb);
 
 #endif /* _USB_ADB_H */

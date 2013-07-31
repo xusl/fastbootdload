@@ -107,8 +107,8 @@ void init_usb_transport(atransport *t, usb_handle *h, int state)
 int is_adb_interface(int vid, int pid, int usb_class, int usb_subclass, int usb_protocol)
 {
     unsigned i;
-    for (i = 0; i < vendorIdCount; i++) {
-        if (vid == vendorIds[i]) {
+    for (i = 0; i < gUSBIdCount; i++) {
+        if (vid == gUSBIds[i].vid) {
             if (usb_class == ADB_CLASS && usb_subclass == ADB_SUBCLASS &&
                     usb_protocol == ADB_PROTOCOL) {
                 return ADB_PROTOCOL;
@@ -129,8 +129,8 @@ int is_fastboot_interface(int vid, int pid, int usb_class, int usb_subclass, int
     if(usb_subclass != ADB_SUBCLASS) return 0;
     if(usb_protocol != FB_PROTOCOL) return 0;
 
-    for (unsigned i = 0; i < vendorIdCount; i++) {
-        if (vid == vendorIds[i]) {
+    for (unsigned i = 0; i < gUSBIdCount; i++) {
+        if (vid == gUSBIds[i].vid) {
                 return FB_PROTOCOL;
         }
     }
