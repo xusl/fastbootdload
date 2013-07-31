@@ -20,6 +20,13 @@ typedef enum
 	PROGRESS_STR,
 }UI_INFO_TYPE;
 
+struct UIInfo
+{
+	UI_INFO_TYPE	infoType;
+	int				iVal;
+	CString			sVal;
+};
+
 // CPortStateUI ¶Ô»°¿ò
 
 class CPortStateUI : public CDialog
@@ -47,4 +54,9 @@ public:
 
 public:
 	PORT_ID iID;
+	UIInfo m_PortFrmVer;
+	UIInfo m_PortQCNVer;
+	UIInfo m_PortLinuxVer;
+	UIInfo m_PortProgressInfo;
+	UIInfo m_PortProgressValue;
 };

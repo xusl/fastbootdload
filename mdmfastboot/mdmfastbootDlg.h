@@ -25,13 +25,6 @@ struct TranseInfo
 	CPortStateUI*		portUI;
 };
 
-struct UIInfo
-{
-	UI_INFO_TYPE	infoType;
-	int				iVal;
-	CString			sVal;
-};
-
 // CmdmfastbootDlg 对话框
 class CmdmfastbootDlg : public CDialog
 {
@@ -51,6 +44,10 @@ public:
 // 实现
 protected:
 	HICON m_hIcon;
+	CWinThread* pThreadPort1;
+	CWinThread* pThreadPort2;
+	CWinThread* pThreadPort3;
+	CWinThread* pThreadPort4;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -60,6 +57,8 @@ protected:
 	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
 	DECLARE_MESSAGE_MAP()
 
+	void OnHelp();
+	void OnAbout();
 	void UpdatePortUI(CPortStateUI& portUI, UIInfo* uiInfo);
 public:
 	afx_msg void OnBnClickedButtonStop();
@@ -83,4 +82,7 @@ public:
 	BOOL RegisterAdbDeviceNotification(void);
 	void UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 	afx_msg void OnBnClickedBtnBrowse();
+	afx_msg void OnBnClickedOk();
+	afx_msg void OnClose();
+	afx_msg void OnBnClickedCancel();
 };
