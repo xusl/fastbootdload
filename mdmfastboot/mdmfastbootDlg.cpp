@@ -67,6 +67,7 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 void CmdmfastbootDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
+	DDX_Text(pDX, IDC_EDIT_PACKAGE_PATH, m_strPackagePath);
 }
 
 BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
@@ -78,8 +79,58 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_BN_CLICKED(IDC_BTN_STOP, &CmdmfastbootDlg::OnBnClickedButtonStop)
 	ON_WM_SIZE()
 	ON_WM_GETMINMAXINFO()
+	ON_MESSAGE(UI_MESSAGE_UPDATE_PROGRESS_INFO, OnUpdateProgressInfo)
+	ON_MESSAGE(UI_MESSAGE_UPDATE_PACKAGE_INFO, OnUpdatePackageInfo)
+	ON_BN_CLICKED(IDC_BTN_BROWSE, &CmdmfastbootDlg::OnBnClickedBtnBrowse)
 END_MESSAGE_MAP()
 
+UINT __cdecl DemoDownloadThread( LPVOID pParam )
+{
+	TranseInfo *info = (TranseInfo*)pParam;
+	int iProcess = 0;
+	sleep(info->portUI->iID-1);
+	UIInfo uiInfoV;
+	UIInfo uiInfoS;
+
+	UIInfo uiInfoFrw;
+	uiInfoFrw.infoType = FIRMWARE_VER;
+	uiInfoFrw.sVal = "VX140100BX";
+	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoFrw);
+
+	UIInfo uiInfoQCN;
+	uiInfoQCN.infoType = QCN_VER;
+	uiInfoQCN.sVal = "VA340100BV";
+	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoQCN);
+
+	UIInfo uiInfoLinux;
+	uiInfoLinux.infoType = LINUX_VER;
+	uiInfoLinux.sVal = "VXB4010000";
+	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoLinux);
+
+	while (1)
+	{
+		iProcess++;
+		uiInfoV.infoType = PROGRESS_VAL;
+		uiInfoV.iVal = iProcess%100;
+		::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoV);
+
+		uiInfoS.infoType = PROGRESS_STR;
+		if (uiInfoV.iVal==5)
+		{
+			uiInfoS.sVal = "Initial...";
+			::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
+		}
+		else if (uiInfoV.iVal==30)
+		{
+			uiInfoS.sVal = "Downloading...";
+			::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
+		}
+
+		Sleep(10);
+	}
+	AfxEndThread(0);
+	return 0;
+}
 
 // CmdmfastbootDlg 消息处理程序
 
@@ -121,30 +172,42 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
 	// TODO: 在此添加额外的初始化代码
 	PortStateUI1.Create(IDD_PORT_STATE, this);
-	PortStateUI1.ShowWindow(1);
-	PortStateUI1.SetTitle(L"端口 1");
-	PortStateUI1.SetProgress(25);
-	PortStateUI1.SetInfo(L"下载中...");
+	PortStateUI1.Init(PORT_UI_ID_FIRST);
 
 	PortStateUI2.Create(IDD_PORT_STATE, this);
-	PortStateUI2.ShowWindow(1);
-	PortStateUI2.SetTitle(L"端口 2");
-	PortStateUI2.SetProgress(75);
-	PortStateUI2.SetInfo(L"下载中...");
+	PortStateUI2.Init(PORT_UI_ID_SECOND);
 
 	PortStateUI3.Create(IDD_PORT_STATE, this);
-	PortStateUI3.ShowWindow(1);
-	PortStateUI3.SetTitle(L"端口 3");
-	PortStateUI3.SetProgress(5);
-	PortStateUI3.SetInfo(L"初始化...");
+	PortStateUI3.Init(PORT_UI_ID_THIRD);
 
 	PortStateUI4.Create(IDD_PORT_STATE, this);
-	PortStateUI4.ShowWindow(1);
-	PortStateUI4.SetTitle(L"端口 4");
-	PortStateUI4.SetProgress(100);
-	PortStateUI4.SetInfo(L"下载完毕...");
+	PortStateUI4.Init(PORT_UI_ID_FOURTH);
 
 	ShowWindow(SW_MAXIMIZE);
+
+#if 1
+	//ui test beging
+	m_strFrmVer = L"VX140100BX";
+	::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, FIRMWARE_VER, (LPARAM)&m_strFrmVer);
+	m_strQCNVer = L"VA340100BV";
+	::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, QCN_VER, (LPARAM)&m_strQCNVer);
+	m_strLinuxVer = L"VXB4010000";
+	::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, LINUX_VER, (LPARAM)&m_strLinuxVer);
+
+	TranseInfo1.dlgMain = this;
+	TranseInfo1.portUI = &PortStateUI1;
+	AfxBeginThread(DemoDownloadThread, &TranseInfo1);
+	TranseInfo2.dlgMain = this;
+	TranseInfo2.portUI = &PortStateUI2;
+	AfxBeginThread(DemoDownloadThread, &TranseInfo2);
+	TranseInfo3.dlgMain = this;
+	TranseInfo3.portUI = &PortStateUI3;
+	AfxBeginThread(DemoDownloadThread, &TranseInfo3);
+	TranseInfo4.dlgMain = this;
+	TranseInfo4.portUI = &PortStateUI4;
+	AfxBeginThread(DemoDownloadThread, &TranseInfo4);
+	//end
+#endif
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -421,10 +484,12 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 	int space = 20;
 	int iWide = cx/2 - space;
 	int iHigh = cy/2 - 5*space;
-	PortStateUI1.SetWindowPos(0, space, space, iWide-space, iHigh, 0);
-	PortStateUI2.SetWindowPos(0, cx/2 + space, space, iWide-space, iHigh, 0);
-	PortStateUI3.SetWindowPos(0, space, cy/2 + space, iWide-space, iHigh, 0);
-	PortStateUI4.SetWindowPos(0, cx/2 + space, cy/2 + space, iWide-space, iHigh, 0);
+	int iTop = 100;
+	//GetDlgItem(IDC_GRP_PKG_INFO)->SetWindowPos(0, space, space, cy-space*2, 50, 0);
+	PortStateUI1.SetWindowPos(0, space, iTop+space, iWide-space, iHigh, 0);
+	PortStateUI2.SetWindowPos(0, cx/2 + space, iTop+space, iWide-space, iHigh, 0);
+	PortStateUI3.SetWindowPos(0, space, cy/2 + space*2, iWide-space, iHigh, 0);
+	PortStateUI4.SetWindowPos(0, cx/2 + space, cy/2 + space*2, iWide-space, iHigh, 0);
 
 	//BUTTON
 	RECT rect;
@@ -439,7 +504,94 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	lpMMI->ptMinTrackSize.x   = 800 ;
-	lpMMI->ptMinTrackSize.y   = 600  ;
+	lpMMI->ptMinTrackSize.x   = 1000 ;	//主窗口最小宽度
+	lpMMI->ptMinTrackSize.y   = 700  ;  //主窗口最小高度
 	CDialog::OnGetMinMaxInfo(lpMMI);
+}
+
+LRESULT CmdmfastbootDlg::OnUpdateProgressInfo(WPARAM wParam, LPARAM lParam)
+{
+	int iUiSerial = (int)wParam;
+	UIInfo* uiInfo = (UIInfo*)lParam;
+	switch(iUiSerial)
+	{
+	case PORT_UI_ID_FIRST:
+		UpdatePortUI(PortStateUI1, uiInfo);
+		break;
+	case PORT_UI_ID_SECOND:
+		UpdatePortUI(PortStateUI2, uiInfo);
+		break;
+	case PORT_UI_ID_THIRD:
+		UpdatePortUI(PortStateUI3, uiInfo);
+		break;
+	case PORT_UI_ID_FOURTH:
+		UpdatePortUI(PortStateUI4, uiInfo);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+LRESULT CmdmfastbootDlg::OnUpdatePackageInfo(WPARAM wParam, LPARAM lParam)
+{
+	UI_INFO_TYPE infoType = (UI_INFO_TYPE)wParam;
+	CString* pStrInfo = (CString*)lParam;
+	switch(infoType)
+	{
+	case FIRMWARE_VER:
+		GetDlgItem(IDC_EDIT_FRM_VER_MAIN)->SetWindowText(pStrInfo->GetBuffer());
+		break;
+	case QCN_VER:
+		GetDlgItem(IDC_EDIT_QCN_VER_MAIN)->SetWindowText(pStrInfo->GetBuffer());
+		break;
+	case LINUX_VER:
+		GetDlgItem(IDC_EDIT_LINUX_VER_MAIN)->SetWindowText(pStrInfo->GetBuffer());
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+void CmdmfastbootDlg::UpdatePortUI(CPortStateUI& portUI, UIInfo* uiInfo)
+{
+	switch(uiInfo->infoType)
+	{
+	case PROGRESS_VAL:
+		portUI.SetProgress(uiInfo->iVal);
+			break;
+	case PROGRESS_STR:
+		portUI.SetInfo(PROGRESS_STR, uiInfo->sVal);
+			break;
+	case FIRMWARE_VER:
+		portUI.SetInfo(FIRMWARE_VER, uiInfo->sVal);
+			break;
+	case QCN_VER:
+		portUI.SetInfo(QCN_VER, uiInfo->sVal);
+			break;
+	case LINUX_VER:
+		portUI.SetInfo(LINUX_VER, uiInfo->sVal);
+			break;
+	default:
+		break;
+	}
+}
+void CmdmfastbootDlg::OnBnClickedBtnBrowse()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	CString str = _T("Img File (*.img)|All Files (*.*)|*.*||");
+
+	CFileDialog cfd( TRUE,
+		NULL,
+		NULL,
+		OFN_FILEMUSTEXIST|OFN_HIDEREADONLY,
+		(LPCTSTR)str,
+		NULL);
+
+	if (cfd.DoModal() == IDOK)
+	{
+		m_strPackagePath = cfd.GetPathName();
+		UpdateData(FALSE);	
+	}
 }

@@ -24,6 +24,22 @@
 #define IDC_PROGRESS1                   1011
 #define IDC_GROUP                       1012
 #define IDC_DL_INFO                     1013
+#define IDC_EDIT_FRM_VER                1014
+#define IDC_EDIT_QCN_VER                1015
+#define IDC_EDIT_LINUX_VER              1016
+#define IDC_STATIC_FRM_VER              1017
+#define IDC_STATIC_QCN_VER              1018
+#define IDC_STATIC_LINUX_VER            1019
+#define IDC_STATIC_FRM_VER_MAIN         1020
+#define IDC_EDIT_FRM_VER_MAIN           1021
+#define IDC_STATIC_QCN_VER_MAIN         1022
+#define IDC_EDIT_QCN_VER_MAIN           1023
+#define IDC_STATIC_LINUX_VER_MAIN       1024
+#define IDC_EDIT_LINUX_VER_MAIN         1025
+#define IDC_GRP_PKG_INFO                1026
+#define IDC_EDIT_PACKAGE_PATH           1027
+#define IDC_BUTTON1                     1028
+#define IDC_BTN_BROWSE                  1028
 
 // Next default values for new objects
 // 
@@ -31,7 +47,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        130
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1014
+#define _APS_NEXT_CONTROL_VALUE         1029
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
