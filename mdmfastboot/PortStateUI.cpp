@@ -13,7 +13,7 @@ IMPLEMENT_DYNAMIC(CPortStateUI, CDialog)
 CPortStateUI::CPortStateUI(CWnd* pParent /*=NULL*/)
 	: CDialog(CPortStateUI::IDD, pParent)
 {
-	iID = 0;
+	iID = PORT_UI_ID_INVALID;
 }
 
 CPortStateUI::~CPortStateUI()
@@ -25,9 +25,23 @@ void CPortStateUI::DoDataExchange(CDataExchange* pDX)
 	CDialog::DoDataExchange(pDX);
 }
 
-void CPortStateUI::SetInfo(CString strInfo)
+void CPortStateUI::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
 {
-	GetDlgItem(IDC_DL_INFO)->SetWindowText(strInfo.GetBuffer());	
+	switch(infoType)
+	{
+	case PROGRESS_STR:
+		GetDlgItem(IDC_DL_INFO)->SetWindowText(strInfo.GetBuffer());
+		break;
+	case FIRMWARE_VER:
+		GetDlgItem(IDC_EDIT_FRM_VER)->SetWindowText(strInfo.GetBuffer());
+		break;
+	case QCN_VER:
+		GetDlgItem(IDC_EDIT_QCN_VER)->SetWindowText(strInfo.GetBuffer());
+		break;
+	case LINUX_VER:
+		GetDlgItem(IDC_EDIT_LINUX_VER)->SetWindowText(strInfo.GetBuffer());
+		break;
+	}	
 }
 
 void CPortStateUI::SetTitle(CString strInfo)
@@ -38,6 +52,15 @@ void CPortStateUI::SetTitle(CString strInfo)
 void CPortStateUI::SetProgress(int iPercent)
 {
 	::SendMessage(GetDlgItem(IDC_PROGRESS1)->m_hWnd, PBM_SETPOS, iPercent, 0);
+}
+
+void CPortStateUI::Init(PORT_ID iPortID)
+{
+	iID = iPortID;
+	CString strTitle;
+	strTitle.Format(L"%s %d", L"Port", iPortID);
+	SetTitle(strTitle);
+	ShowWindow(1);
 }
 
 BEGIN_MESSAGE_MAP(CPortStateUI, CDialog)

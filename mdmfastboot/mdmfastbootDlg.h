@@ -15,23 +15,7 @@ enum
 	// UI Messages
 	UI_MESSAGE_BASE = (WM_USER + 1000),
 	UI_MESSAGE_UPDATE_PROGRESS_INFO,
-};
-
-enum
-{
-	PORT_UI_ID_FIRST = 1,
-	PORT_UI_ID_SECOND,
-	PORT_UI_ID_THIRD,
-	PORT_UI_ID_FOURTH,
-};
-
-enum	UI_INFO_TYPE
-{
-	FIRMWARE_VER,
-	QCN_VER,
-	LINUX_VER,
-	PROGRESS_VAL,
-	PROGRESS_STR,
+	UI_MESSAGE_UPDATE_PACKAGE_INFO,
 };
 
 class CmdmfastbootDlg;
@@ -63,6 +47,7 @@ public:
 
 
 	LRESULT OnUpdateProgressInfo(WPARAM wParam, LPARAM lParam);
+	LRESULT OnUpdatePackageInfo(WPARAM wParam, LPARAM lParam);
 // й╣ож
 protected:
 	HICON m_hIcon;
@@ -88,9 +73,14 @@ public:
 	TranseInfo TranseInfo2;
 	TranseInfo TranseInfo3;
 	TranseInfo TranseInfo4;
+	CString m_strFrmVer;
+	CString m_strQCNVer;
+	CString m_strLinuxVer;
+	CString m_strPackagePath;
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 
 	BOOL RegisterAdbDeviceNotification(void);
 	void UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+	afx_msg void OnBnClickedBtnBrowse();
 };
