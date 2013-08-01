@@ -34,7 +34,7 @@ unsigned host_to_le32(unsigned n)
 
 static int remote_read(apacket *p, atransport *t)
 {
-    if(usb_read(t->usb, &p->msg, sizeof(amessage))){
+    if(usb_read(t->usb, &p->msg, sizeof(amessage), true)){
         D("remote usb: read terminated (message)\n");
         return -1;
     }
@@ -47,7 +47,7 @@ static int remote_read(apacket *p, atransport *t)
     }
 
     if(p->msg.data_length) {
-        if(usb_read(t->usb, p->data, p->msg.data_length)){
+        if(usb_read(t->usb, p->data, p->msg.data_length,true)){
             D("remote usb: terminated (data)\n");
             return -1;
         }

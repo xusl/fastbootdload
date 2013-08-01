@@ -38,10 +38,10 @@ int match(char *str, const char **value, unsigned count);
 
 
 fastboot::~fastboot() {
-	remove_action();
+    remove_action();
 }
 
-fastboot::fastboot():action_list(0), action_last(0) {
+fastboot::fastboot(usb_handle * handle):action_list(0), action_last(0) {
 }
 
 char *fastboot::mkmsg(const char *fmt, ...)
@@ -64,9 +64,10 @@ char *fastboot::mkmsg(const char *fmt, ...)
 //static Action *action_last = 0;
 
 void fastboot::remove_action() {
-    Action *a= action_list;
+    Action *a;
 
-    for (a = action_list; a; a = a->next) {
+    for (a = action_list; a; a = action_list) {
+        action_list = a->next;
 		if (a->data) {
 			free(a->data);
 			a->data = NULL;
@@ -252,7 +253,7 @@ void fastboot::fb_queue_reboot(void)
 {
     Action *a = queue_action(OP_COMMAND, "reboot");
     a->func = cb_do_nothing;
-    a->msg = "rebooting";
+    a->msg = mkmsg("rebooting");
 }
 
 void fastboot::fb_queue_command(const char *cmd, const char *msg)
@@ -328,7 +329,7 @@ int fastboot::check_response(usb_handle *usb, unsigned size,
     int r;
 
     for(;;) {
-        r = usb_read(usb, status, 64);
+        r = usb_read(usb, status, 64, false);
         if(r < 0) {
             sprintf(ERRBUF, "status read failed (%s)", strerror(errno));
             usb_close(usb);

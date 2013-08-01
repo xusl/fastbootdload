@@ -317,8 +317,8 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
          }
       case DBT_DEVTYP_DEVICEINTERFACE:
          {
-            UpdateDevice(pDevInf, dwData);
-            //find_devices();
+            //UpdateDevice(pDevInf, dwData);
+            find_devices();
             //do_nothing();
             break;
          }
@@ -592,6 +592,6 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 	if (cfd.DoModal() == IDOK)
 	{
 		m_strPackagePath = cfd.GetPathName();
-		UpdateData(FALSE);	
+		UpdateData(FALSE);
 	}
 }

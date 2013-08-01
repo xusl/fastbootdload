@@ -26,7 +26,7 @@
 #define   TRACE_TAG  TRACE_USB
 #include "adb.h"
 #include "../adbhost.h"
-//#include "fastboot.h"
+#include "../fb/fastboot.h"
 
 #define MAX_ADB_DEVICE  256
  adbhost* device[MAX_ADB_DEVICE]={0,};
@@ -118,10 +118,10 @@ int recognized_device(usb_handle* handle);
 usb_handle* do_usb_open(const wchar_t* interface_name);
 
 /// Writes data to the opened usb handle
-int usb_write(usb_handle* handle, const void* data, int len);
+//int usb_write(usb_handle* handle, const void* data, int len);
 
 /// Reads data using the opened usb handle
-int usb_read(usb_handle *handle, void* data, int len);
+//int usb_read(usb_handle *handle, void* data, int len);
 
 /// Cleans up opened usb handle
 void usb_cleanup_handle(usb_handle* handle);
@@ -281,6 +281,7 @@ int register_new_device(usb_handle* handle) {
   } else if (protocol == FB_PROTOCOL) {
     ERROR("We do not permit fastboot as the first device status!");
     goto register_new_device_out;
+    //handle->status = DEVICE_FLASH;
   }
 
   // Not in the list. Add this handle to the list.
@@ -468,7 +469,7 @@ int usb_write(usb_handle* handle, const void* data, int len) {
 }
 #endif
 
-int usb_read(usb_handle *handle, void* _data, int len) {
+int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
   unsigned long time_out = 500 + len * 8;
   unsigned long read = 0;
   char *data = (char *)_data;
@@ -488,6 +489,9 @@ int usb_read(usb_handle *handle, void* _data, int len) {
       D("usb_read got: %ld, expected: %d, errno: %d, ret: %d\n",
 	  	read, xfer, errno, ret);
       if (ret) {
+        if (!fulfill)
+            return read;
+
         data += read;
         len -= read;
 
@@ -695,7 +699,17 @@ UINT run(LPVOID data) {
   if (handle->status == DEVICE_CHECK) {
     adbhost adb(handle , handle->usb_sn);
     adb.process();
-  } else {
+    add_switch_device(handle);
+    usb_close(handle);
+  } else if (handle->status == DEVICE_FLASH){
+    fastboot fb(handle);
+  fb.fb_queue_display("product","product");
+  fb.fb_queue_display("version","version");
+  fb.fb_queue_display("serialno","serialno");
+  fb.fb_queue_display("kernel","kernel");
+  fb.fb_queue_reboot();
+
+      fb.fb_execute_queue(handle);
   }
   return 0;
 }

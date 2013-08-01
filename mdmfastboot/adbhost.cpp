@@ -81,7 +81,7 @@ adbhost::~adbhost(void)
    if (packet_buffer != NULL)
       put_apacket(packet_buffer);
 
-   kick_transport(&this->t);
+  // kick_transport(&this->t);
    //    transport_unref(&this->t);
    if (this->t.product != NULL)
       free(this->t.product);
@@ -371,6 +371,7 @@ void adbhost::process() {
    //close_remote();
 
 
+
    //need close service now?
    //or do not need close , util connection close?
    connect(&this->t);
@@ -389,9 +390,25 @@ void adbhost::process() {
    do_sync_pull("/usr/ReadMe.txt", "..");
    // 5. close
    close_remote();
+
+    #if 1
+     connect(&this->t);
+   // receive connect from remote
+   if (!handle_connect_response()) {
+      return;
+   }
+
+   // 3. if we receive connect message from remote, do open
+   open_service("shell:reboot-bootloader");//("shell:cat build.prop");
+   //todo:: we should receive : OKAY(send_ready), mean success,
+   //                    or CLOSE(send_ready), which means failure.
+   if (!handle_open_response()) {
+      return;
+   }
+   // 4. do write what we want to do.
+   handle_shell_response();
+   #endif
 }
-
-
 
 int adbhost::do_sync_pull(const char *rpath, const char *lpath)
 {

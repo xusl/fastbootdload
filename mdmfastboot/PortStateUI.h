@@ -1,7 +1,5 @@
 #pragma once
 
-//#include "mdmfastbootDlg.h"
-
 typedef enum
 {
 	PORT_UI_ID_INVALID = 0,

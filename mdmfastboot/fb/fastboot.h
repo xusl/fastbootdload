@@ -56,7 +56,7 @@ struct Action
 };
 class fastboot {
 public:
-	 fastboot();
+	 fastboot(usb_handle * handle);
 	 ~fastboot();
 
    /* protocol.c - fastboot protocol */
@@ -78,12 +78,8 @@ public:
    void fb_execute_queue(usb_handle *usb);
 
 private:
-   //static
-   Action *action_list;// = 0;
-   //static
-   Action *action_last;// = 0;
-
-   //		static
+   Action *action_list;
+   Action *action_last;
    char ERRBUF[128];
 
    Action *queue_action(unsigned op, const char *fmt, ...);

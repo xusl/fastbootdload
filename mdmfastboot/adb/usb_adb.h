@@ -47,7 +47,7 @@ void find_devices();
 
 /* usb host/client interface */
 int usb_write(usb_handle *h, const void *data, int len);
-int usb_read(usb_handle *h, void *data, int len);
+int usb_read(usb_handle *h, void *data, int len, bool fulfill);
 int usb_close(usb_handle *h);
 void usb_kick(usb_handle *h);
 
