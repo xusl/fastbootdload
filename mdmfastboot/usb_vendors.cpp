@@ -23,11 +23,9 @@
 #  include "windows.h"
 #  include "shlobj.h"
 #include "limits.h"
+#include "dirent.h"
 
-
-#include "sysdeps.h"
 #include "adb.h"
-
 
 #define TRACE_TAG               TRACE_USB
 

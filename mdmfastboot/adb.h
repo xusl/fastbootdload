@@ -97,7 +97,7 @@ struct atransport
 
     int fd;
     int transport_socket;
-    fdevent transport_fde;
+//    fdevent transport_fde;
     int ref_count;
     unsigned sync_token;
     int connection_state;
@@ -146,7 +146,7 @@ struct asocket {
         ** us to our fd event system.  For remote asockets
         ** these fields are not used.
         */
-    fdevent fde;
+//    fdevent fde;
     int fd;
 
         /* queue of apackets waiting to be written
@@ -195,7 +195,7 @@ struct alistener
     alistener *next;
     alistener *prev;
 
-    fdevent fde;
+   // fdevent fde;
     int fd;
 
     const char *local_name;

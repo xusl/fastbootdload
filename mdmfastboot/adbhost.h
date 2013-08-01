@@ -13,7 +13,7 @@ when        who          what
               //      #define __ADBHOST_H
               //      ... ...
               //      #endif
-#include "sysdeps.h"
+
 #include "dirent.h"
 #include "file_sync_service.h"
 #include "adb.h"

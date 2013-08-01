@@ -43,7 +43,8 @@ struct adb_deivce {
 
 /// Enumerates present and available interfaces (devices), opens new ones and
 /// registers usb transport for them.
-void find_devices();
+void find_devices(void);
+void adb_usb_init(void);
 
 /* usb host/client interface */
 int usb_write(usb_handle *h, const void *data, int len);

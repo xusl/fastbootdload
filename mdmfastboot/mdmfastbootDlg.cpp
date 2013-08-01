@@ -180,11 +180,11 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
 	//注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
 	RegisterAdbDeviceNotification();
-	usb_vendors_init();
+    adb_usb_init();
 	find_devices();
 	//do_nothing();
 
-    TransverseDevice(6, usb_class_id[0]);
+    //TransverseDevice(6, usb_class_id[0]);
 
 	// 将“关于...”菜单项添加到系统菜单中。
 

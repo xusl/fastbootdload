@@ -19,8 +19,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sysdeps.h"
-
 #define  TRACE_TAG  TRACE_TRANSPORT
 #include "adb.h"
 
@@ -31,6 +29,42 @@ unsigned host_to_le32(unsigned n)
 {
     return n;
 }
+
+
+int check_header(apacket *p)
+{
+    if(p->msg.magic != (p->msg.command ^ 0xffffffff)) {
+        D("check_header(): invalid magic\n");
+        return -1;
+    }
+
+    if(p->msg.data_length > MAX_PAYLOAD) {
+        D("check_header(): %d > MAX_PAYLOAD\n", p->msg.data_length);
+        return -1;
+    }
+
+    return 0;
+}
+
+int check_data(apacket *p)
+{
+    unsigned count, sum;
+    unsigned char *x;
+
+    count = p->msg.data_length;
+    x = p->data;
+    sum = 0;
+    while(count-- > 0) {
+        sum += *x++;
+    }
+
+    if(sum != p->msg.data_check) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
 
 static int remote_read(apacket *p, atransport *t)
 {
@@ -102,6 +136,7 @@ void init_usb_transport(atransport *t, usb_handle *h, int state)
     t->connection_state = state;
     t->type = kTransportUsb;
     t->usb = h;
+//    ADB_MUTEX(transport_lock);
 }
 
 int is_adb_interface(int vid, int pid, int usb_class, int usb_subclass, int usb_protocol)

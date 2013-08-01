@@ -15,6 +15,115 @@
  */
 #ifndef _ADB_UTILS_H
 #define _ADB_UTILS_H
+//In vc9.0 include winsock2.h before windows.h
+#include <winsock2.h>
+#include <windows.h>
+#include <ws2tcpip.h>
+//#include <WinSock.h>
+#include <process.h>
+#include <fcntl.h>
+#include <io.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <ctype.h>
+#include <direct.h>
+#include <afxwin.h>
+
+#define __inline__
+typedef int socklen_t;
+
+#ifndef snprintf
+#define snprintf _snprintf
+#endif
+
+#define OS_PATH_SEPARATOR '\\'
+#define OS_PATH_SEPARATOR_STR "\\"
+
+typedef CRITICAL_SECTION          adb_mutex_t;
+
+#define  ADB_MUTEX_DEFINE(x)     adb_mutex_t   x
+
+/* declare all mutexes */
+//#define  ADB_MUTEX_DECLARE(x)   extern adb_mutex_t  x;
+
+
+#define  ADB_MUTEX(x)  InitializeCriticalSection( & x );
+
+
+static __inline__ void adb_mutex_lock( adb_mutex_t*  lock )
+{
+    EnterCriticalSection( lock );
+}
+
+static __inline__ void  adb_mutex_unlock( adb_mutex_t*  lock )
+{
+    LeaveCriticalSection( lock );
+}
+
+static __inline__ void  adb_sleep_ms( int  mseconds )
+{
+    Sleep( mseconds );
+}
+
+
+#define  lstat    stat   /* no symlinks on Win32 */
+
+//#define  S_ISLNK(m)   0   /* no symlinks on Win32 */
+
+static __inline__  int    adb_unlink(const char*  path)
+{
+    int  rc = unlink(path);
+
+    if (rc == -1 && errno == EACCES) {
+        /* unlink returns EACCES when the file is read-only, so we first */
+        /* try to make it writable, then unlink again...                  */
+        rc = chmod(path, _S_IREAD|_S_IWRITE );
+        if (rc == 0)
+            rc = unlink(path);
+    }
+    return rc;
+}
+#undef  unlink
+#define unlink  ___xxx_unlink
+
+static __inline__ int  adb_mkdir(const char*  path, int mode)
+{
+	return _mkdir(path);
+}
+#undef   mkdir
+#define  mkdir  ___xxx_mkdir
+
+
+static __inline__  const char*  adb_dirstart( const char*  path )
+{
+    const char*  p  = strchr(path, '/');
+    const char*  p2 = strchr(path, '\\');
+
+    if ( !p )
+        p = p2;
+    else if ( p2 && p2 > p )
+        p = p2;
+
+    return p;
+}
+
+static __inline__  const char*  adb_dirstop( const char*  path )
+{
+    const char*  p  = strrchr(path, '/');
+    const char*  p2 = strrchr(path, '\\');
+
+    if ( !p )
+        p = p2;
+    else if ( p2 && p2 > p )
+        p = p2;
+
+    return p;
+}
+
+static __inline__  int  adb_is_absolute_host_path( const char*  path )
+{
+    return isalpha(path[0]) && path[1] == ':' && path[2] == '\\';
+}
 
 /* bounded buffer functions */
 
@@ -71,5 +180,9 @@ CString GetAppPath(CString & sPath );
 void sleep(int seconds);
 long now(void);
 PCHAR WideStrToMultiStr(PWCHAR WideStr);
+
+
+/* normally provided by <cutils/misc.h> */
+extern void*  load_file(const char*  pathname, unsigned*  psize);
 
 #endif /* _ADB_UTILS_H */

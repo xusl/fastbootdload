@@ -5,9 +5,6 @@
 #include "mdmfastboot.h"
 #include "mdmfastbootDlg.h"
 #include "log.h"
-#include "sysdeps.h"
-#include "adb_client.h"
-#include "usb_vendors.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -62,9 +59,7 @@ BOOL CmdmfastbootApp::InitInstance()
 	// 例如修改为公司或组织名
 	SetRegistryKey(_T("TCL MBB MODULE FASTBOOT"));
 
-	StartLogging();//LogFile();
-	//adb_init() ;
-	adb_sysdeps_init();
+	StartLogging();
 
 	CmdmfastbootDlg dlg;
 	m_pMainWnd = &dlg;

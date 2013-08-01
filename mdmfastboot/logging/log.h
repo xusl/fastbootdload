@@ -16,7 +16,7 @@ when        who        what
 #define __LOG_H__
 
 #include "comdef.h"
-#include "utils.h"
+#include "../utils.h"
 
 #ifdef FEATURE_LOG_FILE
 #include <iostream>

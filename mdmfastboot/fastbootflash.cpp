@@ -32,7 +32,7 @@
 #include <string.h>
 //#include <sys/time.h>
 #include <log.h>
-#include "fastboot.h"
+#include "fastbootflash.h"
 int cb_default(Action *a, int status, char *resp);
 int match(char *str, const char **value, unsigned count);
 

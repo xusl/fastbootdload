@@ -15,7 +15,6 @@
  */
 
 #include "stdafx.h"
-#include "sysdeps.h"
 #include <windows.h>
 #include <winerror.h>
 #include <errno.h>
@@ -25,8 +24,9 @@
 
 #define   TRACE_TAG  TRACE_USB
 #include "adb.h"
-#include "../adbhost.h"
-#include "../fb/fastboot.h"
+#include "adbhost.h"
+#include "fastbootflash.h"
+#include "usb_vendors.h"
 
 #define MAX_ADB_DEVICE  256
  adbhost* device[MAX_ADB_DEVICE]={0,};
@@ -136,6 +136,12 @@ int usb_close(usb_handle* handle);
 const wchar_t *usb_name(usb_handle* handle);
 
 UINT run(LPVOID data);
+
+void adb_usb_init( void )
+{
+    ADB_MUTEX(usb_lock);
+	usb_vendors_init();
+}
 
 // \\?\usb#vid_18d1&pid_d00d#5&10cd67f3&0&4#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b}
 // convert to
