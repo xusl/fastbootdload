@@ -91,6 +91,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_COMMAND(ID_HELP, &CmdmfastbootDlg::OnHelp)
 	ON_WM_CLOSE()
 	ON_BN_CLICKED(IDCANCEL, &CmdmfastbootDlg::OnBnClickedCancel)
+	ON_WM_DESTROY()
 END_MESSAGE_MAP()
 
 void CmdmfastbootDlg::OnHelp()
@@ -177,7 +178,7 @@ UINT __cdecl DemoDownloadThread( LPVOID pParam )
 BOOL CmdmfastbootDlg::OnInitDialog()
 {
 	CDialog::OnInitDialog();
-
+	::SetProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP, (HANDLE)1);//for single instance
 	//注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
 	RegisterAdbDeviceNotification();
 	usb_vendors_init();
@@ -673,4 +674,12 @@ void CmdmfastbootDlg::OnBnClickedCancel()
 		}
 	}
 	OnCancel();
+}
+
+void CmdmfastbootDlg::OnDestroy()
+{
+	CDialog::OnDestroy();
+
+	// TODO: 在此处添加消息处理程序代码
+	::RemoveProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP);	//for single instance
 }
