@@ -61,6 +61,10 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CmdmfastbootDlg::IDD, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	pThreadPort1 = NULL;
+	pThreadPort2 = NULL;
+	pThreadPort3 = NULL;
+	pThreadPort4 = NULL;
 
 }
 
@@ -82,52 +86,88 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_MESSAGE(UI_MESSAGE_UPDATE_PROGRESS_INFO, OnUpdateProgressInfo)
 	ON_MESSAGE(UI_MESSAGE_UPDATE_PACKAGE_INFO, OnUpdatePackageInfo)
 	ON_BN_CLICKED(IDC_BTN_BROWSE, &CmdmfastbootDlg::OnBnClickedBtnBrowse)
+	ON_BN_CLICKED(IDOK, &CmdmfastbootDlg::OnBnClickedOk)
+	ON_COMMAND(ID_ABOUT, &CmdmfastbootDlg::OnAbout)
+	ON_COMMAND(ID_HELP, &CmdmfastbootDlg::OnHelp)
+	ON_WM_CLOSE()
+	ON_BN_CLICKED(IDCANCEL, &CmdmfastbootDlg::OnBnClickedCancel)
 END_MESSAGE_MAP()
+
+void CmdmfastbootDlg::OnHelp()
+{
+	AfxMessageBox(L"Help info...");
+}
+
+void CmdmfastbootDlg::OnAbout()
+{
+	CAboutDlg dlgAbout;
+	dlgAbout.DoModal();
+}
 
 UINT __cdecl DemoDownloadThread( LPVOID pParam )
 {
 	TranseInfo *info = (TranseInfo*)pParam;
 	int iProcess = 0;
 	sleep(info->portUI->iID-1);
-	UIInfo uiInfoV;
-	UIInfo uiInfoS;
+	UIInfo& uiInfoV = info->portUI->m_PortProgressValue;
+	UIInfo& uiInfoS = info->portUI->m_PortProgressInfo;
 
-	UIInfo uiInfoFrw;
+	UIInfo& uiInfoFrw = info->portUI->m_PortFrmVer;
 	uiInfoFrw.infoType = FIRMWARE_VER;
 	uiInfoFrw.sVal = "VX140100BX";
 	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoFrw);
 
-	UIInfo uiInfoQCN;
+	UIInfo& uiInfoQCN = info->portUI->m_PortQCNVer;
 	uiInfoQCN.infoType = QCN_VER;
 	uiInfoQCN.sVal = "VA340100BV";
 	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoQCN);
 
-	UIInfo uiInfoLinux;
+	UIInfo& uiInfoLinux = info->portUI->m_PortLinuxVer;
 	uiInfoLinux.infoType = LINUX_VER;
 	uiInfoLinux.sVal = "VXB4010000";
 	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoLinux);
 
-	while (1)
+	int iDownloadTimes = 3;
+	for (int i=0; i<iDownloadTimes; i++)
 	{
-		iProcess++;
-		uiInfoV.infoType = PROGRESS_VAL;
-		uiInfoV.iVal = iProcess%100;
-		::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoV);
-
-		uiInfoS.infoType = PROGRESS_STR;
-		if (uiInfoV.iVal==5)
+		iProcess = 0;
+		while (1)
 		{
-			uiInfoS.sVal = "Initial...";
-			::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
-		}
-		else if (uiInfoV.iVal==30)
-		{
-			uiInfoS.sVal = "Downloading...";
-			::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
-		}
+			iProcess++;
+			uiInfoV.infoType = PROGRESS_VAL;
+			uiInfoV.iVal = iProcess%100;
+			::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoV);
 
-		Sleep(10);
+			uiInfoS.infoType = PROGRESS_STR;
+			if (uiInfoV.iVal==5)
+			{
+				uiInfoS.sVal = "Initial...";
+				::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
+			}
+			else if (uiInfoV.iVal==30)
+			{
+				uiInfoS.sVal = "Downloading...";
+				::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
+			}
+			if (uiInfoV.iVal==0)
+			{
+				break;
+			}
+			Sleep(10);
+		}
 	}
+
+	//clear info
+	uiInfoFrw.sVal = "";
+	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoFrw);
+	uiInfoQCN.sVal = "";
+	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoQCN);
+	uiInfoLinux.sVal = "";
+	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoLinux);
+	uiInfoS.sVal = "Finished";
+	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
+	//end
+
 	AfxEndThread(0);
 	return 0;
 }
@@ -196,16 +236,16 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
 	TranseInfo1.dlgMain = this;
 	TranseInfo1.portUI = &PortStateUI1;
-	AfxBeginThread(DemoDownloadThread, &TranseInfo1);
+	pThreadPort1 = AfxBeginThread(DemoDownloadThread, &TranseInfo1);
 	TranseInfo2.dlgMain = this;
 	TranseInfo2.portUI = &PortStateUI2;
-	AfxBeginThread(DemoDownloadThread, &TranseInfo2);
+	pThreadPort2 = AfxBeginThread(DemoDownloadThread, &TranseInfo2);
 	TranseInfo3.dlgMain = this;
 	TranseInfo3.portUI = &PortStateUI3;
-	AfxBeginThread(DemoDownloadThread, &TranseInfo3);
+	pThreadPort3 = AfxBeginThread(DemoDownloadThread, &TranseInfo3);
 	TranseInfo4.dlgMain = this;
 	TranseInfo4.portUI = &PortStateUI4;
-	AfxBeginThread(DemoDownloadThread, &TranseInfo4);
+	pThreadPort4 = AfxBeginThread(DemoDownloadThread, &TranseInfo4);
 	//end
 #endif
 
@@ -580,7 +620,7 @@ void CmdmfastbootDlg::UpdatePortUI(CPortStateUI& portUI, UIInfo* uiInfo)
 void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 {
 	// TODO: 在此添加控件通知处理程序代码
-	CString str = _T("Img File (*.img)|All Files (*.*)|*.*||");
+	CString str = _T("Img File (*.img)|*.img|All Files (*.*)|*.*||");
 
 	CFileDialog cfd( TRUE,
 		NULL,
@@ -594,4 +634,43 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 		m_strPackagePath = cfd.GetPathName();
 		UpdateData(FALSE);
 	}
+}
+
+void CmdmfastbootDlg::OnBnClickedOk()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
+}
+
+void CmdmfastbootDlg::OnClose()
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	CDialog::OnClose();
+}
+
+void CmdmfastbootDlg::OnBnClickedCancel()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	DWORD dwExitCode = 0;
+	CWinThread* threadArry[] = {pThreadPort1, pThreadPort2, pThreadPort3, pThreadPort4};
+	for (int i=0; i<sizeof(threadArry)/sizeof(threadArry[0]); i++)
+	{
+		if (NULL!=threadArry[i])
+		{
+			GetExitCodeThread(threadArry[i]->m_hThread, &dwExitCode);
+			if (dwExitCode == STILL_ACTIVE)
+			{
+				int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?", MB_YESNO|MB_DEFBUTTON2);
+				if (IDYES==iRet)
+				{
+					break;
+				}
+				else
+				{
+					return;
+				}
+			}
+		}
+	}
+	OnCancel();
 }
