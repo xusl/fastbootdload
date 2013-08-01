@@ -36,6 +36,38 @@ CmdmfastbootApp theApp;
 
 BOOL CmdmfastbootApp::InitInstance()
 {
+	//for single instance
+	SetLastError(0);
+	HANDLE hSem = CreateSemaphore(NULL, 1, 1, JRD_MDM_FASTBOOT_TOOL_APP);
+	if (GetLastError() == ERROR_ALREADY_EXISTS)
+	{
+		CloseHandle(hSem);
+		// 寻找先前实例的主窗口
+		HWND hWndPrevious = ::GetWindow(::GetDesktopWindow(), GW_CHILD);
+		while (::IsWindow(hWndPrevious))
+		{
+			// 检查窗口是否有预设的标记?
+			// 有，则是我们寻找的主窗
+			if (::GetProp(hWndPrevious, JRD_MDM_FASTBOOT_TOOL_APP))
+			{
+				// 主窗口已最小化，则恢复其大小
+				if (::IsIconic(hWndPrevious))
+					::ShowWindow(hWndPrevious, SW_RESTORE);
+				// 将主窗激活
+				::SetForegroundWindow(hWndPrevious);
+				// 将主窗的对话框激活
+				::SetForegroundWindow(::GetLastActivePopup(hWndPrevious));
+				// 退出本实例
+				return FALSE;
+			}
+
+			// 继续寻找下一个窗口
+			hWndPrevious = ::GetWindow(hWndPrevious, GW_HWNDNEXT);
+		}
+		return FALSE;
+	}
+	//for single instance end
+
 	// 如果一个运行在 Windows XP 上的应用程序清单指定要
 	// 使用 ComCtl32.dll 版本 6 或更高版本来启用可视化方式，
 	//则需要 InitCommonControlsEx()。否则，将无法创建窗口。

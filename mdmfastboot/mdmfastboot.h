@@ -9,6 +9,7 @@
 
 #include "resource.h"		// 主符号
 
+#define JRD_MDM_FASTBOOT_TOOL_APP L"JRD_MDM_FASTBOOT_TOOL"
 
 // CmdmfastbootApp:
 // 有关此类的实现，请参阅 mdmfastboot.cpp
