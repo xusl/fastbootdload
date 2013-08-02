@@ -67,6 +67,12 @@ static void dump_packet( const char*  tag, apacket* const p)
 }
 #endif
 
+adbhost::adbhost(usb_handle *usb)
+{
+   adbhost(usb, usb_port_address(usb));
+}
+
+
 adbhost::adbhost(usb_handle *usb, unsigned address):
    id(address)
 {
@@ -391,7 +397,7 @@ void adbhost::process() {
    // 5. close
    close_remote();
 
-    #if 1
+    #if 0
      connect(&this->t);
    // receive connect from remote
    if (!handle_connect_response()) {
@@ -408,6 +414,26 @@ void adbhost::process() {
    // 4. do write what we want to do.
    handle_shell_response();
    #endif
+}
+
+int adbhost::reboot_bootloader(void) {
+
+     connect(&this->t);
+   // receive connect from remote
+   if (!handle_connect_response()) {
+      return -1;
+   }
+
+   // 3. if we receive connect message from remote, do open
+   open_service("shell:reboot-bootloader");//("shell:cat build.prop");
+   //todo:: we should receive : OKAY(send_ready), mean success,
+   //                    or CLOSE(send_ready), which means failure.
+   if (!handle_open_response()) {
+      return -1;
+   }
+   // 4. do write what we want to do.
+   handle_shell_response();
+   return 0;
 }
 
 int adbhost::do_sync_pull(const char *rpath, const char *lpath)

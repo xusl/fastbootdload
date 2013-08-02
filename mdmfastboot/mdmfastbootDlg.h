@@ -9,6 +9,7 @@
 #include <initguid.h>
 #include <setupapi.h>
 #include "PortStateUI.h"
+#include "usb_adb.h"
 
 enum
 {
@@ -16,6 +17,7 @@ enum
 	UI_MESSAGE_BASE = (WM_USER + 1000),
 	UI_MESSAGE_UPDATE_PROGRESS_INFO,
 	UI_MESSAGE_UPDATE_PACKAGE_INFO,
+	UI_MESSAGE_DEVICE_INFO,
 };
 
 class CmdmfastbootDlg;
@@ -80,6 +82,8 @@ public:
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 
 	BOOL RegisterAdbDeviceNotification(void);
+  BOOL AdbUsbHandler(void);
+  LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
 	void UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 	afx_msg void OnBnClickedBtnBrowse();
 	afx_msg void OnBnClickedOk();

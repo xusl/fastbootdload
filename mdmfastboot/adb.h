@@ -29,9 +29,6 @@ extern "C" {
 
 //typedef struct amessage amessage;
 
-typedef struct asocket asocket;
-typedef struct alistener alistener;
-typedef struct aservice aservice;
 typedef struct atransport atransport;
 typedef struct adisconnect  adisconnect;
 
@@ -97,7 +94,6 @@ struct atransport
 
     int fd;
     int transport_socket;
-//    fdevent transport_fde;
     int ref_count;
     unsigned sync_token;
     int connection_state;
@@ -110,147 +106,16 @@ struct atransport
         /* used to identify transports for clients */
     char *serial;
     char *product;
-    int adb_port; // Use for emulators (local transport)
 
         /* a list of adisconnect callbacks called when the transport is kicked */
     int          kicked;
     adisconnect  disconnects;
 };
 
-/* An asocket represents one half of a connection between a local and
-** remote entity.  A local asocket is bound to a file descriptor.  A
-** remote asocket is bound to the protocol engine.
-*/
-struct asocket {
-        /* chain pointers for the local/remote list of
-        ** asockets that this asocket lives in
-        */
-    asocket *next;
-    asocket *prev;
-
-        /* the unique identifier for this asocket
-        */
-    unsigned id;
-
-        /* flag: set when the socket's peer has closed
-        ** but packets are still queued for delivery
-        */
-    int    closing;
-
-        /* the asocket we are connected to
-        */
-
-    asocket *peer;
-
-        /* For local asockets, the fde is used to bind
-        ** us to our fd event system.  For remote asockets
-        ** these fields are not used.
-        */
-//    fdevent fde;
-    int fd;
-
-        /* queue of apackets waiting to be written
-        */
-    apacket *pkt_first;
-    apacket *pkt_last;
-
-        /* enqueue is called by our peer when it has data
-        ** for us.  It should return 0 if we can accept more
-        ** data or 1 if not.  If we return 1, we must call
-        ** peer->ready() when we once again are ready to
-        ** receive data.
-        */
-    int (*enqueue)(asocket *s, apacket *pkt);
-
-        /* ready is called by the peer when it is ready for
-        ** us to send data via enqueue again
-        */
-    void (*ready)(asocket *s);
-
-        /* close is called by the peer when it has gone away.
-        ** we are not allowed to make any further calls on the
-        ** peer once our close method is called.
-        */
-    void (*close)(asocket *s);
-
-        /* socket-type-specific extradata */
-    void *extra;
-
-    	/* A socket is bound to atransport */
-    atransport *transport;
-};
-
-
-/* A listener is an entity which binds to a local port
-** and, upon receiving a connection on that port, creates
-** an asocket to connect the new local connection to a
-** specific remote service.
-**
-** TODO: some listeners read from the new connection to
-** determine what exact service to connect to on the far
-** side.
-*/
-struct alistener
-{
-    alistener *next;
-    alistener *prev;
-
-   // fdevent fde;
-    int fd;
-
-    const char *local_name;
-    const char *connect_to;
-    atransport *transport;
-    adisconnect  disconnect;
-};
-
-
-
-#define  LOCAL_CLIENT_PREFIX  "emulator-"
-
 void send_packet(apacket *p, atransport *t);
-
-
-/* transports are ref-counted
-** get_device_transport does an acquire on your behalf before returning
-*/
-
-int  list_transports(char *buf, size_t  bufsize);
-void update_transports(void);
-
-asocket*  create_device_tracker(void);
-
-/* Obtain a transport from the available transports.
-** If state is != CS_ANY, only transports in that state are considered.
-** If serial is non-NULL then only the device with that serial will be chosen.
-** If no suitable transport is found, error is set.
-*/
-atransport *acquire_one_transport(int state, transport_type ttype, const char* serial, char **error_out);
-void   add_transport_disconnect( atransport*  t, adisconnect*  dis );
-void   remove_transport_disconnect( atransport*  t, adisconnect*  dis );
-void   run_transport_disconnects( atransport*  t );
-void   kick_transport( atransport*  t );
 
 /* initialize a transport object's func pointers and state */
 void init_usb_transport(atransport *t, usb_handle *usb, int state);
-
-
-/* cause new transports to be init'd and added to the list */
-void register_socket_transport(int s, const char *serial, int port, int local);
-
-/* these should only be used for the "adb disconnect" command */
-void unregister_transport(atransport *t);
-void unregister_all_tcp_transports();
-
-
-
-atransport *find_transport(const char *serial);
-
-
-int service_to_fd(const char *name);
-#if ADB_HOST
-asocket *host_service_to_socket(const char*  name, const char *serial);
-#endif
 
 /* packet allocator */
 apacket *get_apacket(void);
@@ -267,17 +132,8 @@ int readx(int fd, void *ptr, size_t len);
 int writex(int fd, const void *ptr, size_t len);
 
 /* used for USB device detection */
-#if ADB_HOST
 int is_adb_interface(int vid, int pid, int usb_class, int usb_subclass, int usb_protocol);
 int is_fastboot_interface(int vid, int pid, int usb_class, int usb_subclass, int usb_protocol);
-#endif
-int install_listener(const char *local_name, const char *connect_to, atransport* transport);
-void build_local_name(char* target_str, size_t target_size, int server_port);
-
-unsigned host_to_le32(unsigned n);
-int adb_commandline(int argc, char **argv);
-
-int connection_state(atransport *t);
 
 #define CS_ANY       -1
 #define CS_OFFLINE    0
@@ -287,11 +143,7 @@ int connection_state(atransport *t);
 #define CS_RECOVERY   4
 #define CS_NOPERM     5 /* Insufficient permissions to communicate with the device */
 
-
 #define CHUNK_SIZE (64*1024)
-
-int sendfailmsg(int fd, const char *reason);
-int handle_host_request(char *service, transport_type ttype, char* serial, int reply_fd, asocket *s);
 
 #ifdef __cplusplus
 }

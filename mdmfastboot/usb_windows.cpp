@@ -28,20 +28,7 @@
 #include "fastbootflash.h"
 #include "usb_vendors.h"
 
-#define MAX_ADB_DEVICE  256
- adbhost* device[MAX_ADB_DEVICE]={0,};
-static int device_count = 0;
 
-typedef enum {
-    DEVICE_UNKNOW = 0,
-    //DEVICE_PLUGIN,
-    DEVICE_CHECK,//ADB,
-    //DEVICE_SWITCH,
-    DEVICE_FLASH,//FASTBOOT,
-    DEVICE_CONFIGURE,
-    DEVICE_REMOVE,
-    DEVICE_MAX
-}usb_dev_t;
 
 /** Structure usb_handle describes our connection to the usb device via
   AdbWinApi.dll. This structure is returned from usb_open() routine and
@@ -68,6 +55,7 @@ struct usb_handle {
 
   int interface_protocol;
   usb_dev_t status;
+  bool work;
   long usb_sn;
 
   /// Mask for determining when to use zero length packets
@@ -181,7 +169,7 @@ long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
 }
 
 
-int add_switch_device(usb_handle* handle) {
+int usb_switch_device(usb_handle* handle) {
   dev_switch_t* dev = (dev_switch_t*)malloc(sizeof(dev_switch_t));
 
   dev->usb_sn = handle->usb_sn;
@@ -295,6 +283,7 @@ int register_new_device(usb_handle* handle) {
   handle->prev = handle_list.prev;
   handle->prev->next = handle;
   handle->next->prev = handle;
+  handle->work = FALSE;
   ret = 1;
 
 register_new_device_out:
@@ -585,6 +574,23 @@ const wchar_t *usb_name(usb_handle* handle) {
   return handle->interface_name;
 }
 
+long usb_port_address(usb_handle* handle) {
+  if (NULL == handle) {
+    SetLastError(ERROR_INVALID_HANDLE);
+    errno = ERROR_INVALID_HANDLE;
+    return NULL;
+  }
+
+  return handle->usb_sn;
+}
+
+usb_dev_t usb_status(usb_handle* handle) {
+     if (NULL == handle) {
+        return DEVICE_UNKNOW;
+     }
+    return handle->status;
+}
+
 int recognized_device(usb_handle* handle) {
   USB_DEVICE_DESCRIPTOR device_desc;
   USB_INTERFACE_DESCRIPTOR interf_desc;
@@ -701,11 +707,12 @@ void find_devices() {
 
 UINT run(LPVOID data) {
   usb_handle * handle = (usb_handle*)data;
+  handle->work = TRUE;
 
   if (handle->status == DEVICE_CHECK) {
     adbhost adb(handle , handle->usb_sn);
     adb.process();
-    add_switch_device(handle);
+    usb_switch_device(handle);
     usb_close(handle);
   } else if (handle->status == DEVICE_FLASH){
     fastboot fb(handle);
@@ -718,6 +725,28 @@ UINT run(LPVOID data) {
       fb.fb_execute_queue(handle);
   }
   return 0;
+}
+
+usb_handle* usb_handle_enum_init(void) {
+    return handle_list.next;
+}
+
+usb_handle* usb_handle_next(usb_handle* usb) {
+    if (usb == NULL || usb == &handle_list)
+        return NULL;
+    return usb->next;
+}
+
+void usb_set_work(usb_handle* usb) {
+    if (usb != NULL)
+      usb->work = TRUE;
+}
+
+bool usb_is_work(usb_handle* usb) {
+     if (usb != NULL)
+        return usb->work;
+
+     return false;
 }
 
 UINT do_nothing() {

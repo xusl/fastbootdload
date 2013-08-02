@@ -48,11 +48,12 @@ typedef struct {
 class adbhost
 {
 	public:
-		adbhost(void);
+		adbhost(usb_handle *usb);
 		adbhost(usb_handle *usb, unsigned address);
 		~adbhost(void);
 
 		void process(void);
+    int reboot_bootloader(void);
 
 	private:
 		void open_service(const char *destination);

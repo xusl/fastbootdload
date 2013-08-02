@@ -183,6 +183,6 @@ PCHAR WideStrToMultiStr(PWCHAR WideStr);
 
 
 /* normally provided by <cutils/misc.h> */
-extern void*  load_file(const char*  pathname, unsigned*  psize);
+extern void* load_file(LPCWSTR pathname, unsigned*  psize);
 
 #endif /* _ADB_UTILS_H */

@@ -32,14 +32,17 @@
 #define OP_NOTICE     4
 
 typedef struct usb_handle usb_handle;
-typedef struct adb_deivce adb_deivce;
-struct adb_deivce {
-	struct usb_handle *usb;
-	int address;
-	int state;
-	//Action *action_list;
-	//Action *action_last;
-};
+
+typedef enum {
+    DEVICE_UNKNOW = 0,
+    //DEVICE_PLUGIN,
+    DEVICE_CHECK,//ADB,
+    //DEVICE_SWITCH,
+    DEVICE_FLASH,//FASTBOOT,
+    DEVICE_CONFIGURE,
+    DEVICE_REMOVE,
+    DEVICE_MAX
+}usb_dev_t;
 
 /// Enumerates present and available interfaces (devices), opens new ones and
 /// registers usb transport for them.
@@ -51,5 +54,15 @@ int usb_write(usb_handle *h, const void *data, int len);
 int usb_read(usb_handle *h, void *data, int len, bool fulfill);
 int usb_close(usb_handle *h);
 void usb_kick(usb_handle *h);
+
+int usb_switch_device(usb_handle* handle);
+
+usb_handle* usb_handle_enum_init(void);
+usb_handle* usb_handle_next(usb_handle* usb);
+void usb_set_work(usb_handle* usb);
+long usb_port_address(usb_handle* handle);
+const wchar_t *usb_name(usb_handle* handle);
+usb_dev_t usb_status(usb_handle* handle);
+bool usb_is_work(usb_handle* usb);
 
 #endif /* _USB_ADB_H */

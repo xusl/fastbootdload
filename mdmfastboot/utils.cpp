@@ -248,13 +248,13 @@ PCHAR WideStrToMultiStr(PWCHAR WideStr)
 /**************************************************************************/
 /**************************************************************************/
 
-void *load_file(const char *fn, unsigned *_sz)
+void *load_file(LPCWSTR fn, unsigned *_sz)
 {
     HANDLE    file;
     char     *data;
     DWORD     file_size;
 
-    file = CreateFile( reinterpret_cast<LPCWSTR>(fn),
+    file = CreateFile( fn,
                        GENERIC_READ,
                        FILE_SHARE_READ,
                        NULL,

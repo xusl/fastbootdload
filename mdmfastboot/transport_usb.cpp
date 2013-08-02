@@ -25,11 +25,6 @@
 #include "usb_vendors.h"
 
 #define fix_endians(p) do {} while (0)
-unsigned host_to_le32(unsigned n)
-{
-    return n;
-}
-
 
 int check_header(apacket *p)
 {

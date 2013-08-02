@@ -6,7 +6,10 @@
 #include "mdmfastboot.h"
 #include "mdmfastbootDlg.h"
 #include "usb_adb.h"
+#include "fastbootflash.h"
+#include "adbhost.h"
 #include "usb_vendors.h"
+
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -22,7 +25,6 @@ static const GUID usb_class_id[] = {
 	//{0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED}},
 };
 
-extern UINT do_nothing(void);
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -85,6 +87,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_WM_GETMINMAXINFO()
 	ON_MESSAGE(UI_MESSAGE_UPDATE_PROGRESS_INFO, OnUpdateProgressInfo)
 	ON_MESSAGE(UI_MESSAGE_UPDATE_PACKAGE_INFO, OnUpdatePackageInfo)
+	ON_MESSAGE(UI_MESSAGE_DEVICE_INFO, OnDeviceInfo)
 	ON_BN_CLICKED(IDC_BTN_BROWSE, &CmdmfastbootDlg::OnBnClickedBtnBrowse)
 	ON_BN_CLICKED(IDOK, &CmdmfastbootDlg::OnBnClickedOk)
 	ON_COMMAND(ID_ABOUT, &CmdmfastbootDlg::OnAbout)
@@ -182,8 +185,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 	//注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
 	RegisterAdbDeviceNotification();
     adb_usb_init();
-	find_devices();
-	//do_nothing();
+	AdbUsbHandler();
 
     //TransverseDevice(6, usb_class_id[0]);
 
@@ -359,15 +361,14 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       case DBT_DEVTYP_DEVICEINTERFACE:
          {
             //UpdateDevice(pDevInf, dwData);
-            find_devices();
-            //do_nothing();
+            AdbUsbHandler();
             break;
          }
       }
    }
    else if (nEventType == DBT_DEVICEREMOVECOMPLETE)
    {
-      if (phdr->dbch_devicetype == DBT_DEVTYP_PORT)
+      if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE)
       {
          /* enumerate device and check if the port
           * composite should be removed
@@ -378,6 +379,81 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 
    return TRUE;
 }
+
+
+typedef struct {
+    HWND hWnd;
+    CPortStateUI ctl;
+    usb_handle * usb;
+} usb_work_data;
+
+
+LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
+{
+	int iUiSerial = (int)wParam;
+	UIInfo* uiInfo = (UIInfo*)lParam;
+	switch(iUiSerial)
+	{
+	case PORT_UI_ID_FIRST:
+		UpdatePortUI(PortStateUI1, uiInfo);
+		break;
+	case PORT_UI_ID_SECOND:
+		UpdatePortUI(PortStateUI2, uiInfo);
+		break;
+	case PORT_UI_ID_THIRD:
+		UpdatePortUI(PortStateUI3, uiInfo);
+		break;
+	case PORT_UI_ID_FOURTH:
+		UpdatePortUI(PortStateUI4, uiInfo);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+UINT usb_work(LPVOID data) {
+  usb_handle * handle = (usb_handle*)data;
+usb_dev_t status = usb_status( handle);
+  if (status == DEVICE_CHECK) {
+    adbhost adb(handle , usb_port_address(handle));
+    adb.process();
+    adb.reboot_bootloader();
+    usb_switch_device(handle);
+    usb_close(handle);
+  } else if (status == DEVICE_FLASH){
+    fastboot fb(handle);
+      fb.fb_queue_display("product","product");
+      fb.fb_queue_display("version","version");
+      fb.fb_queue_display("serialno","serialno");
+      fb.fb_queue_display("kernel","kernel");
+      fb.fb_queue_reboot();
+      fb.fb_execute_queue(handle);
+  }
+  return 0;
+}
+
+BOOL CmdmfastbootDlg::AdbUsbHandler(void) {
+    usb_handle* handle;
+    find_devices();
+
+    for (handle = usb_handle_enum_init();
+    handle != NULL;
+    handle = usb_handle_next(handle)) {
+        if (!usb_is_work(handle)) {
+        usb_set_work(handle);
+
+
+	TranseInfo1.dlgMain = this;
+	TranseInfo1.portUI = &PortStateUI1;
+	AfxBeginThread(usb_work, &TranseInfo1);
+        ;
+            }
+    }
+
+	return TRUE;
+}
+
 
 void CmdmfastbootDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
 {
@@ -462,7 +538,7 @@ void CmdmfastbootDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARA
 
    SetupDiDestroyDeviceInfoList(hDevInfo);
 }
-
+#if 0
 void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet) {
   BOOL bResult;
   PSP_DEVICE_INTERFACE_DETAIL_DATA   pDetail   =NULL;
@@ -505,6 +581,7 @@ void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet) {
   }
 //  GlobalFree
 }
+#endif
 
 void CmdmfastbootDlg::OnBnClickedButtonStop()
 {
