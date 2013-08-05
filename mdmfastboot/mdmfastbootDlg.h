@@ -21,6 +21,15 @@ enum
 };
 
 class CmdmfastbootDlg;
+
+typedef struct {
+    CWnd* hWnd;
+    CPortStateUI  ctl;
+    usb_handle * usb;
+    int usb_sn;
+} UsbWorkData;
+
+
 struct TranseInfo
 {
 	CmdmfastbootDlg*	dlgMain;
@@ -46,6 +55,7 @@ public:
 // й╣ож
 protected:
 	HICON m_hIcon;
+  BOOL m_bInit;
 	CWinThread* pThreadPort1;
 	CWinThread* pThreadPort2;
 	CWinThread* pThreadPort3;
@@ -65,6 +75,8 @@ protected:
 public:
 	afx_msg void OnBnClickedButtonStop();
 
+  UsbWorkData data[4];
+
 	//port UI
 	CPortStateUI PortStateUI1;
 	CPortStateUI PortStateUI2;
@@ -82,7 +94,8 @@ public:
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 
 	BOOL RegisterAdbDeviceNotification(void);
-  BOOL AdbUsbHandler(void);
+  BOOL AdbUsbHandler(BOOL update_device);
+  BOOL SetPortDialogs(UINT nType, int x, int y, int w, int h);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
 	void UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 	afx_msg void OnBnClickedBtnBrowse();
@@ -90,4 +103,10 @@ public:
 	afx_msg void OnClose();
 	afx_msg void OnBnClickedCancel();
 	afx_msg void OnDestroy();
+
+  private:
+    UsbWorkData * GetUsbWorkData(usb_handle* handle);
+    BOOL InitUsbWorkData(void);
+    BOOL CleanUsbWorkData(UsbWorkData *data);
+    BOOL SwitchUsbWorkData(UsbWorkData *data);
 };

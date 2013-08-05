@@ -63,6 +63,7 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CmdmfastbootDlg::IDD, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+    m_bInit = FALSE;
 	pThreadPort1 = NULL;
 	pThreadPort2 = NULL;
 	pThreadPort3 = NULL;
@@ -176,18 +177,111 @@ UINT __cdecl DemoDownloadThread( LPVOID pParam )
 	return 0;
 }
 
+
+void CmdmfastbootDlg::UpdatePortUI(CPortStateUI& portUI, UIInfo* uiInfo)
+{
+	switch(uiInfo->infoType)
+	{
+	case PROGRESS_VAL:
+		portUI.SetProgress(uiInfo->iVal);
+			break;
+
+	default:
+		portUI.SetInfo(uiInfo->infoType, uiInfo->sVal);
+		break;
+	}
+}
+
+BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
+{
+  int size = sizeof(this->data) / sizeof(this->data[0]);
+  int r, c, pw, ph;
+  CPortStateUI*  port;
+  int R_NUM, C_NUM;
+
+  R_NUM = 2;
+  C_NUM = size / R_NUM;
+  pw = w / C_NUM;
+  ph = h / R_NUM;
+
+  for (r = 0; r < R_NUM; r++) {
+    for (c = 0; c < C_NUM; c++) {
+      port = &this->data[r * R_NUM + c].ctl;
+      port->SetWindowPos(0,
+                         x + c * pw,
+                         y + r * ph,
+                         pw,
+                         ph,
+                         0);
+    }
+  }
+
+  return true;
+}
+
+BOOL CmdmfastbootDlg::InitUsbWorkData(void)
+{
+  int size = sizeof(this->data) / sizeof(this->data[0]);
+  UsbWorkData* workdata;
+  int i= 0;
+  for (; i < size; i++) {
+    workdata = data + i;
+    workdata->hWnd = this;
+    workdata->ctl.Create(IDD_PORT_STATE, this);
+    workdata->ctl.Init(i);
+    workdata->usb = NULL;
+  }
+  return TRUE;
+}
+
+BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
+  if (data == NULL) {
+    ERROR("Invalid parameter");
+    return FALSE;
+  }
+  data->usb = NULL;
+  data->usb_sn = ~1L;
+  return TRUE;
+}
+
+BOOL CmdmfastbootDlg::SwitchUsbWorkData(UsbWorkData *data) {
+  if (data == NULL) {
+    ERROR("Invalid parameter");
+    return FALSE;
+  }
+  data->usb = NULL;
+  return TRUE;
+}
+
+UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(usb_handle* handle) {
+  if (handle == NULL) {
+    return NULL;
+  }
+
+  int size = sizeof(this->data) / sizeof(this->data[0]);
+  long usb_sn = usb_port_address(handle);
+  int i= 0;
+
+  // first search the before, for switch device.
+  for (; i < size; i++) {
+    if (this->data[i].usb_sn == usb_sn && this->data[i].usb == NULL)
+      return data + i;
+  }
+
+  for (i=0; i < size; i++) {
+    if (this->data[i].usb == NULL)
+      return data + i;
+  }
+
+  return NULL;
+}
+
 // CmdmfastbootDlg 消息处理程序
 
 BOOL CmdmfastbootDlg::OnInitDialog()
 {
 	CDialog::OnInitDialog();
 	::SetProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP, (HANDLE)1);//for single instance
-	//注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
-	RegisterAdbDeviceNotification();
-    adb_usb_init();
-	AdbUsbHandler();
-
-    //TransverseDevice(6, usb_class_id[0]);
 
 	// 将“关于...”菜单项添加到系统菜单中。
 
@@ -212,23 +306,12 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// 设置大图标
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
-
-	// TODO: 在此添加额外的初始化代码
-	PortStateUI1.Create(IDD_PORT_STATE, this);
-	PortStateUI1.Init(PORT_UI_ID_FIRST);
-
-	PortStateUI2.Create(IDD_PORT_STATE, this);
-	PortStateUI2.Init(PORT_UI_ID_SECOND);
-
-	PortStateUI3.Create(IDD_PORT_STATE, this);
-	PortStateUI3.Init(PORT_UI_ID_THIRD);
-
-	PortStateUI4.Create(IDD_PORT_STATE, this);
-	PortStateUI4.Init(PORT_UI_ID_FOURTH);
+    InitUsbWorkData();
+    m_bInit = TRUE;
 
 	ShowWindow(SW_MAXIMIZE);
 
-#if 1
+
 	//ui test beging
 	m_strFrmVer = L"VX140100BX";
 	::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, FIRMWARE_VER, (LPARAM)&m_strFrmVer);
@@ -236,7 +319,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 	::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, QCN_VER, (LPARAM)&m_strQCNVer);
 	m_strLinuxVer = L"VXB4010000";
 	::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, LINUX_VER, (LPARAM)&m_strLinuxVer);
-
+#if 0
 	TranseInfo1.dlgMain = this;
 	TranseInfo1.portUI = &PortStateUI1;
 	pThreadPort1 = AfxBeginThread(DemoDownloadThread, &TranseInfo1);
@@ -251,6 +334,18 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 	pThreadPort4 = AfxBeginThread(DemoDownloadThread, &TranseInfo4);
 	//end
 #endif
+
+
+	//注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
+	RegisterAdbDeviceNotification();
+    adb_usb_init();
+	AdbUsbHandler(true);
+
+    //test
+    unsigned size;
+    void * data;
+    data = load_file(L"ReadMe.txt", &size);
+    free(data);
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -361,7 +456,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       case DBT_DEVTYP_DEVICEINTERFACE:
          {
             //UpdateDevice(pDevInf, dwData);
-            AdbUsbHandler();
+            AdbUsbHandler(true);
             break;
          }
       }
@@ -381,77 +476,163 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 }
 
 
-typedef struct {
-    HWND hWnd;
-    CPortStateUI ctl;
-    usb_handle * usb;
-} usb_work_data;
-
-
 LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 {
-	int iUiSerial = (int)wParam;
-	UIInfo* uiInfo = (UIInfo*)lParam;
-	switch(iUiSerial)
-	{
-	case PORT_UI_ID_FIRST:
-		UpdatePortUI(PortStateUI1, uiInfo);
-		break;
-	case PORT_UI_ID_SECOND:
-		UpdatePortUI(PortStateUI2, uiInfo);
-		break;
-	case PORT_UI_ID_THIRD:
-		UpdatePortUI(PortStateUI3, uiInfo);
-		break;
-	case PORT_UI_ID_FOURTH:
-		UpdatePortUI(PortStateUI4, uiInfo);
-		break;
-	default:
-		break;
-	}
-	return 0;
+  UsbWorkData* data = (UsbWorkData*)lParam;
+  UIInfo* uiInfo = (UIInfo*)wParam;
+
+  if ( uiInfo == NULL) {
+    ERROR("Invalid wParam");
+    return -1;
+  }
+
+  if (data == NULL ) {
+    ERROR("Invalid lParam");
+    delete uiInfo;
+    return -1;
+  }
+
+  switch(uiInfo->infoType ) {
+  case REBOOT_DEVICE:
+    SwitchUsbWorkData(data);
+    data->ctl.SetInfo(uiInfo->infoType, uiInfo->sVal);
+    break;
+
+  case TITLE:
+        data->ctl.SetTitle(uiInfo->sVal);
+
+  case PROGRESS_VAL:
+    data->ctl.SetProgress(uiInfo->iVal);
+    break;
+
+  default:
+    data->ctl.SetInfo(uiInfo->infoType, uiInfo->sVal);
+    }
+
+  delete uiInfo;
+  return 0;
 }
 
-UINT usb_work(LPVOID data) {
-  usb_handle * handle = (usb_handle*)data;
-usb_dev_t status = usb_status( handle);
+
+UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCHAR msg) {
+   UIInfo* info = new UIInfo();
+
+    info->infoType = info_type;
+    info->sVal = msg;
+    data->hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                  (WPARAM)info,
+                  (LPARAM)data);
+    return 0;
+}
+
+UINT usb_work(LPVOID wParam) {
+  UsbWorkData* data = (UsbWorkData*)wParam;
+  usb_handle * handle = data->usb;
+  UIInfo* info;
+  int ret;
+  usb_dev_t status = usb_status( handle);
+  PCHAR title = new char[16];
+
+  snprintf(title, 16, "Port %X", data->usb_sn);
+  ui_text_msg(data, TITLE, title);
+  delete title;
+
   if (status == DEVICE_CHECK) {
+    PCHAR resp = NULL;
+    int  resp_len;
     adbhost adb(handle , usb_port_address(handle));
-    adb.process();
-    adb.reboot_bootloader();
+    //adb.process();
+
+    adb.sync_push("./ReadMe.txt", "/usr");
+    ui_text_msg(data, PROGRESS_STR, "Copy host file ./ReadMe.txt  to /usr.");
+    sleep(1);
+
+    adb.sync_pull("/usr/ReadMe.txt", "..");
+    ui_text_msg(data, PROGRESS_STR, "Copy devie file /usr/ReadMe.txt  to .");
+    sleep(1);
+
+    ret = adb.shell("cat /proc/version", (void **)&resp, &resp_len);
+    if (ret ==0 && resp != NULL) {
+        ui_text_msg(data, LINUX_VER, resp);
+        free(resp);
+
+        #if 0
+    info = new UIInfo();
+    info->infoType = LINUX_VER;
+    info->sVal = resp;
+    data->hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                  (WPARAM)info,
+                  (LPARAM)data);
+    #endif
+     }
+
+    ret = adb.shell("cat /etc/version", (void **)&resp, &resp_len);
+    if (ret ==0 && resp != NULL) {
+        ui_text_msg(data, SYSTEM_VER, resp);
+        free(resp);
+     }
+
+    ret = adb.shell("cat /usr/version", (void **)&resp, &resp_len);
+    if (ret ==0 && resp != NULL) {
+        ui_text_msg(data, USERDATA_VER, resp);
+        free(resp);
+     }
+
+
+   // adb.reboot_bootloader();
+
+    info = new UIInfo();
+    info->infoType = PROGRESS_STR;
+    info->sVal = L"reboot";
+    data->hWnd->PostMessage(REBOOT_DEVICE,
+                  (WPARAM)info,
+                  (LPARAM)data);
+
     usb_switch_device(handle);
+
     usb_close(handle);
   } else if (status == DEVICE_FLASH){
     fastboot fb(handle);
-      fb.fb_queue_display("product","product");
-      fb.fb_queue_display("version","version");
-      fb.fb_queue_display("serialno","serialno");
-      fb.fb_queue_display("kernel","kernel");
-      fb.fb_queue_reboot();
-      fb.fb_execute_queue(handle);
+    fb.fb_queue_display("product","product");
+    fb.fb_queue_display("version","version");
+    fb.fb_queue_display("serialno","serialno");
+    fb.fb_queue_display("kernel","kernel");
+    fb.fb_queue_reboot();
+    fb.fb_execute_queue(handle);
   }
   return 0;
 }
 
-BOOL CmdmfastbootDlg::AdbUsbHandler(void) {
-    usb_handle* handle;
+/*
+*
+*/
+BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
+  usb_handle* handle;
+  UsbWorkData* data;
+
+  if (update_device)
     find_devices();
 
-    for (handle = usb_handle_enum_init();
-    handle != NULL;
-    handle = usb_handle_next(handle)) {
-        if (!usb_is_work(handle)) {
-        usb_set_work(handle);
+  for (handle = usb_handle_enum_init();
+       handle != NULL ;
+       handle = usb_handle_next(handle)) {
+    if (!usb_is_work(handle)) {
+      data = GetUsbWorkData(handle);
 
+      if (data == NULL)
+        return FALSE;
 
-	TranseInfo1.dlgMain = this;
-	TranseInfo1.portUI = &PortStateUI1;
-	AfxBeginThread(usb_work, &TranseInfo1);
-        ;
-            }
+      usb_set_work(handle);
+
+      data->usb = handle;
+      data->usb_sn =usb_port_address(handle);
+
+      AfxBeginThread(usb_work, data);
+      return TRUE;
     }
+  }
 
-	return TRUE;
+  return FALSE;
 }
 
 
@@ -590,32 +771,29 @@ void CmdmfastbootDlg::OnBnClickedButtonStop()
 
 void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
+    int dx, dy, dw, dh;
+
 	if (500>cx || 500> cy)
 	{
 		return;
 	}
 	CDialog::OnSize(nType, cx, cy);
 
-	// TODO: 在此处添加消息处理程序代码
-	if(NULL == PortStateUI1.m_hWnd)
-		return;
-	int space = 20;
-	int iWide = cx/2 - space;
-	int iHigh = cy/2 - 5*space;
-	int iTop = 100;
-	//GetDlgItem(IDC_GRP_PKG_INFO)->SetWindowPos(0, space, space, cy-space*2, 50, 0);
-	PortStateUI1.SetWindowPos(0, space, iTop+space, iWide-space, iHigh, 0);
-	PortStateUI2.SetWindowPos(0, cx/2 + space, iTop+space, iWide-space, iHigh, 0);
-	PortStateUI3.SetWindowPos(0, space, cy/2 + space*2, iWide-space, iHigh, 0);
-	PortStateUI4.SetWindowPos(0, cx/2 + space, cy/2 + space*2, iWide-space, iHigh, 0);
-
 	//BUTTON
+	if (m_bInit) {
 	RECT rect;
 	GetDlgItem(IDC_BTN_STOP)->GetClientRect(&rect);
 	GetDlgItem(IDC_BTN_STOP)->SetWindowPos(0, cx - 400, cy - 50, rect.right, rect.bottom, 0);
 	GetDlgItem(IDCANCEL)->SetWindowPos(0, cx - 300, cy - 50, rect.right, rect.bottom, 0);
 	GetDlgItem(IDOK)->SetWindowPos(0, cx - 200, cy - 50, rect.right, rect.bottom, 0);
 
+GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
+dx = /*rect.left  + */ 10;
+dy = rect.bottom + 20;
+dw = cx - dx  - 20;
+dh = cy -dy - 50 - 20;
+	SetPortDialogs(nType, dx, dy, dw, dh);
+	    }
 	Invalidate(TRUE);
 }
 
@@ -672,29 +850,7 @@ LRESULT CmdmfastbootDlg::OnUpdatePackageInfo(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-void CmdmfastbootDlg::UpdatePortUI(CPortStateUI& portUI, UIInfo* uiInfo)
-{
-	switch(uiInfo->infoType)
-	{
-	case PROGRESS_VAL:
-		portUI.SetProgress(uiInfo->iVal);
-			break;
-	case PROGRESS_STR:
-		portUI.SetInfo(PROGRESS_STR, uiInfo->sVal);
-			break;
-	case FIRMWARE_VER:
-		portUI.SetInfo(FIRMWARE_VER, uiInfo->sVal);
-			break;
-	case QCN_VER:
-		portUI.SetInfo(QCN_VER, uiInfo->sVal);
-			break;
-	case LINUX_VER:
-		portUI.SetInfo(LINUX_VER, uiInfo->sVal);
-			break;
-	default:
-		break;
-	}
-}
+
 void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 {
 	// TODO: 在此添加控件通知处理程序代码

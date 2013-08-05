@@ -34,11 +34,11 @@ static void dump_packet( const char*  tag, apacket* const p)
    }
    cmd[4] = 0;
 
-   D("%s:  [%08x %s] %08x %08x (%d) ",
+   DEBUG("%s:  [%08x %s] %08x %08x (%d) ",
      tag, command, cmd, p->msg.arg0, p->msg.arg1, len);
 
-
-   if (len2 > 128) len2 = 128;
+#define DUMP_DATA_LEN 16
+   if (len2 > DUMP_DATA_LEN) len2 = DUMP_DATA_LEN;
    char* buffer = (char*)malloc (len2 * sizeof(char) * 2 + 1);
 
    if (buffer == NULL)
@@ -49,7 +49,7 @@ static void dump_packet( const char*  tag, apacket* const p)
    for (nn = 0; nn < len2; nn++)
       snprintf(buffer+(nn<<1), 2, "%02x", ptr[nn]);
    buffer[2*nn] = '\0';
-   D("%s  ", buffer);
+   DEBUG("%s  ", buffer);
 
    for (nn = 0; nn < len2; nn++) {
       int  c = ptr[nn];
@@ -60,7 +60,7 @@ static void dump_packet( const char*  tag, apacket* const p)
    }
    //D("\n");
    buffer[nn] = '\0';
-   D("%s\n", buffer);
+   DEBUG("%s\n", buffer);
 
    fflush(stdout);
    free(buffer);
@@ -96,10 +96,9 @@ adbhost::~adbhost(void)
 int adbhost::read_packet( apacket** ppacket)
 {
    if(t.read_from_remote(*ppacket, &t) == 0){
-      D("from_remote: received remote packet, sending to transport %p\n",
-        t);
+      DEBUG("from_remote: received remote packet, sending to transport %p\n", t);
    } else {
-      D("from_remote: remote read failed for transport %p\n", *ppacket);
+      DEBUG("from_remote: remote read failed for transport %p\n", *ppacket);
       return -1;
    }
 
@@ -147,8 +146,7 @@ void adbhost::send_packet(apacket *p, atransport *t)
    print_packet("send", p);
 
    if (t == NULL) {
-      fatal_errno("Transport is null");
-      D("Transport is null \n");
+      ERROR("Transport is null \n");
    }
 
    if(write_packet(&p)){
@@ -164,7 +162,7 @@ void adbhost::connect(atransport *t)
    cp->msg.arg1 = MAX_PAYLOAD;
    snprintf((char*) cp->data, sizeof cp->data, "%s::", "host" );
    cp->msg.data_length = strlen((char*) cp->data) + 1;
-   D("Calling connect \n");
+   DEBUG("Calling connect \n");
    send_packet(cp, t);
 
    /* XXX why sleep here? */
@@ -179,13 +177,13 @@ void adbhost::open_service(const char *destination)
 {
    apacket *p = get_apacket();
    int len = strlen(destination) + 1;
-   D("Connect_to_remote call \n");
+   DEBUG("Connect_to_remote call \n");
 
    if(len > (MAX_PAYLOAD-1)) {
       fatal("destination oversized");
    }
 
-   D("LS(%d): connect('%s')\n", id, destination);
+   DEBUG("LS(%d): connect('%s')\n", id, destination);
    p->msg.command = A_OPEN;
    p->msg.arg0 = this->id;
    p->msg.data_length = len;
@@ -197,7 +195,7 @@ void adbhost::open_service(const char *destination)
 
 int adbhost::enqueue_command(apacket *p)
 {
-   D("Calling remote_socket_enqueue\n");
+   DEBUG("Calling remote_socket_enqueue\n");
    p->msg.command = A_WRTE;
    p->msg.arg0 = this->id;
    p->msg.arg1 = this->peer_id;
@@ -213,7 +211,7 @@ void adbhost::notify_ready_to_remote(void)
    p->msg.command = A_OKAY;
    p->msg.arg0 = this->id;
    p->msg.arg1 = this->peer_id;
-   D("Calling remote_socket_ready\n");
+   DEBUG("Calling remote_socket_ready\n");
    send_packet(p, &this->t);
    put_apacket(p);
 }
@@ -225,7 +223,7 @@ void adbhost::close_remote(void)
    p->msg.command = A_CLSE;
    p->msg.arg1 = this->id;
    send_packet(p, &this->t);
-   D("RS(%d): closed\n", this->id);
+   DEBUG("RS(%d): closed\n", this->id);
 
    for (;;) {
       read_packet(&p);
@@ -242,32 +240,55 @@ void adbhost::close_remote(void)
    put_apacket(p);
 }
 
-bool adbhost::handle_shell_response (void) {
-   apacket *p = get_apacket();
-   if (p == NULL)
-      return false;
+bool adbhost::handle_shell_response (void **response, int *len) {
+  apacket *p = get_apacket();
+  int data_len = 0;
+  char *data = (char *)malloc(MAX_PAYLOAD);
+  int capacity = MAX_PAYLOAD;
+  if (p == NULL || data == NULL) {
+    ERROR("No Memory!");
+    return false;
+  }
 
-     for (;;)
-      {
-      memset(p, 0, sizeof(apacket));
-         read_packet(&p);
+  memset(data, 0, MAX_PAYLOAD);
 
-         if (p->msg.command == A_OKAY) {
+  for (;;) {
+    memset(p, 0, sizeof(apacket));
+    read_packet(&p);
 
-         } else if (p->msg.command == A_WRTE) {
-            D("shell return:: %s", p->data);
-            notify_ready_to_remote();
-           // break;
-         } else if (p->msg.command == A_CLSE) {
-            ERROR("shell return close ");
-            notify_ready_to_remote();
-            break;
-         }
+    if (p->msg.command == A_OKAY) {
+      INFO("okay response");
+    } else if (p->msg.command == A_WRTE) {
+      DEBUG("shell return %d bytes data.", p->msg.data_length);
 
+      if (capacity < p->msg.data_length) {
+        if (NULL != realloc(data, data_len + capacity + MAX_PAYLOAD)) {
+          capacity += MAX_PAYLOAD;
+          memset(data + data_len + capacity, 0, MAX_PAYLOAD);
+        } else {
+          ERROR("No Memory!");
+          return false;
+        }
       }
+      memcpy(data + data_len, p->data, p->msg.data_length);
+      data_len += p->msg.data_length;
+      capacity -= p->msg.data_length;
 
-   put_apacket(p);
-   return true;
+      notify_ready_to_remote();
+    } else if (p->msg.command == A_CLSE) {
+      INFO("shell close");
+      notify_ready_to_remote();
+      break;
+    }
+  }
+
+  if (response != NULL && len != NULL) {
+    *response = data;
+    *len = data_len;
+  }
+
+  put_apacket(p);
+  return true;
 }
 
 bool adbhost::handle_open_response (void) {
@@ -310,7 +331,7 @@ bool adbhost::handle_connect_response(void)
 
    banner = (char*) p->data;
 
-   D("parse_banner: %s\n", banner);
+   DEBUG("parse_banner: %s\n", banner);
    type = banner;
    product = strchr(type, ':');
    if(product) {
@@ -372,7 +393,7 @@ void adbhost::process() {
       return;
    }
    // 4. do write what we want to do.
-   handle_shell_response();
+   handle_shell_response(NULL, NULL);
     // 5. close
    //close_remote();
 
@@ -416,24 +437,79 @@ void adbhost::process() {
    #endif
 }
 
+
+int adbhost::shell(const char * command, void **response, int *responselen) {
+  char * shell;
+  int len;
+  if (command == NULL) {
+    ERROR("Invalid parameter. command is NULL.");
+    return -1;
+  }
+
+  connect(&this->t);
+  // receive connect from remote
+  if (!handle_connect_response()) {
+    return -1;
+  }
+
+  len = strlen("shell:") + strlen(command) + 1;
+  shell = (char *)malloc(len);
+  if(shell == 0) {
+    ERROR("No memory");
+    return -1;
+  }
+  snprintf(shell, len, "shell:""%s", command);
+
+
+  // 3. if we receive connect message from remote, do open
+  open_service(shell);
+
+  if (!handle_open_response()) {
+    free(shell);
+    return -1;
+  }
+  // 4. do write what we want to do.
+  handle_shell_response(response, responselen);
+  free(shell);
+  return 0;
+}
+
 int adbhost::reboot_bootloader(void) {
+   return shell("reboot-bootloader", NULL, NULL);
+}
 
-     connect(&this->t);
-   // receive connect from remote
-   if (!handle_connect_response()) {
-      return -1;
-   }
 
-   // 3. if we receive connect message from remote, do open
-   open_service("shell:reboot-bootloader");//("shell:cat build.prop");
-   //todo:: we should receive : OKAY(send_ready), mean success,
-   //                    or CLOSE(send_ready), which means failure.
-   if (!handle_open_response()) {
-      return -1;
-   }
-   // 4. do write what we want to do.
-   handle_shell_response();
-   return 0;
+int adbhost::sync_pull(const char *rpath, const char *lpath) {
+  if (rpath == NULL || lpath == NULL) {
+    ERROR("Invalid parameter!");
+    return -1;
+  }
+
+  connect(&this->t);
+  if (!handle_connect_response()) {
+    return -1;
+  }
+  do_sync_pull(rpath, lpath);
+  close_remote();
+
+  return 0;
+}
+
+
+int adbhost::sync_push(const char *lpath, const char *rpath) {
+  if (rpath == NULL || lpath == NULL) {
+    ERROR("Invalid parameter!");
+    return -1;
+  }
+
+  connect(&this->t);
+  if (!handle_connect_response()) {
+    return -1;
+  }
+  do_sync_push(lpath, rpath);
+  close_remote();
+
+  return 0;
 }
 
 int adbhost::do_sync_pull(const char *rpath, const char *lpath)

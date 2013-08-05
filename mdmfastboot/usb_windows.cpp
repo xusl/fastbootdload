@@ -371,7 +371,7 @@ int usb_write(usb_handle* handle, const void* _data, int len) {
     int ret;
     char *data = (char *)_data;
 
-    D("usb_write %d\n", len);
+    DEBUG("usb_write %d\n", len);
     if (NULL != handle) {
         // Perform write
         while(len > 0) {
@@ -382,7 +382,7 @@ int usb_write(usb_handle* handle, const void* _data, int len) {
                                    &written,
                                    time_out);
             errno = GetLastError();
-            D("AdbWriteEndpointSync returned %d, errno: %d\n", ret, errno);
+            DEBUG("AdbWriteEndpointSync returned %d, errno: %d\n", ret, errno);
             if (ret == 0) {
                 // assume ERROR_INVALID_HANDLE indicates we are disconnected
                 if (errno == ERROR_INVALID_HANDLE)
@@ -410,11 +410,11 @@ int usb_write(usb_handle* handle, const void* _data, int len) {
         	}
         }
     } else {
-        D("usb_write NULL handle\n");
+        ERROR("usb_write NULL handle\n");
         SetLastError(ERROR_INVALID_HANDLE);
     }
 
-    D("usb_write failed: %d\n", errno);
+    WARN("usb_write failed: %d\n", errno);
 
     return -1;
 }
@@ -470,7 +470,7 @@ int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
   char *data = (char *)_data;
   int ret;
 
-  D("usb_read %d\n", len);
+  DEBUG("usb_read %d\n", len);
   if (NULL != handle) {
     while (len > 0) {
       int xfer = (len > 4096) ? 4096 : len;
@@ -481,7 +481,7 @@ int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
                                   &read,
                                   time_out);
       errno = GetLastError();
-      D("usb_read got: %ld, expected: %d, errno: %d, ret: %d\n",
+      DEBUG("usb_read got: %ld, expected: %d, errno: %d, ret: %d\n",
 	  	read, xfer, errno, ret);
       if (ret) {
         if (!fulfill)
@@ -500,11 +500,11 @@ int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
       }
     }
   } else {
-    D("usb_read NULL handle\n");
+    ERROR("usb_read NULL handle\n");
     SetLastError(ERROR_INVALID_HANDLE);
   }
 
-  D("usb_read failed: %d\n", errno);
+  WARN("usb_read failed: %d\n", errno);
 
   return -1;
 }
@@ -541,7 +541,7 @@ void usb_kick(usb_handle* handle) {
 }
 
 int usb_close(usb_handle* handle) {
-  D("usb_close\n");
+  DEBUG("usb_close\n");
 
   if (NULL != handle) {
     // Remove handle from the list
@@ -578,7 +578,7 @@ long usb_port_address(usb_handle* handle) {
   if (NULL == handle) {
     SetLastError(ERROR_INVALID_HANDLE);
     errno = ERROR_INVALID_HANDLE;
-    return NULL;
+    return ~1L;
   }
 
   return handle->usb_sn;
@@ -598,15 +598,16 @@ int recognized_device(usb_handle* handle) {
   if (NULL == handle)
     return 0;
 
-    long sn = usb_host_sn(handle->interface_name, NULL);
-   if (sn != 0) {
-  //DEBUG("%S serial number %x", interface_name, sn);
- }  else {
- //if we do not support multiple, sn is not from host allocation.
- // todo:: add a judge?
- DEBUG("%S serial number %x", handle->interface_name, sn);
- return 0;
-    }
+  long sn = usb_host_sn(handle->interface_name, NULL);
+  if (sn != 0) {
+    handle->usb_sn = sn;
+    //DEBUG("%S serial number %x", interface_name, sn);
+  }  else {
+    //if we do not support multiple, sn is not from host allocation.
+    // todo:: add a judge?
+    ERROR("%S serial number %x", handle->interface_name, sn);
+    return 0;
+  }
 
   // Check vendor and product id first
 
@@ -675,21 +676,21 @@ void find_devices() {
         if (recognized_device(handle)) {
           char serial_number[512];
           unsigned long serial_number_len = sizeof(serial_number);
-          D("adding a new device %s\n", next_interface->device_name);
+          DEBUG("adding a new device %s\n", next_interface->device_name);
           if (AdbGetSerialNumber(handle->adb_interface,
                                 serial_number,
                                 &serial_number_len,
                                 true)) {
             // Lets make sure that we don't duplicate this device
             if (register_new_device(handle)) {
-             AfxBeginThread(run, (void*)handle);
+         //    AfxBeginThread(run, (void*)handle);
             } else {
-              D("register_new_device failed for %s\n", next_interface->device_name);
+              DEBUG("register_new_device failed for %s\n", next_interface->device_name);
               usb_cleanup_handle(handle);
               free(handle);
             }
           } else {
-            D("cannot get serial number\n");
+            DEBUG("cannot get serial number\n");
             usb_cleanup_handle(handle);
             free(handle);
           }
@@ -728,7 +729,11 @@ UINT run(LPVOID data) {
 }
 
 usb_handle* usb_handle_enum_init(void) {
-    return handle_list.next;
+    usb_handle* usb = handle_list.next;
+    if (usb == &handle_list)
+        return NULL;
+    return usb;
+    //return handle_list.next;
 }
 
 usb_handle* usb_handle_next(usb_handle* usb) {

@@ -14,8 +14,12 @@ typedef enum
 	FIRMWARE_VER,
 	QCN_VER,
 	LINUX_VER,
+	SYSTEM_VER,
+	USERDATA_VER,
+	TITLE,
 	PROGRESS_VAL,
 	PROGRESS_STR,
+	REBOOT_DEVICE,
 }UI_INFO_TYPE;
 
 struct UIInfo
@@ -40,18 +44,19 @@ public:
 
 	void SetProgress(int iPercent);
 	void SetInfo(UI_INFO_TYPE infoType, CString strInfo);
-	void Init(PORT_ID iPortID);
+	void Init(int iPortID);
+  void SetTitle(CString strInfo);
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV Ö§³Ö
 
 	DECLARE_MESSAGE_MAP()
 
-	void SetTitle(CString strInfo);
+
 public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 
 public:
-	PORT_ID iID;
+	int iID;
 	UIInfo m_PortFrmVer;
 	UIInfo m_PortQCNVer;
 	UIInfo m_PortLinuxVer;

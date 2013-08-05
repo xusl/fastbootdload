@@ -32,9 +32,14 @@
 #define IDC_STATIC_QCN_VER              1018
 #define IDC_STATIC_LINUX_VER            1019
 #define IDC_STATIC_FRM_VER_MAIN         1020
+#define IDC_STATIC_USERDATA_VER         1020
 #define IDC_EDIT_FRM_VER_MAIN           1021
+#define IDC_EDIT_USERDATA_VER           1021
 #define IDC_STATIC_QCN_VER_MAIN         1022
+#define IDC_STATIC_LINUX_VER3           1022
+#define IDC_STATIC_SYSTEM_VER           1022
 #define IDC_EDIT_QCN_VER_MAIN           1023
+#define IDC_EDIT_SYSTEM_VER             1023
 #define IDC_STATIC_LINUX_VER_MAIN       1024
 #define IDC_EDIT_LINUX_VER_MAIN         1025
 #define IDC_GRP_PKG_INFO                1026

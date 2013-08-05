@@ -54,6 +54,11 @@ class adbhost
 
 		void process(void);
     int reboot_bootloader(void);
+    //
+    int shell(const char * command, void **response, int *len);
+
+		int sync_pull(const char *rpath, const char *lpath);
+		int sync_push(const char *lpath, const char *rpath);
 
 	private:
 		void open_service(const char *destination);
@@ -65,7 +70,7 @@ class adbhost
 
 		bool handle_connect_response(void);
 		bool handle_open_response(void);
-		bool handle_shell_response (void);
+		bool handle_shell_response (void **response, int *len);
 
 		int do_sync_pull(const char *rpath, const char *lpath);
 		int do_sync_push(const char *lpath, const char *rpath);

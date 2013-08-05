@@ -40,13 +40,19 @@ void CPortStateUI::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
 		break;
 	case LINUX_VER:
 		GetDlgItem(IDC_EDIT_LINUX_VER)->SetWindowText(strInfo.GetBuffer());
+        break;
+	case SYSTEM_VER:
+		GetDlgItem(IDC_EDIT_SYSTEM_VER)->SetWindowText(strInfo.GetBuffer());
+        break;
+	case USERDATA_VER:
+		GetDlgItem(IDC_EDIT_USERDATA_VER)->SetWindowText(strInfo.GetBuffer());
 		break;
-	}	
+	}
 }
 
 void CPortStateUI::SetTitle(CString strInfo)
 {
-	GetDlgItem(IDC_GROUP)->SetWindowText(strInfo.GetBuffer());	
+	GetDlgItem(IDC_GROUP)->SetWindowText(strInfo.GetBuffer());
 }
 
 void CPortStateUI::SetProgress(int iPercent)
@@ -54,7 +60,7 @@ void CPortStateUI::SetProgress(int iPercent)
 	::SendMessage(GetDlgItem(IDC_PROGRESS1)->m_hWnd, PBM_SETPOS, iPercent, 0);
 }
 
-void CPortStateUI::Init(PORT_ID iPortID)
+void CPortStateUI::Init(int iPortID)
 {
 	iID = iPortID;
 	CString strTitle;
