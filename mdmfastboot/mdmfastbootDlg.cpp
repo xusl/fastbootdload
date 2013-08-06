@@ -10,6 +10,7 @@
 #include "adbhost.h"
 #include "usb_vendors.h"
 
+#define THREADPOOL_SIZE	4
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -224,6 +225,15 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
 	ShowWindow(SW_MAXIMIZE);
 
+
+	//init thread pool begin.
+	HRESULT hr = m_dlWorkerPool.Initialize(NULL, THREADPOOL_SIZE);
+	if(!SUCCEEDED(hr))
+	{
+		ERROR("Failed to init thread pool!");
+		return FALSE;
+	}
+	//init thread pool end.
 
 	//ui test beging
 	m_strFrmVer = L"VX140100BX";
@@ -589,7 +599,8 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
       data->usb = handle;
       data->usb_sn =usb_port_address(handle);
 
-      AfxBeginThread(usb_work, data);
+	  //AfxBeginThread(usb_work, data);
+	  AddWorkItem(usb_work, data);
       return TRUE;
     }
   }
@@ -762,7 +773,7 @@ dh = cy -dy - 50 - 20;
 void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	lpMMI->ptMinTrackSize.x   = 1000 ;	//主窗口最小宽度
+	lpMMI->ptMinTrackSize.x   = 1100 ;	//主窗口最小宽度
 	lpMMI->ptMinTrackSize.y   = 700  ;  //主窗口最小高度
 	CDialog::OnGetMinMaxInfo(lpMMI);
 }
@@ -855,4 +866,14 @@ void CmdmfastbootDlg::OnDestroy()
 
 	// TODO: 在此处添加消息处理程序代码
 	::RemoveProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP);	//for single instance
+	//Shutdown the thread pool
+	m_dlWorkerPool.Shutdown();
+}
+
+void CmdmfastbootDlg::AddWorkItem(WORKFN fn, UsbWorkData* wParam)
+{
+	CDownload* pDl = new CDownload();
+	pDl->fn = fn;
+	pDl->wParam = wParam;
+	m_dlWorkerPool.QueueRequest( (CDlWorker::RequestType) pDl );
 }

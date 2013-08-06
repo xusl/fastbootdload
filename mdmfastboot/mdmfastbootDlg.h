@@ -10,6 +10,8 @@
 #include <setupapi.h>
 #include "PortStateUI.h"
 #include "usb_adb.h"
+#include <atlutil.h>
+#include "DlWorker.h"
 
 enum
 {
@@ -50,6 +52,7 @@ public:
 protected:
 	HICON m_hIcon;
   BOOL m_bInit;
+	CThreadPool<CDlWorker> m_dlWorkerPool;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -91,4 +94,5 @@ public:
     BOOL InitUsbWorkData(void);
     BOOL CleanUsbWorkData(UsbWorkData *data);
     BOOL SwitchUsbWorkData(UsbWorkData *data);
+	void AddWorkItem(WORKFN fn, UsbWorkData* wParam);
 };
