@@ -167,7 +167,7 @@ void adbhost::connect(atransport *t)
 
    /* XXX why sleep here? */
    // allow the device some time to respond to the connect message
-   adb_sleep_ms(1000);
+  // adb_sleep_ms(1000);
 
    put_apacket(cp);
 }
@@ -243,6 +243,7 @@ void adbhost::close_remote(void)
 bool adbhost::handle_shell_response (void **response, int *len) {
   apacket *p = get_apacket();
   int data_len = 0;
+  int ret;
   char *data = (char *)malloc(MAX_PAYLOAD);
   int capacity = MAX_PAYLOAD;
   if (p == NULL || data == NULL) {
@@ -254,7 +255,10 @@ bool adbhost::handle_shell_response (void **response, int *len) {
 
   for (;;) {
     memset(p, 0, sizeof(apacket));
-    read_packet(&p);
+    ret = read_packet(&p);
+
+    if (ret != 0)
+        break;
 
     if (p->msg.command == A_OKAY) {
       INFO("okay response");
@@ -285,6 +289,7 @@ bool adbhost::handle_shell_response (void **response, int *len) {
   if (response != NULL && len != NULL) {
     *response = data;
     *len = data_len;
+    DEBUG("shell return :%s.", data);
   }
 
   put_apacket(p);

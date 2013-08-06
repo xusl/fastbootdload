@@ -30,12 +30,6 @@ typedef struct {
 } UsbWorkData;
 
 
-struct TranseInfo
-{
-	CmdmfastbootDlg*	dlgMain;
-	CPortStateUI*		portUI;
-};
-
 // CmdmfastbootDlg 对话框
 class CmdmfastbootDlg : public CDialog
 {
@@ -56,10 +50,6 @@ public:
 protected:
 	HICON m_hIcon;
   BOOL m_bInit;
-	CWinThread* pThreadPort1;
-	CWinThread* pThreadPort2;
-	CWinThread* pThreadPort3;
-	CWinThread* pThreadPort4;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -71,21 +61,13 @@ protected:
 
 	void OnHelp();
 	void OnAbout();
-	void UpdatePortUI(CPortStateUI& portUI, UIInfo* uiInfo);
 public:
 	afx_msg void OnBnClickedButtonStop();
 
   UsbWorkData data[4];
 
 	//port UI
-	CPortStateUI PortStateUI1;
-	CPortStateUI PortStateUI2;
-	CPortStateUI PortStateUI3;
-	CPortStateUI PortStateUI4;
-	TranseInfo TranseInfo1;
-	TranseInfo TranseInfo2;
-	TranseInfo TranseInfo3;
-	TranseInfo TranseInfo4;
+
 	CString m_strFrmVer;
 	CString m_strQCNVer;
 	CString m_strLinuxVer;

@@ -1,13 +1,5 @@
 #pragma once
 
-typedef enum
-{
-	PORT_UI_ID_INVALID = 0,
-	PORT_UI_ID_FIRST,
-	PORT_UI_ID_SECOND,
-	PORT_UI_ID_THIRD,
-	PORT_UI_ID_FOURTH,
-}PORT_ID;
 
 typedef enum
 {
@@ -19,6 +11,8 @@ typedef enum
 	TITLE,
 	PROGRESS_VAL,
 	PROGRESS_STR,
+	PROMPT_TITLE,
+	PROMPT_TEXT,
 	REBOOT_DEVICE,
 }UI_INFO_TYPE;
 

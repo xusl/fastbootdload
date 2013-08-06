@@ -274,8 +274,8 @@ int register_new_device(usb_handle* handle) {
     handle->status = DEVICE_CHECK;
   } else if (protocol == FB_PROTOCOL) {
     ERROR("We do not permit fastboot as the first device status!");
-    goto register_new_device_out;
-    //handle->status = DEVICE_FLASH;
+    //goto register_new_device_out;
+    handle->status = DEVICE_FLASH;
   }
 
   // Not in the list. Add this handle to the list.
@@ -723,7 +723,7 @@ UINT run(LPVOID data) {
   fb.fb_queue_display("kernel","kernel");
   fb.fb_queue_reboot();
 
-      fb.fb_execute_queue(handle);
+//      fb.fb_execute_queue(handle);
   }
   return 0;
 }

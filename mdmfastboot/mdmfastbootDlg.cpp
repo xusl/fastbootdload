@@ -64,11 +64,6 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
     m_bInit = FALSE;
-	pThreadPort1 = NULL;
-	pThreadPort2 = NULL;
-	pThreadPort3 = NULL;
-	pThreadPort4 = NULL;
-
 }
 
 void CmdmfastbootDlg::DoDataExchange(CDataExchange* pDX)
@@ -86,7 +81,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_BN_CLICKED(IDC_BTN_STOP, &CmdmfastbootDlg::OnBnClickedButtonStop)
 	ON_WM_SIZE()
 	ON_WM_GETMINMAXINFO()
-	ON_MESSAGE(UI_MESSAGE_UPDATE_PROGRESS_INFO, OnUpdateProgressInfo)
+	//ON_MESSAGE(UI_MESSAGE_UPDATE_PROGRESS_INFO, OnUpdateProgressInfo)
 	ON_MESSAGE(UI_MESSAGE_UPDATE_PACKAGE_INFO, OnUpdatePackageInfo)
 	ON_MESSAGE(UI_MESSAGE_DEVICE_INFO, OnDeviceInfo)
 	ON_BN_CLICKED(IDC_BTN_BROWSE, &CmdmfastbootDlg::OnBnClickedBtnBrowse)
@@ -109,88 +104,6 @@ void CmdmfastbootDlg::OnAbout()
 	dlgAbout.DoModal();
 }
 
-UINT __cdecl DemoDownloadThread( LPVOID pParam )
-{
-	TranseInfo *info = (TranseInfo*)pParam;
-	int iProcess = 0;
-	sleep(info->portUI->iID-1);
-	UIInfo& uiInfoV = info->portUI->m_PortProgressValue;
-	UIInfo& uiInfoS = info->portUI->m_PortProgressInfo;
-
-	UIInfo& uiInfoFrw = info->portUI->m_PortFrmVer;
-	uiInfoFrw.infoType = FIRMWARE_VER;
-	uiInfoFrw.sVal = "VX140100BX";
-	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoFrw);
-
-	UIInfo& uiInfoQCN = info->portUI->m_PortQCNVer;
-	uiInfoQCN.infoType = QCN_VER;
-	uiInfoQCN.sVal = "VA340100BV";
-	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoQCN);
-
-	UIInfo& uiInfoLinux = info->portUI->m_PortLinuxVer;
-	uiInfoLinux.infoType = LINUX_VER;
-	uiInfoLinux.sVal = "VXB4010000";
-	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoLinux);
-
-	int iDownloadTimes = 3;
-	for (int i=0; i<iDownloadTimes; i++)
-	{
-		iProcess = 0;
-		while (1)
-		{
-			iProcess++;
-			uiInfoV.infoType = PROGRESS_VAL;
-			uiInfoV.iVal = iProcess%100;
-			::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoV);
-
-			uiInfoS.infoType = PROGRESS_STR;
-			if (uiInfoV.iVal==5)
-			{
-				uiInfoS.sVal = "Initial...";
-				::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
-			}
-			else if (uiInfoV.iVal==30)
-			{
-				uiInfoS.sVal = "Downloading...";
-				::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
-			}
-			if (uiInfoV.iVal==0)
-			{
-				break;
-			}
-			Sleep(10);
-		}
-	}
-
-	//clear info
-	uiInfoFrw.sVal = "";
-	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoFrw);
-	uiInfoQCN.sVal = "";
-	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoQCN);
-	uiInfoLinux.sVal = "";
-	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoLinux);
-	uiInfoS.sVal = "Finished";
-	::PostMessage(info->dlgMain->m_hWnd, UI_MESSAGE_UPDATE_PROGRESS_INFO, info->portUI->iID, (LPARAM)&uiInfoS);
-	//end
-
-	AfxEndThread(0);
-	return 0;
-}
-
-
-void CmdmfastbootDlg::UpdatePortUI(CPortStateUI& portUI, UIInfo* uiInfo)
-{
-	switch(uiInfo->infoType)
-	{
-	case PROGRESS_VAL:
-		portUI.SetProgress(uiInfo->iVal);
-			break;
-
-	default:
-		portUI.SetInfo(uiInfo->infoType, uiInfo->sVal);
-		break;
-	}
-}
 
 BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
 {
@@ -341,12 +254,6 @@ BOOL CmdmfastbootDlg::OnInitDialog()
     adb_usb_init();
 	AdbUsbHandler(true);
 
-    //test
-    unsigned size;
-    void * data;
-    data = load_file(L"ReadMe.txt", &size);
-    free(data);
-
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -495,11 +402,12 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
   switch(uiInfo->infoType ) {
   case REBOOT_DEVICE:
     SwitchUsbWorkData(data);
-    data->ctl.SetInfo(uiInfo->infoType, uiInfo->sVal);
+    data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
     break;
 
   case TITLE:
-        data->ctl.SetTitle(uiInfo->sVal);
+    data->ctl.SetTitle(uiInfo->sVal);
+    break;
 
   case PROGRESS_VAL:
     data->ctl.SetProgress(uiInfo->iVal);
@@ -525,11 +433,26 @@ UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCHAR msg) {
     return 0;
 }
 
+UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command)
+{
+  PCHAR resp = NULL;
+  int  resp_len;
+  int ret;
+  ret = adb.shell(command, (void **)&resp, &resp_len);
+  if (ret ==0 && resp != NULL) {
+    ui_text_msg(data, PROMPT_TITLE, command);
+    ui_text_msg(data, PROMPT_TEXT, resp);
+    free(resp);
+  }
+
+  return 0;
+}
+
 UINT usb_work(LPVOID wParam) {
   UsbWorkData* data = (UsbWorkData*)wParam;
   usb_handle * handle = data->usb;
-  UIInfo* info;
-  int ret;
+
+
   usb_dev_t status = usb_status( handle);
   PCHAR title = new char[16];
 
@@ -538,32 +461,17 @@ UINT usb_work(LPVOID wParam) {
   delete title;
 
   if (status == DEVICE_CHECK) {
+    UIInfo* info = NULL;
     PCHAR resp = NULL;
     int  resp_len;
+    int ret;
     adbhost adb(handle , usb_port_address(handle));
     //adb.process();
-
-    adb.sync_push("./ReadMe.txt", "/usr");
-    ui_text_msg(data, PROGRESS_STR, "Copy host file ./ReadMe.txt  to /usr.");
-    sleep(1);
-
-    adb.sync_pull("/usr/ReadMe.txt", "..");
-    ui_text_msg(data, PROGRESS_STR, "Copy devie file /usr/ReadMe.txt  to .");
-    sleep(1);
 
     ret = adb.shell("cat /proc/version", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
         ui_text_msg(data, LINUX_VER, resp);
         free(resp);
-
-        #if 0
-    info = new UIInfo();
-    info->infoType = LINUX_VER;
-    info->sVal = resp;
-    data->hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
-                  (WPARAM)info,
-                  (LPARAM)data);
-    #endif
      }
 
     ret = adb.shell("cat /etc/version", (void **)&resp, &resp_len);
@@ -578,27 +486,81 @@ UINT usb_work(LPVOID wParam) {
         free(resp);
      }
 
+    ret = adb.shell("trace -r", (void **)&resp, &resp_len);
+    if (ret ==0 && resp != NULL) {
+        ui_text_msg(data, PROMPT_TITLE, "trace return:");
+        ui_text_msg(data, PROMPT_TEXT, resp);
+        free(resp);
+     }
 
-   // adb.reboot_bootloader();
+#if 0
+    adb.sync_push("./ReadMe.txt", "/usr");
+    ui_text_msg(data, PROGRESS_STR, "Copy host file ./ReadMe.txt  to /usr.");
+    sleep(1);
 
-    info = new UIInfo();
-    info->infoType = PROGRESS_STR;
-    info->sVal = L"reboot";
-    data->hWnd->PostMessage(REBOOT_DEVICE,
-                  (WPARAM)info,
-                  (LPARAM)data);
+    adb.sync_pull("/usr/ReadMe.txt", "..");
+    ui_text_msg(data, PROGRESS_STR, "Copy devie file /usr/ReadMe.txt  to .");
+    sleep(1);
+#endif
+
+    adb.sync_push("config.xml", "/tmp/config.xml");
+    ui_text_msg(data, PROGRESS_STR, "Copy host file config.xml  to /tmp/config.xml.");
+
+
+    do_adb_shell_command(adb,data, "hwinfo_check");
+    do_adb_shell_command(adb,data, "swinfo_compare");
+    do_adb_shell_command(adb,data, "backup");
+
+#if 0
+    ret = adb.shell("hwinfo_check", (void **)&resp, &resp_len);
+    if (ret ==0 && resp != NULL) {
+        ui_text_msg(data, PROMPT_TITLE, "hwinfo_check return:");
+        ui_text_msg(data, PROMPT_TEXT, resp);
+        free(resp);
+     }
+
+    ret = adb.shell("swinfo_compare", (void **)&resp, &resp_len);
+    if (ret ==0 && resp != NULL) {
+        ui_text_msg(data, PROMPT_TITLE, "swinfo_compare return:");
+        ui_text_msg(data, PROMPT_TEXT, resp);
+        free(resp);
+     }
+
+        ret = adb.shell("swinfo_compare", (void **)&resp, &resp_len);
+    if (ret ==0 && resp != NULL) {
+        ui_text_msg(data, PROMPT_TITLE, "swinfo_compare return:");
+        ui_text_msg(data, PROMPT_TEXT, resp);
+        free(resp);
+     }
+#endif
+
+    adb.reboot_bootloader();
+
+    ui_text_msg(data, REBOOT_DEVICE, "reboot");
 
     usb_switch_device(handle);
 
     usb_close(handle);
   } else if (status == DEVICE_FLASH){
     fastboot fb(handle);
+
+    //test
+    unsigned size;
+    void * image;
+    image = load_file(L"ReadMe.txt", &size);
+
     fb.fb_queue_display("product","product");
     fb.fb_queue_display("version","version");
     fb.fb_queue_display("serialno","serialno");
     fb.fb_queue_display("kernel","kernel");
-    fb.fb_queue_reboot();
-    fb.fb_execute_queue(handle);
+
+    fb.fb_queue_flash("appsbl", image, size);
+
+  //  fb.fb_queue_reboot();
+    fb.fb_execute_queue(handle,data->hWnd, data);
+
+     //do not free, fb have done for us.
+     // free(image);
   }
   return 0;
 }
@@ -805,30 +767,6 @@ void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 	CDialog::OnGetMinMaxInfo(lpMMI);
 }
 
-LRESULT CmdmfastbootDlg::OnUpdateProgressInfo(WPARAM wParam, LPARAM lParam)
-{
-	int iUiSerial = (int)wParam;
-	UIInfo* uiInfo = (UIInfo*)lParam;
-	switch(iUiSerial)
-	{
-	case PORT_UI_ID_FIRST:
-		UpdatePortUI(PortStateUI1, uiInfo);
-		break;
-	case PORT_UI_ID_SECOND:
-		UpdatePortUI(PortStateUI2, uiInfo);
-		break;
-	case PORT_UI_ID_THIRD:
-		UpdatePortUI(PortStateUI3, uiInfo);
-		break;
-	case PORT_UI_ID_FOURTH:
-		UpdatePortUI(PortStateUI4, uiInfo);
-		break;
-	default:
-		break;
-	}
-	return 0;
-}
-
 LRESULT CmdmfastbootDlg::OnUpdatePackageInfo(WPARAM wParam, LPARAM lParam)
 {
 	UI_INFO_TYPE infoType = (UI_INFO_TYPE)wParam;
@@ -886,6 +824,7 @@ void CmdmfastbootDlg::OnBnClickedCancel()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	DWORD dwExitCode = 0;
+    #if 0
 	CWinThread* threadArry[] = {pThreadPort1, pThreadPort2, pThreadPort3, pThreadPort4};
 	for (int i=0; i<sizeof(threadArry)/sizeof(threadArry[0]); i++)
 	{
@@ -906,6 +845,7 @@ void CmdmfastbootDlg::OnBnClickedCancel()
 			}
 		}
 	}
+    #endif
 	OnCancel();
 }
 

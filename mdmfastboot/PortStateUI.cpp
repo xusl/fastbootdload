@@ -13,7 +13,7 @@ IMPLEMENT_DYNAMIC(CPortStateUI, CDialog)
 CPortStateUI::CPortStateUI(CWnd* pParent /*=NULL*/)
 	: CDialog(CPortStateUI::IDD, pParent)
 {
-	iID = PORT_UI_ID_INVALID;
+	iID = -1;
 }
 
 CPortStateUI::~CPortStateUI()
@@ -30,7 +30,11 @@ void CPortStateUI::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
 	switch(infoType)
 	{
 	case PROGRESS_STR:
+    case PROMPT_TEXT:
 		GetDlgItem(IDC_DL_INFO)->SetWindowText(strInfo.GetBuffer());
+		break;
+    case PROMPT_TITLE:
+		GetDlgItem(IDC_DLINFO_TITLE)->SetWindowText(strInfo.GetBuffer());
 		break;
 	case FIRMWARE_VER:
 		GetDlgItem(IDC_EDIT_FRM_VER)->SetWindowText(strInfo.GetBuffer());
@@ -81,6 +85,8 @@ void CPortStateUI::OnSize(UINT nType, int cx, int cy)
 	CDialog::OnSize(nType, cx, cy);
 
 	// TODO: 在此处添加消息处理程序代码
+
+#if 0
 	if(NULL == GetDlgItem(IDC_GROUP))
 		return;
 	RECT rect;
@@ -91,4 +97,5 @@ void CPortStateUI::OnSize(UINT nType, int cx, int cy)
 	GetDlgItem(IDC_PROGRESS1)->GetClientRect(&rect);
 	GetDlgItem(IDC_PROGRESS1)->SetWindowPos(0, space, cy-3*rect.bottom, cx-2*space, rect.bottom, 0);
 	GetDlgItem(IDC_DL_INFO)->SetWindowPos(0, space, cy-1*rect.bottom, cx-2*space, rect.bottom-10, 0);
+#endif
 }

@@ -112,6 +112,7 @@ struct atransport
     adisconnect  disconnects;
 };
 
+
 void send_packet(apacket *p, atransport *t);
 
 /* initialize a transport object's func pointers and state */

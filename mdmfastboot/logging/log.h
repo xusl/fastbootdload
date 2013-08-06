@@ -147,7 +147,7 @@ extern CLog* g_pLogInstance;
 
 /* define ADB_TRACE to 1 to enable tracing support, or 0 to disable it */
 
-#define  ADB_TRACE    1
+#define  ADB_TRACE    0
 
 #if ADB_TRACE
 #define ADB_TRACING  ((g_pLogInstance->AdbTraceMask() & (1 << TRACE_TAG)) != 0)

@@ -32,8 +32,13 @@
 #include <string.h>
 //#include <sys/time.h>
 #include <log.h>
+
+#include "resource.h"
+#include "PortStateUI.h"
+#include "mdmfastbootDlg.h"
 #include "fastbootflash.h"
-int cb_default(Action *a, int status, char *resp);
+
+int cb_default(CWnd* hWnd,  void* data, Action *a, int status, char *resp);
 int match(char *str, const char **value, unsigned count);
 
 
@@ -155,7 +160,7 @@ int match(char *str, const char **value, unsigned count)
     return 0;
 }
 
-int cb_default(Action *a, int status, char *resp)
+int cb_default(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
     if (status) {
         fprintf(stderr,"FAILED (%s)\n", resp);
@@ -167,7 +172,7 @@ int cb_default(Action *a, int status, char *resp)
     return status;
 }
 
-int cb_check(Action *a, int status, char *resp, int invert)
+int cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int invert)
 {
     const char **value = (const char **)a->data;
     unsigned count = a->size;
@@ -200,29 +205,43 @@ int cb_check(Action *a, int status, char *resp, int invert)
     return -1;
 }
 
-int cb_require(Action *a, int status, char *resp)
-{
-    return cb_check(a, status, resp, 0);
+static UINT port_text_msg(CWnd* hWnd,void* data, UI_INFO_TYPE info_type, PCHAR msg) {
+   UIInfo* info = new UIInfo();
+
+    info->infoType = info_type;
+    info->sVal = msg;
+    hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                  (WPARAM)info,
+                  (LPARAM)data);
+    return 0;
 }
 
-int cb_reject(Action *a, int status, char *resp)
+int cb_require(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
-    return cb_check(a, status, resp, 1);
+    return cb_check(hWnd, data, a, status, resp, 0);
 }
 
-int cb_do_nothing(Action *a, int status, char *resp)
+int cb_reject(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+{
+    return cb_check(hWnd, data, a, status, resp, 1);
+}
+
+int cb_do_nothing(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
     fprintf(stderr,"\n");
     return 0;
 }
 
-int cb_display(Action *a, int status, char *resp)
+int cb_display(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
+char buffer[256]={0};
     if (status) {
         fprintf(stderr, "%s FAILED (%s)\n", a->cmd, resp);
         return status;
     }
-    fprintf(stderr, "%s: %s\n", (char*) a->data, resp);
+    //fprintf(stderr, "%s: %s\n", (char*) a->data, resp);
+    snprintf(buffer,sizeof(buffer), "%s: %s\n", (char*) a->data, resp);
+    port_text_msg(hWnd, data,PROMPT_TEXT, buffer);
     return 0;
 }
 
@@ -276,7 +295,7 @@ void fastboot::fb_queue_notice(const char *notice)
     a->data = (void*) notice;
 }
 
-void fastboot::fb_execute_queue(usb_handle *usb)
+void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
 {
     Action *a;
     char resp[FB_RESPONSE_SZ+1];
@@ -294,15 +313,15 @@ void fastboot::fb_execute_queue(usb_handle *usb)
         }
         if (a->op == OP_DOWNLOAD) {
             status = fb_download_data(usb, a->data, a->size);
-            status = a->func(a, status, status ? fb_get_error() : "");
+            status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
             if (status) break;
         } else if (a->op == OP_COMMAND) {
             status = fb_command(usb, a->cmd);
-            status = a->func(a, status, status ? fb_get_error() : "");
+            status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
             if (status) break;
         } else if (a->op == OP_QUERY) {
             status = fb_command_response(usb, a->cmd, resp);
-            status = a->func(a, status, status ? fb_get_error() : resp);
+            status = a->func(hWnd, data, a, status, status ? fb_get_error() : resp);
             if (status) break;
         } else if (a->op == OP_NOTICE) {
             fprintf(stderr,"%s\n",(char*)a->data);

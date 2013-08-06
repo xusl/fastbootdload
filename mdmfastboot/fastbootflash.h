@@ -50,7 +50,7 @@ struct Action
     unsigned size;
 
     const char *msg;
-    int (*func)(Action *a, int status, char *resp);
+    int (*func)(CWnd* hWnd, void* data, Action *a, int status, char *resp);
 
     double start;
 };
@@ -75,7 +75,7 @@ public:
    void fb_queue_command(const char *cmd, const char *msg);
    void fb_queue_download(const char *name, void *data, unsigned size);
    void fb_queue_notice(const char *notice);
-   void fb_execute_queue(usb_handle *usb);
+   void fb_execute_queue(usb_handle *usb,CWnd* hWnd,void* data);
 
 private:
    Action *action_list;
