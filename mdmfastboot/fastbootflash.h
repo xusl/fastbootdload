@@ -38,12 +38,34 @@
 #define FB_COMMAND_SZ 64
 #define FB_RESPONSE_SZ 64
 
-typedef struct Action Action;
+typedef struct Image {
+    struct Image *next;
+    char *partition;
+    wchar_t *lpath;
+    void *data;
+    unsigned size;
+}Image;
 
-struct Action
+class flash_image{
+  public:
+    flash_image(const wchar_t* config_file);
+    ~flash_image();
+    int read_config(const wchar_t* config);
+    int get_partition_info(char *partition, void **ppdata, unsigned *psize);
+
+  private:
+    int add_image(wchar_t *partition, const wchar_t *lpath);
+
+  private:
+    int img_count;
+    Image *image_list;
+    Image *image_last;
+};
+
+typedef struct Action
 {
     unsigned op;
-    Action *next;
+    struct Action *next;
 
     char cmd[64];
     void *data;
@@ -53,7 +75,8 @@ struct Action
     int (*func)(CWnd* hWnd, void* data, Action *a, int status, char *resp);
 
     double start;
-};
+}Action;
+
 class fastboot {
 public:
 	 fastboot(usb_handle * handle);

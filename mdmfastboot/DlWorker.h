@@ -1,46 +1,53 @@
 #pragma once
 
-typedef UINT (*WORKFN)(LPVOID wParam);
+//#include "mdmfastbootDlg.h"
+
+typedef UINT (*WORKFN)(struct UsbWorkData * usbdata, flash_image  *image);
 
 class CDownload
 {
 public:
-	WORKFN fn;
-	LPVOID wParam;
+  WORKFN work;
+  UsbWorkData * data;
+  flash_image  *image;
+
 public:
-	CDownload(){ fn = NULL; };
-	void DoDownload()
-	{
-		if (NULL==fn)
-		{
-			return;
-		}
-		fn(wParam);
-	}
+  CDownload(): work(NULL){
+  };
+
+  CDownload(WORKFN wf, UsbWorkData * wParam, flash_image  *img):
+    work(wf), data(wParam), image(img)
+  {
+  };
+
+  void DoDownload()
+  {
+    if (NULL==work)
+    {
+      return;
+    }
+    work(data, image);
+  }
 };
 
 class CDlWorker
 {
 public:
-    typedef DWORD_PTR RequestType;
+  typedef DWORD_PTR RequestType;
 
-	CDlWorker()
-	{
-	}
+  CDlWorker() {
+  }
 
-    virtual BOOL Initialize(void *pvParam)
-    {
-		return TRUE;
-    }
+  virtual BOOL Initialize(void *pvParam) {
+    return TRUE;
+  }
 
-    virtual void Terminate(void* pvParam)
-    {
-	}
+  virtual void Terminate(void* pvParam) {
+  }
 
-	void Execute(RequestType dw, void *pvParam, OVERLAPPED* pOverlapped) throw()
-    {
-		CDownload* pTask = (CDownload*)(DWORD_PTR)dw;
-		pTask->DoDownload();
-		delete pTask;
-	}
+  void Execute(RequestType dw, void *pvParam, OVERLAPPED* pOverlapped) throw() {
+    CDownload* pTask = (CDownload*)(DWORD_PTR)dw;
+    pTask->DoDownload();
+    delete pTask;
+  }
 };

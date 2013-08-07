@@ -65,6 +65,7 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
     m_bInit = FALSE;
+    InitSettingConfig();
 }
 
 void CmdmfastbootDlg::DoDataExchange(CDataExchange* pDX)
@@ -108,19 +109,19 @@ void CmdmfastbootDlg::OnAbout()
 
 BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
 {
-  int size = sizeof(this->data) / sizeof(this->data[0]);
+  //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
   int r, c, pw, ph;
   CPortStateUI*  port;
   int R_NUM, C_NUM;
 
-  R_NUM = 2;
-  C_NUM = size / R_NUM;
+  R_NUM = PORT_LAYOUT_ROW;
+  C_NUM = PORT_NUM / R_NUM;
   pw = w / C_NUM;
   ph = h / R_NUM;
 
   for (r = 0; r < R_NUM; r++) {
     for (c = 0; c < C_NUM; c++) {
-      port = &this->data[r * R_NUM + c].ctl;
+      port = &m_workdata[r * R_NUM + c].ctl;
       port->SetWindowPos(0,
                          x + c * pw,
                          y + r * ph,
@@ -135,11 +136,11 @@ BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
 
 BOOL CmdmfastbootDlg::InitUsbWorkData(void)
 {
-  int size = sizeof(this->data) / sizeof(this->data[0]);
+  //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
   UsbWorkData* workdata;
   int i= 0;
-  for (; i < size; i++) {
-    workdata = data + i;
+  for (; i < PORT_NUM; i++) {
+    workdata = m_workdata + i;
     workdata->hWnd = this;
     workdata->ctl.Create(IDD_PORT_STATE, this);
     workdata->ctl.Init(i);
@@ -147,6 +148,7 @@ BOOL CmdmfastbootDlg::InitUsbWorkData(void)
   }
   return TRUE;
 }
+
 
 BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
   if (data == NULL) {
@@ -172,22 +174,34 @@ UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(usb_handle* handle) {
     return NULL;
   }
 
-  int size = sizeof(this->data) / sizeof(this->data[0]);
+  //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
   long usb_sn = usb_port_address(handle);
   int i= 0;
 
   // first search the before, for switch device.
-  for (; i < size; i++) {
-    if (this->data[i].usb_sn == usb_sn && this->data[i].usb == NULL)
-      return data + i;
+  for (; i < PORT_NUM; i++) {
+    if (m_workdata[i].usb_sn == usb_sn && m_workdata[i].usb == NULL)
+      return m_workdata + i;
   }
 
-  for (i=0; i < size; i++) {
-    if (this->data[i].usb == NULL)
-      return data + i;
+  for (i=0; i < PORT_NUM; i++) {
+    if (m_workdata[i].usb == NULL)
+      return m_workdata + i;
   }
 
   return NULL;
+}
+
+
+
+BOOL CmdmfastbootDlg::InitSettingConfig()
+{
+CString sPath(".\\");
+	GetAppPath(sPath);
+    sPath += L"mdmconfig.ini";
+    m_image = new flash_image(sPath.GetString());
+
+return TRUE;
 }
 
 // CmdmfastbootDlg 消息处理程序
@@ -458,10 +472,16 @@ UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command)
   return 0;
 }
 
-UINT usb_work(LPVOID wParam) {
-  UsbWorkData* data = (UsbWorkData*)wParam;
-  usb_handle * handle = data->usb;
+UINT usb_work(UsbWorkData* data, flash_image  *img) {
+ // UsbWorkData* data = (UsbWorkData*)wParam;
+  usb_handle * handle;
 
+ if (data == NULL || img == NULL) {
+    ERROR("Bad parameter");
+    return -1;
+    }
+
+ handle = data->usb;
 
   usb_dev_t status = usb_status( handle);
   PCHAR title = new char[16];
@@ -496,6 +516,7 @@ UINT usb_work(LPVOID wParam) {
         free(resp);
      }
 
+#if 0
     ret = adb.shell("trace -r", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
         ui_text_msg(data, PROMPT_TITLE, "trace return:");
@@ -503,7 +524,6 @@ UINT usb_work(LPVOID wParam) {
         free(resp);
      }
 
-#if 0
     adb.sync_push("./ReadMe.txt", "/usr");
     ui_text_msg(data, PROGRESS_STR, "Copy host file ./ReadMe.txt  to /usr.");
     sleep(1);
@@ -516,7 +536,7 @@ UINT usb_work(LPVOID wParam) {
     adb.sync_push("config.xml", "/tmp/config.xml");
     ui_text_msg(data, PROGRESS_STR, "Copy host file config.xml  to /tmp/config.xml.");
 
-
+    do_adb_shell_command(adb,data, "trace -r");
     do_adb_shell_command(adb,data, "hwinfo_check");
     do_adb_shell_command(adb,data, "swinfo_compare");
     do_adb_shell_command(adb,data, "backup");
@@ -545,26 +565,23 @@ UINT usb_work(LPVOID wParam) {
 #endif
 
     adb.reboot_bootloader();
-
     ui_text_msg(data, REBOOT_DEVICE, "reboot");
-
     usb_switch_device(handle);
 
     usb_close(handle);
   } else if (status == DEVICE_FLASH){
     fastboot fb(handle);
-
-    //test
     unsigned size;
-    void * image;
-    image = load_file(L"ReadMe.txt", &size);
+    void * img_data;
+//    image = load_file(L"ReadMe.txt", &size);
 
     fb.fb_queue_display("product","product");
     fb.fb_queue_display("version","version");
     fb.fb_queue_display("serialno","serialno");
     fb.fb_queue_display("kernel","kernel");
 
-    fb.fb_queue_flash("appsbl", image, size);
+if(0 == img->get_partition_info("boot", &img_data, &size))
+    fb.fb_queue_flash("boot", img_data, size);
 
   //  fb.fb_queue_reboot();
     fb.fb_execute_queue(handle,data->hWnd, data);
@@ -600,7 +617,8 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
       data->usb_sn =usb_port_address(handle);
 
 	  //AfxBeginThread(usb_work, data);
-	  AddWorkItem(usb_work, data);
+	CDownload* pDl = new CDownload(usb_work, data, m_image);
+	m_dlWorkerPool.QueueRequest( (CDlWorker::RequestType) pDl );
       return TRUE;
     }
   }
@@ -868,12 +886,6 @@ void CmdmfastbootDlg::OnDestroy()
 	::RemoveProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP);	//for single instance
 	//Shutdown the thread pool
 	m_dlWorkerPool.Shutdown();
+    delete m_image;
 }
 
-void CmdmfastbootDlg::AddWorkItem(WORKFN fn, UsbWorkData* wParam)
-{
-	CDownload* pDl = new CDownload();
-	pDl->fn = fn;
-	pDl->wParam = wParam;
-	m_dlWorkerPool.QueueRequest( (CDlWorker::RequestType) pDl );
-}

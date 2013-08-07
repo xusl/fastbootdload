@@ -11,7 +11,10 @@
 #include "PortStateUI.h"
 #include "usb_adb.h"
 #include <atlutil.h>
+#include "fastbootflash.h"
 #include "DlWorker.h"
+
+#include "adbhost.h"
 
 enum
 {
@@ -24,13 +27,18 @@ enum
 
 class CmdmfastbootDlg;
 
-typedef struct {
+typedef struct UsbWorkData UsbWorkData;
+
+ struct UsbWorkData{
     CWnd* hWnd;
     CPortStateUI  ctl;
     usb_handle * usb;
     int usb_sn;
-} UsbWorkData;
+} ;
 
+static const int PORT_NUM = 4;
+static const int PORT_LAYOUT_ROW = 2;
+static const int PARTITION_NAME_LEN = 32;
 
 // CmdmfastbootDlg 对话框
 class CmdmfastbootDlg : public CDialog
@@ -53,6 +61,8 @@ protected:
 	HICON m_hIcon;
   BOOL m_bInit;
 	CThreadPool<CDlWorker> m_dlWorkerPool;
+  flash_image *m_image;
+  UsbWorkData m_workdata[PORT_NUM];
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -67,7 +77,6 @@ protected:
 public:
 	afx_msg void OnBnClickedButtonStop();
 
-  UsbWorkData data[4];
 
 	//port UI
 
@@ -90,9 +99,10 @@ public:
 	afx_msg void OnDestroy();
 
   private:
-    UsbWorkData * GetUsbWorkData(usb_handle* handle);
     BOOL InitUsbWorkData(void);
+    UsbWorkData * GetUsbWorkData(usb_handle* handle);
     BOOL CleanUsbWorkData(UsbWorkData *data);
     BOOL SwitchUsbWorkData(UsbWorkData *data);
-	void AddWorkItem(WORKFN fn, UsbWorkData* wParam);
+
+    BOOL InitSettingConfig(void);
 };

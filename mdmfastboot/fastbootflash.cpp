@@ -38,103 +38,172 @@
 #include "mdmfastbootDlg.h"
 #include "fastbootflash.h"
 
-int cb_default(CWnd* hWnd,  void* data, Action *a, int status, char *resp);
-int match(char *str, const char **value, unsigned count);
-
-
-fastboot::~fastboot() {
-    remove_action();
-}
-
-fastboot::fastboot(usb_handle * handle):action_list(0), action_last(0) {
-}
-
-char *fastboot::mkmsg(const char *fmt, ...)
+flash_image::flash_image(const wchar_t* config_file):
+  image_list(NULL),
+  image_last(NULL)
 {
-    char buf[256];
-    char *s;
-    va_list ap;
-
-    va_start(ap, fmt);
-    vsprintf(buf, fmt, ap);
-    va_end(ap);
-
-    s = strdup(buf);
-    if (s == 0) die("out of memory");
-    return s;
+  read_config(config_file);
 }
 
+int flash_image::read_config(const wchar_t* config) {
+  wchar_t partition_tbl[PARTITION_NAME_LEN * 32] = {0};
+  wchar_t filename[MAX_PATH];
+  wchar_t *partition;
+  size_t partition_len;
+  wchar_t pkg_dir[MAX_PATH];
+    CString path;
+  int data_len;
 
-//static Action *action_list = 0;
-//static Action *action_last = 0;
+  if (config == NULL) {
+    ERROR("not specified config file name");
+    return -1;
+  }
 
-void fastboot::remove_action() {
-    Action *a;
+  data_len = GetPrivateProfileString(L"path",
+                                     L"package",
+                                     GetAppPath(path).GetString(),
+                                     pkg_dir,
+                                     MAX_PATH,
+                                     config);
 
-    for (a = action_list; a; a = action_list) {
-        action_list = a->next;
-		if (a->data) {
-			free(a->data);
-			a->data = NULL;
-		}
-		if (a->msg) {
-			free((void *)a->msg);
-			a->msg = NULL;
-		}
-		a->func = NULL;
-		a->next = NULL;
-		free(a);
-		a = NULL;
-	}
-	action_list = 0;
-	action_last = 0;
-}
-
-Action * fastboot::queue_action(unsigned op, const char *fmt, ...)
-{
-    Action *a;
-    va_list ap;
-
-    a = (Action *)calloc(1, sizeof(Action));
-    if (a == 0) die("out of memory");
-
-    va_start(ap, fmt);
-    vsprintf(a->cmd, fmt, ap);
-    va_end(ap);
-
-    if (action_last) {
-        action_last->next = a;
-    } else {
-        action_list = a;
+  if (pkg_dir[data_len - 1] != L'\\' ) {
+    if ( data_len > MAX_PATH - 2) {
+    ERROR("bad package directory in the section path.");
+        return -1;
     }
-    action_last = a;
-    a->op = op;
-    a->func = cb_default;
+    pkg_dir[data_len] = L'\\';
+    pkg_dir[data_len + 1] = L'\0';
+    }
 
-    a->start = -1;
+  data_len = GetPrivateProfileString(L"partition_table",
+                                     NULL,
+                                     NULL,
+                                     partition_tbl,
+                                     PARTITION_NAME_LEN * 32,
+                                     config);
 
-    return a;
+  if (data_len == 0) {
+    WARN("no %S exist, load default partition table.", config);
+    add_image(L"mibib", L"sbl1.mbn");
+    add_image(L"sbl2", L"sbl2.mbn");
+    add_image(L"rpm", L"rpm.mbn");
+    add_image(L"dsp1", L"dsp1.mbn");
+    add_image(L"dsp3", L"dsp3.mbn");
+    add_image(L"dsp2", L"dsp2.mbn");
+    add_image(L"aboot", L"appsboot.mbn");
+    add_image(L"boot", L"boot-oe-msm9615.img");
+    add_image(L"system", L"9615-cdp-image-9615-cdp.yaffs2");
+    add_image(L"userdata", L"9615-cdp-usr-image.usrfs.yaffs2");
+    return 0;
+  }
+
+  partition = partition_tbl;
+  partition_len = wcslen(partition);
+
+  while (partition_len > 0) {
+    data_len = GetPrivateProfileString(L"partition_table",
+                                       partition,
+                                       NULL,
+                                       filename,
+                                       MAX_PATH,
+                                       config);
+    if (data_len > 0) {
+        path.Empty();
+        path += pkg_dir;
+        //path += L'\\';
+        path += filename;
+      add_image(partition, path.GetString());
+    }
+
+    partition = partition + partition_len + 1;
+    partition_len = wcslen(partition);
+  }
+
+  return 0;
 }
 
-void fastboot::fb_queue_erase(const char *ptn)
-{
-    Action *a;
-    a = queue_action(OP_COMMAND, "erase:%s", ptn);
-    a->msg = mkmsg("erasing '%s'", ptn);
+int flash_image::add_image( wchar_t *partition, const wchar_t *lpath) {
+  Image* img = NULL;
+
+  if (partition == NULL || lpath == NULL) {
+    ERROR("Bad parameter");
+    return -1;
+  }
+
+  img = (Image *)calloc(1, sizeof(Image));
+  if (img == NULL) ERROR("out of memory");
+
+  img->data = load_file(lpath, &img->size);
+
+  if (img->data == NULL) {
+    ERROR("can not load data from file %S for  partition %S", lpath, partition);
+    free(img);
+    return -1;
+  }
+
+  img->partition = WideStrToMultiStr(partition);
+
+  if (image_last != NULL)
+    image_last->next = img;
+  else
+    image_list = img;
+
+  image_last = img;
+
+  DEBUG("Load data from file %S for partition %S", lpath, partition);
+
+  return 0;
 }
 
-void fastboot::fb_queue_flash(const char *ptn, void *data, unsigned sz)
-{
-    Action *a;
+int flash_image::get_partition_info(char *partition, void **ppdata, unsigned *psize) {
+  Image* img;
 
-    a = queue_action(OP_DOWNLOAD, "");
-    a->data = data;
-    a->size = sz;
-    a->msg = mkmsg("sending '%s' (%d KB)", ptn, sz / 1024);
+  // ASSERT( ppdata == NULL || psize == NULL );
+  if(ppdata == NULL || psize == NULL) {
+    ERROR("Bad parameter");
+    return -1;
+  }
 
-    a = queue_action(OP_COMMAND, "flash:%s", ptn);
-    a->msg = mkmsg("writing '%s'", ptn);
+  for (img = image_list; img; img = img->next) {
+    if (strcmp(partition, img->partition) == 0) {
+      *ppdata = img->data;
+      *psize = img->size;
+      return 0;
+    }
+  }
+  return 1;
 }
+
+flash_image::~flash_image() {
+    Image *img;
+    for (img = image_list; img; img = image_list) {
+      image_list = img->next;
+      if (img->partition != NULL) {
+        //free(img->partition);
+        delete img->partition;
+        img->partition = NULL;
+      }
+
+      if (img->lpath != NULL) {
+        free(img->lpath);
+        img->lpath = NULL;
+      }
+
+      if (img->data != NULL) {
+        free(img->data);
+        img->data = NULL;
+      }
+
+      free(img);
+      img = NULL;
+    }
+
+    image_list = NULL;
+}
+
+
+int cb_default(CWnd* hWnd,  void* data, Action *a, int status, char *resp);
+
 
 int match(char *str, const char **value, unsigned count)
 {
@@ -245,6 +314,102 @@ char buffer[256]={0};
     return 0;
 }
 
+
+fastboot::~fastboot() {
+    remove_action();
+}
+
+fastboot::fastboot(usb_handle * handle):action_list(0), action_last(0) {
+}
+
+char *fastboot::mkmsg(const char *fmt, ...)
+{
+    char buf[256];
+    char *s;
+    va_list ap;
+
+    va_start(ap, fmt);
+    vsprintf(buf, fmt, ap);
+    va_end(ap);
+
+    s = strdup(buf);
+    if (s == 0) die("out of memory");
+    return s;
+}
+
+void fastboot::remove_action() {
+  Action *a;
+
+  for (a = action_list; a; a = action_list) {
+    action_list = a->next;
+
+#if 0
+    if (a->data) {
+      free(a->data);
+      a->data = NULL;
+    }
+#else
+    a->data = NULL;
+#endif
+
+    if (a->msg) {
+      free((void *)a->msg);
+      a->msg = NULL;
+    }
+    a->func = NULL;
+    a->next = NULL;
+    free(a);
+    a = NULL;
+  }
+  action_list = 0;
+  action_last = 0;
+}
+
+Action * fastboot::queue_action(unsigned op, const char *fmt, ...)
+{
+    Action *a;
+    va_list ap;
+
+    a = (Action *)calloc(1, sizeof(Action));
+    if (a == 0) die("out of memory");
+
+    va_start(ap, fmt);
+    vsprintf(a->cmd, fmt, ap);
+    va_end(ap);
+
+    if (action_last) {
+        action_last->next = a;
+    } else {
+        action_list = a;
+    }
+    action_last = a;
+    a->op = op;
+    a->func = cb_default;
+
+    a->start = -1;
+
+    return a;
+}
+
+void fastboot::fb_queue_erase(const char *ptn)
+{
+    Action *a;
+    a = queue_action(OP_COMMAND, "erase:%s", ptn);
+    a->msg = mkmsg("erasing '%s'", ptn);
+}
+
+void fastboot::fb_queue_flash(const char *ptn, void *data, unsigned sz)
+{
+    Action *a;
+
+    a = queue_action(OP_DOWNLOAD, "");
+    a->data = data;
+    a->size = sz;
+    a->msg = mkmsg("sending '%s' (%d KB)", ptn, sz / 1024);
+
+    a = queue_action(OP_COMMAND, "flash:%s", ptn);
+    a->msg = mkmsg("writing '%s'", ptn);
+}
 void fastboot::fb_queue_require(const char *var, int invert, unsigned nvalues, const char **value)
 {
     Action *a;

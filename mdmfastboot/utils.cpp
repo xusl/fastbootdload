@@ -148,7 +148,8 @@ void get_my_path(char *exe, size_t maxLen)
     char  *r;
 
     /* XXX: should be GetModuleFileNameA */
-    if (GetModuleFileNameA(NULL, exe, maxLen) > 0) {
+//    if (GetModuleFileNameA(NULL, exe, maxLen) > 0) {
+    if( GetCurrentDirectoryA(maxLen, exe) > 0) {
         r = strrchr(exe, '\\');
         if (r != NULL)
             *r = '\0';
