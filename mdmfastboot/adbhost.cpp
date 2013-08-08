@@ -8,11 +8,12 @@ when        who          what
 2013-07-10  shenlong.xu  Init first version
 
 =============================================================================*/
+
+
 #include "StdAfx.h"
 
+#define   TRACE_TAG  TRACE_ADB
 #include "adbhost.h"
-
-#define   TRACE_TAG  TRACE_TRANSPORT
 
 
 #if ADB_TRACE
@@ -96,9 +97,9 @@ adbhost::~adbhost(void)
 int adbhost::read_packet( apacket** ppacket)
 {
    if(t.read_from_remote(*ppacket, &t) == 0){
-      DEBUG("from_remote: received remote packet, sending to transport %p\n", t);
+      //DEBUG("from_remote: received remote packet, sending to transport %p", t);
    } else {
-      DEBUG("from_remote: remote read failed for transport %p\n", *ppacket);
+      ERROR("from_remote: remote read failed for transport %p", *ppacket);
       return -1;
    }
 
@@ -146,11 +147,11 @@ void adbhost::send_packet(apacket *p, atransport *t)
    print_packet("send", p);
 
    if (t == NULL) {
-      ERROR("Transport is null \n");
+      ERROR("Transport is null ");
    }
 
    if(write_packet(&p)){
-      fatal_errno("cannot enqueue packet on transport socket");
+      ERROR("cannot enqueue packet on transport socket");
    }
 }
 
@@ -162,7 +163,7 @@ void adbhost::connect(atransport *t)
    cp->msg.arg1 = MAX_PAYLOAD;
    snprintf((char*) cp->data, sizeof cp->data, "%s::", "host" );
    cp->msg.data_length = strlen((char*) cp->data) + 1;
-   DEBUG("Calling connect \n");
+   DEBUG("Calling connect ");
    send_packet(cp, t);
 
    /* XXX why sleep here? */
@@ -177,13 +178,13 @@ void adbhost::open_service(const char *destination)
 {
    apacket *p = get_apacket();
    int len = strlen(destination) + 1;
-   DEBUG("Connect_to_remote call \n");
+   DEBUG("Connect_to_remote call ");
 
    if(len > (MAX_PAYLOAD-1)) {
-      fatal("destination oversized");
+      ERROR("destination oversized");
    }
 
-   DEBUG("LS(%d): connect('%s')\n", id, destination);
+   DEBUG("LS(%d): connect('%s')", id, destination);
    p->msg.command = A_OPEN;
    p->msg.arg0 = this->id;
    p->msg.data_length = len;
@@ -195,7 +196,7 @@ void adbhost::open_service(const char *destination)
 
 int adbhost::enqueue_command(apacket *p)
 {
-   DEBUG("Calling remote_socket_enqueue\n");
+   DEBUG("Calling remote_socket_enqueue");
    p->msg.command = A_WRTE;
    p->msg.arg0 = this->id;
    p->msg.arg1 = this->peer_id;
@@ -211,7 +212,7 @@ void adbhost::notify_ready_to_remote(void)
    p->msg.command = A_OKAY;
    p->msg.arg0 = this->id;
    p->msg.arg1 = this->peer_id;
-   DEBUG("Calling remote_socket_ready\n");
+   DEBUG("Calling remote_socket_ready");
    send_packet(p, &this->t);
    put_apacket(p);
 }
@@ -223,7 +224,7 @@ void adbhost::close_remote(void)
    p->msg.command = A_CLSE;
    p->msg.arg1 = this->id;
    send_packet(p, &this->t);
-   DEBUG("RS(%d): closed\n", this->id);
+   DEBUG("RS(%d): closed", this->id);
 
    for (;;) {
       read_packet(&p);
@@ -336,7 +337,7 @@ bool adbhost::handle_connect_response(void)
 
    banner = (char*) p->data;
 
-   DEBUG("parse_banner: %s\n", banner);
+   DEBUG("parse_banner: %s", banner);
    type = banner;
    product = strchr(type, ':');
    if(product) {
@@ -360,15 +361,15 @@ bool adbhost::handle_connect_response(void)
    t.connection_state = CS_HOST;
 
    if(!strcmp(type, "bootloader")){
-      D("setting connection_state to CS_BOOTLOADER\n");
+      DEBUG("setting connection_state to CS_BOOTLOADER\n");
       t.connection_state = CS_BOOTLOADER;
    }
    if(!strcmp(type, "device")) {
-      D("setting connection_state to CS_DEVICE\n");
+      DEBUG("setting connection_state to CS_DEVICE\n");
       t.connection_state = CS_DEVICE;
    }
    if(!strcmp(type, "recovery")) {
-      D("setting connection_state to CS_RECOVERY\n");
+      DEBUG("setting connection_state to CS_RECOVERY\n");
       t.connection_state = CS_RECOVERY;
    }
 
@@ -527,7 +528,7 @@ int adbhost::do_sync_pull(const char *rpath, const char *lpath)
 
     open_service("sync:");
     if(!handle_open_response()) {
-        fprintf(stderr,"error: open sync failed\n");
+        ERROR("error: open sync failed");
         return 1;
     }
 
@@ -535,7 +536,7 @@ int adbhost::do_sync_pull(const char *rpath, const char *lpath)
         return 1;
     }
     if(mode == 0) {
-        fprintf(stderr,"remote object '%s' does not exist\n", rpath);
+        ERROR("remote object '%s' does not exist", rpath);
         return 1;
     }
 
@@ -576,7 +577,7 @@ int adbhost::do_sync_pull(const char *rpath, const char *lpath)
             return 0;
         }
     } else {
-        fprintf(stderr,"remote object '%s' not a file or directory\n", rpath);
+        ERROR("remote object '%s' not a file or directory", rpath);
         return 1;
     }
 }
@@ -597,7 +598,7 @@ int adbhost::do_sync_push(const char *lpath, const char *rpath)
     }
 
     if(stat(lpath, &st)) {
-        fprintf(stderr,"cannot stat local file '%s'\n", lpath);
+        ERROR("cannot stat local file '%s'", lpath);
         sync_quit();
         return 1;
     }
@@ -699,14 +700,14 @@ int adbhost::sync_send(int fd, const char *lpath, const char *rpath,
         } else
             strcpy(sbuf->data, "unknown reason");
 
-        fprintf(stderr,"failed to copy '%s' to '%s': %s\n", lpath, rpath, sbuf->data);
+        ERROR("failed to copy '%s' to '%s': %s", lpath, rpath, sbuf->data);
         return -1;
     }
 
     return 0;
 
 fail:
-    fprintf(stderr,"protocol failure\n");
+    ERROR("protocol failure");
     return -1;
 }
 
@@ -739,7 +740,7 @@ int adbhost::sync_recv(int fd, const char *rpath, const char *lpath)
         mkdirs((char *)lpath);
         lfd = adb_creat(lpath, 0644);
         if(lfd < 0) {
-            fprintf(stderr,"cannot create '%s': %s\n", lpath, strerror(errno));
+            ERROR("cannot create '%s': %s", lpath, strerror(errno));
             return -1;
         }
         goto handle_data;
@@ -758,7 +759,7 @@ int adbhost::sync_recv(int fd, const char *rpath, const char *lpath)
         if(id == ID_DONE) break;
         if(id != ID_DATA) goto remote_error;
         if(len > SYNC_DATA_MAX) {
-            fprintf(stderr,"data overrun\n");
+            ERROR("data overrun");
             adb_close(lfd);
             return -1;
         }
@@ -769,7 +770,7 @@ int adbhost::sync_recv(int fd, const char *rpath, const char *lpath)
         }
 
         if(adb_write(lfd, buffer, len)) {
-            fprintf(stderr,"cannot write '%s': %s\n", rpath, strerror(errno));
+            ERROR("cannot write '%s': %s", rpath, strerror(errno));
             adb_close(lfd);
             return -1;
         }
@@ -796,7 +797,7 @@ remote_error:
         buffer[4] = 0;
 //        strcpy(buffer,"unknown reason");
     }
-    fprintf(stderr,"failed to copy '%s' to '%s': %s\n", rpath, lpath, buffer);
+    ERROR("failed to copy '%s' to '%s': %s", rpath, lpath, buffer);
     return 0;
 }
 
@@ -875,7 +876,7 @@ int adbhost::copy_local_dir_remote(int fd, const char *lpath, const char *rpath,
     for(ci = filelist; ci != 0; ci = next) {
         next = ci->next;
         if(ci->flag == 0) {
-            fprintf(stderr,"%spush: %s -> %s\n", listonly ? "would " : "", ci->src, ci->dst);
+            ERROR("%spush: %s -> %s", listonly ? "would " : "", ci->src, ci->dst);
             if(!listonly &&
                sync_send(fd, ci->src, ci->dst, ci->time, ci->mode)){
                 return 1;
@@ -887,7 +888,7 @@ int adbhost::copy_local_dir_remote(int fd, const char *lpath, const char *rpath,
         free(ci);
     }
 
-    fprintf(stderr,"%d file%s pushed. %d file%s skipped.\n",
+    ERROR("%d file%s pushed. %d file%s skipped.",
             pushed, (pushed == 1) ? "" : "s",
             skipped, (skipped == 1) ? "" : "s");
 
@@ -920,7 +921,7 @@ int adbhost::copy_remote_dir_local(int fd, const char *rpath, const char *lpath,
         lpath = tmp;
     }
 
-    fprintf(stderr, "pull: building file list...\n");
+    ERROR( "pull: building file list...");
     /* Recursively build the list of files to copy. */
     if (remote_build_list(fd, &filelist, rpath, lpath)) {
         return -1;
@@ -949,7 +950,7 @@ int adbhost::copy_remote_dir_local(int fd, const char *rpath, const char *lpath,
     for (ci = filelist; ci != 0; ci = next) {
         next = ci->next;
         if (ci->flag == 0) {
-            fprintf(stderr, "pull: %s -> %s\n", ci->src, ci->dst);
+            ERROR( "pull: %s -> %s", ci->src, ci->dst);
             if (sync_recv(fd, ci->src, ci->dst)) {
                 return 1;
             }
@@ -960,7 +961,7 @@ int adbhost::copy_remote_dir_local(int fd, const char *rpath, const char *lpath,
         free(ci);
     }
 
-    fprintf(stderr, "%d file%s pulled. %d file%s skipped.\n",
+    ERROR( "%d file%s pulled. %d file%s skipped.",
             pulled, (pulled == 1) ? "" : "s",
             skipped, (skipped == 1) ? "" : "s");
 
@@ -996,7 +997,7 @@ adbhost::sync_ls_build_list_cb(unsigned mode, unsigned size, unsigned time,
         ci->next = *filelist;
         *filelist = ci;
     } else {
-        fprintf(stderr, "skipping special file '%s'\n", name);
+        ERROR( "skipping special file '%s'", name);
     }
 }
 
@@ -1078,7 +1079,7 @@ int adbhost::write_data_file(int fd, const char *path, syncsendbuf *sbuf)
 
     lfd = adb_open(path, "rb");
     if(lfd < 0) {
-        fprintf(stderr,"cannot open '%s': %s\n", path, strerror(errno));
+        ERROR("cannot open '%s': %s", path, strerror(errno));
         return -1;
     }
 
@@ -1093,7 +1094,7 @@ int adbhost::write_data_file(int fd, const char *path, syncsendbuf *sbuf)
         if(ret < 0) {
             if(errno == EINTR)
                 continue;
-            fprintf(stderr,"cannot read '%s': %s\n", path, strerror(errno));
+            ERROR("cannot read '%s': %s", path, strerror(errno));
             break;
         }
 
@@ -1208,7 +1209,7 @@ int adbhost::local_build_list(copyinfo **filelist,
 
    d = opendir(lpath);
    if(d == 0) {
-      fprintf(stderr,"cannot open '%s': %s\n", lpath, strerror(errno));
+      ERROR("cannot open '%s': %s", lpath, strerror(errno));
       return -1;
    }
 
@@ -1239,11 +1240,11 @@ int adbhost::local_build_list(copyinfo **filelist,
          ci = mkcopyinfo(lpath, rpath, name, 0);
          if(lstat(ci->src, &st)) {
             closedir(d);
-            fprintf(stderr,"cannot stat '%s': %s\n", ci->src, strerror(errno));
+            ERROR("cannot stat '%s': %s", ci->src, strerror(errno));
             return -1;
          }
          if(!S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) {
-            fprintf(stderr, "skipping special file '%s'\n", ci->src);
+            ERROR( "skipping special file '%s'", ci->src);
             free(ci);
          } else {
             ci->time = st.st_mtime;
@@ -1272,15 +1273,15 @@ int adbhost::adb_read(FILE* fd, void *ptr, size_t len)
     int r;
 
     if (feof(fd)) {
-        D("adb_read: reach end of file.\n", fd);
+        DEBUG("adb_read: reach end of file.", fd);
         return 0;
     }
 
-    D("adb_read: %d %p %d\n", fd, ptr, (int)len);
+    DEBUG("adb_read: %d %p %d", fd, ptr, (int)len);
     r = fread(ptr, 1, len, fd);
 
     if(r < 0) {
-        D("adb_read: %d %d , errno :%s, ferror %d\n", fd, r, strerror(errno), ferror(fd));
+        DEBUG("adb_read: %d %d , errno :%s, ferror %d", fd, r, strerror(errno), ferror(fd));
         return -1;
     }
 
@@ -1298,13 +1299,13 @@ int adbhost::adb_write(FILE* fd, const void *ptr, size_t len)
             len -= r;
             p += r;
         } else {
-            D("adb_write: %d %d %s\n", fd, r, strerror(errno));
+            DEBUG("adb_write: %d %d %s", fd, r, strerror(errno));
             if((r < 0) && (errno == EINTR)) continue;
             return -1;
         }
     }
 
-    D("adb_write: %d ok\n", fd);
+    DEBUG("adb_write: %d ok", fd);
     return 0;
 }
 
@@ -1332,7 +1333,7 @@ copyinfo *adbhost::mkcopyinfo(const char *spath, const char *dpath,
 
     copyinfo *ci = (copyinfo *)malloc(sizeof(copyinfo) + ssize + dsize);
     if(ci == 0) {
-        fprintf(stderr,"out of memory\n");
+        ERROR("out of memory");
         abort();
     }
 
@@ -1418,7 +1419,7 @@ int adbhost::sync_finish_readtime(int fd, unsigned int *timestamp,
     if (t == 0)  /* prevent division by 0 :-) */
         t = 1000000;
 
-    fprintf(stderr,"%lld KB/s (%d bytes in %lld.%03llds)\n",
+    ERROR("%lld KB/s (%d bytes in %lld.%03llds)",
             ((((long ) total_bytes) * 1000000LL) / t) / 1024LL,
             total_bytes, (t / 1000000LL), (t % 1000000LL) / 1000LL);
 }
@@ -1426,7 +1427,7 @@ int adbhost::sync_finish_readtime(int fd, unsigned int *timestamp,
 apacket *get_apacket(void)
 {
     apacket *p = (apacket *)malloc(sizeof(apacket));
-    if(p == 0) fatal("failed to allocate an apacket");
+    if(p == 0) ERROR("failed to allocate an apacket");
     memset(p, 0, sizeof(apacket) - MAX_PAYLOAD);
     return p;
 }
@@ -1454,7 +1455,7 @@ void print_packet(const char *label, apacket *p)
    default: tag = "????"; break;
    }
 
-   fprintf(stderr, "%s: %s %08x %08x %04x \"",
+   ERROR( "%s: %s %08x %08x %04x \"",
            label, tag, p->msg.arg0, p->msg.arg1, p->msg.data_length);
    count = p->msg.data_length;
    x = (char*) p->data;
@@ -1472,6 +1473,6 @@ void print_packet(const char *label, apacket *p)
       }
       x++;
    }
-   fprintf(stderr, tag);
+   ERROR( tag);
 }
 #endif

@@ -196,11 +196,31 @@ UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(usb_handle* handle) {
 
 BOOL CmdmfastbootDlg::InitSettingConfig()
 {
+  int data_len;
+  LPCTSTR lpFileName;
+  wchar_t log_conf[MAX_PATH + 128];
+    wchar_t* log_file = NULL;
+    char *log_tag = NULL;
+    char *log_level = NULL;
 CString sPath(".\\");
+
+
 	GetAppPath(sPath);
     sPath += L"mdmconfig.ini";
-    m_image = new flash_image(sPath.GetString());
 
+    lpFileName = sPath.GetString();
+    m_image = new flash_image(lpFileName);
+
+  data_len = GetPrivateProfileString(L"log",L"FILE",NULL,log_conf, MAX_PATH,lpFileName);
+  if (data_len) log_file = wcsdup(log_conf);
+  data_len = GetPrivateProfileString(L"log",L"TAG",L"all",log_conf, MAX_PATH,lpFileName);
+  if (data_len) log_tag = WideStrToMultiStr(log_conf);
+    data_len = GetPrivateProfileString(L"log",L"LEVEL",NULL,log_conf,MAX_PATH,lpFileName);
+    if (data_len) log_level = WideStrToMultiStr(log_conf);
+	StartLogging(log_file, log_level, log_tag);
+    if(log_file) free(log_file);
+    if(log_tag) delete log_tag;
+    if(log_level) delete log_level;
 return TRUE;
 }
 
@@ -429,6 +449,11 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
     data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
     break;
 
+  case FLASH_DONE:
+    CleanUsbWorkData(data);
+    //data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
+    break;
+
   case TITLE:
     data->ctl.SetTitle(uiInfo->sVal);
     break;
@@ -588,6 +613,9 @@ if(0 == img->get_partition_info("boot", &img_data, &size))
 
      //do not free, fb have done for us.
      // free(image);
+
+    ui_text_msg(data, FLASH_DONE, " firmware updated!");
+     usb_close(handle);
   }
   return 0;
 }

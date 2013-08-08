@@ -58,12 +58,12 @@ CLog* CLog::GetInstance()
 
 CLog::CLog() : mask (LOG_MASK_NONE)
 {
-  adb_trace_init();
 }
 
 CLog::~CLog()
 {
-//	std::locale::global(loc);
+	std::locale::global(loc);
+	INFO("***** Stop logging *****");
 #ifdef FEATURE_LOG_FILE
 	if (this->stream.is_open())
 	{
@@ -107,53 +107,6 @@ void fatal_errno(const char *fmt, ...)
     exit(-1);
 }
 
-//把标准输出重定向到文件adb.log
-void RedirectStdIO(wchar_t *filename)
-{
-    char    temp[ MAX_PATH ];
-    FILE*   fnul;
-    FILE*   flog;
-
-    GetTempPathA( sizeof(temp) - 8, temp );
-    strcat( temp, "adb.log" );
-
-    /* Win32 specific redirections */
-    fnul = fopen( "NUL", "rt" );
-    if (fnul != NULL)
-        stdin[0] = fnul[0];
-
-    if (filename == NULL)
-	    flog = fopen( temp, "at" );
-	else {
-		char * fn = WideStrToMultiStr(filename);
-		flog = fopen(fn , "at" );
-		delete fn;
-	}
-
-    if (flog == NULL)
-        flog = fnul;
-
-    setvbuf( flog, NULL, _IONBF, 0 );
-
-    stdout[0] = flog[0];
-    stderr[0] = flog[0];
-    fprintf(stderr,"\n\n--- adb starting (pid %d) ---\n", getpid());
-
-}
-
-void StartLogging(void) {
-	SYSTEMTIME time;
-	CString sPath = L"";
-	GetLocalTime(&time);
-	GetAppPath(sPath);
-
-	wchar_t filename[MAX_PATH] = {0};
-	wsprintf(filename, L"%smdmfastboot_%d%02d%02d.log", sPath,
-		time.wYear, time.wMonth, time.wDay);
-	StartLogging(filename, LOG_MASK_ALL);
-	RedirectStdIO(filename);
-}
-
 /*===========================================================================
 DESCRIPTION
 	Start logging message to App and/or local disk file according to the
@@ -174,7 +127,8 @@ SIDE EFFECTS
 void CLog::StartLogging
 (
 	const wchar_t* fname,
-	unsigned int mask
+	const char* mask,
+	const char* tags
 )
 {
 	loc = std::locale::global(std::locale(""));
@@ -188,7 +142,12 @@ void CLog::StartLogging
 	}
 	this->stream.open(fname, ios_base::app);
 #endif
-	this->mask = mask;
+	//this->mask = mask;
+
+    log_tags_init(tags);
+	log_level_init(mask);
+
+	INFO("===== Start logging =====");
 }
 
 /*===========================================================================
@@ -208,6 +167,7 @@ SIDE EFFECTS
 
 void CLog::Debug
 (
+    AdbTrace tag,
 	const char* fmtstr,
 	...
 )
@@ -226,7 +186,7 @@ void CLog::Debug
 
 	va_list args;
 	va_start(args, fmtstr);
-	this->WriteLog(
+	this->WriteLog(tag,
 			"DEBUG",
 			fmtstr,
 			args
@@ -253,6 +213,7 @@ SIDE EFFECTS
 
 void CLog::Log
 (
+    AdbTrace tag,
 	const char* fmtstr,
 	...
 )
@@ -271,7 +232,7 @@ void CLog::Log
 
 	va_list args;
 	va_start(args, fmtstr);
-	this->WriteLog(
+	this->WriteLog(tag,
 			"LOG",
 			fmtstr,
 			args
@@ -298,6 +259,7 @@ SIDE EFFECTS
 
 void CLog::Info
 (
+    AdbTrace tag,
 	const char* fmtstr,
 	...
 )
@@ -316,7 +278,7 @@ void CLog::Info
 
 	va_list args;
 	va_start(args, fmtstr);
-	this->WriteLog(
+	this->WriteLog(tag,
 			"INFO",
 			fmtstr,
 			args
@@ -343,6 +305,7 @@ SIDE EFFECTS
 
 void CLog::Warn
 (
+    AdbTrace tag,
 	const char* fmtstr,
 	...
 )
@@ -361,7 +324,7 @@ void CLog::Warn
 
 	va_list args;
 	va_start(args, fmtstr);
-	this->WriteLog(
+	this->WriteLog(tag,
 			"WARNING",
 			fmtstr,
 			args
@@ -388,6 +351,7 @@ SIDE EFFECTS
 
 void CLog::Error
 (
+    AdbTrace tag,
 	const char* fmtstr,
 	...
 )
@@ -406,7 +370,7 @@ void CLog::Error
 
 	va_list args;
 	va_start(args, fmtstr);
-	this->WriteLog(
+	this->WriteLog(tag,
 			"ERROR",
 			fmtstr,
 			args
@@ -433,6 +397,7 @@ SIDE EFFECTS
 
 void CLog::Critical
 (
+    AdbTrace tag,
 	const char * fmtstr,
 	...
 )
@@ -451,7 +416,7 @@ void CLog::Critical
 
 	va_list args;
 	va_start(args, fmtstr);
-	this->WriteLog(
+	this->WriteLog(tag,
 			"CRITICAL",
 			fmtstr,
 			args
@@ -463,6 +428,7 @@ void CLog::Critical
 
 void CLog::Memdump
 (
+    AdbTrace tag,
 	const char* fmtstr,
 	...
 )
@@ -481,7 +447,7 @@ void CLog::Memdump
 
 	va_list args;
 	va_start(args, fmtstr);
-	this->WriteLog(
+	this->WriteLog(tag,
 			"MEMDUMP",
 			fmtstr,
 			args
@@ -509,6 +475,7 @@ SIDE EFFECTS
 
 void CLog::WriteLog
 (
+    AdbTrace tag,
 	const char* msg,
 	const char* fmtstr,
 	va_list& args
@@ -522,6 +489,10 @@ void CLog::WriteLog
 	char  szBuffer[MAX_BUF_LEN] = {0};
 	char  buf[MAX_BUF_LEN] = {0};
 	int   len ;
+
+    if(!((AdbTraceMask() & (1 << tag)) != 0)) {
+        return;
+    }
 
 	if (fmtstr == NULL)
 	{
@@ -541,7 +512,7 @@ void CLog::WriteLog
 	 //_snprintf(buf,MAX_BUF_LEN, "%4d-%02d-%02d %02d:%02d:%02d.%03d  %8s  %s",
 	//			time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
 	//			time.wSecond, time.wMilliseconds,  msg, fmtstr);
-	 	 _snprintf(buf,MAX_BUF_LEN, "%02d:%02d:%02d  %8s  %s",
+	 	 _snprintf(buf,MAX_BUF_LEN, "%02d:%02d:%02d %8s %s",
 				 time.wHour, time.wMinute,time.wSecond, msg, fmtstr);
 
 	nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), buf, args);
@@ -578,9 +549,9 @@ int CLog::AdbTraceMask() {
  * mask from it. note that '1' and 'all' are special cases to
  * enable all tracing
  */
-void CLog::adb_trace_init(void)
+void CLog::log_tags_init(const char*  p)
 {
-    const char*  p = getenv("ADB_TRACE");
+    //const char*  p = getenv("ADB_TRACE");
     const char*  q;
 
     static const struct {
@@ -590,14 +561,12 @@ void CLog::adb_trace_init(void)
         { "1", 0 },
         { "all", 0 },
         { "adb", TRACE_ADB },
-        { "sockets", TRACE_SOCKETS },
         { "packets", TRACE_PACKETS },
         { "rwx", TRACE_RWX },
         { "usb", TRACE_USB },
         { "sync", TRACE_SYNC },
-        { "sysdeps", TRACE_SYSDEPS },
         { "transport", TRACE_TRANSPORT },
-        { "jdwp", TRACE_JDWP },
+        { "fb", TRACE_FB },
         { NULL, 0 }
     };
 
@@ -639,6 +608,129 @@ void CLog::adb_trace_init(void)
     }
 }
 
+
+/* read a comma/space/colum/semi-column separated list of tags
+ * from the ADB_TRACE environment variable and build the trace
+ * mask from it. note that '1' and 'all' are special cases to
+ * enable all tracing
+ */
+void CLog::log_level_init(const char*  p)
+{
+    const char*  q;
+
+    static const struct {
+        const char*  tag;
+        int           flag;
+    } tags[] = {
+        { "1", 0 },
+        { "all", LOG_MASK_ALL },
+        { "debug", LOG_MASK_DEBUG },
+        { "log", LOG_MASK_LOG },
+        { "info", LOG_MASK_INFO },
+        { "warn", LOG_MASK_WARNING},
+        { "error", LOG_MASK_ERROR},
+        { "critical", LOG_MASK_CRITICAL},
+        { "memdump", LOG_MASK_MEMDUMP},
+        { NULL, 0 }
+    };
+
+    if (p == NULL) {
+#ifdef _DEBUG
+            mask = LOG_MASK_ALL;
+#endif
+            return;
+	}
+
+    /* use a comma/column/semi-colum/space separated list */
+    while (*p) {
+        int  len, tagn;
+
+        q = strpbrk(p, " ,:;");
+        if (q == NULL) {
+            q = p + strlen(p);
+        }
+        len = q - p;
+
+        for (tagn = 0; tags[tagn].tag != NULL; tagn++)
+        {
+            int  taglen = strlen(tags[tagn].tag);
+
+            if (len == taglen && !memcmp(tags[tagn].tag, p, len) )
+            {
+                int  flag = tags[tagn].flag;
+                if (flag == 0) {
+                    mask = LOG_MASK_ALL;
+                    return;
+                }
+                mask |= flag;
+                break;
+            }
+        }
+        p = q;
+        if (*p)
+            p++;
+    }
+}
+
+
+//把标准输出重定向到文件adb.log
+void RedirectStdIO(const wchar_t *filename)
+{
+    char    temp[ MAX_PATH ];
+    FILE*   fnul;
+    FILE*   flog;
+
+    GetTempPathA( sizeof(temp) - 8, temp );
+    strcat( temp, "adb.log" );
+
+    /* Win32 specific redirections */
+    fnul = fopen( "NUL", "rt" );
+    if (fnul != NULL)
+        stdin[0] = fnul[0];
+
+    if (filename == NULL)
+	    flog = fopen( temp, "at" );
+	else {
+		char * fn = WideStrToMultiStr((PWCHAR)filename);
+		flog = fopen(fn , "at" );
+		delete fn;
+	}
+
+    if (flog == NULL)
+        flog = fnul;
+
+    setvbuf( flog, NULL, _IONBF, 0 );
+
+    stdout[0] = flog[0];
+    stderr[0] = flog[0];
+    fprintf(stderr,"\n\n--- adb starting (pid %d) ---\n", getpid());
+
+}
+
+void StartLogging(const wchar_t* fname,
+	const char* mask,
+	const char* tags) {
+	SYSTEMTIME time;
+	CString sPath = L"";
+	GetLocalTime(&time);
+	GetAppPath(sPath);
+
+	wchar_t filename[MAX_PATH] = {0};
+	wsprintf(filename, L"%smdmfastboot_%d%02d%02d.log", sPath,
+		time.wYear, time.wMonth, time.wDay);
+
+	if (fname == NULL || fname == L"")
+	{
+		fname = filename;
+	}
+#ifdef FEATURE_LOG_SYS
+	g_pLogInstance = CLog::GetInstance();
+	g_pLogInstance->StartLogging(fname, mask, tags);
+#endif
+
+	RedirectStdIO(fname);
+}
+
 //-----------------------------------------------------------------------------
 
 /*===========================================================================
@@ -656,22 +748,7 @@ SIDE EFFECTS
 
 ===========================================================================*/
 
-void StartLogging
-(
-	const wchar_t* fname,
-	unsigned int mask
-)
-{
-	if (fname == NULL || fname == L"")
-	{
-		return;
-	}
-#ifdef FEATURE_LOG_SYS
-	g_pLogInstance = CLog::GetInstance();
-	g_pLogInstance->StartLogging(fname, mask);
-#endif
-	INFO("===== Start logging =====");
-}
+
 
 /*===========================================================================
 DESCRIPTION
@@ -690,7 +767,6 @@ SIDE EFFECTS
 
 void StopLogging(void)
 {
-	INFO("***** Stop logging *****");
 #ifdef FEATURE_LOG_SYS
 	delete g_pLogInstance;
 	g_pLogInstance = NULL;

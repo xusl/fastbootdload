@@ -39,10 +39,8 @@ typedef enum {
 	LOG_MASK_WARNING     = LEFT_SHIFT_BITS(3),
 	LOG_MASK_ERROR       = LEFT_SHIFT_BITS(4),
 	LOG_MASK_CRITICAL    = LEFT_SHIFT_BITS(5),
-	LOG_MASK_ALL         = LEFT_SHIFT_BITS(6) - 1,
-
-	LOG_MASK_MEMDUMP     = LEFT_SHIFT_BITS(7), // for memory allocate/free info
-
+	LOG_MASK_MEMDUMP     = LEFT_SHIFT_BITS(6), // for memory allocate/free info
+	LOG_MASK_ALL         = LEFT_SHIFT_BITS(7) - 1,
 	LOG_MASK_MAX         = LEFT_SHIFT_BITS(31),
 } TLogMaskEnumType;
 
@@ -52,22 +50,20 @@ typedef enum {
  */
 typedef enum {
     TRACE_ADB = 0,
-    TRACE_SOCKETS,
     TRACE_PACKETS,
     TRACE_TRANSPORT,
     TRACE_RWX,
     TRACE_USB,
     TRACE_SYNC,
-    TRACE_SYSDEPS,
-    TRACE_JDWP,
+    TRACE_FB,
 } AdbTrace;
 
 
 #ifdef FEATURE_LOG_FUNC_NAME
-#define TRACE_FMT "    %20s  %04d %20s    "
+#define TRACE_FMT " %20s %04d %20s "
 #define LOG_TRACE basename(__FILE__),__LINE__,__FUNCTION__
 #else
-#define TRACE_FMT "   %20s  %04d    "
+#define TRACE_FMT " %20s %04d "
 #define LOG_TRACE basename(__FILE__),__LINE__
 #endif
 
@@ -79,15 +75,15 @@ public:
 	~CLog();
 
 public:
-	void StartLogging(const wchar_t* logname, unsigned int mask = LOG_MASK_ALL);
+	void StartLogging(const wchar_t* logname, const char* mask = NULL,const char*  tags= NULL);
 
-	void Debug(const char* fmtstr, ...);
-	void Log(const char* fmtstr, ...);
-	void Info(const char* fmtstr, ...);
-	void Warn(const char* fmtstr, ...);
-	void Error(const char* fmtstr, ...);
-	void Critical(const char* fmtstr, ...);
-	void Memdump(const char* fmtstr, ...);
+	void Debug(AdbTrace tag, const char* fmtstr, ...);
+	void Log(AdbTrace tag, const char* fmtstr, ...);
+	void Info(AdbTrace tag, const char* fmtstr, ...);
+	void Warn(AdbTrace tag, const char* fmtstr, ...);
+	void Error(AdbTrace tag, const char* fmtstr, ...);
+	void Critical(AdbTrace tag, const char* fmtstr, ...);
+	void Memdump(AdbTrace tag, const char* fmtstr, ...);
 	int AdbTraceMask();
 
 public:
@@ -95,9 +91,10 @@ public:
 
 private:
 	CLog();
-	void WriteLog(const char* msg, const char* fmtstr, va_list& args);
+	void WriteLog(AdbTrace tag, const char* msg, const char* fmtstr, va_list& args);
 
-  void adb_trace_init(void);
+  void log_tags_init(const char* tags);
+  void log_level_init(const char* p);
 
 private:
 	static CLog* pLogInstance;
@@ -124,17 +121,20 @@ extern CLog* g_pLogInstance;
 #undef CRITICAL
 #undef MEMDUMP
 
+#ifndef TRACE_TAG
+#define TRACE_TAG TRACE_ADB
+#endif
 //-----------------------------------------------------------------------------
 /* For external call
 */
 #ifdef FEATURE_LOG_SYS
-#define DEBUG(fmt, ...)			g_pLogInstance->Debug(TRACE_FMT# fmt,  LOG_TRACE, __VA_ARGS__)
-#define INFO(fmt, ...)				g_pLogInstance->Info(TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define LOG(fmt, ...)				g_pLogInstance->Log(TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define WARN(fmt, ...)			g_pLogInstance->Warn(TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define ERROR(fmt, ...)			g_pLogInstance->Error(TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define CRITICAL(fmt, ...)		g_pLogInstance->Critical(TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define MEMDUMP(fmt, ...)  g_pLogInstance->Memdump(TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
+#define DEBUG(fmt, ...)			g_pLogInstance->Debug(TRACE_TAG, TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
+#define INFO(fmt, ...)				g_pLogInstance->Info(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
+#define LOG(fmt, ...)				g_pLogInstance->Log(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
+#define WARN(fmt, ...)			g_pLogInstance->Warn(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
+#define ERROR(fmt, ...)			g_pLogInstance->Error(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
+#define CRITICAL(fmt, ...)		g_pLogInstance->Critical(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
+#define MEMDUMP(fmt, ...)  g_pLogInstance->Memdump(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
 #else // !FEATURE_LOG_SYS
 #define DEBUG(fmt, ...)
 #define INFO(fmt, ...)
@@ -178,8 +178,7 @@ void fatal_errno(const char *fmt, ...);
 /*redirect stderr to adb.log*/
 void RedirectStdIO(void);
 
-void StartLogging(const wchar_t* fname, unsigned int mask = LOG_MASK_ALL);
-void StartLogging(void);
+void StartLogging(const wchar_t* fname, const char* mask, const char* tags);
 void StopLogging(void);
 
 //-----------------------------------------------------------------------------

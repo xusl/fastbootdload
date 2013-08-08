@@ -371,7 +371,7 @@ int usb_write(usb_handle* handle, const void* _data, int len) {
     int ret;
     char *data = (char *)_data;
 
-    DEBUG("usb_write %d\n", len);
+    //DEBUG("usb_write %d", len);
     if (NULL != handle) {
         // Perform write
         while(len > 0) {
@@ -382,7 +382,7 @@ int usb_write(usb_handle* handle, const void* _data, int len) {
                                    &written,
                                    time_out);
             errno = GetLastError();
-            DEBUG("AdbWriteEndpointSync returned %d, errno: %d\n", ret, errno);
+            //DEBUG("AdbWriteEndpointSync returned %d, errno: %d\n", ret, errno);
             if (ret == 0) {
                 // assume ERROR_INVALID_HANDLE indicates we are disconnected
                 if (errno == ERROR_INVALID_HANDLE)
@@ -410,11 +410,11 @@ int usb_write(usb_handle* handle, const void* _data, int len) {
         	}
         }
     } else {
-        ERROR("usb_write NULL handle\n");
+        ERROR("usb_write NULL handle");
         SetLastError(ERROR_INVALID_HANDLE);
     }
 
-    WARN("usb_write failed: %d\n", errno);
+    WARN("usb_write failed: %d", errno);
 
     return -1;
 }
@@ -470,7 +470,7 @@ int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
   char *data = (char *)_data;
   int ret;
 
-  DEBUG("usb_read %d\n", len);
+  //DEBUG("usb_read %d", len);
   if (NULL != handle) {
     while (len > 0) {
       int xfer = (len > 4096) ? 4096 : len;
@@ -481,7 +481,7 @@ int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
                                   &read,
                                   time_out);
       errno = GetLastError();
-      DEBUG("usb_read got: %ld, expected: %d, errno: %d, ret: %d\n",
+      DEBUG("usb_read got: %ld, expected: %d, errno: %d, ret: %d",
 	  	read, xfer, errno, ret);
       if (ret) {
         if (!fulfill)
@@ -500,11 +500,11 @@ int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
       }
     }
   } else {
-    ERROR("usb_read NULL handle\n");
+    ERROR("usb_read NULL handle");
     SetLastError(ERROR_INVALID_HANDLE);
   }
 
-  WARN("usb_read failed: %d\n", errno);
+  WARN("usb_read failed: %d", errno);
 
   return -1;
 }
@@ -541,7 +541,7 @@ void usb_kick(usb_handle* handle) {
 }
 
 int usb_close(usb_handle* handle) {
-  DEBUG("usb_close\n");
+  DEBUG("usb_close");
 
   if (NULL != handle) {
     // Remove handle from the list
@@ -676,7 +676,7 @@ void find_devices() {
         if (recognized_device(handle)) {
           char serial_number[512];
           unsigned long serial_number_len = sizeof(serial_number);
-          DEBUG("adding a new device %s\n", next_interface->device_name);
+          DEBUG("adding a new device %s", next_interface->device_name);
           if (AdbGetSerialNumber(handle->adb_interface,
                                 serial_number,
                                 &serial_number_len,

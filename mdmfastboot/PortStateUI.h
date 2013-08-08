@@ -14,6 +14,7 @@ typedef enum
 	PROMPT_TITLE,
 	PROMPT_TEXT,
 	REBOOT_DEVICE,
+	FLASH_DONE,
 }UI_INFO_TYPE;
 
 struct UIInfo

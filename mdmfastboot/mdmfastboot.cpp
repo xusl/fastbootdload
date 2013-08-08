@@ -91,8 +91,6 @@ BOOL CmdmfastbootApp::InitInstance()
 	// 例如修改为公司或组织名
 	SetRegistryKey(_T("TCL MBB MODULE FASTBOOT"));
 
-	StartLogging();
-
 	CmdmfastbootDlg dlg;
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();

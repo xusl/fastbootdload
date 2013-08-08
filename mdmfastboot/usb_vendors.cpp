@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 #include "stdafx.h"
+
+#define TRACE_TAG               TRACE_USB
 #include "atlbase.h"
 #include "usb_vendors.h"
 
@@ -27,7 +29,7 @@
 
 #include "adb.h"
 
-#define TRACE_TAG               TRACE_USB
+
 
 /** built-in vendor list */
 usbid_t builtInIds[] = {

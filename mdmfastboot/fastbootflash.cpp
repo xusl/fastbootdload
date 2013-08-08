@@ -274,11 +274,21 @@ int cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int inve
     return -1;
 }
 
-static UINT port_text_msg(CWnd* hWnd,void* data, UI_INFO_TYPE info_type, PCHAR msg) {
-   UIInfo* info = new UIInfo();
+UINT port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
 
-    info->infoType = info_type;
-    info->sVal = msg;
+    va_list ap;
+    va_start(ap, fmt);
+    char buffer[256]={0};
+
+    //snprintf is not work properly .  vsprintf or _snprintf or _vsnprintf is OK.
+    _vsnprintf(buffer, sizeof(buffer), fmt, ap);
+    va_end(ap);
+
+
+    UIInfo* info = new UIInfo();
+
+    info->infoType = PROMPT_TEXT;
+    info->sVal = buffer;
     hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
                   (WPARAM)info,
                   (LPARAM)data);
@@ -303,14 +313,12 @@ int cb_do_nothing(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 
 int cb_display(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
-char buffer[256]={0};
     if (status) {
         fprintf(stderr, "%s FAILED (%s)\n", a->cmd, resp);
         return status;
     }
     //fprintf(stderr, "%s: %s\n", (char*) a->data, resp);
-    snprintf(buffer,sizeof(buffer), "%s: %s\n", (char*) a->data, resp);
-    port_text_msg(hWnd, data,PROMPT_TEXT, buffer);
+    port_text_msg(hWnd, data,"%s: %s", (char*) a->data, resp);
     return 0;
 }
 
@@ -333,7 +341,7 @@ char *fastboot::mkmsg(const char *fmt, ...)
     va_end(ap);
 
     s = strdup(buf);
-    if (s == 0) die("out of memory");
+    if (s == 0) ERROR("out of memory");
     return s;
 }
 
@@ -371,7 +379,7 @@ Action * fastboot::queue_action(unsigned op, const char *fmt, ...)
     va_list ap;
 
     a = (Action *)calloc(1, sizeof(Action));
-    if (a == 0) die("out of memory");
+    if (a == 0) ERROR("out of memory");
 
     va_start(ap, fmt);
     vsprintf(a->cmd, fmt, ap);
@@ -418,7 +426,7 @@ void fastboot::fb_queue_require(const char *var, int invert, unsigned nvalues, c
     a->size = nvalues;
     a->msg = mkmsg("checking %s", var);
     a->func = invert ? cb_reject : cb_require;
-    if (a->data == 0) die("out of memory");
+    if (a->data == 0) ERROR("out of memory");
 }
 
 
@@ -428,7 +436,7 @@ void fastboot::fb_queue_display(const char *var, const char *prettyname)
     Action *a;
     a = queue_action(OP_QUERY, "getvar:%s", var);
     a->data = strdup(prettyname);
-    if (a->data == 0) die("out of memory");
+    if (a->data == 0) ERROR("out of memory");
     a->func = cb_display;
 }
 
@@ -474,7 +482,8 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
         a->start = now();
         if (start < 0) start = a->start;
         if (a->msg) {
-            fprintf(stderr,"%s...\n",a->msg);
+            //fprintf(stderr,"%s...\n",a->msg);
+            port_text_msg(hWnd, data, "%s...",a->msg);
         }
         if (a->op == OP_DOWNLOAD) {
             status = fb_download_data(usb, a->data, a->size);
@@ -489,13 +498,14 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
             status = a->func(hWnd, data, a, status, status ? fb_get_error() : resp);
             if (status) break;
         } else if (a->op == OP_NOTICE) {
-            fprintf(stderr,"%s\n",(char*)a->data);
+            //fprintf(stderr,"%s\n",(char*)a->data);
+            port_text_msg(hWnd, data, "%s\n",(char*)a->data);
         } else {
-            die("bogus action");
+            ERROR("bogus action");
         }
     }
 
-    fprintf(stderr,"finished. total time: %.3fs\n", (now() - start));
+    port_text_msg(hWnd, data, "finished. total time: %.3fs\n", (now() - start));
 }
 
 /////////////////////////////////////////////////////////////////////////////
