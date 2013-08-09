@@ -204,6 +204,7 @@ flash_image::~flash_image() {
 
 int cb_default(CWnd* hWnd,  void* data, Action *a, int status, char *resp);
 
+UINT port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... );
 
 int match(char *str, const char **value, unsigned count)
 {
@@ -232,10 +233,10 @@ int match(char *str, const char **value, unsigned count)
 int cb_default(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
     if (status) {
-        fprintf(stderr,"FAILED (%s)\n", resp);
+        port_text_msg(hWnd, data, "FAILED (%s)\n", resp);
     } else {
         double split = now();
-        fprintf(stderr,"OKAY [%7.3fs]\n", (split - a->start));
+        port_text_msg(hWnd, data, "OKAY [%7.3fs]\n", (split - a->start));
         a->start = split;
     }
     return status;
@@ -247,9 +248,12 @@ int cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int inve
     unsigned count = a->size;
     unsigned n;
     int yes;
+    char msg[256]={0};
+    int msg_len = 0;
+    int write_len;
 
     if (status) {
-        fprintf(stderr,"FAILED (%s)\n", resp);
+        port_text_msg(hWnd, data, "FAILED (%s)\n", resp);
         return status;
     }
 
@@ -258,19 +262,32 @@ int cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int inve
 
     if (yes) {
         double split = now();
-        fprintf(stderr,"OKAY [%7.3fs]\n", (split - a->start));
+        port_text_msg(hWnd, data,"OKAY [%7.3fs]\n", (split - a->start));
         a->start = split;
         return 0;
     }
 
-    fprintf(stderr,"FAILED\n\n");
-    fprintf(stderr,"Device %s is '%s'.\n", a->cmd + 7, resp);
-    fprintf(stderr,"Update %s '%s'",
-            invert ? "rejects" : "requires", value[0]);
-    for (n = 1; n < count; n++) {
-        fprintf(stderr," or '%s'", value[n]);
+    write_len = _snprintf(msg, sizeof(msg), "FAILED\n\nDevice %s is '%s'.\nUpdate %s '%s'",
+        a->cmd + 7, resp, invert ? "rejects" : "requires", value[0]);
+    msg_len += write_len;
+    //fprintf(stderr,"FAILED\n\n");
+    //fprintf(stderr,"Device %s is '%s'.\n", a->cmd + 7, resp);
+    //fprintf(stderr,"Update %s '%s'",
+    //        invert ? "rejects" : "requires", value[0]);
+    for (n = 1; n < count && msg_len < sizeof(msg); n++) {
+        //fprintf(stderr," or '%s'", value[n]);
+        write_len = _snprintf(msg + msg_len, sizeof(msg) - msg_len, " or '%s'", value[n]);
+        if (write_len > 0) {
+            msg_len += write_len;
+        } else {
+            msg_len = sizeof(msg);
+            break;
+        }
     }
-    fprintf(stderr,".\n\n");
+    //fprintf(stderr,".\n\n");
+    if (msg_len < sizeof(msg))
+        _snprintf(msg + msg_len, sizeof(msg) - msg_len, ".\n\n");
+    port_text_msg(hWnd, data, msg);
     return -1;
 }
 
@@ -289,6 +306,18 @@ UINT port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
 
     info->infoType = PROMPT_TEXT;
     info->sVal = buffer;
+    hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                  (WPARAM)info,
+                  (LPARAM)data);
+    return 0;
+}
+
+
+UINT port_progress(CWnd* hWnd,void* data, int process ) {
+    UIInfo* info = new UIInfo();
+
+    info->infoType = PROGRESS_VAL;
+    info->iVal = process;
     hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
                   (WPARAM)info,
                   (LPARAM)data);
@@ -314,11 +343,11 @@ int cb_do_nothing(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 int cb_display(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
     if (status) {
-        fprintf(stderr, "%s FAILED (%s)\n", a->cmd, resp);
+        port_text_msg(hWnd, data, "%s FAILED (%s)\n", a->cmd, resp);
         return status;
     }
     //fprintf(stderr, "%s: %s\n", (char*) a->data, resp);
-    port_text_msg(hWnd, data,"%s: %s", (char*) a->data, resp);
+    port_text_msg(hWnd, data, "%s: %s", (char*) a->data, resp);
     return 0;
 }
 
@@ -468,12 +497,25 @@ void fastboot::fb_queue_notice(const char *notice)
     a->data = (void*) notice;
 }
 
+unsigned fastboot::image_size(void) {
+   Action *a;
+   unsigned total_size = 0;
+
+    for (a = action_list; a; a = a->next) {
+        total_size += a->size;
+    }
+
+    return total_size;
+}
+
 void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
 {
     Action *a;
     char resp[FB_RESPONSE_SZ+1];
     int status;
     double start = -1;
+   unsigned total_size = image_size();
+   unsigned flashed_size = 0;
 
     a = action_list;
     resp[FB_RESPONSE_SZ] = 0;
@@ -489,10 +531,12 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
             status = fb_download_data(usb, a->data, a->size);
             status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
             if (status) break;
+            flashed_size += a->size;
         } else if (a->op == OP_COMMAND) {
             status = fb_command(usb, a->cmd);
             status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
             if (status) break;
+            port_progress(hWnd, data, flashed_size / total_size * 100);
         } else if (a->op == OP_QUERY) {
             status = fb_command_response(usb, a->cmd, resp);
             status = a->func(hWnd, data, a, status, status ? fb_get_error() : resp);

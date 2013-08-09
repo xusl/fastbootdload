@@ -45,7 +45,6 @@
 #define IDC_EDIT_PACKAGE_PATH           1027
 #define IDC_BUTTON1                     1028
 #define IDC_BTN_BROWSE                  1028
-#define IDC_STATIC_PROMPT_TITLE         1029
 #define IDC_DLINFO_TITLE                1029
 #define ID_ABOUT_ABOUT                  32771
 #define ID_HELP_HELP                    32772
@@ -56,7 +55,7 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        131
+#define _APS_NEXT_RESOURCE_VALUE        132
 #define _APS_NEXT_COMMAND_VALUE         32775
 #define _APS_NEXT_CONTROL_VALUE         1030
 #define _APS_NEXT_SYMED_VALUE           101

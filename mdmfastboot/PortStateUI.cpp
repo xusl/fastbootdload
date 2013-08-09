@@ -29,7 +29,6 @@ void CPortStateUI::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
 {
 	switch(infoType)
 	{
-	case PROGRESS_STR:
     case PROMPT_TEXT:
 		GetDlgItem(IDC_DL_INFO)->SetWindowText(strInfo.GetBuffer());
 		break;

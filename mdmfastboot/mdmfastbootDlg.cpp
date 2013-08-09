@@ -550,16 +550,16 @@ UINT usb_work(UsbWorkData* data, flash_image  *img) {
      }
 
     adb.sync_push("./ReadMe.txt", "/usr");
-    ui_text_msg(data, PROGRESS_STR, "Copy host file ./ReadMe.txt  to /usr.");
+    ui_text_msg(data, PROMPT_TEXT, "Copy host file ./ReadMe.txt  to /usr.");
     sleep(1);
 
     adb.sync_pull("/usr/ReadMe.txt", "..");
-    ui_text_msg(data, PROGRESS_STR, "Copy devie file /usr/ReadMe.txt  to .");
+    ui_text_msg(data, PROMPT_TEXT, "Copy devie file /usr/ReadMe.txt  to .");
     sleep(1);
 #endif
 
     adb.sync_push("config.xml", "/tmp/config.xml");
-    ui_text_msg(data, PROGRESS_STR, "Copy host file config.xml  to /tmp/config.xml.");
+    ui_text_msg(data, PROMPT_TEXT, "Copy host file config.xml  to /tmp/config.xml.");
 
     do_adb_shell_command(adb,data, "trace -r");
     do_adb_shell_command(adb,data, "hwinfo_check");

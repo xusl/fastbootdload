@@ -107,6 +107,7 @@ private:
 
    Action *queue_action(unsigned op, const char *fmt, ...);
 	 void remove_action();
+   unsigned image_size(void);
    char *mkmsg(const char *fmt, ...);
 
    int check_response(usb_handle *usb, unsigned size,  unsigned data_okay, char *response);
