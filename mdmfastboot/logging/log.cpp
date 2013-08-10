@@ -716,7 +716,7 @@ void StartLogging(const wchar_t* fname,
 	GetAppPath(sPath);
 
 	wchar_t filename[MAX_PATH] = {0};
-	wsprintf(filename, L"%smdmfastboot_%d%02d%02d.log", sPath,
+	wsprintf(filename, L"%smdmfastboot_%d%02d%02d.log", sPath.GetString(),
 		time.wYear, time.wMonth, time.wDay);
 
 	if (fname == NULL || fname == L"")

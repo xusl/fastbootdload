@@ -63,9 +63,11 @@ END_MESSAGE_MAP()
 CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CmdmfastbootDlg::IDD, pParent)
 {
-	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-    m_bInit = FALSE;
-    InitSettingConfig();
+  m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+  m_bInit = FALSE;
+  m_nPort = PORT_NUM;
+  m_nPortRow = PORT_LAYOUT_ROW;
+  InitSettingConfig();
 }
 
 void CmdmfastbootDlg::DoDataExchange(CDataExchange* pDX)
@@ -87,7 +89,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_MESSAGE(UI_MESSAGE_UPDATE_PACKAGE_INFO, OnUpdatePackageInfo)
 	ON_MESSAGE(UI_MESSAGE_DEVICE_INFO, OnDeviceInfo)
 	ON_BN_CLICKED(IDC_BTN_BROWSE, &CmdmfastbootDlg::OnBnClickedBtnBrowse)
-	ON_BN_CLICKED(IDOK, &CmdmfastbootDlg::OnBnClickedOk)
+	ON_BN_CLICKED(IDC_BTN_START, &CmdmfastbootDlg::OnBnClickedStart)
 	ON_COMMAND(ID_ABOUT, &CmdmfastbootDlg::OnAbout)
 	ON_COMMAND(ID_HELP, &CmdmfastbootDlg::OnHelp)
 	ON_WM_CLOSE()
@@ -114,8 +116,8 @@ BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
   CPortStateUI*  port;
   int R_NUM, C_NUM;
 
-  R_NUM = PORT_LAYOUT_ROW;
-  C_NUM = PORT_NUM / R_NUM;
+  R_NUM = m_nPortRow;
+  C_NUM = m_nPort / R_NUM;
   pw = w / C_NUM;
   ph = h / R_NUM;
 
@@ -139,16 +141,28 @@ BOOL CmdmfastbootDlg::InitUsbWorkData(void)
   //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
   UsbWorkData* workdata;
   int i= 0;
-  for (; i < PORT_NUM; i++) {
+  for (; i < m_nPort; i++) {
     workdata = m_workdata + i;
     workdata->hWnd = this;
     workdata->ctl.Create(IDD_PORT_STATE, this);
     workdata->ctl.Init(i);
     workdata->usb = NULL;
+    workdata->usb_sn = ~1L;
   }
   return TRUE;
 }
 
+
+BOOL CmdmfastbootDlg::IsHaveUsbWork(void) {
+  UsbWorkData* workdata;
+  int i= 0;
+  for (; i < m_nPort; i++) {
+    workdata = m_workdata + i;
+    if (workdata->usb != NULL || workdata->usb_sn != ~1L)
+        return TRUE ;
+  }
+  return FALSE;
+}
 
 BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
   if (data == NULL) {
@@ -179,12 +193,12 @@ UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(usb_handle* handle) {
   int i= 0;
 
   // first search the before, for switch device.
-  for (; i < PORT_NUM; i++) {
+  for (; i < m_nPort; i++) {
     if (m_workdata[i].usb_sn == usb_sn && m_workdata[i].usb == NULL)
       return m_workdata + i;
   }
 
-  for (i=0; i < PORT_NUM; i++) {
+  for (i=0; i < m_nPort; i++) {
     if (m_workdata[i].usb == NULL)
       return m_workdata + i;
   }
@@ -193,112 +207,136 @@ UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(usb_handle* handle) {
 }
 
 
+BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
+  if(!bforce && m_bWork == bwork) {
+    WARN("Do not need to chage status.");
+    return FALSE;
+  }
+
+  GetDlgItem(IDC_BTN_START)->EnableWindow(!bwork);
+  GetDlgItem(IDC_BTN_BROWSE)->EnableWindow(!bwork);
+  GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
+  m_bWork = bwork;
+  return TRUE;
+
+}
 
 BOOL CmdmfastbootDlg::InitSettingConfig()
 {
-  int data_len;
   LPCTSTR lpFileName;
+  CString sPath(".\\");
+
+  int data_len;
+
+  int auto_work;
+
   wchar_t log_conf[MAX_PATH + 128];
-    wchar_t* log_file = NULL;
-    char *log_tag = NULL;
-    char *log_level = NULL;
-CString sPath(".\\");
+  wchar_t* log_file = NULL;
+  char *log_tag = NULL;
+  char *log_level = NULL;
 
 
-	GetAppPath(sPath);
-    sPath += L"mdmconfig.ini";
+  GetAppPath(sPath);
+  sPath += L"mdmconfig.ini";
 
-    lpFileName = sPath.GetString();
-    m_image = new flash_image(lpFileName);
+  lpFileName = sPath.GetString();
+  m_image = new flash_image(lpFileName);
 
-  data_len = GetPrivateProfileString(L"log",L"FILE",NULL,log_conf, MAX_PATH,lpFileName);
+  auto_work = GetPrivateProfileInt(L"app",L"autowork", 0, lpFileName);
+  m_bWork = auto_work;
+
+
+  //read configuration for log system and start log.
+  data_len = GetPrivateProfileString(L"log",L"file",NULL,log_conf, MAX_PATH,lpFileName);
   if (data_len) log_file = wcsdup(log_conf);
-  data_len = GetPrivateProfileString(L"log",L"TAG",L"all",log_conf, MAX_PATH,lpFileName);
+  data_len = GetPrivateProfileString(L"log",L"tag",L"all",log_conf, MAX_PATH,lpFileName);
   if (data_len) log_tag = WideStrToMultiStr(log_conf);
-    data_len = GetPrivateProfileString(L"log",L"LEVEL",NULL,log_conf,MAX_PATH,lpFileName);
-    if (data_len) log_level = WideStrToMultiStr(log_conf);
-	StartLogging(log_file, log_level, log_tag);
-    if(log_file) free(log_file);
-    if(log_tag) delete log_tag;
-    if(log_level) delete log_level;
-return TRUE;
+  data_len = GetPrivateProfileString(L"log",L"level",NULL,log_conf,MAX_PATH,lpFileName);
+  if (data_len) log_level = WideStrToMultiStr(log_conf);
+  StartLogging(log_file, log_level, log_tag);
+  if(log_file) free(log_file);
+  if(log_tag) delete log_tag;
+  if(log_level) delete log_level;
+  return TRUE;
 }
 
 // CmdmfastbootDlg 消息处理程序
 
 BOOL CmdmfastbootDlg::OnInitDialog()
 {
-	CDialog::OnInitDialog();
-	::SetProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP, (HANDLE)1);//for single instance
+  CDialog::OnInitDialog();
+  ::SetProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP, (HANDLE)1);//for single instance
 
-	// 将“关于...”菜单项添加到系统菜单中。
+  // 将“关于...”菜单项添加到系统菜单中。
 
-	// IDM_ABOUTBOX 必须在系统命令范围内。
-	ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
-	ASSERT(IDM_ABOUTBOX < 0xF000);
+  // IDM_ABOUTBOX 必须在系统命令范围内。
+  ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
+  ASSERT(IDM_ABOUTBOX < 0xF000);
 
-	CMenu* pSysMenu = GetSystemMenu(FALSE);
-	if (pSysMenu != NULL)
-	{
-		CString strAboutMenu;
-		strAboutMenu.LoadString(IDS_ABOUTBOX);
-		if (!strAboutMenu.IsEmpty())
-		{
-			pSysMenu->AppendMenu(MF_SEPARATOR);
-			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
-		}
-	}
+  CMenu* pSysMenu = GetSystemMenu(FALSE);
+  if (pSysMenu != NULL)
+  {
+    CString strAboutMenu;
+    strAboutMenu.LoadString(IDS_ABOUTBOX);
+    if (!strAboutMenu.IsEmpty())
+    {
+      pSysMenu->AppendMenu(MF_SEPARATOR);
+      pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
+    }
+  }
 
-	// 设置此对话框的图标。当应用程序主窗口不是对话框时，框架将自动
-	//  执行此操作
-	SetIcon(m_hIcon, TRUE);			// 设置大图标
-	SetIcon(m_hIcon, FALSE);		// 设置小图标
-
-    InitUsbWorkData();
-    m_bInit = TRUE;
-
-	ShowWindow(SW_MAXIMIZE);
+  // 设置此对话框的图标。当应用程序主窗口不是对话框时，框架将自动
+  //  执行此操作
+  SetIcon(m_hIcon, TRUE);			// 设置大图标
+  SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 
-	//init thread pool begin.
-	HRESULT hr = m_dlWorkerPool.Initialize(NULL, THREADPOOL_SIZE);
-	if(!SUCCEEDED(hr))
-	{
-		ERROR("Failed to init thread pool!");
-		return FALSE;
-	}
-	//init thread pool end.
+  InitUsbWorkData();
 
-	//ui test beging
-	m_strFrmVer = L"VX140100BX";
-	::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, FIRMWARE_VER, (LPARAM)&m_strFrmVer);
-	m_strQCNVer = L"VA340100BV";
-	::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, QCN_VER, (LPARAM)&m_strQCNVer);
-	m_strLinuxVer = L"VXB4010000";
-	::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, LINUX_VER, (LPARAM)&m_strLinuxVer);
+  m_bInit = TRUE;
+  ShowWindow(SW_MAXIMIZE);
+
+  //init thread pool begin.
+  HRESULT hr = m_dlWorkerPool.Initialize(NULL, THREADPOOL_SIZE);
+  if(!SUCCEEDED(hr))
+  {
+    ERROR("Failed to init thread pool!");
+    return FALSE;
+  }
+  //init thread pool end.
+
+
+
+  //ui test beging
+  m_strFrmVer = L"VX140100BX";
+  ::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, FIRMWARE_VER, (LPARAM)&m_strFrmVer);
+  m_strQCNVer = L"VA340100BV";
+  ::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, QCN_VER, (LPARAM)&m_strQCNVer);
+  m_strLinuxVer = L"VXB4010000";
+  ::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, LINUX_VER, (LPARAM)&m_strLinuxVer);
 #if 0
-	TranseInfo1.dlgMain = this;
-	TranseInfo1.portUI = &PortStateUI1;
-	pThreadPort1 = AfxBeginThread(DemoDownloadThread, &TranseInfo1);
-	TranseInfo2.dlgMain = this;
-	TranseInfo2.portUI = &PortStateUI2;
-	pThreadPort2 = AfxBeginThread(DemoDownloadThread, &TranseInfo2);
-	TranseInfo3.dlgMain = this;
-	TranseInfo3.portUI = &PortStateUI3;
-	pThreadPort3 = AfxBeginThread(DemoDownloadThread, &TranseInfo3);
-	TranseInfo4.dlgMain = this;
-	TranseInfo4.portUI = &PortStateUI4;
-	pThreadPort4 = AfxBeginThread(DemoDownloadThread, &TranseInfo4);
-	//end
+  TranseInfo1.dlgMain = this;
+  TranseInfo1.portUI = &PortStateUI1;
+  pThreadPort1 = AfxBeginThread(DemoDownloadThread, &TranseInfo1);
+  TranseInfo2.dlgMain = this;
+  TranseInfo2.portUI = &PortStateUI2;
+  pThreadPort2 = AfxBeginThread(DemoDownloadThread, &TranseInfo2);
+  TranseInfo3.dlgMain = this;
+  TranseInfo3.portUI = &PortStateUI3;
+  pThreadPort3 = AfxBeginThread(DemoDownloadThread, &TranseInfo3);
+  TranseInfo4.dlgMain = this;
+  TranseInfo4.portUI = &PortStateUI4;
+  pThreadPort4 = AfxBeginThread(DemoDownloadThread, &TranseInfo4);
+  //end
 #endif
 
+  //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
+  RegisterAdbDeviceNotification();
+  SetWorkStatus(m_bWork, TRUE);
+  adb_usb_init();
+  AdbUsbHandler(true);
 
-	//注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
-	RegisterAdbDeviceNotification();
-    adb_usb_init();
-	AdbUsbHandler(true);
-
-	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
+  return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
 void CmdmfastbootDlg::OnSysCommand(UINT nID, LPARAM lParam)
@@ -377,53 +415,53 @@ BOOL CmdmfastbootDlg::RegisterAdbDeviceNotification(void) {
 
 BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 {
-   if (dwData == 0)
-   {
-      WARN("OnDeviceChange, dwData == 0 .EventType: 0x%x",
+  if (dwData == 0)
+  {
+    WARN("OnDeviceChange, dwData == 0 .EventType: 0x%x",
          nEventType);
-      return FALSE;
-   }
+    return FALSE;
+  }
 
-   DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
-   PDEV_BROADCAST_DEVICEINTERFACE pDevInf =
-               (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
+  DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
+  PDEV_BROADCAST_DEVICEINTERFACE pDevInf =
+    (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
 
-   DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
-         nEventType, phdr->dbch_devicetype);
+  DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
+        nEventType, phdr->dbch_devicetype);
 
-   if (nEventType == DBT_DEVICEARRIVAL)
-   {
-      switch( phdr->dbch_devicetype )
+  if (nEventType == DBT_DEVICEARRIVAL)
+  {
+    switch( phdr->dbch_devicetype )
+    {
+    case DBT_DEVTYP_DEVNODE:
+      WARN("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
+      break;
+    case DBT_DEVTYP_VOLUME:
       {
-      case DBT_DEVTYP_DEVNODE:
-        WARN("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
+        /* enumerate devices and shiftdevice
+        */
         break;
-      case DBT_DEVTYP_VOLUME:
-         {
-            /* enumerate devices and shiftdevice
-            */
-            break;
-         }
-      case DBT_DEVTYP_DEVICEINTERFACE:
-         {
-            //UpdateDevice(pDevInf, dwData);
-            AdbUsbHandler(true);
-            break;
-         }
       }
-   }
-   else if (nEventType == DBT_DEVICEREMOVECOMPLETE)
-   {
-      if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE)
+    case DBT_DEVTYP_DEVICEINTERFACE:
       {
-         /* enumerate device and check if the port
-          * composite should be removed
-          */
-
+        //UpdateDevice(pDevInf, dwData);
+        AdbUsbHandler(true);
+        break;
       }
-   }
+    }
+  }
+  else if (nEventType == DBT_DEVICEREMOVECOMPLETE)
+  {
+    if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE)
+    {
+      /* enumerate device and check if the port
+       * composite should be removed
+       */
 
-   return TRUE;
+    }
+  }
+
+  return TRUE;
 }
 
 
@@ -472,14 +510,14 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 
 
 UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCHAR msg) {
-   UIInfo* info = new UIInfo();
+  UIInfo* info = new UIInfo();
 
-    info->infoType = info_type;
-    info->sVal = msg;
-    data->hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
-                  (WPARAM)info,
-                  (LPARAM)data);
-    return 0;
+  info->infoType = info_type;
+  info->sVal = msg;
+  data->hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                          (WPARAM)info,
+                          (LPARAM)data);
+  return 0;
 }
 
 UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command)
@@ -498,15 +536,15 @@ UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command)
 }
 
 UINT usb_work(UsbWorkData* data, flash_image  *img) {
- // UsbWorkData* data = (UsbWorkData*)wParam;
+  // UsbWorkData* data = (UsbWorkData*)wParam;
   usb_handle * handle;
 
- if (data == NULL || img == NULL) {
+  if (data == NULL || img == NULL) {
     ERROR("Bad parameter");
     return -1;
-    }
+  }
 
- handle = data->usb;
+  handle = data->usb;
 
   usb_dev_t status = usb_status( handle);
   PCHAR title = new char[16];
@@ -525,29 +563,29 @@ UINT usb_work(UsbWorkData* data, flash_image  *img) {
 
     ret = adb.shell("cat /proc/version", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
-        ui_text_msg(data, LINUX_VER, resp);
-        free(resp);
-     }
+      ui_text_msg(data, LINUX_VER, resp);
+      free(resp);
+    }
 
     ret = adb.shell("cat /etc/version", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
-        ui_text_msg(data, SYSTEM_VER, resp);
-        free(resp);
-     }
+      ui_text_msg(data, SYSTEM_VER, resp);
+      free(resp);
+    }
 
     ret = adb.shell("cat /usr/version", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
-        ui_text_msg(data, USERDATA_VER, resp);
-        free(resp);
-     }
+      ui_text_msg(data, USERDATA_VER, resp);
+      free(resp);
+    }
 
 #if 0
     ret = adb.shell("trace -r", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
-        ui_text_msg(data, PROMPT_TITLE, "trace return:");
-        ui_text_msg(data, PROMPT_TEXT, resp);
-        free(resp);
-     }
+      ui_text_msg(data, PROMPT_TITLE, "trace return:");
+      ui_text_msg(data, PROMPT_TEXT, resp);
+      free(resp);
+    }
 
     adb.sync_push("./ReadMe.txt", "/usr");
     ui_text_msg(data, PROMPT_TEXT, "Copy host file ./ReadMe.txt  to /usr.");
@@ -569,24 +607,24 @@ UINT usb_work(UsbWorkData* data, flash_image  *img) {
 #if 0
     ret = adb.shell("hwinfo_check", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
-        ui_text_msg(data, PROMPT_TITLE, "hwinfo_check return:");
-        ui_text_msg(data, PROMPT_TEXT, resp);
-        free(resp);
-     }
+      ui_text_msg(data, PROMPT_TITLE, "hwinfo_check return:");
+      ui_text_msg(data, PROMPT_TEXT, resp);
+      free(resp);
+    }
 
     ret = adb.shell("swinfo_compare", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
-        ui_text_msg(data, PROMPT_TITLE, "swinfo_compare return:");
-        ui_text_msg(data, PROMPT_TEXT, resp);
-        free(resp);
-     }
+      ui_text_msg(data, PROMPT_TITLE, "swinfo_compare return:");
+      ui_text_msg(data, PROMPT_TEXT, resp);
+      free(resp);
+    }
 
-        ret = adb.shell("swinfo_compare", (void **)&resp, &resp_len);
+    ret = adb.shell("swinfo_compare", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
-        ui_text_msg(data, PROMPT_TITLE, "swinfo_compare return:");
-        ui_text_msg(data, PROMPT_TEXT, resp);
-        free(resp);
-     }
+      ui_text_msg(data, PROMPT_TITLE, "swinfo_compare return:");
+      ui_text_msg(data, PROMPT_TEXT, resp);
+      free(resp);
+    }
 #endif
 
     adb.reboot_bootloader();
@@ -604,16 +642,16 @@ UINT usb_work(UsbWorkData* data, flash_image  *img) {
     fb.fb_queue_display("serialno","serialno");
     fb.fb_queue_display("kernel","kernel");
 
-if(0 == img->get_partition_info("boot", &img_data, &size))
-    fb.fb_queue_flash("boot", img_data, size);
+    if(0 == img->get_partition_info("boot", &img_data, &size))
+      fb.fb_queue_flash("boot", img_data, size);
 
-if(0 == img->get_partition_info("system", &img_data, &size))
-    fb.fb_queue_flash("system", img_data, size);
-  //  fb.fb_queue_reboot();
+    if(0 == img->get_partition_info("system", &img_data, &size))
+      fb.fb_queue_flash("system", img_data, size);
+    //  fb.fb_queue_reboot();
     fb.fb_execute_queue(handle,data->hWnd, data);
 
     ui_text_msg(data, FLASH_DONE, " firmware updated!");
-     usb_close(handle);
+    usb_close(handle);
   }
   return 0;
 }
@@ -624,6 +662,11 @@ if(0 == img->get_partition_info("system", &img_data, &size))
 BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
   usb_handle* handle;
   UsbWorkData* data;
+
+  if (!m_bWork) {
+    INFO("We do not permit to work now.");
+    return FALSE;
+  }
 
   if (update_device)
     find_devices();
@@ -642,9 +685,9 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
       data->usb = handle;
       data->usb_sn =usb_port_address(handle);
 
-	  //AfxBeginThread(usb_work, data);
-	CDownload* pDl = new CDownload(usb_work, data, m_image);
-	m_dlWorkerPool.QueueRequest( (CDlWorker::RequestType) pDl );
+      //AfxBeginThread(usb_work, data);
+      CDownload* pDl = new CDownload(usb_work, data, m_image);
+      m_dlWorkerPool.QueueRequest( (CDlWorker::RequestType) pDl );
       return TRUE;
     }
   }
@@ -781,37 +824,33 @@ void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet) {
 }
 #endif
 
-void CmdmfastbootDlg::OnBnClickedButtonStop()
-{
-	// TODO: 在此添加控件通知处理程序代码
-}
 
 void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
-    int dx, dy, dw, dh;
+  int dx, dy, dw, dh;
 
-	if (500>cx || 500> cy)
-	{
-		return;
-	}
-	CDialog::OnSize(nType, cx, cy);
+  if (500>cx || 500> cy)
+  {
+    return;
+  }
+  CDialog::OnSize(nType, cx, cy);
 
-	//BUTTON
-	if (m_bInit) {
-	RECT rect;
-	GetDlgItem(IDC_BTN_STOP)->GetClientRect(&rect);
-	GetDlgItem(IDC_BTN_STOP)->SetWindowPos(0, cx - 400, cy - 50, rect.right, rect.bottom, 0);
-	GetDlgItem(IDCANCEL)->SetWindowPos(0, cx - 300, cy - 50, rect.right, rect.bottom, 0);
-	GetDlgItem(IDOK)->SetWindowPos(0, cx - 200, cy - 50, rect.right, rect.bottom, 0);
+  //BUTTON
+  if (m_bInit) {
+    RECT rect;
+    GetDlgItem(IDC_BTN_STOP)->GetClientRect(&rect);
+    GetDlgItem(IDC_BTN_STOP)->SetWindowPos(0, cx - 400, cy - 50, rect.right, rect.bottom, 0);
+    GetDlgItem(IDCANCEL)->SetWindowPos(0, cx - 300, cy - 50, rect.right, rect.bottom, 0);
+    GetDlgItem(IDC_BTN_START)->SetWindowPos(0, cx - 200, cy - 50, rect.right, rect.bottom, 0);
 
-GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
-dx = /*rect.left  + */ 10;
-dy = rect.bottom + 20;
-dw = cx - dx  - 20;
-dh = cy -dy - 50 - 20;
-	SetPortDialogs(nType, dx, dy, dw, dh);
-	    }
-	Invalidate(TRUE);
+    GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
+    dx = /*rect.left  + */ 10;
+    dy = rect.bottom + 20;
+    dw = cx - dx  - 20;
+    dh = cy -dy - 50 - 20;
+    SetPortDialogs(nType, dx, dy, dw, dh);
+  }
+  Invalidate(TRUE);
 }
 
 void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
@@ -863,45 +902,76 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 	}
 }
 
-void CmdmfastbootDlg::OnBnClickedOk()
+void CmdmfastbootDlg::OnBnClickedStart()
 {
-	// TODO: 在此添加控件通知处理程序代码
-	::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
+  if (SetWorkStatus(TRUE, FALSE)) {
+    AdbUsbHandler(TRUE);
+  }
+
+  //::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
+}
+
+
+void CmdmfastbootDlg::OnBnClickedButtonStop()
+{
+    SetWorkStatus(FALSE, FALSE);
 }
 
 void CmdmfastbootDlg::OnClose()
 {
-	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	CDialog::OnClose();
+  // TODO: 在此添加消息处理程序代码和/或调用默认值
+  //CDialog::OnClose();
+
+  if (IsHaveUsbWork())
+  {
+    int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
+    MB_YESNO|MB_DEFBUTTON2);
+    if (IDYES!=iRet)
+    {
+      return;
+    }
+  }
+
+  CDialog::OnClose();
 }
 
 void CmdmfastbootDlg::OnBnClickedCancel()
 {
-	// TODO: 在此添加控件通知处理程序代码
-	DWORD dwExitCode = 0;
-    #if 0
-	CWinThread* threadArry[] = {pThreadPort1, pThreadPort2, pThreadPort3, pThreadPort4};
-	for (int i=0; i<sizeof(threadArry)/sizeof(threadArry[0]); i++)
-	{
-		if (NULL!=threadArry[i])
-		{
-			GetExitCodeThread(threadArry[i]->m_hThread, &dwExitCode);
-			if (dwExitCode == STILL_ACTIVE)
-			{
-				int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?", MB_YESNO|MB_DEFBUTTON2);
-				if (IDYES==iRet)
-				{
-					break;
-				}
-				else
-				{
-					return;
-				}
-			}
-		}
-	}
-    #endif
-	OnCancel();
+  DWORD dwExitCode = 0;
+#if 0
+  CWinThread* threadArry[] = {pThreadPort1, pThreadPort2, pThreadPort3, pThreadPort4};
+  for (int i=0; i<sizeof(threadArry)/sizeof(threadArry[0]); i++)
+  {
+    if (NULL!=threadArry[i])
+    {
+      GetExitCodeThread(threadArry[i]->m_hThread, &dwExitCode);
+      if (dwExitCode == STILL_ACTIVE)
+      {
+        int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?", MB_YESNO|MB_DEFBUTTON2);
+        if (IDYES==iRet)
+        {
+          break;
+        }
+        else
+        {
+          return;
+        }
+      }
+    }
+  }
+#endif
+  if (IsHaveUsbWork())
+  {
+    int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
+                    MB_YESNO|MB_DEFBUTTON2);
+    if (IDYES!=iRet)
+    {
+      return;
+    }
+  }
+
+  OnCancel();
+
 }
 
 void CmdmfastbootDlg::OnDestroy()

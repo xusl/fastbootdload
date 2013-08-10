@@ -172,6 +172,10 @@ long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
 int usb_switch_device(usb_handle* handle) {
   dev_switch_t* dev = (dev_switch_t*)malloc(sizeof(dev_switch_t));
 
+  if (dev == NULL) {
+	  ERROR("Out of Memory");
+	  return -1;
+  }
   dev->usb_sn = handle->usb_sn;
   dev->status = handle->status;
   dev->time = now();

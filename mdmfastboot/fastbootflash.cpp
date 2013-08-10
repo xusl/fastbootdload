@@ -208,9 +208,9 @@ UINT port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... );
 
 int match(char *str, const char **value, unsigned count)
 {
-    const char *val;
+   // const char *val;
     unsigned n;
-    int len;
+   // int len;
 
     for (n = 0; n < count; n++) {
         const char *val = value[n];

@@ -60,6 +60,9 @@ public:
 protected:
 	HICON m_hIcon;
   BOOL m_bInit;
+  volatile BOOL m_bWork;
+  int m_nPort;
+  int m_nPortRow;
 	CThreadPool<CDlWorker> m_dlWorkerPool;
   flash_image *m_image;
   UsbWorkData m_workdata[PORT_NUM];
@@ -75,9 +78,6 @@ protected:
 	void OnHelp();
 	void OnAbout();
 public:
-	afx_msg void OnBnClickedButtonStop();
-
-
 	//port UI
 
 	CString m_strFrmVer;
@@ -93,16 +93,18 @@ public:
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
 	void UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 	afx_msg void OnBnClickedBtnBrowse();
-	afx_msg void OnBnClickedOk();
-	afx_msg void OnClose();
+	afx_msg void OnBnClickedStart();
+	afx_msg void OnBnClickedButtonStop();
 	afx_msg void OnBnClickedCancel();
+	afx_msg void OnClose();
 	afx_msg void OnDestroy();
 
-  private:
+private:
     BOOL InitUsbWorkData(void);
     UsbWorkData * GetUsbWorkData(usb_handle* handle);
     BOOL CleanUsbWorkData(UsbWorkData *data);
     BOOL SwitchUsbWorkData(UsbWorkData *data);
-
+    BOOL IsHaveUsbWork(void);
+    BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
     BOOL InitSettingConfig(void);
 };
