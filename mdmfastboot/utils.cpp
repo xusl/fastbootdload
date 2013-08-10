@@ -208,9 +208,22 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
 
 long now(void)
 {
-	struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec + tv.tv_usec / 1000000;
+#if 0
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return tv.tv_sec + tv.tv_usec / 1000000;
+#else
+
+  FILETIME ft;
+  unsigned __int64 tmpres = 0;
+
+  GetSystemTimeAsFileTime(&ft);
+
+  tmpres |= ft.dwHighDateTime;
+  tmpres <<= 32;
+  tmpres |= ft.dwLowDateTime;
+  return (long)(tmpres / 10000000UL);
+#endif
 }
 
 // called from fastboot.c
@@ -219,25 +232,25 @@ void sleep(int seconds)
     Sleep(seconds * 1000);
 }
 
-//字符转换
+
 PCHAR WideStrToMultiStr(PWCHAR WideStr)
 {
     ULONG nBytes;
 	PCHAR MultiStr;
-// 取被变换字串的长度
+
     nBytes = WideCharToMultiByte(CP_ACP,0,WideStr, -1, NULL, 0, NULL, NULL);
     if (nBytes == 0) return NULL;
-// 分配内存
+
     MultiStr = new char[nBytes];
     if(!MultiStr) return NULL;
-// 变换字串
+
     nBytes = WideCharToMultiByte(CP_ACP,0,WideStr,-1,MultiStr,nBytes,NULL,NULL);
     if (nBytes == 0)
     {
         delete [] MultiStr;
         return NULL;
     }
-//
+
     return MultiStr;
 }
 

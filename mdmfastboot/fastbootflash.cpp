@@ -514,8 +514,8 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
     char resp[FB_RESPONSE_SZ+1];
     int status;
     double start = -1;
-   unsigned total_size = image_size();
-   unsigned flashed_size = 0;
+    unsigned total_size = image_size();
+    unsigned flashed_size = 0;
 
     a = action_list;
     resp[FB_RESPONSE_SZ] = 0;
@@ -536,7 +536,7 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
             status = fb_command(usb, a->cmd);
             status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
             if (status) break;
-            port_progress(hWnd, data, flashed_size / total_size * 100);
+            port_progress(hWnd, data, 100 * flashed_size / total_size );
         } else if (a->op == OP_QUERY) {
             status = fb_command_response(usb, a->cmd, resp);
             status = a->func(hWnd, data, a, status, status ? fb_get_error() : resp);

@@ -594,11 +594,10 @@ UINT usb_work(UsbWorkData* data, flash_image  *img) {
     usb_switch_device(handle);
 
     usb_close(handle);
-  } else if (status == DEVICE_FLASH){
+  } else if (status == DEVICE_FLASH) {
     fastboot fb(handle);
     unsigned size;
     void * img_data;
-//    image = load_file(L"ReadMe.txt", &size);
 
     fb.fb_queue_display("product","product");
     fb.fb_queue_display("version","version");
@@ -608,11 +607,10 @@ UINT usb_work(UsbWorkData* data, flash_image  *img) {
 if(0 == img->get_partition_info("boot", &img_data, &size))
     fb.fb_queue_flash("boot", img_data, size);
 
+if(0 == img->get_partition_info("system", &img_data, &size))
+    fb.fb_queue_flash("system", img_data, size);
   //  fb.fb_queue_reboot();
     fb.fb_execute_queue(handle,data->hWnd, data);
-
-     //do not free, fb have done for us.
-     // free(image);
 
     ui_text_msg(data, FLASH_DONE, " firmware updated!");
      usb_close(handle);

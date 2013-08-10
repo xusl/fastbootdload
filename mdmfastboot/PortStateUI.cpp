@@ -61,13 +61,16 @@ void CPortStateUI::SetTitle(CString strInfo)
 void CPortStateUI::SetProgress(int iPercent)
 {
 	::SendMessage(GetDlgItem(IDC_PROGRESS1)->m_hWnd, PBM_SETPOS, iPercent, 0);
+    //GetDlgItem(IDC_PROGRESS1)->SendMessage(PBM_SETPOS, iPercent, 0);
+    //Invalidate();
+    //((CProgressCtrl)GetDlgItem(IDC_PROGRESS1))->SetPos(iPercent);
 }
 
 void CPortStateUI::Init(int iPortID)
 {
 	iID = iPortID;
 	CString strTitle;
-	strTitle.Format(L"%s %d", L"Port", iPortID);
+	strTitle.Format(_T("%s %d"), _T("Port"), iPortID);
 	SetTitle(strTitle);
 	ShowWindow(1);
 }
