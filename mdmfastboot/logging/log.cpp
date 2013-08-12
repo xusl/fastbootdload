@@ -728,7 +728,7 @@ void StartLogging(const wchar_t* fname,
 	g_pLogInstance->StartLogging(fname, mask, tags);
 #endif
 
-	RedirectStdIO(fname);
+	//RedirectStdIO(fname);
 }
 
 //-----------------------------------------------------------------------------

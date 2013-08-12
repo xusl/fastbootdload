@@ -38,29 +38,31 @@
 #include "mdmfastbootDlg.h"
 #include "fastbootflash.h"
 
-flash_image::flash_image(const wchar_t* config_file):
-  image_list(NULL),
-  image_last(NULL)
-{
-  read_config(config_file);
-}
+using namespace std;
 
-int flash_image::read_config(const wchar_t* config) {
-  wchar_t partition_tbl[PARTITION_NAME_LEN * 32] = {0};
-  wchar_t filename[MAX_PATH];
-  wchar_t *partition;
-  size_t partition_len;
-  wchar_t pkg_dir[MAX_PATH];
-    CString path;
+#include <msxml.h>
+#include <atlstr.h>
+#import "msxml.dll" raw_interfaces_only
+
+flash_image::flash_image(const wchar_t* config):
+  image_list(NULL),
+  image_last(NULL),
+  a5sw_kern_ver("Unknown"),
+  a5sw_sys_ver("Unknown"),
+  a5sw_usr_ver("Unknown"),
+  fw_ver("Unknown"),
+  qcn_ver("Unknown")
+{
+  CString path;
   int data_len;
 
   if (config == NULL) {
     ERROR("not specified config file name");
-    return -1;
+    return ;
   }
 
-  data_len = GetPrivateProfileString(L"path",
-                                     L"package",
+  data_len = GetPrivateProfileString(PKG_PATH_SECTION,
+                                     PKG_PATH_KEY,
                                      GetAppPath(path).GetString(),
                                      pkg_dir,
                                      MAX_PATH,
@@ -69,13 +71,34 @@ int flash_image::read_config(const wchar_t* config) {
   if (pkg_dir[data_len - 1] != L'\\' ) {
     if ( data_len > MAX_PATH - 2) {
     ERROR("bad package directory in the section path.");
-        return -1;
+        return ;
     }
     pkg_dir[data_len] = L'\\';
     pkg_dir[data_len + 1] = L'\0';
     }
 
-  data_len = GetPrivateProfileString(L"partition_table",
+  read_config(config);
+  read_package_version(PKG_CONFIG_XML);
+}
+
+flash_image::~flash_image() {
+  reset(TRUE);
+}
+
+int flash_image::read_config(const wchar_t* config) {
+  wchar_t partition_tbl[PARTITION_NAME_LEN * 32] = {0};
+  wchar_t filename[MAX_PATH];
+  wchar_t *partition;
+  size_t partition_len;
+  CString path;
+  int data_len;
+
+  if (config == NULL) {
+    ERROR("not specified config file name");
+    return -1;
+  }
+
+  data_len = GetPrivateProfileString(PARTITIONTBL_SECTION,
                                      NULL,
                                      NULL,
                                      partition_tbl,
@@ -84,16 +107,25 @@ int flash_image::read_config(const wchar_t* config) {
 
   if (data_len == 0) {
     WARN("no %S exist, load default partition table.", config);
-    add_image(L"mibib", L"sbl1.mbn");
-    add_image(L"sbl2", L"sbl2.mbn");
-    add_image(L"rpm", L"rpm.mbn");
-    add_image(L"dsp1", L"dsp1.mbn");
-    add_image(L"dsp3", L"dsp3.mbn");
-    add_image(L"dsp2", L"dsp2.mbn");
-    add_image(L"aboot", L"appsboot.mbn");
-    add_image(L"boot", L"boot-oe-msm9615.img");
-    add_image(L"system", L"9615-cdp-image-9615-cdp.yaffs2");
-    add_image(L"userdata", L"9615-cdp-usr-image.usrfs.yaffs2");
+    wchar_t *imgs[] = {
+    L"mibib", L"sbl1.mbn",
+    L"sbl2", L"sbl2.mbn",
+    L"rpm", L"rpm.mbn",
+    L"dsp1", L"dsp1.mbn",
+    L"dsp3", L"dsp3.mbn",
+    L"dsp2", L"dsp2.mbn",
+    L"aboot", L"appsboot.mbn",
+    L"boot", L"boot-oe-msm9615.img",
+    L"system", L"9615-cdp-image-9615-cdp.yaffs2",
+    L"userdata", L"9615-cdp-usr-image.usrfs.yaffs2",
+    };
+
+    for (int i = 0; i < sizeof(imgs)/ sizeof(imgs[0]); i += 2) {
+        //parameter push stack from right to left
+        add_image(imgs[i], imgs[i+1], TRUE, config);
+    }
+
+    set_package_dir(GetAppPath(path).GetString(), config);
     return 0;
   }
 
@@ -101,7 +133,7 @@ int flash_image::read_config(const wchar_t* config) {
   partition_len = wcslen(partition);
 
   while (partition_len > 0) {
-    data_len = GetPrivateProfileString(L"partition_table",
+    data_len = GetPrivateProfileString(PARTITIONTBL_SECTION,
                                        partition,
                                        NULL,
                                        filename,
@@ -109,7 +141,7 @@ int flash_image::read_config(const wchar_t* config) {
                                        config);
     if (data_len > 0) {
         path.Empty();
-        path += pkg_dir;
+        path = pkg_dir;
         //path += L'\\';
         path += filename;
       add_image(partition, path.GetString());
@@ -122,7 +154,8 @@ int flash_image::read_config(const wchar_t* config) {
   return 0;
 }
 
-int flash_image::add_image( wchar_t *partition, const wchar_t *lpath) {
+int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write, const wchar_t* config)
+{
   Image* img = NULL;
 
   if (partition == NULL || lpath == NULL) {
@@ -152,7 +185,34 @@ int flash_image::add_image( wchar_t *partition, const wchar_t *lpath) {
 
   DEBUG("Load data from file %S for partition %S", lpath, partition);
 
+  if (write && config != NULL) {
+    WritePrivateProfileString(PARTITIONTBL_SECTION,partition,lpath,config);
+  }
+
   return 0;
+}
+
+const wchar_t * flash_image::get_package_dir(void) {
+    return pkg_dir;
+}
+
+BOOL flash_image::set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL release) {
+    if(dir == NULL) {
+        ERROR("Bad Parameter.");
+        return FALSE;
+    }
+    wcscpy(pkg_dir, dir);
+
+    if (config != NULL)
+    WritePrivateProfileString(PKG_PATH_SECTION, PKG_PATH_KEY, dir ,config);
+
+    if(release) {
+        reset(FALSE);
+        read_config(config);
+        read_package_version(PKG_CONFIG_XML);
+    }
+
+    return TRUE;
 }
 
 int flash_image::get_partition_info(char *partition, void **ppdata, unsigned *psize) {
@@ -174,7 +234,121 @@ int flash_image::get_partition_info(char *partition, void **ppdata, unsigned *ps
   return 1;
 }
 
-flash_image::~flash_image() {
+void flash_image::read_package_version(PCWCHAR package_conf){
+  CComPtr<MSXML::IXMLDOMDocument> spDoc;
+  CComPtr<MSXML::IXMLDOMNodeList> spNodeList;
+  CComPtr<MSXML::IXMLDOMElement> spElement;
+  CComBSTR strTagName;
+  VARIANT_BOOL bFlag;
+  long lCount;
+  HRESULT hr;
+  CString conf(pkg_dir);
+
+
+  ::CoInitialize(NULL);
+  conf += package_conf;
+  hr = spDoc.CoCreateInstance(__uuidof(MSXML::DOMDocument));    //创建文档对象
+  hr = spDoc->load(CComVariant(conf.GetString()), &bFlag);       //load xml文件
+  hr = spDoc->get_documentElement(&spElement);   //获取根结点
+  if (spElement == NULL) {
+    ERROR("No %S exist", conf.GetString());
+    return;
+    }
+  hr = spElement->get_tagName(&strTagName);
+
+  //cout << "------TagName------" << CString(strTagName) << endl;
+
+  hr = spElement->get_childNodes(&spNodeList);   //获取子结点列表
+  hr = spNodeList->get_length(&lCount);
+
+  for (long i=0; i<lCount; ++i) {
+    CComVariant varNodeValue;
+    CComPtr<MSXML::IXMLDOMNode> spNode;
+    MSXML::DOMNodeType NodeType;
+    CComPtr<MSXML::IXMLDOMNodeList> spChildNodeList;
+
+    hr = spNodeList->get_item(i, &spNode);         //获取结点
+    hr = spNode->get_nodeType(&NodeType);     //获取结点信息的类型
+
+    if (NODE_ELEMENT == NodeType) {
+      long childLen;
+      hr = spNode->get_childNodes(&spChildNodeList);
+      hr = spChildNodeList->get_length(&childLen);
+
+      //cout << "------NodeList------" << endl;
+
+      for (int j=0; j<childLen; ++j) {
+        CComPtr<MSXML::IXMLDOMNode> spChildNode;
+        CComBSTR value;
+        CComBSTR name;
+
+        hr = spChildNodeList->get_item(j, &spChildNode);
+        hr = spChildNode->get_nodeName(&name);            //获取结点名字
+        hr = spChildNode->get_text(&value);                //获取结点的值
+        //cout << CString(name) << endl;
+        //cout << CString(value) << endl << endl;
+
+        parse_pkg_sw(CString(name), CString(value));
+
+        spChildNode.Release();
+      }
+    }
+
+    spNode.Release();
+    spChildNodeList.Release();
+  }
+
+  spNodeList.Release();
+  spElement.Release();
+  spDoc.Release();
+  ::CoUninitialize();
+}
+
+
+ int flash_image::parse_pkg_sw(CString & node, CString & text) {
+    if (node == L"Linux_Kernel_Ver")
+        a5sw_kern_ver = text;
+
+    else if (node == L"Linux_SYS_Ver")
+        a5sw_sys_ver = text;
+
+    else if (node == L"Linux_UserData_Ver")
+        a5sw_usr_ver = text;
+
+    else if (node == L"Q6_Resource_Ver")
+        fw_ver = text;
+
+    else if (node == L"QCN")
+        qcn_ver = text;
+
+    return 0;
+}
+ int flash_image::parse_pkg_hw(CString & node, CString & text) {
+    return 0;
+}
+
+BOOL flash_image::get_pkg_a5sw_sys_ver(CString &version) {
+    version = a5sw_sys_ver;
+    return TRUE;
+}
+BOOL flash_image::get_pkg_a5sw_usr_ver(CString &version) {
+    version = a5sw_usr_ver;
+    return TRUE;
+}
+BOOL flash_image::get_pkg_a5sw_kern_ver(CString &version) {
+    version = a5sw_kern_ver;
+    return TRUE;
+}
+BOOL flash_image::get_pkg_qcn_ver(CString &version) {
+    version = qcn_ver;
+    return TRUE;
+}
+BOOL flash_image::get_pkg_fw_ver(CString &version) {
+    version = fw_ver;
+    return TRUE;
+}
+
+BOOL flash_image::reset(BOOL free_only) {
     Image *img;
     for (img = image_list; img; img = image_list) {
       image_list = img->next;
@@ -199,6 +373,16 @@ flash_image::~flash_image() {
     }
 
     image_list = NULL;
+
+    if (!free_only) {
+        a5sw_kern_ver=("Unknown"),
+  a5sw_sys_ver=("Unknown"),
+  a5sw_usr_ver=("Unknown"),
+  fw_ver=("Unknown"),
+  qcn_ver=("Unknown");
+    }
+
+	return TRUE;
 }
 
 

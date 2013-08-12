@@ -99,7 +99,6 @@ BOOL CmdmfastbootApp::InitInstance()
 		// TODO: 在此放置处理何时用
 		//  “确定”来关闭对话框的代码
 
-		StopLogging();
 	}
 	else if (nResponse == IDCANCEL)
 	{

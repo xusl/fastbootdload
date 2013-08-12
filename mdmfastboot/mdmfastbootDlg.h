@@ -64,6 +64,7 @@ protected:
   int m_nPort;
   int m_nPortRow;
 	CThreadPool<CDlWorker> m_dlWorkerPool;
+  CString m_ConfigPath;
   flash_image *m_image;
   UsbWorkData m_workdata[PORT_NUM];
 
@@ -80,10 +81,10 @@ protected:
 public:
 	//port UI
 
-	CString m_strFrmVer;
-	CString m_strQCNVer;
-	CString m_strLinuxVer;
-	CString m_strPackagePath;
+	CString m_FwVer;
+	CString m_QCNVer;
+	CString m_LinuxVer;
+	CString m_PackagePath;
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 

@@ -73,7 +73,10 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 void CmdmfastbootDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
-	DDX_Text(pDX, IDC_EDIT_PACKAGE_PATH, m_strPackagePath);
+	DDX_Text(pDX, IDC_EDIT_PACKAGE_PATH, m_PackagePath);
+	DDX_Text(pDX, IDC_EDIT_FRM_VER_MAIN, m_FwVer);
+	DDX_Text(pDX, IDC_EDIT_QCN_VER_MAIN, m_QCNVer);
+	DDX_Text(pDX, IDC_EDIT_LINUX_VER_MAIN, m_LinuxVer);
 }
 
 BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
@@ -85,9 +88,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_BN_CLICKED(IDC_BTN_STOP, &CmdmfastbootDlg::OnBnClickedButtonStop)
 	ON_WM_SIZE()
 	ON_WM_GETMINMAXINFO()
-	//ON_MESSAGE(UI_MESSAGE_UPDATE_PROGRESS_INFO, OnUpdateProgressInfo)
-	ON_MESSAGE(UI_MESSAGE_UPDATE_PACKAGE_INFO, OnUpdatePackageInfo)
-	ON_MESSAGE(UI_MESSAGE_DEVICE_INFO, OnDeviceInfo)
+	ON_MESSAGE(UI_MESSAGE_DEVICE_INFO, &CmdmfastbootDlg::OnDeviceInfo)
 	ON_BN_CLICKED(IDC_BTN_BROWSE, &CmdmfastbootDlg::OnBnClickedBtnBrowse)
 	ON_BN_CLICKED(IDC_BTN_START, &CmdmfastbootDlg::OnBnClickedStart)
 	ON_COMMAND(ID_ABOUT, &CmdmfastbootDlg::OnAbout)
@@ -224,7 +225,6 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
 BOOL CmdmfastbootDlg::InitSettingConfig()
 {
   LPCTSTR lpFileName;
-  CString sPath(".\\");
 
   int data_len;
 
@@ -235,15 +235,11 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   char *log_tag = NULL;
   char *log_level = NULL;
 
+  GetAppPath(m_ConfigPath);
+  m_ConfigPath += L"mdmconfig.ini";
 
-  GetAppPath(sPath);
-  sPath += L"mdmconfig.ini";
-
-  lpFileName = sPath.GetString();
-  m_image = new flash_image(lpFileName);
-
-  auto_work = GetPrivateProfileInt(L"app",L"autowork", 0, lpFileName);
-  m_bWork = auto_work;
+  lpFileName = m_ConfigPath.GetString();
+//  m_ConfigPath.GetBuffer(int nMinBufLength)
 
 
   //read configuration for log system and start log.
@@ -254,9 +250,17 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   data_len = GetPrivateProfileString(L"log",L"level",NULL,log_conf,MAX_PATH,lpFileName);
   if (data_len) log_level = WideStrToMultiStr(log_conf);
   StartLogging(log_file, log_level, log_tag);
+
+
+  m_image = new flash_image(lpFileName);
+
+  auto_work = GetPrivateProfileInt(L"app",L"autowork", 0, lpFileName);
+  m_bWork = auto_work;
+
   if(log_file) free(log_file);
   if(log_tag) delete log_tag;
   if(log_level) delete log_level;
+
   return TRUE;
 }
 
@@ -290,9 +294,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   SetIcon(m_hIcon, TRUE);			// 设置大图标
   SetIcon(m_hIcon, FALSE);		// 设置小图标
 
-
   InitUsbWorkData();
-
   m_bInit = TRUE;
   ShowWindow(SW_MAXIMIZE);
 
@@ -305,30 +307,13 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   }
   //init thread pool end.
 
+  //GetDlgItem(IDC_EDIT_PACKAGE_PATH)->SetWindowText(m_image->get_package_dir());
+  m_PackagePath = m_image->get_package_dir();
+  m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
+  m_image->get_pkg_qcn_ver(m_QCNVer);
+  m_image->get_pkg_fw_ver(m_FwVer);
 
-
-  //ui test beging
-  m_strFrmVer = L"VX140100BX";
-  ::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, FIRMWARE_VER, (LPARAM)&m_strFrmVer);
-  m_strQCNVer = L"VA340100BV";
-  ::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, QCN_VER, (LPARAM)&m_strQCNVer);
-  m_strLinuxVer = L"VXB4010000";
-  ::PostMessage(m_hWnd, UI_MESSAGE_UPDATE_PACKAGE_INFO, LINUX_VER, (LPARAM)&m_strLinuxVer);
-#if 0
-  TranseInfo1.dlgMain = this;
-  TranseInfo1.portUI = &PortStateUI1;
-  pThreadPort1 = AfxBeginThread(DemoDownloadThread, &TranseInfo1);
-  TranseInfo2.dlgMain = this;
-  TranseInfo2.portUI = &PortStateUI2;
-  pThreadPort2 = AfxBeginThread(DemoDownloadThread, &TranseInfo2);
-  TranseInfo3.dlgMain = this;
-  TranseInfo3.portUI = &PortStateUI3;
-  pThreadPort3 = AfxBeginThread(DemoDownloadThread, &TranseInfo3);
-  TranseInfo4.dlgMain = this;
-  TranseInfo4.portUI = &PortStateUI4;
-  pThreadPort4 = AfxBeginThread(DemoDownloadThread, &TranseInfo4);
-  //end
-#endif
+  UpdateData(FALSE);
 
   //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
   RegisterAdbDeviceNotification();
@@ -861,45 +846,50 @@ void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 	CDialog::OnGetMinMaxInfo(lpMMI);
 }
 
-LRESULT CmdmfastbootDlg::OnUpdatePackageInfo(WPARAM wParam, LPARAM lParam)
-{
-	UI_INFO_TYPE infoType = (UI_INFO_TYPE)wParam;
-	CString* pStrInfo = (CString*)lParam;
-	switch(infoType)
-	{
-	case FIRMWARE_VER:
-		GetDlgItem(IDC_EDIT_FRM_VER_MAIN)->SetWindowText(pStrInfo->GetBuffer());
-		break;
-	case QCN_VER:
-		GetDlgItem(IDC_EDIT_QCN_VER_MAIN)->SetWindowText(pStrInfo->GetBuffer());
-		break;
-	case LINUX_VER:
-		GetDlgItem(IDC_EDIT_LINUX_VER_MAIN)->SetWindowText(pStrInfo->GetBuffer());
-		break;
-	default:
-		break;
-	}
-	return 0;
-}
-
-
 void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 {
-	// TODO: 在此添加控件通知处理程序代码
-	CString str = _T("Img File (*.img)|*.img|All Files (*.*)|*.*||");
+#if 0
+  // TODO: 在此添加控件通知处理程序代码
+  CString str = _T("Img File (*.img)|*.img|All Files (*.*)|*.*||");
 
-	CFileDialog cfd( TRUE,
-		NULL,
-		NULL,
-		OFN_FILEMUSTEXIST|OFN_HIDEREADONLY,
-		(LPCTSTR)str,
-		NULL);
+  CFileDialog cfd( TRUE,
+                  NULL,
+                  NULL,
+                  OFN_FILEMUSTEXIST|OFN_HIDEREADONLY,
+                  (LPCTSTR)str,
+                  NULL);
+  CDirDialog
 
-	if (cfd.DoModal() == IDOK)
-	{
-		m_strPackagePath = cfd.GetPathName();
-		UpdateData(FALSE);
-	}
+    if (cfd.DoModal() == IDOK)
+    {
+      m_PackagePath = cfd.GetPathName();
+      UpdateData(FALSE);
+    }
+#endif
+
+
+  BROWSEINFO bi;
+
+  ZeroMemory(&bi,sizeof(BROWSEINFO));
+  bi.hwndOwner=GetSafeHwnd();
+  bi.pszDisplayName= m_PackagePath.GetBuffer(MAX_PATH);
+  bi.lpszTitle=L"Select Package folder";
+  bi.ulFlags=BIF_USENEWUI;
+  LPITEMIDLIST idl= SHBrowseForFolder(&bi);
+  if(idl==NULL)
+    return;
+  m_PackagePath.ReleaseBuffer();
+  SHGetPathFromIDList(idl,m_PackagePath.GetBuffer(MAX_PATH));
+  m_PackagePath.ReleaseBuffer();
+
+  if(m_PackagePath[m_PackagePath.GetLength()-1]!=L'\\')
+    m_PackagePath+=L'\\';
+
+  m_image->set_package_dir(m_PackagePath.GetString(), m_ConfigPath.GetString(), TRUE);
+  m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
+  m_image->get_pkg_qcn_ver(m_QCNVer);
+  m_image->get_pkg_fw_ver(m_FwVer);
+  UpdateData(FALSE);
 }
 
 void CmdmfastbootDlg::OnBnClickedStart()
@@ -983,5 +973,7 @@ void CmdmfastbootDlg::OnDestroy()
 	//Shutdown the thread pool
 	m_dlWorkerPool.Shutdown();
     delete m_image;
+
+	StopLogging();
 }
 
