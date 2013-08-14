@@ -21,7 +21,7 @@
 			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
-			UseOfMFC="2"
+			UseOfMFC="1"
 			CharacterSet="1"
 			>
 			<Tool
@@ -51,7 +51,7 @@
 				PreprocessorDefinitions="WIN32;_WINDOWS;_DEBUG;ADB_HOST;HAVE_WINSOCK;HAVE_WIN32_PROC;HAVE_WIN32_IPC;HAVE_WIN32_THREADS;FEATURE_LOG_SYS;FEATURE_LOG_FILE;FEATURE_THREAD_SYNC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="3"
+				RuntimeLibrary="1"
 				UsePrecompiledHeader="2"
 				WarningLevel="2"
 				DebugInformationFormat="4"
