@@ -187,14 +187,14 @@ long extract_serial_number(wchar_t * sn, wchar_t **ppstart =NULL, wchar_t **ppen
 
   pstart = (wchar_t*)wcschr(sn, L'&');
   if (pstart == NULL || pstart - sn >= len) {
-    ERROR("Can not find first '&'.");
+    //ERROR("Can not find first '&'.");
     return -1;
   }
 
   pstart++;
   pend = wcschr(pstart , L'&');
   if (pend == NULL || pend - sn >= len) {
-    ERROR("Can not find first '&'.");
+    //ERROR("Can not find first '&'.");
     return -1;
   }
 
@@ -226,7 +226,7 @@ int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
   adb_sn = extract_serial_number(parentId);
 
   if (cd_sn <= 0 || adb_sn <= 0 ) {
-    ERROR("Invalid cd_sn %l or adb_sn %l", cd_sn, adb_sn);
+    ERROR("ERROR %S<=>%S", ccgp, parentId);
     return -1;
   }
 
@@ -391,8 +391,8 @@ int register_new_device(usb_handle* handle) {
     } else if (handle->status == DEVICE_FLASH && protocol == ADB_PROTOCOL) {
         handle->status = DEVICE_CONFIGURE;
     } else {
-        ERROR("Device status switch error, \n"
-        "Do not know how to switch from status %d with new protocol %d"
+        ERROR("Device status switch error, \n\
+        Do not know how to switch from status %d with new protocol %d",
         handle->status, protocol);
         goto register_new_device_out;
     }

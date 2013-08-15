@@ -36,6 +36,7 @@ typedef struct UsbWorkData UsbWorkData;
     int usb_sn;
 } ;
 
+#define THREADPOOL_SIZE	4
 static const int PORT_NUM = 4;
 static const int PORT_LAYOUT_ROW = 2;
 static const int PARTITION_NAME_LEN = 32;

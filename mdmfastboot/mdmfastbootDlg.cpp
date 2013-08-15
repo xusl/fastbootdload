@@ -11,7 +11,7 @@
 #include "usb_vendors.h"
 #include "devguid.h"
 
-#define THREADPOOL_SIZE	4
+
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -752,8 +752,7 @@ void CmdmfastbootDlg::SetUpAdbDevice(
       lResult = reg.QueryStringValue(L"ParentIdPrefix", static_cast<LPTSTR>(value), &nSize);
 
       if (lResult == ERROR_SUCCESS ) {
-        if (add_adb_device(buf, value) != 0)
-        DEBUG(L"%S, ParentIdPrefix is %S not add", buf, value);
+        add_adb_device(buf, value);
       }
       reg.Close();
     }

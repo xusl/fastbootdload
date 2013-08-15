@@ -77,13 +77,8 @@ public:
 public:
 	void StartLogging(const wchar_t* logname, const char* mask = NULL,const char*  tags= NULL);
 
-	void Debug(AdbTrace tag, const char* fmtstr, ...);
-	void Log(AdbTrace tag, const char* fmtstr, ...);
-	void Info(AdbTrace tag, const char* fmtstr, ...);
-	void Warn(AdbTrace tag, const char* fmtstr, ...);
-	void Error(AdbTrace tag, const char* fmtstr, ...);
-	void Critical(AdbTrace tag, const char* fmtstr, ...);
-	void Memdump(AdbTrace tag, const char* fmtstr, ...);
+	void WriteLog(AdbTrace tag, TLogMaskEnumType type, const char* msg, const char* fmtstr, ...);
+
 	int AdbTraceMask();
 
 public:
@@ -91,8 +86,6 @@ public:
 
 private:
 	CLog();
-	void WriteLog(AdbTrace tag, const char* msg, const char* fmtstr, va_list& args);
-
   void log_tags_init(const char* tags);
   void log_level_init(const char* p);
 
@@ -128,13 +121,13 @@ extern CLog* g_pLogInstance;
 /* For external call
 */
 #ifdef FEATURE_LOG_SYS
-#define DEBUG(fmt, ...)			g_pLogInstance->Debug(TRACE_TAG, TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define INFO(fmt, ...)				g_pLogInstance->Info(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define LOG(fmt, ...)				g_pLogInstance->Log(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define WARN(fmt, ...)			g_pLogInstance->Warn(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define ERROR(fmt, ...)			g_pLogInstance->Error(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define CRITICAL(fmt, ...)		g_pLogInstance->Critical(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
-#define MEMDUMP(fmt, ...)  g_pLogInstance->Memdump(TRACE_TAG,TRACE_FMT# fmt, LOG_TRACE, __VA_ARGS__)
+#define DEBUG(fmt, ...)			g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_DEBUG, "DBG", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
+#define INFO(fmt, ...)				g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_INFO, "INFO", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
+#define LOG(fmt, ...)				g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_LOG, "LOG", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
+#define WARN(fmt, ...)			g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_WARNING, "WARN",TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
+#define ERROR(fmt, ...)			g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_ERROR, "ERR", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
+#define CRITICAL(fmt, ...)		g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_CRITICAL, "CRT", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
+#define MEMDUMP(fmt, ...)  g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_MEMDUMP, "MDMP", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
 #else // !FEATURE_LOG_SYS
 #define DEBUG(fmt, ...)
 #define INFO(fmt, ...)

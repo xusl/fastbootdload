@@ -150,312 +150,6 @@ void CLog::StartLogging
 	INFO("===== Start logging =====");
 }
 
-/*===========================================================================
-DESCRIPTION
-	Logging debug message to App and/or local disk file.
-
-DEPENDENCIES
-	None
-
-RETURN VALUE
-	None
-
-SIDE EFFECTS
-	None
-
-===========================================================================*/
-
-void CLog::Debug
-(
-    AdbTrace tag,
-	const char* fmtstr,
-	...
-)
-{
-#ifdef FEATURE_LOG_SYS
-
-	if (this == NULL)
-	{
-		return;
-	}
-
-	if (!(this->mask & LOG_MASK_DEBUG))
-	{
-		return;
-	}
-
-	va_list args;
-	va_start(args, fmtstr);
-	this->WriteLog(tag,
-			"DEBUG",
-			fmtstr,
-			args
-			);
-	va_end(args);
-
-#endif
-}
-
-/*===========================================================================
-DESCRIPTION
-	Logging log message to App and/or local disk file.
-
-DEPENDENCIES
-	None
-
-RETURN VALUE
-	None
-
-SIDE EFFECTS
-	None
-
-===========================================================================*/
-
-void CLog::Log
-(
-    AdbTrace tag,
-	const char* fmtstr,
-	...
-)
-{
-#ifdef FEATURE_LOG_SYS
-
-	if (this == NULL)
-	{
-		return;
-	}
-
-	if (!(this->mask & LOG_MASK_LOG))
-	{
-		return;
-	}
-
-	va_list args;
-	va_start(args, fmtstr);
-	this->WriteLog(tag,
-			"LOG",
-			fmtstr,
-			args
-			);
-	va_end(args);
-
-#endif
-}
-
-/*===========================================================================
-DESCRIPTION
-	Logging info message to App and/or local disk file.
-
-DEPENDENCIES
-	None
-
-RETURN VALUE
-	None
-
-SIDE EFFECTS
-	None
-
-===========================================================================*/
-
-void CLog::Info
-(
-    AdbTrace tag,
-	const char* fmtstr,
-	...
-)
-{
-#ifdef FEATURE_LOG_SYS
-
-	if (this == NULL)
-	{
-		return;
-	}
-
-	if (!(this->mask & LOG_MASK_INFO))
-	{
-		return;
-	}
-
-	va_list args;
-	va_start(args, fmtstr);
-	this->WriteLog(tag,
-			"INFO",
-			fmtstr,
-			args
-			);
-	va_end(args);
-
-#endif
-}
-
-/*===========================================================================
-DESCRIPTION
-	Logging warning message to App and/or local disk file.
-
-DEPENDENCIES
-	None
-
-RETURN VALUE
-	None
-
-SIDE EFFECTS
-	None
-
-===========================================================================*/
-
-void CLog::Warn
-(
-    AdbTrace tag,
-	const char* fmtstr,
-	...
-)
-{
-#ifdef FEATURE_LOG_SYS
-
-	if (this == NULL)
-	{
-		return;
-	}
-
-	if (!(this->mask & LOG_MASK_WARNING))
-	{
-		return;
-	}
-
-	va_list args;
-	va_start(args, fmtstr);
-	this->WriteLog(tag,
-			"WARNING",
-			fmtstr,
-			args
-			);
-	va_end(args);
-
-#endif
-}
-
-/*===========================================================================
-DESCRIPTION
-	Logging error message to App and/or local disk file.
-
-DEPENDENCIES
-	None
-
-RETURN VALUE
-	None
-
-SIDE EFFECTS
-	None
-
-===========================================================================*/
-
-void CLog::Error
-(
-    AdbTrace tag,
-	const char* fmtstr,
-	...
-)
-{
-#ifdef FEATURE_LOG_SYS
-
-	if (this == NULL)
-	{
-		return;
-	}
-
-	if (!(this->mask & LOG_MASK_ERROR))
-	{
-		return;
-	}
-
-	va_list args;
-	va_start(args, fmtstr);
-	this->WriteLog(tag,
-			"ERROR",
-			fmtstr,
-			args
-			);
-	va_end(args);
-
-#endif
-}
-
-/*===========================================================================
-DESCRIPTION
-	Logging critical message to App and/or local disk file.
-
-DEPENDENCIES
-	None
-
-RETURN VALUE
-	None
-
-SIDE EFFECTS
-	None
-
-===========================================================================*/
-
-void CLog::Critical
-(
-    AdbTrace tag,
-	const char * fmtstr,
-	...
-)
-{
-#ifdef FEATURE_LOG_SYS
-
-	if (this == NULL)
-	{
-		return;
-	}
-
-	if (!(this->mask & LOG_MASK_CRITICAL))
-	{
-		return;
-	}
-
-	va_list args;
-	va_start(args, fmtstr);
-	this->WriteLog(tag,
-			"CRITICAL",
-			fmtstr,
-			args
-			);
-	va_end(args);
-
-#endif
-}
-
-void CLog::Memdump
-(
-    AdbTrace tag,
-	const char* fmtstr,
-	...
-)
-{
-#ifdef FEATURE_LOG_SYS
-
-	if (this == NULL)
-	{
-		return;
-	}
-
-	if (!(this->mask & LOG_MASK_MEMDUMP))
-	{
-		return;
-	}
-
-	va_list args;
-	va_start(args, fmtstr);
-	this->WriteLog(tag,
-			"MEMDUMP",
-			fmtstr,
-			args
-			);
-	va_end(args);
-
-#endif
-}
 
 /*===========================================================================
 DESCRIPTION
@@ -476,9 +170,10 @@ SIDE EFFECTS
 void CLog::WriteLog
 (
     AdbTrace tag,
+    TLogMaskEnumType type,
 	const char* msg,
 	const char* fmtstr,
-	va_list& args
+	...
 )
 {
 #ifdef FEATURE_LOG_SYS
@@ -488,23 +183,33 @@ void CLog::WriteLog
 	int   nBuf;
 	char  szBuffer[MAX_BUF_LEN] = {0};
 	char  buf[MAX_BUF_LEN] = {0};
-	int   len ;
+
+    if (this == NULL)
+	{
+		return;
+	}
+
+    if (!(this->mask & type))
+	{
+		return;
+	}
 
     if(!((AdbTraceMask() & (1 << tag)) != 0)) {
         return;
     }
 
-	if (fmtstr == NULL)
+	if (fmtstr == NULL || msg == NULL)
 	{
 		return;
 	}
 
-	len = strlen(fmtstr);
-
-	if (len > MAX_BUF_LEN)
+	if (strlen(fmtstr) > MAX_BUF_LEN)
 	{
 		return;
 	}
+
+    	va_list args;
+	va_start(args, fmtstr);
 
 	SYSTEMTIME time;
 	GetLocalTime(&time);
@@ -516,6 +221,8 @@ void CLog::WriteLog
 				 time.wHour, time.wMinute,time.wSecond, msg, fmtstr);
 
 	nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), buf, args);
+
+    va_end(args);
 
 	ASSERT(nBuf >= 0);
 
