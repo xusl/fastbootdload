@@ -143,10 +143,10 @@ void adb_usb_init( void )
 }
 
 
-adb_device_t* is_adb_device_exist(long cd_sn) {
+adb_device_t* is_adb_device_exist(long cd_sn, long adb_sn) {
   adb_device_t* adb;
   for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-    if (adb->cd_sn == cd_sn) {
+    if (adb->cd_sn == cd_sn && adb->adb_sn == adb_sn) {
       return adb;
     }
   }
@@ -230,7 +230,7 @@ int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
     return -1;
   }
 
-  if (is_adb_device_exist(cd_sn) == NULL) {
+  if (is_adb_device_exist(cd_sn, adb_sn) == NULL) {
     adb_device_t* adb = (adb_device_t*)malloc(sizeof(adb_device_t));
 
     if (adb == NULL) {
