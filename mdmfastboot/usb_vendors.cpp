@@ -144,9 +144,9 @@ void check_regedit_usbflags(usbid_t USBIds[], unsigned count){
   for (unsigned i = 0; i <= count; i++) {
     if (i == count ) {
       //wcsdup
-      _snwprintf_s(szName, sizeof(szName), L"GlobalDisableSerNumGen");
+      _snwprintf_s(szName, sizeof(szName)/sizeof(szName[0]), L"GlobalDisableSerNumGen");
     } else {
-      _snwprintf_s(szName, sizeof(szName), L"IgnoreHWSerNum%04X%04X",
+      _snwprintf_s(szName, sizeof(szName)/sizeof(szName[0]), L"IgnoreHWSerNum%04X%04X",
                    USBIds[i].vid, USBIds[i].pid);
     }
     //ZeroMemory(szValue, sizeof(szValue));

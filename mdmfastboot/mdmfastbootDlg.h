@@ -92,7 +92,7 @@ public:
   BOOL AdbUsbHandler(BOOL update_device);
   BOOL SetPortDialogs(UINT nType, int x, int y, int w, int h);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
-	void UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+	void SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 	afx_msg void OnBnClickedBtnBrowse();
 	afx_msg void OnBnClickedStart();
 	afx_msg void OnBnClickedButtonStop();
@@ -108,4 +108,6 @@ private:
     BOOL IsHaveUsbWork(void);
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
     BOOL InitSettingConfig(void);
-};
+public:
+	afx_msg void OnBnClickedSetting();
+	};

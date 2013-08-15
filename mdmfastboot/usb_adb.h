@@ -44,10 +44,11 @@ typedef enum {
     DEVICE_MAX
 }usb_dev_t;
 
+void adb_usb_init(void);
+
 /// Enumerates present and available interfaces (devices), opens new ones and
 /// registers usb transport for them.
 void find_devices(void);
-void adb_usb_init(void);
 
 /* usb host/client interface */
 int usb_write(usb_handle *h, const void *data, int len);
@@ -60,7 +61,12 @@ int usb_switch_device(usb_handle* handle);
 usb_handle* usb_handle_enum_init(void);
 usb_handle* usb_handle_next(usb_handle* usb);
 void usb_set_work(usb_handle* usb);
+/*get host sn from us_handle*/
 long usb_port_address(usb_handle* handle);
+
+int add_adb_device(wchar_t *ccgp, wchar_t *parentId);
+void dump_adb_device(void);
+
 const wchar_t *usb_name(usb_handle* handle);
 usb_dev_t usb_status(usb_handle* handle);
 bool usb_is_work(usb_handle* usb);

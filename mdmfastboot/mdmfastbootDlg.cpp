@@ -9,6 +9,7 @@
 #include "fastbootflash.h"
 #include "adbhost.h"
 #include "usb_vendors.h"
+#include "devguid.h"
 
 #define THREADPOOL_SIZE	4
 
@@ -96,6 +97,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_WM_CLOSE()
 	ON_BN_CLICKED(IDCANCEL, &CmdmfastbootDlg::OnBnClickedCancel)
 	ON_WM_DESTROY()
+	ON_BN_CLICKED(IDC_SETTING, &CmdmfastbootDlg::OnBnClickedSetting)
 END_MESSAGE_MAP()
 
 void CmdmfastbootDlg::OnHelp()
@@ -319,6 +321,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   RegisterAdbDeviceNotification();
   SetWorkStatus(m_bWork, TRUE);
   adb_usb_init();
+  SetUpAdbDevice(NULL, 0);
   AdbUsbHandler(true);
 
   return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
@@ -429,7 +432,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       }
     case DBT_DEVTYP_DEVICEINTERFACE:
       {
-        //UpdateDevice(pDevInf, dwData);
+        SetUpAdbDevice(pDevInf, dwData);
         AdbUsbHandler(true);
         break;
       }
@@ -681,88 +684,88 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
 }
 
 
-void CmdmfastbootDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
+void CmdmfastbootDlg::SetUpAdbDevice(
+    PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
 {
-   // dbcc_name:
-   // \\?\USB#Vid_04e8&Pid_503b#0002F9A9828E0F06#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
-   // convert to
-   // USB\Vid_04e8&Pid_503b\0002F9A9828E0F06
-   ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
-   CString szDevId = pDevInf->dbcc_name+4;
-   int idx = szDevId.ReverseFind(_T('#'));
-   ASSERT( -1 != idx );
-   szDevId.Truncate(idx);
-   szDevId.Replace(_T('#'), _T('\\'));
-   szDevId.MakeUpper();
+#if 0
+  // dbcc_name:
+  // \\?\USB#Vid_04e8&Pid_503b#0002F9A9828E0F06#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+  // convert to  USB\Vid_04e8&Pid_503b\0002F9A9828E0F06
+  ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+  CString szDevId = pDevInf->dbcc_name+4;
+  int idx = szDevId.ReverseFind(_T('#'));
+  ASSERT( -1 != idx );
+  szDevId.Truncate(idx);
+  szDevId.Replace(_T('#'), _T('\\'));
+  szDevId.MakeUpper();
 
-   CString szClass;
-   idx = szDevId.Find(_T('\\'));
-   ASSERT(-1 != idx );
-   szClass = szDevId.Left(idx);
+  CString szClass;
+  idx = szDevId.Find(_T('\\'));
+  ASSERT(-1 != idx );
+  szClass = szDevId.Left(idx);
+  DEBUG(L"szClass %S", szClass.GetString());
+#endif
+  // if we are adding device, we only need present devices
+  // otherwise, we need all devices
+  DWORD dwFlag = (DBT_DEVICEARRIVAL != wParam
+                  ? DIGCF_ALLCLASSES : (DIGCF_ALLCLASSES | DIGCF_PRESENT));
+  //HDEVINFO hDevInfo = SetupDiGetClassDevs(NULL, szClass, NULL, dwFlag);
+  HDEVINFO hDevInfo = SetupDiGetClassDevs(&GUID_DEVCLASS_USB,  L"USB",NULL, dwFlag);
+  long lResult;
+  CRegKey reg;
+  WCHAR key[MAX_PATH];
+  TCHAR value[MAX_PATH];
 
-   // if we are adding device, we only need present devices
-   // otherwise, we need all devices
-   DWORD dwFlag = DBT_DEVICEARRIVAL != wParam
-      ? DIGCF_ALLCLASSES : (DIGCF_ALLCLASSES | DIGCF_PRESENT);
-   HDEVINFO hDevInfo = SetupDiGetClassDevs(NULL, szClass, NULL, dwFlag);
-   if( INVALID_HANDLE_VALUE == hDevInfo )
-   {
-      AfxMessageBox(CString("SetupDiGetClassDevs(): ")
+  if( INVALID_HANDLE_VALUE == hDevInfo )  {
+    AfxMessageBox(CString("SetupDiGetClassDevs(): ")
+                  + _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);
+    return;
+  }
+
+  SP_DEVINFO_DATA* pspDevInfoData =
+    (SP_DEVINFO_DATA*)HeapAlloc(GetProcessHeap(), 0, sizeof(SP_DEVINFO_DATA));
+  pspDevInfoData->cbSize = sizeof(SP_DEVINFO_DATA);
+  for(int i=0; SetupDiEnumDeviceInfo(hDevInfo,i,pspDevInfoData); i++)  {
+    DWORD DataT ;
+    DWORD nSize=0;
+    BYTE srv[MAX_PATH];
+    TCHAR buf[MAX_PATH];
+
+    if ( !SetupDiGetDeviceInstanceId(hDevInfo, pspDevInfoData, buf, sizeof(buf), &nSize) )  {
+      AfxMessageBox(CString("SetupDiGetDeviceInstanceId(): ")
                     + _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);
-      return;
-   }
+      break;
+    }
 
-   SP_DEVINFO_DATA* pspDevInfoData =
-      (SP_DEVINFO_DATA*)HeapAlloc(GetProcessHeap(), 0, sizeof(SP_DEVINFO_DATA));
-   pspDevInfoData->cbSize = sizeof(SP_DEVINFO_DATA);
-   for(int i=0; SetupDiEnumDeviceInfo(hDevInfo,i,pspDevInfoData); i++)
-   {
-      DWORD DataT ;
-      DWORD nSize=0 ;
-      TCHAR buf[MAX_PATH];
-
-      if ( !SetupDiGetDeviceInstanceId(hDevInfo, pspDevInfoData, buf, sizeof(buf), &nSize) )
-      {
-         AfxMessageBox(CString("SetupDiGetDeviceInstanceId(): ")
-                       + _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);
-         break;
+    if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData, SPDRP_SERVICE,
+                                          &DataT, (PBYTE)srv, sizeof(srv), &nSize) ) {
+      //DEBUG(" %S, size %d", srv, nSize);
+      if (wcsnicmp((const wchar_t *)srv, L"usbccgp",nSize/sizeof(wchar_t))) {
+        continue;
       }
+    }
 
-     DEBUG(L"LOCATEION %d, DeviceInstanceId %S", i, buf);
-      if ( szDevId == buf )
-      {
-         // device found
-         if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
-                                               SPDRP_LOCATION_INFORMATION,
-                                               &DataT, (PBYTE)buf, sizeof(buf), &nSize) ) {
-            DEBUG("LOCATEION %S(datatype %d)", buf,DataT);
-            // do nothing
-         }
-         if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
-                                               SPDRP_ADDRESS, &DataT,
-                                               (PBYTE)buf, sizeof(buf), &nSize) ) {
-            DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
+    _snwprintf_s(key, MAX_PATH,L"SYSTEM\\ControlSet001\\Enum\\%s", buf);
+    lResult = reg.Open(HKEY_LOCAL_MACHINE,key);
+    if (lResult == ERROR_SUCCESS) {
+      nSize = MAX_PATH;
+      lResult = reg.QueryStringValue(L"ParentIdPrefix", static_cast<LPTSTR>(value), &nSize);
 
-         }
-         if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
-                                               SPDRP_BUSNUMBER, &DataT,
-                                               (PBYTE)buf, sizeof(buf), &nSize) ) {
-            DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
-
-         }
-         else {
-            lstrcpy(buf, _T("Unknown"));
-         }
-         // update UI
-         break;
+      if (lResult == ERROR_SUCCESS ) {
+        if (add_adb_device(buf, value) != 0)
+        DEBUG(L"%S, ParentIdPrefix is %S not add", buf, value);
       }
-   }
+      reg.Close();
+    }
+  }
 
-   if ( pspDevInfoData ) {
-      HeapFree(GetProcessHeap(), 0, pspDevInfoData);
-   }
+  dump_adb_device();
 
-   SetupDiDestroyDeviceInfoList(hDevInfo);
+  if ( pspDevInfoData ) {
+    HeapFree(GetProcessHeap(), 0, pspDevInfoData);
+  }
+
+  SetupDiDestroyDeviceInfoList(hDevInfo);
 }
 #if 0
 void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet) {
@@ -824,9 +827,17 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
   if (m_bInit) {
     RECT rect;
     GetDlgItem(IDC_BTN_STOP)->GetClientRect(&rect);
-    GetDlgItem(IDC_BTN_STOP)->SetWindowPos(0, cx - 400, cy - 50, rect.right, rect.bottom, 0);
-    GetDlgItem(IDCANCEL)->SetWindowPos(0, cx - 300, cy - 50, rect.right, rect.bottom, 0);
-    GetDlgItem(IDC_BTN_START)->SetWindowPos(0, cx - 200, cy - 50, rect.right, rect.bottom, 0);
+    GetDlgItem(IDC_BTN_STOP)->SetWindowPos(0, (cx + 200) /2, cy - 50, rect.right, rect.bottom, 0);
+
+    GetDlgItem(IDCANCEL)->GetClientRect(&rect);
+    GetDlgItem(IDCANCEL)->SetWindowPos(0, (cx + 400 ) /2, cy - 50, rect.right, rect.bottom, 0);
+
+     GetDlgItem(IDC_BTN_START)->GetClientRect(&rect);
+    GetDlgItem(IDC_BTN_START)->SetWindowPos(0, (cx - 200) /2, cy - 50, rect.right, rect.bottom, 0);
+
+
+     GetDlgItem(IDC_SETTING)->GetClientRect(&rect);
+    GetDlgItem(IDC_SETTING)->SetWindowPos(0, (cx - 400) /2, cy - 50, rect.right, rect.bottom, 0);
 
     GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
     dx = /*rect.left  + */ 10;
@@ -977,3 +988,9 @@ void CmdmfastbootDlg::OnDestroy()
 	StopLogging();
 }
 
+
+void CmdmfastbootDlg::OnBnClickedSetting()
+	{
+	// TODO: 在此添加控件通知处理程序代码
+
+	}

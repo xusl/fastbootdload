@@ -140,11 +140,12 @@ int flash_image::read_config(const wchar_t* config) {
                                        MAX_PATH,
                                        config);
     if (data_len > 0) {
-        path.Empty();
+//        path.Empty();
         path = pkg_dir;
         //path += L'\\';
         path += filename;
-      add_image(partition, path.GetString());
+      add_image(partition, path.GetBuffer());
+      path.ReleaseBuffer();
     }
 
     partition = partition + partition_len + 1;
@@ -234,7 +235,7 @@ int flash_image::get_partition_info(char *partition, void **ppdata, unsigned *ps
   return 1;
 }
 
-void flash_image::read_package_version(PCWCHAR package_conf){
+void flash_image::read_package_version(const wchar_t * package_conf){
   CComPtr<MSXML::IXMLDOMDocument> spDoc;
   CComPtr<MSXML::IXMLDOMNodeList> spNodeList;
   CComPtr<MSXML::IXMLDOMElement> spElement;

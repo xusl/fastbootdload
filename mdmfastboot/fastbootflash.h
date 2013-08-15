@@ -70,7 +70,7 @@ class flash_image{
 
   private:
     int add_image(wchar_t *partition, const wchar_t *lpath, BOOL write =FALSE, const wchar_t* config = NULL);
-    void read_package_version(PCWCHAR package_conf);
+    void read_package_version(const wchar_t * package_conf);
     int read_config(const wchar_t* config);
     BOOL reset(BOOL free_only);
 

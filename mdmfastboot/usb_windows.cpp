@@ -62,6 +62,13 @@ struct usb_handle {
   unsigned zero_mask;
 };
 
+typedef struct adb_device_t {
+   adb_device_t *prev;
+   adb_device_t *next;
+   long adb_sn;  // adb device serial number that allocate by Windows.
+   long cd_sn;    // serial number of composite device which adb device in.
+}adb_device;
+
 typedef struct dev_switch_t {
   dev_switch_t *prev;
   dev_switch_t *next;
@@ -85,6 +92,12 @@ static dev_switch_t switch_list = {
   &switch_list,
   &switch_list,
 };
+
+static adb_device_t adbdev_list= {
+    &adbdev_list,
+    &adbdev_list,
+};
+
 
 /// Locker for the list of opened usb handles
 ADB_MUTEX_DEFINE( usb_lock );
@@ -123,13 +136,120 @@ int usb_close(usb_handle* handle);
 /// Gets interface (device) name for an opened usb handle
 const wchar_t *usb_name(usb_handle* handle);
 
-UINT run(LPVOID data);
-
 void adb_usb_init( void )
 {
     ADB_MUTEX(usb_lock);
 	usb_vendors_init();
 }
+
+
+adb_device_t* is_adb_device_exist(long cd_sn) {
+  adb_device_t* adb;
+  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
+    if (adb->cd_sn == cd_sn) {
+      return adb;
+    }
+  }
+
+  return NULL;
+}
+
+void dump_adb_device(void) {
+  adb_device_t* adb;
+  INFO("Begin dump host installed adb device driver\n================");
+  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
+        INFO("0x%x (composite)<==> 0x%x(adb)", adb->cd_sn, adb->adb_sn);
+  }
+  INFO("End dump host installed adb device driver\n=================");
+}
+
+long get_adb_composite_device_sn(long adb_sn) {
+  adb_device_t* adb;
+  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
+    if (adb->adb_sn == adb_sn) {
+        INFO("adb_sn 0x%x convert composite sn 0x%x", adb_sn, adb->cd_sn);
+      return adb->cd_sn;
+    }
+  }
+  return adb_sn;
+}
+
+//5&10cd67f3&0&4 5&10cd67f3&0
+long extract_serial_number(wchar_t * sn, wchar_t **ppstart =NULL, wchar_t **ppend= NULL) {
+  size_t len;
+  wchar_t *pstart, *pend;
+  if (sn == NULL) {
+    ERROR("Bad Parameter");
+    return -1;
+  }
+
+  len = wcslen (sn);
+
+  pstart = (wchar_t*)wcschr(sn, L'&');
+  if (pstart == NULL || pstart - sn >= len) {
+    ERROR("Can not find first '&'.");
+    return -1;
+  }
+
+  pstart++;
+  pend = wcschr(pstart , L'&');
+  if (pend == NULL || pend - sn >= len) {
+    ERROR("Can not find first '&'.");
+    return -1;
+  }
+
+  if (ppstart != NULL)
+    *ppstart = pstart;
+  if (ppend != NULL)
+    *ppend = pend;
+  return wcstol(pstart , &pend, 16);
+}
+
+// Usually, adb is a composite device interface, and fastboot is a single interface device.
+// So the adb interface 's host number is differ from fastboot. But it's composite's host number
+// is equal fastboot's host number.
+// adb composite device USB\VID_1BBB&PID_0192\5&10CD67F3&0&4 have key ParentIdPrefix
+// with 6&29f04a5a&0. And adb interface's host number prefix with 6&29f04a5a&0. Then,
+// fastboot host number contain 10CD67F3.
+int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
+  long cd_sn, adb_sn;
+
+  if (ccgp == NULL || parentId == NULL) {
+    ERROR("null parameter");
+    return -1;
+  }
+
+  size_t len = wcslen (ccgp);
+  if(wcslen (ccgp) < 22)
+    return -1;
+  cd_sn = extract_serial_number(ccgp + 22);
+  adb_sn = extract_serial_number(parentId);
+
+  if (cd_sn <= 0 || adb_sn <= 0 ) {
+    ERROR("Invalid cd_sn %l or adb_sn %l", cd_sn, adb_sn);
+    return -1;
+  }
+
+  if (is_adb_device_exist(cd_sn) == NULL) {
+    adb_device_t* adb = (adb_device_t*)malloc(sizeof(adb_device_t));
+
+    if (adb == NULL) {
+      ERROR("Out of Memory");
+      return -1;
+    }
+    adb->adb_sn = adb_sn;
+    adb->cd_sn = cd_sn;
+
+    adb->next = &adbdev_list;
+    adb->prev = adbdev_list.prev;
+    adb->prev->next = adb;
+    adb->next->prev = adb;
+  } else {
+  DEBUG("ADB_DEVICE has already exist.");
+    }
+  return 0;
+}
+
 
 // \\?\usb#vid_18d1&pid_d00d#5&10cd67f3&0&4#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b}
 // convert to
@@ -138,8 +258,10 @@ long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
   wchar_t * snb, *sne, * sn;
 
   size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
-  if(wcsnicmp(L"\\\\?\\usb#",dev_name,8) || len < 26 + 40)
+  if(wcsnicmp(L"\\\\?\\usb#",dev_name,8) || len < 26 + 40) {
+    ERROR("Not invalid dev name.");
     return 0;
+  }
 
   snb = (wchar_t*)wcschr(dev_name + 26, L'&');
   if (snb == NULL || snb - dev_name >= len)
@@ -278,8 +400,8 @@ int register_new_device(usb_handle* handle) {
     handle->status = DEVICE_CHECK;
   } else if (protocol == FB_PROTOCOL) {
     ERROR("We do not permit fastboot as the first device status!");
-    //goto register_new_device_out;
-    handle->status = DEVICE_FLASH;
+    goto register_new_device_out;
+    //handle->status = DEVICE_FLASH;
   }
 
   // Not in the list. Add this handle to the list.
@@ -604,7 +726,7 @@ int recognized_device(usb_handle* handle) {
 
   long sn = usb_host_sn(handle->interface_name, NULL);
   if (sn != 0) {
-    handle->usb_sn = sn;
+    handle->usb_sn = get_adb_composite_device_sn(sn);
     //DEBUG("%S serial number %x", interface_name, sn);
   }  else {
     //if we do not support multiple, sn is not from host allocation.
@@ -710,28 +832,6 @@ void find_devices() {
   AdbCloseHandle(enum_handle);
 }
 
-UINT run(LPVOID data) {
-  usb_handle * handle = (usb_handle*)data;
-  handle->work = TRUE;
-
-  if (handle->status == DEVICE_CHECK) {
-    adbhost adb(handle , handle->usb_sn);
-    adb.process();
-    usb_switch_device(handle);
-    usb_close(handle);
-  } else if (handle->status == DEVICE_FLASH){
-    fastboot fb(handle);
-  fb.fb_queue_display("product","product");
-  fb.fb_queue_display("version","version");
-  fb.fb_queue_display("serialno","serialno");
-  fb.fb_queue_display("kernel","kernel");
-  fb.fb_queue_reboot();
-
-//      fb.fb_execute_queue(handle);
-  }
-  return 0;
-}
-
 usb_handle* usb_handle_enum_init(void) {
     usb_handle* usb = handle_list.next;
     if (usb == &handle_list)
@@ -756,14 +856,4 @@ bool usb_is_work(usb_handle* usb) {
         return usb->work;
 
      return false;
-}
-
-UINT do_nothing() {
-  usb_handle* usb;
-
-  for(usb = handle_list.next; usb != &handle_list; usb = usb->next) {
-
-  }
-
-  return 0;
 }
