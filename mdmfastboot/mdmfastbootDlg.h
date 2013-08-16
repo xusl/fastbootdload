@@ -46,8 +46,8 @@ typedef struct UsbWorkData{
 } UsbWorkData;
 
 #define THREADPOOL_SIZE	4
-static const int PORT_NUM = 4;
-static const int PORT_LAYOUT_ROW = 2;
+static const int PORT_NUM = 9;
+static const int PORT_LAYOUT_ROW = 3;
 static const int PARTITION_NAME_LEN = 32;
 
 // CmdmfastbootDlg ¶Ô»°¿ò

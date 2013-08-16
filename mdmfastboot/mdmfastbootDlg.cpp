@@ -128,7 +128,7 @@ BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
 
   for (r = 0; r < R_NUM; r++) {
     for (c = 0; c < C_NUM; c++) {
-      port = &m_workdata[r * R_NUM + c].ctl;
+      port = &m_workdata[r * C_NUM + c].ctl;
       port->SetWindowPos(0,
                          x + c * pw,
                          y + r * ph,
@@ -930,7 +930,7 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
   int dx, dy, dw, dh;
 
-  if (500>cx || 500> cy)
+  if (600>cx || 600> cy)
   {
     return;
   }
@@ -965,8 +965,8 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	lpMMI->ptMinTrackSize.x   = 1100 ;	//主窗口最小宽度
-	lpMMI->ptMinTrackSize.y   = 700  ;  //主窗口最小高度
+	lpMMI->ptMinTrackSize.x   = 800 ;	//主窗口最小宽度
+	lpMMI->ptMinTrackSize.y   = 800  ;  //主窗口最小高度
 	CDialog::OnGetMinMaxInfo(lpMMI);
 }
 
@@ -1107,3 +1107,4 @@ void CmdmfastbootDlg::OnBnClickedSetting()
 	// TODO: 在此添加控件通知处理程序代码
 
 	}
+
