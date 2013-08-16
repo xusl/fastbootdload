@@ -101,3 +101,21 @@ void CPortStateUI::OnSize(UINT nType, int cx, int cy)
 	GetDlgItem(IDC_DL_INFO)->SetWindowPos(0, space, cy-1*rect.bottom, cx-2*space, rect.bottom-10, 0);
 #endif
 }
+
+void CPortStateUI::Reset(void)
+{
+    LPCTSTR lpszString = L"";
+
+	CString strTitle;
+	strTitle.Format(_T("%s %d"), _T("Port"), iID);
+	SetTitle(strTitle);
+	GetDlgItem(IDC_DL_INFO)->SetWindowText(lpszString);
+	GetDlgItem(IDC_DLINFO_TITLE)->SetWindowText(lpszString);
+	GetDlgItem(IDC_EDIT_FRM_VER)->SetWindowText(lpszString);
+	GetDlgItem(IDC_EDIT_QCN_VER)->SetWindowText(lpszString);
+	GetDlgItem(IDC_EDIT_LINUX_VER)->SetWindowText(lpszString);
+	GetDlgItem(IDC_EDIT_SYSTEM_VER)->SetWindowText(lpszString);
+	GetDlgItem(IDC_EDIT_USERDATA_VER)->SetWindowText(lpszString);
+     ((CProgressCtrl *)GetDlgItem(IDC_PROGRESS1))->SetPos(0);
+}
+

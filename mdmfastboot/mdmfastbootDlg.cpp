@@ -27,6 +27,7 @@ static const GUID usb_class_id[] = {
 	//{0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED}},
 };
 
+static UINT usb_work(LPVOID wParam);
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -88,6 +89,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	//}}AFX_MSG_MAP
 	ON_BN_CLICKED(IDC_BTN_STOP, &CmdmfastbootDlg::OnBnClickedButtonStop)
 	ON_WM_SIZE()
+	ON_WM_TIMER()
 	ON_WM_GETMINMAXINFO()
 	ON_MESSAGE(UI_MESSAGE_DEVICE_INFO, &CmdmfastbootDlg::OnDeviceInfo)
 	ON_BN_CLICKED(IDC_BTN_BROWSE, &CmdmfastbootDlg::OnBnClickedBtnBrowse)
@@ -151,6 +153,9 @@ BOOL CmdmfastbootDlg::InitUsbWorkData(void)
     workdata->ctl.Init(i);
     workdata->usb = NULL;
     workdata->usb_sn = ~1L;
+    workdata->stat = USB_STAT_IDLE;
+    workdata->img = m_image;
+    workdata->work = NULL;
   }
   return TRUE;
 }
@@ -161,10 +166,30 @@ BOOL CmdmfastbootDlg::IsHaveUsbWork(void) {
   int i= 0;
   for (; i < m_nPort; i++) {
     workdata = m_workdata + i;
-    if (workdata->usb != NULL || workdata->usb_sn != ~1L)
+    if (workdata->stat == USB_STAT_SWITCH ||
+        workdata->stat == USB_STAT_WORKING)
         return TRUE ;
   }
   return FALSE;
+}
+
+UINT CmdmfastbootDlg::UsbWorkStat(UsbWorkData *data) {
+  if (data == NULL) {
+    ERROR("Invalid parameter");
+    return FALSE;
+  }
+
+  return data->stat;
+}
+
+BOOL CmdmfastbootDlg::FinishUsbWorkData(UsbWorkData *data) {
+  if (data == NULL) {
+    ERROR("Invalid parameter");
+    return FALSE;
+  }
+  data->stat = USB_STAT_FINISH;
+  //data->work = NULL;
+  return TRUE;
 }
 
 BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
@@ -172,8 +197,42 @@ BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
     ERROR("Invalid parameter");
     return FALSE;
   }
+
+  if (data->stat = USB_STAT_SWITCH) {
+    KillTimer(data->usb_sn);
+  }
+
   data->usb = NULL;
   data->usb_sn = ~1L;
+  data->stat = USB_STAT_IDLE;
+  data->work = NULL;
+  data->ctl.Reset();
+  return TRUE;
+}
+
+BOOL CmdmfastbootDlg::SetUsbWorkData(UsbWorkData *data, usb_handle * usb) {
+  if (data == NULL || usb == NULL) {
+    ERROR("Invalid parameter");
+    return FALSE;
+  }
+
+  if (data->stat = USB_STAT_SWITCH) {
+    KillTimer(usb_port_address(usb));
+  }
+
+  usb_set_work(usb, TRUE);
+  data->usb = usb;
+  data->usb_sn =usb_port_address(usb);
+  data->stat = USB_STAT_WORKING;
+  data->work = AfxBeginThread(usb_work, data);
+
+  if (data->work != NULL) {
+    data->work->m_bAutoDelete = TRUE;
+  } else {
+    CRITICAL("Can not begin thread!(0x%x)", data->usb_sn);
+    usb_set_work(usb, FALSE);
+    CleanUsbWorkData(data);
+  }
   return TRUE;
 }
 
@@ -183,26 +242,45 @@ BOOL CmdmfastbootDlg::SwitchUsbWorkData(UsbWorkData *data) {
     return FALSE;
   }
   data->usb = NULL;
+  data->work = NULL;
+  data->stat = USB_STAT_SWITCH;
+  /*Set 30 secnods for switch timeout*/
+  SetTimer(data->usb_sn, 300 * 1000, NULL);
   return TRUE;
 }
 
-UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(usb_handle* handle) {
-  if (handle == NULL) {
-    return NULL;
-  }
-
-  //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
-  long usb_sn = usb_port_address(handle);
+/*
+* Get usbworkdata that in free or in switch.
+*/
+UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn) {
   int i= 0;
 
   // first search the before, for switch device.
   for (; i < m_nPort; i++) {
-    if (m_workdata[i].usb_sn == usb_sn && m_workdata[i].usb == NULL)
+    //if (m_workdata[i].usb_sn == usb_sn && m_workdata[i].usb == NULL)
+    if (m_workdata[i].stat == USB_STAT_SWITCH && m_workdata[i].usb_sn == usb_sn)
       return m_workdata + i;
   }
 
   for (i=0; i < m_nPort; i++) {
-    if (m_workdata[i].usb == NULL)
+    //if (m_workdata[i].usb_sn == ~1L && m_workdata[i].usb == NULL)
+    if (m_workdata[i].stat == USB_STAT_IDLE)
+      return m_workdata + i;
+  }
+
+  return NULL;
+}
+
+/*
+* get usbworkdata by usb_sn, so the device is in switch or in working
+* or done?
+*/
+UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(long usb_sn) {
+  int i= 0;
+
+  // first search the before, for switch device.
+  for (; i < m_nPort; i++) {
+    if (m_workdata[i].usb_sn == usb_sn)
       return m_workdata + i;
   }
 
@@ -256,6 +334,9 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
 
   m_image = new flash_image(lpFileName);
 
+  GetPrivateProfileString(L"app",L"adb_usb",NULL,log_conf, MAX_PATH,lpFileName);
+
+
   auto_work = GetPrivateProfileInt(L"app",L"autowork", 0, lpFileName);
   m_bWork = auto_work;
 
@@ -302,6 +383,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
   //init thread pool begin.
   HRESULT hr = m_dlWorkerPool.Initialize(NULL, THREADPOOL_SIZE);
+  m_dlWorkerPool.SetTimeout(30 * 1000);
   if(!SUCCEEDED(hr))
   {
     ERROR("Failed to init thread pool!");
@@ -405,22 +487,18 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 {
   if (dwData == 0)
   {
-    WARN("OnDeviceChange, dwData == 0 .EventType: 0x%x",
-         nEventType);
+    WARN("OnDeviceChange, dwData == 0 .EventType: 0x%x", nEventType);
     return FALSE;
   }
 
   DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
-  PDEV_BROADCAST_DEVICEINTERFACE pDevInf =
-    (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
+  PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
 
   DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
         nEventType, phdr->dbch_devicetype);
 
-  if (nEventType == DBT_DEVICEARRIVAL)
-  {
-    switch( phdr->dbch_devicetype )
-    {
+  if (nEventType == DBT_DEVICEARRIVAL) {
+    switch( phdr->dbch_devicetype ) {
     case DBT_DEVTYP_DEVNODE:
       WARN("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
       break;
@@ -437,15 +515,29 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         break;
       }
     }
-  }
-  else if (nEventType == DBT_DEVICEREMOVECOMPLETE)
-  {
-    if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE)
-    {
-      /* enumerate device and check if the port
-       * composite should be removed
-       */
+  } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
+    if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
+      // dbcc_name:
+      ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
 
+      long sn = usb_host_sn(pDevInf->dbcc_name);
+      sn = get_adb_composite_device_sn(sn);
+      UsbWorkData * data = FindUsbWorkData(sn);
+      UINT stat;
+      if (data == NULL)
+        return FALSE;
+      stat = UsbWorkStat(data);
+      if (stat == USB_STAT_WORKING) {
+        // the device is plugin off when in working, that is because some accident.
+        //the accident power-off in switch is handle by the timer.
+        //thread pool notify , exit
+        if (data->work != NULL)
+            data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
+        usb_close(data->usb);
+        CleanUsbWorkData(data);
+      } else if (stat == USB_STAT_FINISH) {
+        CleanUsbWorkData(data);
+      }
     }
   }
 
@@ -471,12 +563,18 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 
   switch(uiInfo->infoType ) {
   case REBOOT_DEVICE:
+    if (data->usb != NULL) {
+    usb_switch_device(data->usb);
+    usb_close(data->usb);
+    }
+
     SwitchUsbWorkData(data);
     data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
     break;
 
   case FLASH_DONE:
-    CleanUsbWorkData(data);
+    usb_close(data->usb);
+    FinishUsbWorkData(data);
     //data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
     break;
 
@@ -494,6 +592,20 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 
   delete uiInfo;
   return 0;
+}
+
+/*nIDEvent is the usb sn*/
+void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
+    UsbWorkData * data = FindUsbWorkData(nIDEvent);
+    WARN("PORT %d switch device timeout", nIDEvent);
+
+      if (data == NULL) {
+        ERROR("PORT %d switch device timeout", nIDEvent);
+        return ;
+        }
+
+    CleanUsbWorkData(data);
+  remove_switch_device(nIDEvent);
 }
 
 
@@ -523,11 +635,11 @@ UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command)
   return 0;
 }
 
-UINT usb_work(UsbWorkData* data, flash_image  *img) {
-  // UsbWorkData* data = (UsbWorkData*)wParam;
+UINT usb_work(LPVOID wParam) {
+  UsbWorkData* data = (UsbWorkData*)wParam;
   usb_handle * handle;
 
-  if (data == NULL || img == NULL) {
+  if (data == NULL ) {
     ERROR("Bad parameter");
     return -1;
   }
@@ -617,18 +729,21 @@ UINT usb_work(UsbWorkData* data, flash_image  *img) {
 
     adb.reboot_bootloader();
     ui_text_msg(data, REBOOT_DEVICE, "reboot");
-    usb_switch_device(handle);
-
-    usb_close(handle);
   } else if (status == DEVICE_FLASH) {
     fastboot fb(handle);
     unsigned size;
     void * img_data;
+  flash_image  *img;
 
     fb.fb_queue_display("product","product");
     fb.fb_queue_display("version","version");
     fb.fb_queue_display("serialno","serialno");
     fb.fb_queue_display("kernel","kernel");
+    img = data->img;
+    if (img == NULL ){
+        ERROR("FLASH image in null.");
+        return -1;
+        }
 
     if(0 == img->get_partition_info("boot", &img_data, &size))
       fb.fb_queue_flash("boot", img_data, size);
@@ -639,7 +754,6 @@ UINT usb_work(UsbWorkData* data, flash_image  *img) {
     fb.fb_execute_queue(handle,data->hWnd, data);
 
     ui_text_msg(data, FLASH_DONE, " firmware updated!");
-    usb_close(handle);
   }
   return 0;
 }
@@ -663,19 +777,19 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
        handle != NULL ;
        handle = usb_handle_next(handle)) {
     if (!usb_is_work(handle)) {
-      data = GetUsbWorkData(handle);
+      data = GetUsbWorkData(usb_port_address(handle));
 
       if (data == NULL)
         return FALSE;
 
-      usb_set_work(handle);
-
-      data->usb = handle;
-      data->usb_sn =usb_port_address(handle);
+      //usb_set_work(handle);
+      //data->usb = handle;
+      //data->usb_sn =usb_port_address(handle);
+      SetUsbWorkData(data, handle);
 
       //AfxBeginThread(usb_work, data);
-      CDownload* pDl = new CDownload(usb_work, data, m_image);
-      m_dlWorkerPool.QueueRequest( (CDlWorker::RequestType) pDl );
+      //CDownload* pDl = new CDownload(usb_work, data, m_image);
+      //m_dlWorkerPool.QueueRequest( (CDlWorker::RequestType) pDl );
       return TRUE;
     }
   }

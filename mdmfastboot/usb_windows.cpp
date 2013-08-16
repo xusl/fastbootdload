@@ -298,6 +298,8 @@ int usb_switch_device(usb_handle* handle) {
 	  ERROR("Out of Memory");
 	  return -1;
   }
+
+  adb_mutex_lock(&usb_lock);
   dev->usb_sn = handle->usb_sn;
   dev->status = handle->status;
   dev->time = now();
@@ -307,8 +309,45 @@ int usb_switch_device(usb_handle* handle) {
   dev->prev = switch_list.prev;
   dev->prev->next = dev;
   dev->next->prev = dev;
+  adb_mutex_unlock(&usb_lock);
 
   return 0;
+}
+
+
+static int switch_device_close(dev_switch_t* dev) {
+    if (dev == NULL)
+        return -1;
+
+  adb_mutex_lock(&usb_lock);
+      if ((dev->next != dev) && (dev->prev != dev)) {
+      //link the next node and previous node
+      dev->next->prev = dev->prev;
+      dev->prev->next = dev->next;
+      //unlink self from the list
+      dev->prev = dev;
+      dev->next = dev;
+    }
+
+    free(dev);
+
+  adb_mutex_unlock(&usb_lock);
+  return 0;
+}
+
+
+int remove_switch_device(long sn)  {
+    dev_switch_t* dev;
+
+  // Iterate through the list looking for the name match.
+  for(dev = switch_list.next; dev != &switch_list; dev = dev->next) {
+    if (sn != dev->usb_sn)
+      continue;
+
+    switch_device_close(dev);
+    return 0;
+  }
+  return -1;
 }
 
 /*
@@ -323,7 +362,10 @@ int known_switch_device(usb_handle* handle) {
       continue;
 
     handle->status = dev->status;
+    switch_device_close(dev);
 
+#if 0
+     adb_mutex_lock(&usb_lock);
     if ((dev->next != dev) && (dev->prev != dev)) {
       //link the next node and previous node
       dev->next->prev = dev->prev;
@@ -332,11 +374,13 @@ int known_switch_device(usb_handle* handle) {
       dev->prev = dev;
       dev->next = dev;
     }
-
     free(dev);
-    return 1;
+    adb_mutex_unlock(&usb_lock);
+#endif
+    return 0;
   }
-  return 0;
+
+  return -1;
 }
 
 int known_device_locked(const wchar_t* dev_name) {
@@ -385,7 +429,7 @@ int register_new_device(usb_handle* handle) {
     goto register_new_device_out;
   }
 
-  if (known_switch_device(handle)) {
+  if (known_switch_device(handle) == 0) {
     if(handle->status == DEVICE_CHECK && protocol == FB_PROTOCOL) {
         handle->status = DEVICE_FLASH;
     } else if (handle->status == DEVICE_FLASH && protocol == ADB_PROTOCOL) {
@@ -846,9 +890,9 @@ usb_handle* usb_handle_next(usb_handle* usb) {
     return usb->next;
 }
 
-void usb_set_work(usb_handle* usb) {
+void usb_set_work(usb_handle* usb,  BOOL bwork) {
     if (usb != NULL)
-      usb->work = TRUE;
+      usb->work = bwork;
 }
 
 bool usb_is_work(usb_handle* usb) {

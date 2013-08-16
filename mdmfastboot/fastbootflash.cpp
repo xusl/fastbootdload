@@ -755,14 +755,12 @@ int fastboot::check_response(usb_handle *usb, unsigned size,
         r = usb_read(usb, status, 64, false);
         if(r < 0) {
             sprintf(ERRBUF, "status read failed (%s)", strerror(errno));
-            usb_close(usb);
             return -1;
         }
         status[r] = 0;
 
         if(r < 4) {
             sprintf(ERRBUF, "status malformed (%d bytes)", r);
-            usb_close(usb);
             return -1;
         }
 
@@ -791,14 +789,12 @@ int fastboot::check_response(usb_handle *usb, unsigned size,
             unsigned dsize = strtoul((char*) status + 4, 0, 16);
             if(dsize > size) {
                 strcpy(ERRBUF, "data size too large");
-                usb_close(usb);
                 return -1;
             }
             return dsize;
         }
 
         strcpy(ERRBUF,"unknown status code");
-        usb_close(usb);
         break;
     }
 
@@ -823,7 +819,6 @@ int fastboot::_command_send(usb_handle *usb, const char *cmd,
 
     if(usb_write(usb, cmd, cmdsize) != cmdsize) {
         sprintf(ERRBUF,"command write failed (%s)", strerror(errno));
-        usb_close(usb);
         return -1;
     }
 
@@ -841,12 +836,10 @@ int fastboot::_command_send(usb_handle *usb, const char *cmd,
         r = usb_write(usb, data, size);
         if(r < 0) {
             sprintf(ERRBUF, "data transfer failure (%s)", strerror(errno));
-            usb_close(usb);
             return -1;
         }
         if(r != ((int) size)) {
             sprintf(ERRBUF, "data transfer failure (short transfer)");
-            usb_close(usb);
             return -1;
         }
     }

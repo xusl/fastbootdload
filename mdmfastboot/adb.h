@@ -26,12 +26,6 @@
 extern "C" {
 #endif
 
-
-//typedef struct amessage amessage;
-
-typedef struct atransport atransport;
-typedef struct adisconnect  adisconnect;
-
 typedef struct amessage {
     unsigned command;       /* command identifier constant      */
     unsigned arg0;          /* first argument                   */
@@ -52,20 +46,6 @@ typedef struct apacket
     unsigned char data[MAX_PAYLOAD];
 }apacket;
 
-/* the adisconnect structure is used to record a callback that
-** will be called whenever a transport is disconnected (e.g. by the user)
-** this should be used to cleanup objects that depend on the
-** transport (e.g. remote sockets, listeners, etc...)
-*/
-struct  adisconnect
-{
-    void        (*func)(void*  opaque, atransport*  t);
-    void*         opaque;
-    adisconnect*  next;
-    adisconnect*  prev;
-};
-
-
 /* a transport object models the connection to a remote device or emulator
 ** there is one transport per connected device/emulator. a "local transport"
 ** connects through TCP (for the emulator), while a "usb transport" through
@@ -82,37 +62,28 @@ typedef enum transport_type {
         kTransportHost,
 } transport_type;
 
-struct atransport
+typedef struct atransport
 {
     atransport *next;
     atransport *prev;
 
     int (*read_from_remote)(apacket *p, atransport *t);
     int (*write_to_remote)(apacket *p, atransport *t);
-    void (*close)(atransport *t);
-    void (*kick)(atransport *t);
+   // void (*close)(atransport *t);
+   // void (*kick)(atransport *t);
 
-    int fd;
-    int transport_socket;
     int ref_count;
     unsigned sync_token;
     int connection_state;
     transport_type type;
 
-        /* usb handle or socket fd as needed */
+    /* usb handle or socket fd as needed */
     usb_handle *usb;
-    int sfd;
 
-        /* used to identify transports for clients */
-    char *serial;
+    /* used to identify transports for clients */
+   // char *serial;
     char *product;
-
-        /* a list of adisconnect callbacks called when the transport is kicked */
-    int          kicked;
-    adisconnect  disconnects;
-};
-
-
+} atransport;
 void send_packet(apacket *p, atransport *t);
 
 /* initialize a transport object's func pointers and state */

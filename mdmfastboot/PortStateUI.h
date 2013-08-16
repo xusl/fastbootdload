@@ -40,6 +40,8 @@ public:
 	void SetInfo(UI_INFO_TYPE infoType, CString strInfo);
 	void Init(int iPortID);
   void SetTitle(CString strInfo);
+  void Reset(void);
+
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV Ö§³Ö
 

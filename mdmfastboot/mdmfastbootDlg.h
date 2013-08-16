@@ -25,16 +25,25 @@ enum
 	UI_MESSAGE_DEVICE_INFO,
 };
 
+enum
+{
+  USB_STAT_IDLE,
+  USB_STAT_WORKING,
+  USB_STAT_SWITCH,
+  USB_STAT_FINISH
+};
+
 class CmdmfastbootDlg;
 
-typedef struct UsbWorkData UsbWorkData;
-
- struct UsbWorkData{
-    CWnd* hWnd;
+typedef struct UsbWorkData{
+    CWnd         *hWnd;
     CPortStateUI  ctl;
-    usb_handle * usb;
-    int usb_sn;
-} ;
+    CWinThread   *work;
+    flash_image  *img;
+    usb_handle   *usb;
+    int           usb_sn;
+    int           stat;
+} UsbWorkData;
 
 #define THREADPOOL_SIZE	4
 static const int PORT_NUM = 4;
@@ -93,6 +102,7 @@ public:
   BOOL AdbUsbHandler(BOOL update_device);
   BOOL SetPortDialogs(UINT nType, int x, int y, int w, int h);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
+  afx_msg void OnTimer(UINT_PTR nIDEvent);
 	void SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 	afx_msg void OnBnClickedBtnBrowse();
 	afx_msg void OnBnClickedStart();
@@ -103,10 +113,14 @@ public:
 
 private:
     BOOL InitUsbWorkData(void);
-    UsbWorkData * GetUsbWorkData(usb_handle* handle);
+    UsbWorkData * GetUsbWorkData(long usb_sn );
+    UsbWorkData * FindUsbWorkData(long usb_sn);
+    BOOL SetUsbWorkData(UsbWorkData *data, usb_handle * usb);
     BOOL CleanUsbWorkData(UsbWorkData *data);
     BOOL SwitchUsbWorkData(UsbWorkData *data);
+    BOOL FinishUsbWorkData(UsbWorkData *data);
     BOOL IsHaveUsbWork(void);
+    UINT UsbWorkStat(UsbWorkData *data);
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
     BOOL InitSettingConfig(void);
 public:
