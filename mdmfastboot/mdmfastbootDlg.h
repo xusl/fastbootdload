@@ -73,7 +73,8 @@ protected:
 	HICON m_hIcon;
   BOOL m_bInit;
   volatile BOOL m_bWork;
-  BOOL  m_schedule_remove;
+  BOOL m_schedule_remove;
+  BOOL m_flashdirect;
   int m_nPort;
   int m_nPortRow;
   int switch_timeout;

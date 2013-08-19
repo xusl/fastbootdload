@@ -367,6 +367,7 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   switch_timeout = GetPrivateProfileInt(L"app", L"switch_timeout", 300,lpFileName);
   work_timeout = GetPrivateProfileInt(L"app", L"work_timeout",600,lpFileName);
 
+  m_flashdirect = GetPrivateProfileInt(L"app", L"flashdirect",1,lpFileName);
 
   m_nPort = GetPrivateProfileInt(L"app", L"port_num",1,lpFileName);
   m_nPortRow = GetPrivateProfileInt(L"app", L"port_row",1,lpFileName);
@@ -843,7 +844,7 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
   }
 
   if (update_device)
-    find_devices();
+    find_devices(m_flashdirect);
 
   for (handle = usb_handle_enum_init();
        handle != NULL ;

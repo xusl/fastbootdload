@@ -434,7 +434,7 @@ int known_device(const wchar_t* dev_name) {
 }
 
 
-int register_new_device(usb_handle* handle) {
+int register_new_device(usb_handle* handle, BOOL flashdirect) {
   int ret = 0;
   int protocol;
 
@@ -464,9 +464,12 @@ int register_new_device(usb_handle* handle) {
   } else if (protocol == ADB_PROTOCOL) {
     handle->status = DEVICE_CHECK;
   } else if (protocol == FB_PROTOCOL) {
+   if (flashdirect) {
+    handle->status = DEVICE_FLASH;
+    } else {
     ERROR("We do not permit fastboot as the first device status!");
     goto register_new_device_out;
-    //handle->status = DEVICE_FLASH;
+    }
   }
 
   // Not in the list. Add this handle to the list.
@@ -844,7 +847,7 @@ int recognized_device(usb_handle* handle) {
   return 0;
 }
 
-void find_devices() {
+void find_devices(BOOL flashdirect) {
   usb_handle* handle = NULL;
   char entry_buffer[2048];
   AdbInterfaceInfo* next_interface = (AdbInterfaceInfo*)(&entry_buffer[0]);
@@ -873,7 +876,7 @@ void find_devices() {
                                 &serial_number_len,
                                 true)) {
             // Lets make sure that we don't duplicate this device
-            if (register_new_device(handle)) {
+            if (register_new_device(handle, flashdirect)) {
          //    AfxBeginThread(run, (void*)handle);
             } else {
               DEBUG("register_new_device failed for %s\n", next_interface->device_name);
