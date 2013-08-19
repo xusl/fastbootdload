@@ -36,10 +36,10 @@ enum
 class CmdmfastbootDlg;
 
 typedef struct UsbWorkData{
-    CWnd         *hWnd;
+    CmdmfastbootDlg         *hWnd;
     CPortStateUI  ctl;
     CWinThread   *work;
-    flash_image  *img;
+    //flash_image  *img;
     usb_handle   *usb;
     int           usb_sn;
     int           stat;
@@ -77,6 +77,8 @@ protected:
   CString m_ConfigPath;
   flash_image *m_image;
   UsbWorkData m_workdata[PORT_NUM];
+  CListCtrl  *m_imglist;
+  CListCtrl  *m_port;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -112,6 +114,11 @@ public:
 	afx_msg void OnDestroy();
 
 private:
+    BOOL UpdatePackageInfo(void);
+    static UINT usb_work(LPVOID wParam);
+    static UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command);
+    static UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCHAR msg);
+
     BOOL InitUsbWorkData(void);
     UsbWorkData * GetUsbWorkData(long usb_sn );
     UsbWorkData * FindUsbWorkData(long usb_sn);

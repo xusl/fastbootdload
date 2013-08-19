@@ -43,19 +43,21 @@
 #define PKG_PATH_SECTION        L"path"
 #define PKG_PATH_KEY            L"package"
 
-typedef struct Image {
-    struct Image *next;
-    char *partition;
+typedef struct FlashImageInfo {
+    struct FlashImageInfo *next;
+    wchar_t *partition;
     wchar_t *lpath;
     void *data;
     unsigned size;
-}Image;
+}FlashImageInfo;
 
 class flash_image{
   public:
     flash_image(const wchar_t* config_file);
     ~flash_image();
-    int get_partition_info(char *partition, void **ppdata, unsigned *psize);
+    int get_partition_info(wchar_t *partition, void **ppdata, unsigned *psize);
+    const FlashImageInfo* image_enum_init (void) ;
+    const FlashImageInfo* image_enum_next (const FlashImageInfo* img);
     const wchar_t * get_package_dir(void);
     BOOL set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL reset=FALSE);
     BOOL get_pkg_a5sw_sys_ver(CString &version);
@@ -63,6 +65,7 @@ class flash_image{
     BOOL get_pkg_a5sw_kern_ver(CString &version);
     BOOL get_pkg_fw_ver(CString &version);
     BOOL get_pkg_qcn_ver(CString &version);
+    int read_config(const wchar_t* config);
 
   protected:
     virtual int parse_pkg_sw(CString & node, CString & text);
@@ -71,12 +74,12 @@ class flash_image{
   private:
     int add_image(wchar_t *partition, const wchar_t *lpath, BOOL write =FALSE, const wchar_t* config = NULL);
     void read_package_version(const wchar_t * package_conf);
-    int read_config(const wchar_t* config);
+
     BOOL reset(BOOL free_only);
 
   private:
-    Image *image_list;
-    Image *image_last;
+    FlashImageInfo *image_list;
+    FlashImageInfo *image_last;
     wchar_t pkg_dir[MAX_PATH];
     CString a5sw_kern_ver;
     CString a5sw_usr_ver;
@@ -137,6 +140,15 @@ private:
    int _command_send(usb_handle *usb, const char *cmd,
                      const void *data, unsigned size,
                      char *response);
+   static int cb_display(CWnd* hWnd, void* data, Action *a, int status, char *resp);
+   static int cb_do_nothing(CWnd* hWnd, void* data, Action *a, int status, char *resp);
+   static int cb_reject(CWnd* hWnd, void* data, Action *a, int status, char *resp);
+   static int cb_require(CWnd* hWnd, void* data, Action *a, int status, char *resp);
+   static UINT port_progress(CWnd* hWnd,void* data, int process );
+   static UINT port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... );
+   static int cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int invert);
+   static int cb_default(CWnd* hWnd, void* data, Action *a, int status, char *resp);
+   static int match(char *str, const char **value, unsigned count);
 };
 //#ifdef __cplusplus
 //}

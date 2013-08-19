@@ -143,7 +143,6 @@ BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
 
 BOOL CmdmfastbootDlg::InitUsbWorkData(void)
 {
-  //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
   UsbWorkData* workdata;
   int i= 0;
   for (; i < m_nPort; i++) {
@@ -154,7 +153,7 @@ BOOL CmdmfastbootDlg::InitUsbWorkData(void)
     workdata->usb = NULL;
     workdata->usb_sn = ~1L;
     workdata->stat = USB_STAT_IDLE;
-    workdata->img = m_image;
+    //workdata->img = m_image;
     workdata->work = NULL;
   }
   return TRUE;
@@ -287,6 +286,26 @@ UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(long usb_sn) {
   return NULL;
 }
 
+BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
+
+  const FlashImageInfo* img = m_image->image_enum_init();
+int item = 0;
+m_imglist->DeleteAllItems();
+for(;img != NULL; ) {
+m_imglist->InsertItem(item,img->partition);
+m_imglist->SetItemText(item,1,img->lpath);
+item ++;
+img = m_image->image_enum_next(img);
+}
+
+ m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
+  m_image->get_pkg_qcn_ver(m_QCNVer);
+  m_image->get_pkg_fw_ver(m_FwVer);
+
+
+  UpdateData(FALSE);
+  return TRUE;
+}
 
 BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
   if(!bforce && m_bWork == bwork) {
@@ -378,6 +397,8 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   SetIcon(m_hIcon, FALSE);		// 设置小图标
 
   InitUsbWorkData();
+  SetUpAdbDevice(NULL, 0);
+
   m_bInit = TRUE;
   ShowWindow(SW_MAXIMIZE);
 
@@ -391,19 +412,26 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   }
   //init thread pool end.
 
+  m_port = ((CListCtrl*)GetDlgItem(IDC_LIST_PORT));
+
+  m_port->InsertColumn(0, _T("Composite"),LVCFMT_LEFT, 100);
+  m_port->InsertColumn(1, _T("Adb"), LVCFMT_LEFT, 100);
+  build_port_map(m_port);
+
+
+m_imglist = ((CListCtrl*)GetDlgItem(IDC_IMAGE_LIST));
+m_imglist->InsertColumn(0, _T("Partition"),LVCFMT_LEFT, 50);
+m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 600);
+
   //GetDlgItem(IDC_EDIT_PACKAGE_PATH)->SetWindowText(m_image->get_package_dir());
   m_PackagePath = m_image->get_package_dir();
-  m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
-  m_image->get_pkg_qcn_ver(m_QCNVer);
-  m_image->get_pkg_fw_ver(m_FwVer);
-
-  UpdateData(FALSE);
+  UpdatePackageInfo();
 
   //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
   RegisterAdbDeviceNotification();
   SetWorkStatus(m_bWork, TRUE);
   adb_usb_init();
-  SetUpAdbDevice(NULL, 0);
+  //SetUpAdbDevice(NULL, 0);
   AdbUsbHandler(true);
 
   return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
@@ -609,7 +637,7 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
 }
 
 
-UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCHAR msg) {
+UINT CmdmfastbootDlg::ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCHAR msg) {
   UIInfo* info = new UIInfo();
 
   info->infoType = info_type;
@@ -620,7 +648,7 @@ UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCHAR msg) {
   return 0;
 }
 
-UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command)
+UINT CmdmfastbootDlg::do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command)
 {
   PCHAR resp = NULL;
   int  resp_len;
@@ -635,7 +663,7 @@ UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command)
   return 0;
 }
 
-UINT usb_work(LPVOID wParam) {
+UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
   UsbWorkData* data = (UsbWorkData*)wParam;
   usb_handle * handle;
 
@@ -739,16 +767,16 @@ UINT usb_work(LPVOID wParam) {
     fb.fb_queue_display("version","version");
     fb.fb_queue_display("serialno","serialno");
     fb.fb_queue_display("kernel","kernel");
-    img = data->img;
+    img = data->hWnd->m_image;//data->img;
     if (img == NULL ){
         ERROR("FLASH image in null.");
         return -1;
         }
 
-    if(0 == img->get_partition_info("boot", &img_data, &size))
+    if(0 == img->get_partition_info(L"boot", &img_data, &size))
       fb.fb_queue_flash("boot", img_data, size);
 
-    if(0 == img->get_partition_info("system", &img_data, &size))
+    if(0 == img->get_partition_info(L"system", &img_data, &size))
       fb.fb_queue_flash("system", img_data, size);
     //  fb.fb_queue_reboot();
     fb.fb_execute_queue(handle,data->hWnd, data);
@@ -940,23 +968,33 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
   if (m_bInit) {
     RECT rect;
     GetDlgItem(IDC_BTN_STOP)->GetClientRect(&rect);
-    GetDlgItem(IDC_BTN_STOP)->SetWindowPos(0, (cx + 200) /2, cy - 50, rect.right, rect.bottom, 0);
+    GetDlgItem(IDC_BTN_STOP)->SetWindowPos(0, (cx + 800) /2, cy - 60, rect.right, rect.bottom, 0);
 
     GetDlgItem(IDCANCEL)->GetClientRect(&rect);
-    GetDlgItem(IDCANCEL)->SetWindowPos(0, (cx + 400 ) /2, cy - 50, rect.right, rect.bottom, 0);
+    GetDlgItem(IDCANCEL)->SetWindowPos(0, (cx + 1000 ) /2, cy - 60, rect.right, rect.bottom, 0);
 
      GetDlgItem(IDC_BTN_START)->GetClientRect(&rect);
-    GetDlgItem(IDC_BTN_START)->SetWindowPos(0, (cx - 200) /2, cy - 50, rect.right, rect.bottom, 0);
-
+    GetDlgItem(IDC_BTN_START)->SetWindowPos(0, (cx + 500) /2, cy - 60, rect.right, rect.bottom, 0);
 
      GetDlgItem(IDC_SETTING)->GetClientRect(&rect);
-    GetDlgItem(IDC_SETTING)->SetWindowPos(0, (cx - 400) /2, cy - 50, rect.right, rect.bottom, 0);
+    GetDlgItem(IDC_SETTING)->SetWindowPos(0, (cx +300) /2, cy - 60, rect.right, rect.bottom, 0);
+
+     GetDlgItem(IDC_BTN_BROWSE)->GetClientRect(&rect);
+    GetDlgItem(IDC_BTN_BROWSE)->SetWindowPos(0, (cx ) /2, cy - 60, rect.right, rect.bottom, 0);
+
+     GetDlgItem(IDC_EDIT_PACKAGE_PATH)->GetClientRect(&rect);
+    GetDlgItem(IDC_EDIT_PACKAGE_PATH)->SetWindowPos(0, 100, cy - 60, rect.right, rect.bottom, 0);
+
+
+     GetDlgItem(IDC_STATIC_PKG)->GetClientRect(&rect);
+    GetDlgItem(IDC_STATIC_PKG)->SetWindowPos(0, 20, cy - 60, rect.right, rect.bottom, 0);
+
 
     GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
-    dx = /*rect.left  + */ 10;
-    dy = rect.bottom + 20;
-    dw = cx - dx  - 20;
-    dh = cy -dy - 50 - 20;
+    dx = rect.right  +  10;
+    dy = /*rect.bottom +*/ 6;
+    dw = cx - dx  - 10;
+    dh = cy -dy - 20 -50;
     SetPortDialogs(nType, dx, dy, dw, dh);
   }
   Invalidate(TRUE);
@@ -995,6 +1033,7 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
   BROWSEINFO bi;
 
   ZeroMemory(&bi,sizeof(BROWSEINFO));
+  //bi.pidlRoot = SHParsePidlFromPath("E:\\");
   bi.hwndOwner=GetSafeHwnd();
   bi.pszDisplayName= m_PackagePath.GetBuffer(MAX_PATH);
   bi.lpszTitle=L"Select Package folder";
@@ -1009,11 +1048,21 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
   if(m_PackagePath[m_PackagePath.GetLength()-1]!=L'\\')
     m_PackagePath+=L'\\';
 
-  m_image->set_package_dir(m_PackagePath.GetString(), m_ConfigPath.GetString(), TRUE);
-  m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
-  m_image->get_pkg_qcn_ver(m_QCNVer);
-  m_image->get_pkg_fw_ver(m_FwVer);
-  UpdateData(FALSE);
+  LPMALLOC pMalloc;
+  if(SUCCEEDED(SHGetMalloc(&pMalloc)))
+  {
+       pMalloc->Free(idl);
+       pMalloc->Release();
+  }
+
+    m_image->set_package_dir(m_PackagePath.GetBuffer(MAX_PATH),
+    m_ConfigPath.GetBuffer(MAX_PATH));
+
+    delete m_image;
+    m_image =  new flash_image(m_ConfigPath.GetString());
+
+UpdatePackageInfo();
+
 }
 
 void CmdmfastbootDlg::OnBnClickedStart()

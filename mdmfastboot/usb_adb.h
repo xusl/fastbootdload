@@ -68,6 +68,7 @@ long usb_host_sn(const wchar_t* dev_name, wchar_t** psn = NULL);
 long get_adb_composite_device_sn(long adb_sn);
 int add_adb_device(wchar_t *ccgp, wchar_t *parentId);
 void dump_adb_device(void);
+void build_port_map(CListCtrl *  port_list) ;
 
 const wchar_t *usb_name(usb_handle* handle);
 usb_dev_t usb_status(usb_handle* handle);

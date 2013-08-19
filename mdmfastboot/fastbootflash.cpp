@@ -157,16 +157,17 @@ int flash_image::read_config(const wchar_t* config) {
 
 int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write, const wchar_t* config)
 {
-  Image* img = NULL;
+  FlashImageInfo* img = NULL;
 
   if (partition == NULL || lpath == NULL) {
     ERROR("Bad parameter");
     return -1;
   }
 
-  img = (Image *)calloc(1, sizeof(Image));
+ // img = (FlashImageInfo *)calloc(1, sizeof(FlashImageInfo));
+  img = (FlashImageInfo *)malloc(sizeof(FlashImageInfo));
   if (img == NULL) ERROR("out of memory");
-
+  memset(img, 0, sizeof(FlashImageInfo));
   img->data = load_file(lpath, &img->size);
 
   if (img->data == NULL) {
@@ -175,7 +176,8 @@ int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write
     return -1;
   }
 
-  img->partition = WideStrToMultiStr(partition);
+  img->partition = wcsdup(partition);//WideStrToMultiStr(partition);
+  img->lpath = wcsdup(lpath);
 
   if (image_last != NULL)
     image_last->next = img;
@@ -216,8 +218,8 @@ BOOL flash_image::set_package_dir(const wchar_t * dir, const wchar_t* config, BO
     return TRUE;
 }
 
-int flash_image::get_partition_info(char *partition, void **ppdata, unsigned *psize) {
-  Image* img;
+int flash_image::get_partition_info(wchar_t *partition, void **ppdata, unsigned *psize) {
+  FlashImageInfo* img;
 
   // ASSERT( ppdata == NULL || psize == NULL );
   if(ppdata == NULL || psize == NULL) {
@@ -226,13 +228,24 @@ int flash_image::get_partition_info(char *partition, void **ppdata, unsigned *ps
   }
 
   for (img = image_list; img; img = img->next) {
-    if (strcmp(partition, img->partition) == 0) {
+    if (wcscmp(partition, img->partition) == 0) {
       *ppdata = img->data;
       *psize = img->size;
       return 0;
     }
   }
   return 1;
+}
+
+const FlashImageInfo* flash_image::image_enum_init (void) {
+    return image_list;
+}
+
+const FlashImageInfo* flash_image::image_enum_next (const FlashImageInfo* img) {
+    if (img == NULL)
+        return NULL;
+
+    return img->next;
 }
 
 void flash_image::read_package_version(const wchar_t * package_conf){
@@ -350,12 +363,12 @@ BOOL flash_image::get_pkg_fw_ver(CString &version) {
 }
 
 BOOL flash_image::reset(BOOL free_only) {
-    Image *img;
+    FlashImageInfo *img;
     for (img = image_list; img; img = image_list) {
       image_list = img->next;
       if (img->partition != NULL) {
-        //free(img->partition);
-        delete img->partition;
+        free(img->partition);
+        //delete img->partition;
         img->partition = NULL;
       }
 
@@ -387,11 +400,7 @@ BOOL flash_image::reset(BOOL free_only) {
 }
 
 
-int cb_default(CWnd* hWnd,  void* data, Action *a, int status, char *resp);
-
-UINT port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... );
-
-int match(char *str, const char **value, unsigned count)
+int fastboot::match(char *str, const char **value, unsigned count)
 {
    // const char *val;
     unsigned n;
@@ -415,7 +424,7 @@ int match(char *str, const char **value, unsigned count)
     return 0;
 }
 
-int cb_default(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_default(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
     if (status) {
         port_text_msg(hWnd, data, "FAILED (%s)\n", resp);
@@ -427,7 +436,7 @@ int cb_default(CWnd* hWnd, void* data, Action *a, int status, char *resp)
     return status;
 }
 
-int cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int invert)
+int fastboot::cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int invert)
 {
     const char **value = (const char **)a->data;
     unsigned count = a->size;
@@ -476,7 +485,7 @@ int cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int inve
     return -1;
 }
 
-UINT port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
+UINT fastboot::port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
 
     va_list ap;
     va_start(ap, fmt);
@@ -498,7 +507,7 @@ UINT port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
 }
 
 
-UINT port_progress(CWnd* hWnd,void* data, int process ) {
+UINT fastboot::port_progress(CWnd* hWnd,void* data, int process ) {
     UIInfo* info = new UIInfo();
 
     info->infoType = PROGRESS_VAL;
@@ -509,23 +518,23 @@ UINT port_progress(CWnd* hWnd,void* data, int process ) {
     return 0;
 }
 
-int cb_require(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_require(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
     return cb_check(hWnd, data, a, status, resp, 0);
 }
 
-int cb_reject(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_reject(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
     return cb_check(hWnd, data, a, status, resp, 1);
 }
 
-int cb_do_nothing(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_do_nothing(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
     fprintf(stderr,"\n");
     return 0;
 }
 
-int cb_display(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_display(CWnd* hWnd, void* data, Action *a, int status, char *resp)
 {
     if (status) {
         port_text_msg(hWnd, data, "%s FAILED (%s)\n", a->cmd, resp);

@@ -154,6 +154,27 @@ adb_device_t* is_adb_device_exist(long cd_sn, long adb_sn) {
   return NULL;
 }
 
+void build_port_map(CListCtrl *  port_list) {
+    int item = 0;
+    adb_device_t* adb;
+    wchar_t  compsite[64];
+    wchar_t  adb_sn[64];
+
+    if (port_list == NULL)
+        return;
+
+    port_list->DeleteAllItems();
+
+  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
+    _snwprintf(compsite,63, _T("0x%X"), adb->cd_sn);
+    _snwprintf(adb_sn, 63,_T("0x%X"), adb->adb_sn);
+    port_list->InsertItem(item,compsite);
+port_list->SetItemText(item++,1,adb_sn);
+
+//        INFO("0x%x (composite)<==> 0x%x(adb)", adb->cd_sn, adb->adb_sn);
+  }
+}
+
 void dump_adb_device(void) {
   adb_device_t* adb;
   INFO("Begin dump host installed adb device driver\n================");
