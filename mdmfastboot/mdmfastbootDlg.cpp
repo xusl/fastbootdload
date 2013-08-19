@@ -188,6 +188,8 @@ BOOL CmdmfastbootDlg::FinishUsbWorkData(UsbWorkData *data) {
   }
   data->stat = USB_STAT_FINISH;
   //data->work = NULL;
+  //KILL work timer.
+  KillTimer(data->usb_sn);
   return TRUE;
 }
 
@@ -197,9 +199,7 @@ BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
     return FALSE;
   }
 
-  if (data->stat = USB_STAT_SWITCH) {
-    KillTimer(data->usb_sn);
-  }
+
 
   data->usb = NULL;
   data->usb_sn = ~1L;
@@ -220,6 +220,7 @@ BOOL CmdmfastbootDlg::SetUsbWorkData(UsbWorkData *data, usb_handle * usb) {
   }
 
   if (data->stat = USB_STAT_SWITCH) {
+    //clear switch timer
     KillTimer(usb_port_address(usb));
   }
 
@@ -231,6 +232,7 @@ BOOL CmdmfastbootDlg::SetUsbWorkData(UsbWorkData *data, usb_handle * usb) {
 
   if (data->work != NULL) {
     data->work->m_bAutoDelete = TRUE;
+    SetTimer(data->usb_sn, work_timeout * 1000, NULL);
   } else {
     CRITICAL("Can not begin thread!(0x%x)", data->usb_sn);
     usb_set_work(usb, FALSE);
@@ -247,8 +249,8 @@ BOOL CmdmfastbootDlg::SwitchUsbWorkData(UsbWorkData *data) {
   data->usb = NULL;
   data->work = NULL;
   data->stat = USB_STAT_SWITCH;
-  /*Set 30 secnods for switch timeout*/
-  SetTimer(data->usb_sn, 300 * 1000, NULL);
+  /*Set switch timeout*/
+  SetTimer(data->usb_sn, switch_timeout * 1000, NULL);
   return TRUE;
 }
 
@@ -357,6 +359,9 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   m_image = new flash_image(lpFileName);
 
   m_schedule_remove = GetPrivateProfileInt(L"app", L"schedule_remove",1,lpFileName);
+
+  switch_timeout = GetPrivateProfileInt(L"app", L"switch_timeout", 300,lpFileName);
+  work_timeout = GetPrivateProfileInt(L"app", L"work_timeout",600,lpFileName);
 
   auto_work = GetPrivateProfileInt(L"app",L"autowork", 0, lpFileName);
   m_bWork = auto_work;
@@ -642,16 +647,26 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 
 /*nIDEvent is the usb sn*/
 void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
-    UsbWorkData * data = FindUsbWorkData(nIDEvent);
-    WARN("PORT %d switch device timeout", nIDEvent);
+  UsbWorkData * data = FindUsbWorkData(nIDEvent);
+  WARN("PORT %d switch device timeout", nIDEvent);
 
-      if (data == NULL) {
-        ERROR("PORT %d switch device timeout", nIDEvent);
-        return ;
-        }
+  if (data == NULL) {
+    ERROR("PORT %d switch device timeout", nIDEvent);
+    return ;
+  }
 
-  remove_switch_device(nIDEvent);
-    CleanUsbWorkData(data);
+  if (data->stat = USB_STAT_SWITCH) {
+    remove_switch_device(nIDEvent);
+
+  } else if (data->stat = USB_STAT_WORKING){
+    if (data->work != NULL)
+      data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
+    usb_close(data->usb);
+  }
+  CleanUsbWorkData(data);
+
+  KillTimer(data->usb_sn);
+
 }
 
 

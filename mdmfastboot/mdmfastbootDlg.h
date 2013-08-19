@@ -30,7 +30,8 @@ enum
   USB_STAT_IDLE,
   USB_STAT_WORKING,
   USB_STAT_SWITCH,
-  USB_STAT_FINISH
+  USB_STAT_FINISH,
+  USB_STAT_ERROR,
 };
 
 class CmdmfastbootDlg;
@@ -74,6 +75,8 @@ protected:
   BOOL  m_schedule_remove;
   int m_nPort;
   int m_nPortRow;
+  int switch_timeout;
+  int work_timeout;
 	CThreadPool<CDlWorker> m_dlWorkerPool;
   CString m_ConfigPath;
   flash_image *m_image;
