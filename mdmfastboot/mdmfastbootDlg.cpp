@@ -206,6 +206,10 @@ BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
   data->stat = USB_STAT_IDLE;
   data->work = NULL;
   data->ctl.Reset();
+
+  INFO("Schedule next work!");
+  AdbUsbHandler(FALSE);
+
   return TRUE;
 }
 
@@ -340,7 +344,6 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   lpFileName = m_ConfigPath.GetString();
 //  m_ConfigPath.GetBuffer(int nMinBufLength)
 
-
   //read configuration for log system and start log.
   data_len = GetPrivateProfileString(L"log",L"file",NULL,log_conf, MAX_PATH,lpFileName);
   if (data_len) log_file = wcsdup(log_conf);
@@ -353,8 +356,7 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
 
   m_image = new flash_image(lpFileName);
 
-  GetPrivateProfileString(L"app",L"adb_usb",NULL,log_conf, MAX_PATH,lpFileName);
-
+  m_schedule_remove = GetPrivateProfileInt(L"app", L"schedule_remove",1,lpFileName);
 
   auto_work = GetPrivateProfileInt(L"app",L"autowork", 0, lpFileName);
   m_bWork = auto_work;
@@ -545,15 +547,19 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
     }
   } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
     if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
-      // dbcc_name:
+
       ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
 
       long sn = usb_host_sn(pDevInf->dbcc_name);
       sn = get_adb_composite_device_sn(sn);
       UsbWorkData * data = FindUsbWorkData(sn);
       UINT stat;
-      if (data == NULL)
+
+      if (data == NULL) {
+        WARN("Can not find usbworkdata for %d, schedule remove is %d", sn, m_schedule_remove);
         return FALSE;
+      }
+
       stat = UsbWorkStat(data);
       if (stat == USB_STAT_WORKING) {
         // the device is plugin off when in working, that is because some accident.
@@ -564,6 +570,11 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         usb_close(data->usb);
         CleanUsbWorkData(data);
       } else if (stat == USB_STAT_FINISH) {
+         if (!m_schedule_remove) {
+            ERROR("We do not set m_schedule_remove, "
+                "but in device remove event we can found usb work data");
+            return TRUE;
+        }
         CleanUsbWorkData(data);
       }
     }
@@ -603,6 +614,13 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
   case FLASH_DONE:
     usb_close(data->usb);
     FinishUsbWorkData(data);
+
+    if (!m_schedule_remove) {
+    // schedule next port now, and when  app receice device remove event,
+    // the current finished port is not in workdata set.
+        sleep(1);
+        CleanUsbWorkData(data);
+    }
     //data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
     break;
 
@@ -632,8 +650,8 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
         return ;
         }
 
-    CleanUsbWorkData(data);
   remove_switch_device(nIDEvent);
+    CleanUsbWorkData(data);
 }
 
 
@@ -1068,7 +1086,7 @@ UpdatePackageInfo();
 void CmdmfastbootDlg::OnBnClickedStart()
 {
   if (SetWorkStatus(TRUE, FALSE)) {
-    AdbUsbHandler(TRUE);
+    AdbUsbHandler(FALSE);
   }
 
   //::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
