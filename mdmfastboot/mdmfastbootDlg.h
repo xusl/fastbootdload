@@ -47,8 +47,9 @@ typedef struct UsbWorkData{
 } UsbWorkData;
 
 #define THREADPOOL_SIZE	4
-static const int PORT_NUM = 9;
-static const int PORT_LAYOUT_ROW = 3;
+static const int PORT_NUM_MAX = 9;
+//static const int PORT_NUM = 1;
+//static const int PORT_LAYOUT_ROW = 1;
 static const int PARTITION_NAME_LEN = 32;
 
 // CmdmfastbootDlg ¶Ô»°¿ò
@@ -80,7 +81,7 @@ protected:
 	CThreadPool<CDlWorker> m_dlWorkerPool;
   CString m_ConfigPath;
   flash_image *m_image;
-  UsbWorkData m_workdata[PORT_NUM];
+  UsbWorkData m_workdata[PORT_NUM_MAX];
   CListCtrl  *m_imglist;
   CListCtrl  *m_port;
 

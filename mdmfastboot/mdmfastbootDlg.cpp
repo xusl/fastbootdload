@@ -67,8 +67,6 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 {
   m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
   m_bInit = FALSE;
-  m_nPort = PORT_NUM;
-  m_nPortRow = PORT_LAYOUT_ROW;
   InitSettingConfig();
 }
 
@@ -123,12 +121,19 @@ BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
 
   R_NUM = m_nPortRow;
   C_NUM = m_nPort / R_NUM;
+
+  if (R_NUM * C_NUM < m_nPort) {
+    R_NUM > C_NUM ? C_NUM ++ :  R_NUM++;
+  }
+
   pw = w / C_NUM;
   ph = h / R_NUM;
 
   for (r = 0; r < R_NUM; r++) {
     for (c = 0; c < C_NUM; c++) {
-      port = &m_workdata[r * C_NUM + c].ctl;
+      if (r * C_NUM + c >= m_nPort) break;
+
+      port = &(m_workdata + r * C_NUM + c)->ctl;
       port->SetWindowPos(0,
                          x + c * pw,
                          y + r * ph,
@@ -263,13 +268,13 @@ UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn) {
   // first search the before, for switch device.
   for (; i < m_nPort; i++) {
     //if (m_workdata[i].usb_sn == usb_sn && m_workdata[i].usb == NULL)
-    if (m_workdata[i].stat == USB_STAT_SWITCH && m_workdata[i].usb_sn == usb_sn)
+    if ((m_workdata +i)->stat == USB_STAT_SWITCH && (m_workdata + i)->usb_sn == usb_sn)
       return m_workdata + i;
   }
 
   for (i=0; i < m_nPort; i++) {
     //if (m_workdata[i].usb_sn == ~1L && m_workdata[i].usb == NULL)
-    if (m_workdata[i].stat == USB_STAT_IDLE)
+    if ((m_workdata + i)->stat == USB_STAT_IDLE)
       return m_workdata + i;
   }
 
@@ -285,7 +290,7 @@ UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(long usb_sn) {
 
   // first search the before, for switch device.
   for (; i < m_nPort; i++) {
-    if (m_workdata[i].usb_sn == usb_sn)
+    if ((m_workdata+i)->usb_sn == usb_sn)
       return m_workdata + i;
   }
 
@@ -359,9 +364,15 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   m_image = new flash_image(lpFileName);
 
   m_schedule_remove = GetPrivateProfileInt(L"app", L"schedule_remove",1,lpFileName);
-
   switch_timeout = GetPrivateProfileInt(L"app", L"switch_timeout", 300,lpFileName);
   work_timeout = GetPrivateProfileInt(L"app", L"work_timeout",600,lpFileName);
+
+
+  m_nPort = GetPrivateProfileInt(L"app", L"port_num",1,lpFileName);
+  m_nPortRow = GetPrivateProfileInt(L"app", L"port_row",1,lpFileName);
+
+  m_nPort = m_nPort > PORT_NUM_MAX ?  PORT_NUM_MAX : m_nPort;
+  m_nPortRow = m_nPortRow > m_nPort ? m_nPort :  m_nPortRow;
 
   auto_work = GetPrivateProfileInt(L"app",L"autowork", 0, lpFileName);
   m_bWork = auto_work;
