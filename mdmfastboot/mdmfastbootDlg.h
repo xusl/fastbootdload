@@ -37,20 +37,19 @@ enum
 class CmdmfastbootDlg;
 
 typedef struct UsbWorkData{
-    CmdmfastbootDlg         *hWnd;
-    CPortStateUI  ctl;
-    CWinThread   *work;
+    CmdmfastbootDlg  *hWnd;
+    CPortStateUI      ctl;
+    CWinThread       *work;
     //flash_image  *img;
-    usb_handle   *usb;
-    int           usb_sn;
-    int           stat;
+    usb_handle       *usb;
+    int              usb_sn;
+    int              stat;
+    FlashImageInfo const *  flash_partition[PARTITION_NUM_MAX];
 } UsbWorkData;
 
 #define THREADPOOL_SIZE	4
 static const int PORT_NUM_MAX = 9;
-//static const int PORT_NUM = 1;
-//static const int PORT_LAYOUT_ROW = 1;
-static const int PARTITION_NAME_LEN = 32;
+
 
 // CmdmfastbootDlg ¶Ô»°¿ò
 class CmdmfastbootDlg : public CDialog
@@ -109,22 +108,28 @@ public:
 	BOOL RegisterAdbDeviceNotification(void);
   BOOL AdbUsbHandler(BOOL update_device);
   BOOL SetPortDialogs(UINT nType, int x, int y, int w, int h);
+  BOOL UpdatePackageInfo(void);
+	void SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
   afx_msg void OnTimer(UINT_PTR nIDEvent);
-	void SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 	afx_msg void OnBnClickedBtnBrowse();
 	afx_msg void OnBnClickedStart();
 	afx_msg void OnBnClickedButtonStop();
 	afx_msg void OnBnClickedCancel();
+  afx_msg void OnBnClickedSetting();
 	afx_msg void OnClose();
 	afx_msg void OnDestroy();
 
 private:
-    BOOL UpdatePackageInfo(void);
     static UINT usb_work(LPVOID wParam);
-    static UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command);
-    static UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCHAR msg);
+    static UINT adb_hw_check(adbhost& adb, UsbWorkData* data);
+    static UINT adb_sw_version_cmp(adbhost& adb, UsbWorkData* data);
+    static UINT sw_version_parse(UsbWorkData* data,PCCH key, PCCH value);
+    static UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH command,
+                                UI_INFO_TYPE info = UI_DEFAULT);
+    static UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg);
 
+private:
     BOOL InitUsbWorkData(void);
     UsbWorkData * GetUsbWorkData(long usb_sn );
     UsbWorkData * FindUsbWorkData(long usb_sn);
@@ -132,10 +137,9 @@ private:
     BOOL CleanUsbWorkData(UsbWorkData *data);
     BOOL SwitchUsbWorkData(UsbWorkData *data);
     BOOL FinishUsbWorkData(UsbWorkData *data);
+    BOOL AbortUsbWorkData(UsbWorkData *data);
     BOOL IsHaveUsbWork(void);
     UINT UsbWorkStat(UsbWorkData *data);
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
     BOOL InitSettingConfig(void);
-public:
-	afx_msg void OnBnClickedSetting();
 	};

@@ -179,7 +179,8 @@ void get_my_path(char *s, size_t maxLen);
 CString GetAppPath(CString & sPath );
 void sleep(int seconds);
 long now(void);
-PCHAR WideStrToMultiStr(PWCHAR WideStr);
+ PWCH MultiStrToWideStr(PCCH pc);
+PCHAR WideStrToMultiStr(PCWCH WideStr);
 
 
 /* normally provided by <cutils/misc.h> */

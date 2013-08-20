@@ -57,6 +57,7 @@ struct usb_handle {
   usb_dev_t status;
   bool work;
   long usb_sn;
+  long dummy_sn;
 
   /// Mask for determining when to use zero length packets
   unsigned zero_mask;
@@ -778,6 +779,11 @@ long usb_port_address(usb_handle* handle) {
   return handle->usb_sn;
 }
 
+
+long usb_port_dummy_sn(usb_handle* handle) {
+  return handle->dummy_sn;
+}
+
 usb_dev_t usb_status(usb_handle* handle) {
      if (NULL == handle) {
         return DEVICE_UNKNOW;
@@ -794,6 +800,7 @@ int recognized_device(usb_handle* handle) {
 
   long sn = usb_host_sn(handle->interface_name, NULL);
   if (sn != 0) {
+    handle->dummy_sn = sn;
     handle->usb_sn = get_adb_composite_device_sn(sn);
     //DEBUG("%S serial number %x", interface_name, sn);
   }  else {

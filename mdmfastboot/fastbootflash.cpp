@@ -75,10 +75,14 @@ flash_image::flash_image(const wchar_t* config):
     }
     pkg_dir[data_len] = L'\\';
     pkg_dir[data_len + 1] = L'\0';
+    data_len++;
     }
 
+  wcsncpy(pkg_conf_file, pkg_dir, data_len+1);
+  wcsncat(pkg_conf_file, PKG_CONFIG_XML, sizeof(pkg_conf_file) / sizeof(pkg_conf_file[0]) - data_len);
+
   read_config(config);
-  read_package_version(PKG_CONFIG_XML);
+  read_package_version(pkg_conf_file);
 }
 
 flash_image::~flash_image() {
@@ -86,7 +90,7 @@ flash_image::~flash_image() {
 }
 
 int flash_image::read_config(const wchar_t* config) {
-  wchar_t partition_tbl[PARTITION_NAME_LEN * 32] = {0};
+  wchar_t partition_tbl[PARTITION_TBL_LEN] = {0};
   wchar_t filename[MAX_PATH];
   wchar_t *partition;
   size_t partition_len;
@@ -102,7 +106,7 @@ int flash_image::read_config(const wchar_t* config) {
                                      NULL,
                                      NULL,
                                      partition_tbl,
-                                     PARTITION_NAME_LEN * 32,
+                                     PARTITION_TBL_LEN,
                                      config);
 
   if (data_len == 0) {
@@ -164,10 +168,10 @@ int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write
     return -1;
   }
 
- // img = (FlashImageInfo *)calloc(1, sizeof(FlashImageInfo));
-  img = (FlashImageInfo *)malloc(sizeof(FlashImageInfo));
+  img = (FlashImageInfo *)calloc(1, sizeof(FlashImageInfo));
+  //img = (FlashImageInfo *)malloc(sizeof(FlashImageInfo));
   if (img == NULL) ERROR("out of memory");
-  memset(img, 0, sizeof(FlashImageInfo));
+  //memset(img, 0, sizeof(FlashImageInfo));
   img->data = load_file(lpath, &img->size);
 
   if (img->data == NULL) {
@@ -176,7 +180,8 @@ int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write
     return -1;
   }
 
-  img->partition = wcsdup(partition);//WideStrToMultiStr(partition);
+  img->partition = wcsdup(partition);
+  img->partition_str = WideStrToMultiStr(partition);
   img->lpath = wcsdup(lpath);
 
   if (image_last != NULL)
@@ -199,42 +204,52 @@ const wchar_t * flash_image::get_package_dir(void) {
     return pkg_dir;
 }
 
+const wchar_t * flash_image::get_package_config(void) {
+    return pkg_conf_file;
+}
+
 BOOL flash_image::set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL release) {
     if(dir == NULL) {
         ERROR("Bad Parameter.");
         return FALSE;
     }
+
+    if (wcscmp(dir, pkg_dir) == 0) {
+        INFO("Package directory is not changed.");
+        return FALSE;
+    }
+
     wcscpy(pkg_dir, dir);
 
     if (config != NULL)
     WritePrivateProfileString(PKG_PATH_SECTION, PKG_PATH_KEY, dir ,config);
 
+#if 0
     if(release) {
         reset(FALSE);
         read_config(config);
         read_package_version(PKG_CONFIG_XML);
     }
+#endif
 
     return TRUE;
 }
 
-int flash_image::get_partition_info(wchar_t *partition, void **ppdata, unsigned *psize) {
+const FlashImageInfo* flash_image::get_partition_info(wchar_t *partition, void **ppdata, unsigned *psize) {
   FlashImageInfo* img;
 
   // ASSERT( ppdata == NULL || psize == NULL );
-  if(ppdata == NULL || psize == NULL) {
-    ERROR("Bad parameter");
-    return -1;
-  }
 
   for (img = image_list; img; img = img->next) {
     if (wcscmp(partition, img->partition) == 0) {
-      *ppdata = img->data;
-      *psize = img->size;
-      return 0;
+      if(ppdata != NULL)
+        *ppdata = img->data;
+      if(psize != NULL)
+        *psize = img->size;
+      return img;
     }
   }
-  return 1;
+  return NULL;
 }
 
 const FlashImageInfo* flash_image::image_enum_init (void) {
@@ -256,16 +271,13 @@ void flash_image::read_package_version(const wchar_t * package_conf){
   VARIANT_BOOL bFlag;
   long lCount;
   HRESULT hr;
-  CString conf(pkg_dir);
-
 
   ::CoInitialize(NULL);
-  conf += package_conf;
   hr = spDoc.CoCreateInstance(__uuidof(MSXML::DOMDocument));    //创建文档对象
-  hr = spDoc->load(CComVariant(conf.GetString()), &bFlag);       //load xml文件
+  hr = spDoc->load(CComVariant(package_conf), &bFlag);       //load xml文件
   hr = spDoc->get_documentElement(&spElement);   //获取根结点
   if (spElement == NULL) {
-    ERROR("No %S exist", conf.GetString());
+    ERROR("No %S exist", package_conf);
     return;
     }
   hr = spElement->get_tagName(&strTagName);
@@ -368,8 +380,12 @@ BOOL flash_image::reset(BOOL free_only) {
       image_list = img->next;
       if (img->partition != NULL) {
         free(img->partition);
-        //delete img->partition;
         img->partition = NULL;
+      }
+
+      if (img->partition_str != NULL) {
+        delete img->partition_str;
+        img->partition_str = NULL;
       }
 
       if (img->lpath != NULL) {
@@ -389,11 +405,11 @@ BOOL flash_image::reset(BOOL free_only) {
     image_list = NULL;
 
     if (!free_only) {
-        a5sw_kern_ver=("Unknown"),
-  a5sw_sys_ver=("Unknown"),
-  a5sw_usr_ver=("Unknown"),
-  fw_ver=("Unknown"),
-  qcn_ver=("Unknown");
+      a5sw_kern_ver=("Unknown"),
+      a5sw_sys_ver=("Unknown"),
+      a5sw_usr_ver=("Unknown"),
+      fw_ver=("Unknown"),
+      qcn_ver=("Unknown");
     }
 
 	return TRUE;

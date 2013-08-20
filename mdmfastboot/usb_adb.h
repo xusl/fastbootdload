@@ -64,6 +64,7 @@ usb_handle* usb_handle_next(usb_handle* usb);
 void usb_set_work(usb_handle* usb, BOOL bwork);
 /*get host sn from us_handle*/
 long usb_port_address(usb_handle* handle);
+long usb_port_dummy_sn(usb_handle* handle);
 long usb_host_sn(const wchar_t* dev_name, wchar_t** psn = NULL);
 long get_adb_composite_device_sn(long adb_sn);
 int add_adb_device(wchar_t *ccgp, wchar_t *parentId);

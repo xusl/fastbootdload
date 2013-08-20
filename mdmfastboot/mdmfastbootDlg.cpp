@@ -160,6 +160,7 @@ BOOL CmdmfastbootDlg::InitUsbWorkData(void)
     workdata->stat = USB_STAT_IDLE;
     //workdata->img = m_image;
     workdata->work = NULL;
+    ZeroMemory(workdata->flash_partition, sizeof(workdata->flash_partition));
   }
   return TRUE;
 }
@@ -198,19 +199,28 @@ BOOL CmdmfastbootDlg::FinishUsbWorkData(UsbWorkData *data) {
   return TRUE;
 }
 
+BOOL CmdmfastbootDlg::AbortUsbWorkData(UsbWorkData *data) {
+  if (data == NULL) {
+    ERROR("Invalid parameter");
+    return FALSE;
+  }
+  data->stat = USB_STAT_ERROR;
+  KillTimer(data->usb_sn);
+  return TRUE;
+}
+
 BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
   if (data == NULL) {
     ERROR("Invalid parameter");
     return FALSE;
   }
 
-
-
   data->usb = NULL;
   data->usb_sn = ~1L;
   data->stat = USB_STAT_IDLE;
   data->work = NULL;
   data->ctl.Reset();
+  ZeroMemory(data->flash_partition, sizeof(data->flash_partition));
 
   INFO("Schedule next work!");
   AdbUsbHandler(FALSE);
@@ -298,21 +308,19 @@ UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(long usb_sn) {
 }
 
 BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
-
   const FlashImageInfo* img = m_image->image_enum_init();
-int item = 0;
-m_imglist->DeleteAllItems();
-for(;img != NULL; ) {
-m_imglist->InsertItem(item,img->partition);
-m_imglist->SetItemText(item,1,img->lpath);
-item ++;
-img = m_image->image_enum_next(img);
-}
+  int item = 0;
+  m_imglist->DeleteAllItems();
+  for(;img != NULL; ) {
+    m_imglist->InsertItem(item,img->partition);
+    m_imglist->SetItemText(item,1,img->lpath);
+    item ++;
+    img = m_image->image_enum_next(img);
+  }
 
- m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
+  m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
   m_image->get_pkg_qcn_ver(m_QCNVer);
   m_image->get_pkg_fw_ver(m_FwVer);
-
 
   UpdateData(FALSE);
   return TRUE;
@@ -585,15 +593,19 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         if (data->work != NULL)
             data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
         usb_close(data->usb);
-        CleanUsbWorkData(data);
       } else if (stat == USB_STAT_FINISH) {
          if (!m_schedule_remove) {
             ERROR("We do not set m_schedule_remove, "
                 "but in device remove event we can found usb work data");
             return TRUE;
         }
-        CleanUsbWorkData(data);
+      } else if (stat == USB_STAT_ERROR) {
+        usb_close(data->usb);
+      } else {
+        return TRUE;
       }
+
+        CleanUsbWorkData(data);
     }
   }
 
@@ -618,10 +630,16 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
   }
 
   switch(uiInfo->infoType ) {
+  case ADB_CHK_ABORT:
+    // remove manually, do not schedule next device into this UI port.
+    AbortUsbWorkData(data);
+    data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
+    break;
+
   case REBOOT_DEVICE:
     if (data->usb != NULL) {
-    usb_switch_device(data->usb);
-    usb_close(data->usb);
+        usb_switch_device(data->usb);
+        usb_close(data->usb);
     }
 
     SwitchUsbWorkData(data);
@@ -669,20 +687,18 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
 
   if (data->stat = USB_STAT_SWITCH) {
     remove_switch_device(nIDEvent);
-
   } else if (data->stat = USB_STAT_WORKING){
-    if (data->work != NULL)
+    if (data->work != NULL) //Delete, or ExitInstance
       data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
     usb_close(data->usb);
   }
+
   CleanUsbWorkData(data);
-
   KillTimer(data->usb_sn);
-
 }
 
 
-UINT CmdmfastbootDlg::ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCHAR msg) {
+UINT CmdmfastbootDlg::ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg) {
   UIInfo* info = new UIInfo();
 
   info->infoType = info_type;
@@ -693,47 +709,219 @@ UINT CmdmfastbootDlg::ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCH
   return 0;
 }
 
-UINT CmdmfastbootDlg::do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCHAR command)
+UINT CmdmfastbootDlg::do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH command,
+                                              UI_INFO_TYPE info_type)
 {
   PCHAR resp = NULL;
   int  resp_len;
   int ret;
   ret = adb.shell(command, (void **)&resp, &resp_len);
   if (ret ==0 && resp != NULL) {
-    ui_text_msg(data, PROMPT_TITLE, command);
-    ui_text_msg(data, PROMPT_TEXT, resp);
+    if (UI_DEFAULT == info_type) {
+      ui_text_msg(data, PROMPT_TITLE, command);
+      ui_text_msg(data, PROMPT_TEXT, resp);
+    } else {
+      ui_text_msg(data, info_type, resp);
+    }
     free(resp);
+    return 0;
   }
 
-  return 0;
+  return -1;
+}
+
+#define VERSION_CMP_TEST
+UINT CmdmfastbootDlg::adb_hw_check(adbhost& adb, UsbWorkData* data) {
+  PCHAR resp = NULL;
+  int  resp_len;
+  int ret;
+  ret = adb.shell("hwinfo_check", (void **)&resp, &resp_len);
+  if (ret ==0 && resp != NULL) {
+    ret = strcmp(resp, "match");
+    if (ret == 0) {
+      ui_text_msg(data, PROMPT_TEXT, "hardware is match!");
+    } else {
+      ui_text_msg(data, PROMPT_TITLE, "hwinfo_check return ");
+      ui_text_msg(data, PROMPT_TEXT, resp);
+      WARN("hwinfo_check return \"%s\"", resp);
+    }
+
+    free(resp);
+ #ifdef VERSION_CMP_TEST
+     return 0;
+ #else
+    return ret;
+ #endif
+  } else {
+    return -1;
+  }
+}
+
+UINT CmdmfastbootDlg::adb_sw_version_cmp(adbhost& adb, UsbWorkData* data){
+  PCHAR resp = NULL;
+  int  resp_len;
+  int ret;
+  ret = adb.shell("swinfo_compare", (void **)&resp, &resp_len);
+
+  //test code
+  #ifdef VERSION_CMP_TEST
+  free(resp);
+  resp = strdup("A5:mismatch,Q6:match,QCN:match");
+  #endif
+
+  if (ret ==0 && resp != NULL) {
+    //A5:mismatch,Q6:match,QCN:mismatch
+    // strtok_s OR strtok split string by replcae delimited char into '\0'
+    // so constant string is not applied.
+    char *result, *sub_result, *token, *subtoken;
+    char *context, *sub_context;
+
+    for (result = resp; ; result = NULL) {
+      token = strtok_s(result, ",", &context);
+      if (token == NULL) {
+        ERROR("%s contain none \",\"", result);
+        break;
+      }
+
+      for (sub_result = token; ; sub_result = NULL) {
+        subtoken = strtok_s(sub_result, ":", &sub_context);
+        if (subtoken == NULL) {
+          ERROR("%s contain none \":\"", sub_result);
+        } else {
+          ret+=sw_version_parse(data, sub_result, sub_context);
+        }
+        break;
+      }
+    }
+    // ui_text_msg(data, PROMPT_TITLE, command);
+    //ui_text_msg(data, PROMPT_TEXT, resp);
+    //ret = ret >= 0 ? 0 : ret;
+    free(resp);
+  }
+  return ret;
+
+}
+
+UINT CmdmfastbootDlg::sw_version_parse(UsbWorkData* data,PCCH key, PCCH value) {
+   PWCHAR a5_partition[] = {L"boot", L"system", L"userdata", L"aboot"};
+   PWCHAR q6_partition[] = {L"dsp1", L"dsp2", L"dsp3", L"mibib", L"sbl2", L"rpm"};
+   PWCHAR *partition;
+   int count,i;
+   int index;
+
+   if (stricmp(value, "mismatch")) {
+    ERROR("Not valid value %d", value);
+    return 0;
+   }
+
+  if (stricmp(key , "a5") == 0) {
+    partition = a5_partition;
+    count = sizeof(a5_partition)/ sizeof(a5_partition[0]);
+    ui_text_msg(data, PROMPT_TEXT, "A5 firmware can update");
+  } else if (stricmp(key , "q6") == 0) {
+    partition = q6_partition;
+    count = sizeof(q6_partition)/ sizeof(q6_partition[0]);
+    ui_text_msg(data, PROMPT_TEXT, "Q6 firmware can update.");
+  } else if (stricmp(key , "qcn")) {
+    ui_text_msg(data, PROMPT_TEXT, "QCN can update.");
+    return 1;
+  } else {
+    ERROR("Not valid key %d", key);
+    return 0;
+  }
+
+  for (index = 0;  index < PARTITION_NUM_MAX; index++)
+    if (NULL == data->flash_partition[index])
+      break;
+
+  for (i =0; i < count && index < PARTITION_NUM_MAX; i++) {
+     data->flash_partition[index] =
+    data->hWnd->m_image->get_partition_info(*(partition+i), NULL, NULL);
+     if (data->flash_partition[index] != NULL)
+      index++;
+  }
+
+  return 1;
 }
 
 UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
   UsbWorkData* data = (UsbWorkData*)wParam;
   usb_handle * handle;
+  flash_image  *img;
 
-  if (data == NULL ) {
+  if (data == NULL || data->usb == NULL ||  data->hWnd == NULL ||
+      data->hWnd->m_image == NULL) {
     ERROR("Bad parameter");
     return -1;
   }
 
   handle = data->usb;
-
+  img = data->hWnd->m_image;
+  int result;
   usb_dev_t status = usb_status( handle);
-  PCHAR title = new char[16];
+  PCHAR title = new char[32];
 
-  snprintf(title, 16, "Port %X", data->usb_sn);
+  if (usb_port_dummy_sn(handle) == data->usb_sn)
+  snprintf(title, 32, "Port %X", data->usb_sn);
+  else
+  snprintf(title, 32, "Port %X<=>%X", data->usb_sn, usb_port_dummy_sn(handle));
+
   ui_text_msg(data, TITLE, title);
-  delete title;
+  delete []title;
 
   if (status == DEVICE_CHECK) {
-    UIInfo* info = NULL;
-    PCHAR resp = NULL;
-    int  resp_len;
-    int ret;
     adbhost adb(handle , usb_port_address(handle));
-    //adb.process();
+    const wchar_t *conf_file = img->get_package_config();
+    char *conf_file_char = WideStrToMultiStr(conf_file);
 
+    do_adb_shell_command(adb,data, "cat /proc/version",LINUX_VER);
+    do_adb_shell_command(adb,data, "cat /etc/version",SYSTEM_VER);
+    do_adb_shell_command(adb,data, "cat /usr/version",USERDATA_VER);
+
+    if (INVALID_FILE_ATTRIBUTES != GetFileAttributes(conf_file) &&  conf_file_char != NULL) {
+      adb.sync_push(conf_file_char, "/tmp/config.xml");
+      ui_text_msg(data, PROMPT_TEXT, "Copy config.xml to /tmp/config.xml.");
+      delete conf_file_char;
+
+      result = adb_hw_check(adb,data);
+      if (result != 0) {
+        WARN("hardware check failed.");
+        ui_text_msg(data, ADB_CHK_ABORT, "hardware check failed, abort!");
+        return -1;
+      }
+
+      result = adb_sw_version_cmp(adb,data);
+      if (result < 0) {
+        WARN("firmware version check failed.");
+        ui_text_msg(data, ADB_CHK_ABORT, "firmware version check failed, abort!");
+        return -1;
+      } else if (result ==0) {
+        WARN("firmware version check failed.");
+        ui_text_msg(data, ADB_CHK_ABORT, "firmware version check failed, abort!");
+        return -1;
+      }
+
+      //todo:: update nv ? 1. change offline mode. 2 . write imei
+    } else {
+      if (conf_file_char != NULL) delete conf_file_char;
+      WARN("no config.xml in the package.");
+
+      if (data->hWnd->m_flashdirect) {
+        const FlashImageInfo* imgInfo = img->image_enum_init();
+        int item = 0;
+        ui_text_msg(data, PROMPT_TEXT, "no config.xml, flash all images in package directly!");
+
+        for(;imgInfo != NULL && item < PARTITION_NUM_MAX; item++) {
+          data->flash_partition[item] = imgInfo;
+          imgInfo = img->image_enum_next(imgInfo);
+        }
+      } else {
+        ui_text_msg(data, ADB_CHK_ABORT, "no config.xml in the package,  abort!");
+      }
+      return -1;
+    }
+
+#if 0
     ret = adb.shell("cat /proc/version", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
       ui_text_msg(data, LINUX_VER, resp);
@@ -752,7 +940,6 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
       free(resp);
     }
 
-#if 0
     ret = adb.shell("trace -r", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
       ui_text_msg(data, PROMPT_TITLE, "trace return:");
@@ -767,17 +954,7 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     adb.sync_pull("/usr/ReadMe.txt", "..");
     ui_text_msg(data, PROMPT_TEXT, "Copy devie file /usr/ReadMe.txt  to .");
     sleep(1);
-#endif
 
-    adb.sync_push("config.xml", "/tmp/config.xml");
-    ui_text_msg(data, PROMPT_TEXT, "Copy host file config.xml  to /tmp/config.xml.");
-
-    do_adb_shell_command(adb,data, "trace -r");
-    do_adb_shell_command(adb,data, "hwinfo_check");
-    do_adb_shell_command(adb,data, "swinfo_compare");
-    do_adb_shell_command(adb,data, "backup");
-
-#if 0
     ret = adb.shell("hwinfo_check", (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
       ui_text_msg(data, PROMPT_TITLE, "hwinfo_check return:");
@@ -800,29 +977,36 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     }
 #endif
 
+  do_adb_shell_command(adb,data, "trace -r");
+  do_adb_shell_command(adb,data, "backup");
     adb.reboot_bootloader();
-    ui_text_msg(data, REBOOT_DEVICE, "reboot");
+    ui_text_msg(data, REBOOT_DEVICE, "reboot bootloader");
   } else if (status == DEVICE_FLASH) {
     fastboot fb(handle);
-    unsigned size;
-    void * img_data;
-  flash_image  *img;
+    FlashImageInfo const * image;
 
     fb.fb_queue_display("product","product");
     fb.fb_queue_display("version","version");
     fb.fb_queue_display("serialno","serialno");
     fb.fb_queue_display("kernel","kernel");
-    img = data->hWnd->m_image;//data->img;
-    if (img == NULL ){
-        ERROR("FLASH image in null.");
-        return -1;
-        }
 
+    for (int index = 0; index < PARTITION_NUM_MAX; index++) {
+      image = data->flash_partition[index];
+      if (NULL == image)
+        break;
+      fb.fb_queue_flash(image->partition_str, image->data, image->size);
+    }
+
+#if 0
+    unsigned size;
+    void * img_data;
     if(0 == img->get_partition_info(L"boot", &img_data, &size))
       fb.fb_queue_flash("boot", img_data, size);
 
     if(0 == img->get_partition_info(L"system", &img_data, &size))
       fb.fb_queue_flash("system", img_data, size);
+#endif
+
     //  fb.fb_queue_reboot();
     fb.fb_execute_queue(handle,data->hWnd, data);
 
@@ -1100,20 +1284,23 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
        pMalloc->Release();
   }
 
-    m_image->set_package_dir(m_PackagePath.GetBuffer(MAX_PATH),
-    m_ConfigPath.GetBuffer(MAX_PATH));
+   if( m_image->set_package_dir(m_PackagePath.GetBuffer(MAX_PATH),
+    m_ConfigPath.GetBuffer(MAX_PATH))) {
 
     delete m_image;
     m_image =  new flash_image(m_ConfigPath.GetString());
 
 UpdatePackageInfo();
+    } else {
+    AfxMessageBox(L"Package path is not change!", MB_ICONEXCLAMATION);
+    }
 
 }
 
 void CmdmfastbootDlg::OnBnClickedStart()
 {
   if (SetWorkStatus(TRUE, FALSE)) {
-    AdbUsbHandler(FALSE);
+    AdbUsbHandler(true);
   }
 
   //::PostMessage(m_hWnd, WM_CLOSE, 0, 0);

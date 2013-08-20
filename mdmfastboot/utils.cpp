@@ -232,33 +232,28 @@ void sleep(int seconds)
     Sleep(seconds * 1000);
 }
 
-# if 0
-PWCHAR ANSIToUnicode( PCHAR str )
+ PWCH MultiStrToWideStr(PCCH pc)
 {
- int  unicodeLen = ::MultiByteToWideChar( CP_ACP,
-            0,
-            str.c_str(),
-            -1,
-            NULL,
-            0 );
- wchar_t *  pUnicode;
- pUnicode = new  wchar_t[unicodeLen+1];
- memset(pUnicode,0,(unicodeLen+1)*sizeof(wchar_t));
- ::MultiByteToWideChar( CP_ACP,
-         0,
-         str.c_str(),
-         -1,
-         (LPWSTR)pUnicode,
-         unicodeLen );
- wstring  rt;
- rt = ( wchar_t* )pUnicode;
- delete  pUnicode;
+    ULONG nBytes;
+  	PWCH wcs;
 
- return  rt;
+    nBytes = MultiByteToWideChar(CP_ACP,0,pc, -1, NULL, 0);
+    if (nBytes == 0) return NULL;
+
+    wcs = new WCHAR[nBytes];
+    if(!wcs) return NULL;
+
+    nBytes = MultiByteToWideChar(CP_ACP,0, pc,-1,wcs,nBytes);
+    if (nBytes == 0)
+    {
+        delete [] wcs;
+        return NULL;
+    }
+
+    return wcs;
 }
-#endif
 
-PCHAR WideStrToMultiStr(PWCHAR WideStr)
+PCHAR WideStrToMultiStr(PCWCH WideStr)
 {
     ULONG nBytes;
 	PCHAR MultiStr;

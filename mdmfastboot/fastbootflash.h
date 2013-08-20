@@ -42,10 +42,14 @@
 #define PARTITIONTBL_SECTION    L"partition_table"
 #define PKG_PATH_SECTION        L"path"
 #define PKG_PATH_KEY            L"package"
+static const int PARTITION_NUM_MAX = 32;
+static const int PARTITION_NAME_LEN = 32;
+static const int PARTITION_TBL_LEN = PARTITION_NUM_MAX * PARTITION_NAME_LEN;
 
 typedef struct FlashImageInfo {
     struct FlashImageInfo *next;
     wchar_t *partition;
+    char *partition_str;
     wchar_t *lpath;
     void *data;
     unsigned size;
@@ -55,10 +59,11 @@ class flash_image{
   public:
     flash_image(const wchar_t* config_file);
     ~flash_image();
-    int get_partition_info(wchar_t *partition, void **ppdata, unsigned *psize);
+    const FlashImageInfo* get_partition_info(wchar_t *partition, void **ppdata, unsigned *psize);
     const FlashImageInfo* image_enum_init (void) ;
     const FlashImageInfo* image_enum_next (const FlashImageInfo* img);
     const wchar_t * get_package_dir(void);
+    const wchar_t * get_package_config(void);
     BOOL set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL reset=FALSE);
     BOOL get_pkg_a5sw_sys_ver(CString &version);
     BOOL get_pkg_a5sw_usr_ver(CString &version);
@@ -81,6 +86,7 @@ class flash_image{
     FlashImageInfo *image_list;
     FlashImageInfo *image_last;
     wchar_t pkg_dir[MAX_PATH];
+    wchar_t pkg_conf_file[MAX_PATH];
     CString a5sw_kern_ver;
     CString a5sw_usr_ver;
     CString a5sw_sys_ver;
