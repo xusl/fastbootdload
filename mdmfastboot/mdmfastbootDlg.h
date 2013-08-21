@@ -44,7 +44,9 @@ typedef struct UsbWorkData{
     usb_handle       *usb;
     int              usb_sn;
     int              stat;
-    FlashImageInfo const *  flash_partition[PARTITION_NUM_MAX];
+    FlashImageInfo const * flash_partition[PARTITION_NUM_MAX];
+    short           partition_nr;
+    BOOL            update_qcn;
 } UsbWorkData;
 
 #define THREADPOOL_SIZE	4
@@ -72,18 +74,22 @@ protected:
 	HICON m_hIcon;
   BOOL m_bInit;
   volatile BOOL m_bWork;
+
+  //configuration
   BOOL m_schedule_remove;
   BOOL m_flashdirect;
+  BOOL m_forceupdate; // do not check version, if not exist config.xml or version rule is not match
   int m_nPort;
   int m_nPortRow;
   int switch_timeout;
   int work_timeout;
-	CThreadPool<CDlWorker> m_dlWorkerPool;
+
+	//CThreadPool<CDlWorker> m_dlWorkerPool;
   CString m_ConfigPath;
   flash_image *m_image;
   UsbWorkData m_workdata[PORT_NUM_MAX];
   CListCtrl  *m_imglist;
-  CListCtrl  *m_port;
+  //CListCtrl  *m_port;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -125,8 +131,10 @@ private:
     static UINT adb_hw_check(adbhost& adb, UsbWorkData* data);
     static UINT adb_sw_version_cmp(adbhost& adb, UsbWorkData* data);
     static UINT sw_version_parse(UsbWorkData* data,PCCH key, PCCH value);
-    static UINT do_adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH command,
+    static UINT adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH command,
                                 UI_INFO_TYPE info = UI_DEFAULT);
+    static UINT adb_write_IMEI(adbhost& adb, UsbWorkData* data);
+    static UINT adb_update_NV(adbhost& adb, UsbWorkData* data);
     static UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg);
 
 private:

@@ -61,8 +61,8 @@ flash_image::flash_image(const wchar_t* config):
     return ;
   }
 
-  data_len = GetPrivateProfileString(PKG_PATH_SECTION,
-                                     PKG_PATH_KEY,
+  data_len = GetPrivateProfileString(PKG_SECTION,
+                                     PKG_PATH,
                                      GetAppPath(path).GetString(),
                                      pkg_dir,
                                      MAX_PATH,
@@ -112,16 +112,16 @@ int flash_image::read_config(const wchar_t* config) {
   if (data_len == 0) {
     WARN("no %S exist, load default partition table.", config);
     wchar_t *imgs[] = {
-    L"mibib", L"sbl1.mbn",
-    L"sbl2", L"sbl2.mbn",
-    L"rpm", L"rpm.mbn",
-    L"dsp1", L"dsp1.mbn",
-    L"dsp3", L"dsp3.mbn",
-    L"dsp2", L"dsp2.mbn",
-    L"aboot", L"appsboot.mbn",
-    L"boot", L"boot-oe-msm9615.img",
-    L"system", L"9615-cdp-image-9615-cdp.yaffs2",
-    L"userdata", L"9615-cdp-usr-image.usrfs.yaffs2",
+      L"mibib", L"sbl1.mbn",
+      L"sbl2", L"sbl2.mbn",
+      L"rpm", L"rpm.mbn",
+      L"dsp1", L"dsp1.mbn",
+      L"dsp3", L"dsp3.mbn",
+      L"dsp2", L"dsp2.mbn",
+      L"aboot", L"appsboot.mbn",
+      L"boot", L"boot-oe-msm9615.img",
+      L"system", L"9615-cdp-image-9615-cdp.yaffs2",
+      L"userdata", L"9615-cdp-usr-image.usrfs.yaffs2",
     };
 
     for (int i = 0; i < sizeof(imgs)/ sizeof(imgs[0]); i += 2) {
@@ -222,7 +222,7 @@ BOOL flash_image::set_package_dir(const wchar_t * dir, const wchar_t* config, BO
     wcscpy(pkg_dir, dir);
 
     if (config != NULL)
-    WritePrivateProfileString(PKG_PATH_SECTION, PKG_PATH_KEY, dir ,config);
+    WritePrivateProfileString(PKG_SECTION, PKG_PATH, dir ,config);
 
 #if 0
     if(release) {
@@ -746,7 +746,13 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
             status = fb_command(usb, a->cmd);
             status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
             if (status) break;
-            port_progress(hWnd, data, 100 * flashed_size / total_size );
+
+            if (total_size == 0) {
+              CRITICAL("Error total_size is 0");
+              return;
+            }
+
+            port_progress(hWnd, data, (int) (100.0 * (double) flashed_size / total_size ));
         } else if (a->op == OP_QUERY) {
             status = fb_command_response(usb, a->cmd, resp);
             status = a->func(hWnd, data, a, status, status ? fb_get_error() : resp);

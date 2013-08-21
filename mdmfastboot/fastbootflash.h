@@ -40,8 +40,8 @@
 #define VERSION_STR_LEN 16
 #define PKG_CONFIG_XML          L"config.xml"
 #define PARTITIONTBL_SECTION    L"partition_table"
-#define PKG_PATH_SECTION        L"path"
-#define PKG_PATH_KEY            L"package"
+#define PKG_SECTION             L"package"
+#define PKG_PATH                L"path"
 static const int PARTITION_NUM_MAX = 32;
 static const int PARTITION_NAME_LEN = 32;
 static const int PARTITION_TBL_LEN = PARTITION_NUM_MAX * PARTITION_NAME_LEN;
