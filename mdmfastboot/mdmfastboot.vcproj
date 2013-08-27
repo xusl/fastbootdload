@@ -217,6 +217,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\qcnlib\QcnParser.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\stdafx.cpp"
 				>
 				<FileConfiguration
@@ -280,6 +284,14 @@
 			</File>
 			<File
 				RelativePath=".\mdmfastbootDlg.h"
+				>
+			</File>
+			<File
+				RelativePath=".\qcnlib\memmgr.h"
+				>
+			</File>
+			<File
+				RelativePath=".\qcnlib\QcnParser.h"
 				>
 			</File>
 			<File
