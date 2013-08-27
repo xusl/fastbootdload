@@ -148,7 +148,7 @@ void QcnParser::ExamineBranch(IStorage* spStorage, int indentCount,
 		}
 
 		CString strName = MultiStrToWideStr(nameBuf);
-		if (strName1.Compare(L"NV_ITEM_ARRAY") == 0)
+		if (strName.Compare(L"NV_ITEM_ARRAY") == 0)
 		{			
 			if (binDump)
 			{
@@ -157,7 +157,7 @@ void QcnParser::ExamineBranch(IStorage* spStorage, int indentCount,
 		}	
 
 		//add by jie.li 2012-2-17 for LTE NV>20000
-		if (strName1.Compare(L"Feature_Mask") != 0 && strName1.Compare(L"File_Version") != 0 && !bProvisioning)
+		if (strName.Compare(L"Feature_Mask") != 0 && strName.Compare(L"File_Version") != 0 && !bProvisioning)
 		{
 			//read file name
 			if (bEfsDir)
