@@ -11,8 +11,6 @@
 #include "usb_vendors.h"
 #include "devguid.h"
 
-
-
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -98,6 +96,8 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_BN_CLICKED(IDCANCEL, &CmdmfastbootDlg::OnBnClickedCancel)
 	ON_WM_DESTROY()
 	ON_BN_CLICKED(IDC_SETTING, &CmdmfastbootDlg::OnBnClickedSetting)
+	ON_WM_SIZING()
+	ON_WM_MEASUREITEM()
 END_MESSAGE_MAP()
 
 void CmdmfastbootDlg::OnHelp()
@@ -112,7 +112,7 @@ void CmdmfastbootDlg::OnAbout()
 }
 
 
-BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
+BOOL CmdmfastbootDlg::SetPortDialogs(int x, int y,  int w, int h)
 {
   //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
   int r, c, pw, ph;
@@ -146,24 +146,26 @@ BOOL CmdmfastbootDlg::SetPortDialogs(UINT nType, int x, int y,  int w, int h)
   return true;
 }
 
-BOOL CmdmfastbootDlg::InitUsbWorkData(void)
-{
-  UsbWorkData* workdata;
-  int i= 0;
-  for (; i < m_nPort; i++) {
-    workdata = m_workdata + i;
-    workdata->hWnd = this;
-    workdata->ctl.Create(IDD_PORT_STATE, this);
-    workdata->ctl.Init(i);
-    workdata->usb = NULL;
-    workdata->usb_sn = ~1L;
-    workdata->stat = USB_STAT_IDLE;
-    //workdata->img = m_image;
-    workdata->work = NULL;
-    workdata->update_qcn = FALSE;
-    workdata->partition_nr = 0;
-    ZeroMemory(workdata->flash_partition, sizeof(workdata->flash_partition));
+
+
+BOOL CmdmfastbootDlg::SetDlgItemPos(UINT nID, int x, int y) {
+  RECT rect;
+  int w, h;
+  CWnd * handle = GetDlgItem(nID);
+  if (handle == NULL) {
+    ERROR("NO Item %d", nID);
+    return FALSE;
   }
+
+  handle->GetClientRect(&rect);
+  //w = x + rect.right - rect.left;
+  //h = y +  rect.bottom - rect.top;
+  if (IDC_EDIT_PACKAGE_PATH == nID && m_nPort == 1) {
+    w = rect.right < 300 ? 300 : rect.right;
+  }
+  w = rect.right < 100 ? 100 : rect.right;
+  h = rect.bottom < 25 ? 25 : rect.bottom;
+  handle->SetWindowPos(0, x, y, w, h, SWP_NOSENDCHANGING | SWP_NOSIZE);
   return TRUE;
 }
 
@@ -211,7 +213,7 @@ BOOL CmdmfastbootDlg::AbortUsbWorkData(UsbWorkData *data) {
   return TRUE;
 }
 
-BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
+BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data, BOOL schedule) {
   if (data == NULL) {
     ERROR("Invalid parameter");
     return FALSE;
@@ -225,8 +227,7 @@ BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data) {
   data->partition_nr = 0;
   ZeroMemory(data->flash_partition, sizeof(data->flash_partition));
 
-  INFO("Schedule next work!");
-  if (AdbUsbHandler(FALSE) == FALSE) {
+  if ((!schedule) || (AdbUsbHandler(FALSE) == FALSE)) {
     data->ctl.Reset();
   }
 
@@ -239,16 +240,18 @@ BOOL CmdmfastbootDlg::SetUsbWorkData(UsbWorkData *data, usb_handle * usb) {
     return FALSE;
   }
 
-  if (data->stat = USB_STAT_SWITCH) {
+  //if (data->stat = USB_STAT_SWITCH) {
     //clear switch timer
-    KillTimer(usb_port_address(usb));
-  }
+  //  KillTimer(usb_port_address(usb));
+  //}
 
   usb_set_work(usb, TRUE);
   data->usb = usb;
   data->usb_sn =usb_port_address(usb);
   data->stat = USB_STAT_WORKING;
   data->work = AfxBeginThread(usb_work, data);
+
+  INFO("Schedule work for port %d!", data->usb_sn);
 
   if (data->work != NULL) {
     data->work->m_bAutoDelete = TRUE;
@@ -337,6 +340,18 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
     return FALSE;
   }
 
+  if (m_bWork && IsHaveUsbWork()) {
+    int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
+                  MB_YESNO|MB_DEFBUTTON2);
+    if (IDYES!=iRet)
+    {
+      return FALSE;
+    }
+  }
+
+  if (bwork)
+    ResetUsbWorkData();
+
   GetDlgItem(IDC_BTN_START)->EnableWindow(!bwork);
   GetDlgItem(IDC_BTN_BROWSE)->EnableWindow(!bwork);
   GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
@@ -344,6 +359,53 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
   return TRUE;
 
 }
+
+BOOL CmdmfastbootDlg::ResetUsbWorkData(void) {
+  UsbWorkData* workdata;
+  int i= 0;
+  for (; i < m_nPort; i++) {
+    workdata = m_workdata + i;
+    if (workdata->stat == USB_STAT_WORKING) {
+      if (workdata->work != NULL) //Delete, or ExitInstance
+        workdata->work->PostThreadMessage( WM_QUIT, NULL, NULL );
+      usb_close(workdata->usb);
+      KillTimer(workdata->usb_sn);
+    } else if (workdata->stat == USB_STAT_SWITCH) {
+      remove_switch_device(workdata->usb_sn);
+      KillTimer(workdata->usb_sn);
+    } else if (workdata->stat == USB_STAT_FINISH) {
+      ;
+    } else if (workdata->stat == USB_STAT_ERROR) {
+      usb_close(workdata->usb);
+    } else {
+      continue;
+    }
+    CleanUsbWorkData(workdata, FALSE);
+  }
+  return TRUE;
+}
+
+BOOL CmdmfastbootDlg::InitUsbWorkData(void)
+{
+  UsbWorkData* workdata;
+  int i= 0;
+  for (; i < m_nPort; i++) {
+    workdata = m_workdata + i;
+    workdata->hWnd = this;
+    workdata->ctl.Create(IDD_PORT_STATE, this);
+    workdata->ctl.Init(i);
+    workdata->usb = NULL;
+    workdata->usb_sn = ~1L;
+    workdata->stat = USB_STAT_IDLE;
+    //workdata->img = m_image;
+    workdata->work = NULL;
+    workdata->update_qcn = FALSE;
+    workdata->partition_nr = 0;
+    ZeroMemory(workdata->flash_partition, sizeof(workdata->flash_partition));
+  }
+  return TRUE;
+}
+
 
 BOOL CmdmfastbootDlg::InitSettingConfig()
 {
@@ -358,7 +420,7 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   m_ConfigPath += L"mdmconfig.ini";
 
   lpFileName = m_ConfigPath.GetString();
-//  m_ConfigPath.GetBuffer(int nMinBufLength)
+  //  m_ConfigPath.GetBuffer(int nMinBufLength)
 
   //read configuration for log system and start log.
   data_len = GetPrivateProfileString(L"log",L"file",NULL,log_conf, MAX_PATH,lpFileName);
@@ -388,10 +450,35 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   //layout setting.
   m_nPort = GetPrivateProfileInt(L"app", L"port_num",1,lpFileName);
   m_nPortRow = GetPrivateProfileInt(L"app", L"port_row",1,lpFileName);
-  m_nPort = m_nPort > PORT_NUM_MAX ?  PORT_NUM_MAX : m_nPort;
-  m_nPortRow = m_nPortRow > m_nPort ? m_nPort :  m_nPortRow;
+  if ( m_nPort < 1 )
+    m_nPort = 1;
+  else if (m_nPort > PORT_NUM_MAX)
+    m_nPort = PORT_NUM_MAX;
+
+  if (m_nPortRow < 1 )
+    m_nPortRow  = 1;
+  else if (m_nPortRow > m_nPort)
+    m_nPortRow =  m_nPort;
 
   return TRUE;
+}
+
+
+BOOL CmdmfastbootDlg::InitSettingDlg(void) {
+    //CWnd * handle = GetDlgItem(IDC_SETTING);
+    //handle->EnableWindow(FALSE);
+
+    //m_SetDlg.Attach(this->m_hWnd);
+    //m_SetDlg.ModifyStyle(WS_POPUP | DS_MODALFRAME | WS_CAPTION | WS_SYSMENU,
+    //          WS_CHILD | WS_VISIBLE | DS_CENTER, 0);
+    //m_SetDlg.EnableWindow(TRUE);
+    m_SetDlg.SetFlashDirectData(&m_flashdirect);
+    m_SetDlg.SetScheduleData(&m_schedule_remove);
+    m_SetDlg.SetForeUpdateData(&m_forceupdate);
+    //m_SetDlg.UpdateData();
+    m_SetDlg.Create(IDD_SETTINGS, this);
+    m_SetDlg.ShowWindow(WS_CHILDWINDOW);//Invalidate();
+    return TRUE;
 }
 
 // CmdmfastbootDlg 消息处理程序
@@ -424,6 +511,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   SetIcon(m_hIcon, TRUE);			// 设置大图标
   SetIcon(m_hIcon, FALSE);		// 设置小图标
 
+  InitSettingDlg();
   InitUsbWorkData();
   SetUpAdbDevice(NULL, 0);
 
@@ -431,7 +519,6 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   ShowWindow(SW_MAXIMIZE);
 
 #if 0
-  //init thread pool begin.
   HRESULT hr = m_dlWorkerPool.Initialize(NULL, THREADPOOL_SIZE);
   m_dlWorkerPool.SetTimeout(30 * 1000);
   if(!SUCCEEDED(hr))
@@ -439,14 +526,6 @@ BOOL CmdmfastbootDlg::OnInitDialog()
     ERROR("Failed to init thread pool!");
     return FALSE;
   }
-  //init thread pool end.
-
-
-  m_port = ((CListCtrl*)GetDlgItem(IDC_LIST_PORT));
-
-  m_port->InsertColumn(0, _T("Composite"),LVCFMT_LEFT, 100);
-  m_port->InsertColumn(1, _T("Adb"), LVCFMT_LEFT, 100);
-  build_port_map(m_port);
   #endif
 
   m_imglist = ((CListCtrl*)GetDlgItem(IDC_IMAGE_LIST));
@@ -595,6 +674,8 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         //thread pool notify , exit
         if (data->work != NULL)
             data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
+
+        KillTimer(data->usb_sn);
         usb_close(data->usb);
       } else if (stat == USB_STAT_FINISH) {
          if (!m_schedule_remove) {
@@ -608,7 +689,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         return TRUE;
       }
 
-        CleanUsbWorkData(data);
+      CleanUsbWorkData(data);
     }
   }
 
@@ -1179,54 +1260,76 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
   int dx, dy, dw, dh;
 
-  if (600>cx || 600> cy)
+  if (m_nPort > 1 && (800 > cx || 800 > cy))
   {
+    return;
+  } else if (m_nPort == 1 && ( 500 > cx || 500 > cy)) {
     return;
   }
   CDialog::OnSize(nType, cx, cy);
 
-  //BUTTON
   if (m_bInit) {
     RECT rect;
-    GetDlgItem(IDC_BTN_STOP)->GetClientRect(&rect);
-    GetDlgItem(IDC_BTN_STOP)->SetWindowPos(0, (cx + 800) /2, cy - 60, rect.right, rect.bottom, 0);
-
-    GetDlgItem(IDCANCEL)->GetClientRect(&rect);
-    GetDlgItem(IDCANCEL)->SetWindowPos(0, (cx + 1000 ) /2, cy - 60, rect.right, rect.bottom, 0);
-
-     GetDlgItem(IDC_BTN_START)->GetClientRect(&rect);
-    GetDlgItem(IDC_BTN_START)->SetWindowPos(0, (cx + 500) /2, cy - 60, rect.right, rect.bottom, 0);
-
-     GetDlgItem(IDC_SETTING)->GetClientRect(&rect);
-    GetDlgItem(IDC_SETTING)->SetWindowPos(0, (cx +300) /2, cy - 60, rect.right, rect.bottom, 0);
-
-     GetDlgItem(IDC_BTN_BROWSE)->GetClientRect(&rect);
-    GetDlgItem(IDC_BTN_BROWSE)->SetWindowPos(0, (cx ) /2, cy - 60, rect.right, rect.bottom, 0);
-
-     GetDlgItem(IDC_EDIT_PACKAGE_PATH)->GetClientRect(&rect);
-    GetDlgItem(IDC_EDIT_PACKAGE_PATH)->SetWindowPos(0, 100, cy - 60, rect.right, rect.bottom, 0);
-
-
-     GetDlgItem(IDC_STATIC_PKG)->GetClientRect(&rect);
-    GetDlgItem(IDC_STATIC_PKG)->SetWindowPos(0, 20, cy - 60, rect.right, rect.bottom, 0);
-
 
     GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
-    dx = rect.right  +  10;
-    dy = /*rect.bottom +*/ 6;
-    dw = cx - dx  - 10;
-    dh = cy -dy - 20 -50;
-    SetPortDialogs(nType, dx, dy, dw, dh);
+    dx = rect.right + 10;
+
+    if (m_nPort == 1) {
+      dy = cy - 50;
+      SetDlgItemPos(IDC_BTN_BROWSE, cx - 80, dy);
+      SetDlgItemPos(IDC_EDIT_PACKAGE_PATH, 60, dy);
+      SetDlgItemPos(IDC_STATIC_PKG, 00, dy);
+
+      dy = cy - 100;
+      SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
+      SetDlgItemPos(IDCANCEL, dx + 120, dy);
+      SetDlgItemPos(IDC_BTN_START, dx , dy);
+      //SetDlgItemPos(IDC_SETTING, dx, dy);
+
+      dy = 5;
+      m_SetDlg.SetWindowPos(NULL, dx, dy, 280, 220, 0);
+
+      dy = 230;
+      dw = cx - dx - 10;
+      dh = cy -dy - 100 -20;
+    } else {
+      dy = cy - 90;
+      SetDlgItemPos(IDC_BTN_STOP, (cx + 800) /2, dy);
+      SetDlgItemPos(IDCANCEL, (cx + 1000 ) /2, dy);
+      SetDlgItemPos(IDC_BTN_START, (cx + 500) /2, dy);
+      //SetDlgItemPos(IDC_SETTING, (cx +300) /2, cy - 60);
+      SetDlgItemPos(IDC_BTN_BROWSE, (cx -120) /2, dy);
+      SetDlgItemPos(IDC_EDIT_PACKAGE_PATH, 100,dy);
+      SetDlgItemPos(IDC_STATIC_PKG, 20, dy);
+
+      dy = rect.bottom + 20;
+      m_SetDlg.SetWindowPos(NULL, rect.left, dy, 280, 220, 0);
+
+      dy = 5;
+      dw = cx - dx - 10;
+      dh = cy -dy - 20 -70;
+    }
+
+    SetPortDialogs(dx, dy, dw, dh);
   }
-  Invalidate(TRUE);
+  //Invalidate(TRUE);
+
 }
 
 void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {
-	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	lpMMI->ptMinTrackSize.x   = 800 ;	//主窗口最小宽度
-	lpMMI->ptMinTrackSize.y   = 800  ;  //主窗口最小高度
-	CDialog::OnGetMinMaxInfo(lpMMI);
+  if (m_nPort > 1) {
+    lpMMI->ptMinTrackSize.x   = 800 ;
+    lpMMI->ptMinTrackSize.y   = 800 ;
+  } else {
+    lpMMI->ptMaxSize.x   = 700 ;
+    lpMMI->ptMaxSize.y   = 650 ;
+    lpMMI->ptMaxTrackSize.x   = 700 ;
+    lpMMI->ptMaxTrackSize.y   = 650 ;
+    lpMMI->ptMinTrackSize.x   = 700 ;
+    lpMMI->ptMinTrackSize.y   = 650 ;
+  }
+  CDialog::OnGetMinMaxInfo(lpMMI);
 }
 
 void CmdmfastbootDlg::OnBnClickedBtnBrowse()
@@ -1258,7 +1361,7 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
   bi.hwndOwner=GetSafeHwnd();
   bi.pszDisplayName= m_PackagePath.GetBuffer(MAX_PATH);
   bi.lpszTitle=L"Select Package folder";
-  bi.ulFlags=BIF_USENEWUI;
+  bi.ulFlags=BIF_USENEWUI | BIF_NONEWFOLDERBUTTON;
   LPITEMIDLIST idl= SHBrowseForFolder(&bi);
   if(idl==NULL)
     return;
@@ -1272,21 +1375,20 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
   LPMALLOC pMalloc;
   if(SUCCEEDED(SHGetMalloc(&pMalloc)))
   {
-       pMalloc->Free(idl);
-       pMalloc->Release();
+    pMalloc->Free(idl);
+    pMalloc->Release();
   }
 
-   if( m_image->set_package_dir(m_PackagePath.GetBuffer(MAX_PATH),
-    m_ConfigPath.GetBuffer(MAX_PATH))) {
+  if( m_image->set_package_dir(m_PackagePath.GetBuffer(MAX_PATH),
+                               m_ConfigPath.GetBuffer(MAX_PATH)))
+  {
 
     delete m_image;
     m_image =  new flash_image(m_ConfigPath.GetString());
-
-UpdatePackageInfo();
-    } else {
+    UpdatePackageInfo();
+  } else {
     AfxMessageBox(L"Package path is not change!", MB_ICONEXCLAMATION);
-    }
-
+  }
 }
 
 void CmdmfastbootDlg::OnBnClickedStart()
@@ -1306,7 +1408,6 @@ void CmdmfastbootDlg::OnBnClickedButtonStop()
 
 void CmdmfastbootDlg::OnClose()
 {
-  // TODO: 在此添加消息处理程序代码和/或调用默认值
   //CDialog::OnClose();
 
   if (IsHaveUsbWork())
@@ -1325,28 +1426,7 @@ void CmdmfastbootDlg::OnClose()
 void CmdmfastbootDlg::OnBnClickedCancel()
 {
   DWORD dwExitCode = 0;
-#if 0
-  CWinThread* threadArry[] = {pThreadPort1, pThreadPort2, pThreadPort3, pThreadPort4};
-  for (int i=0; i<sizeof(threadArry)/sizeof(threadArry[0]); i++)
-  {
-    if (NULL!=threadArry[i])
-    {
-      GetExitCodeThread(threadArry[i]->m_hThread, &dwExitCode);
-      if (dwExitCode == STILL_ACTIVE)
-      {
-        int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?", MB_YESNO|MB_DEFBUTTON2);
-        if (IDYES==iRet)
-        {
-          break;
-        }
-        else
-        {
-          return;
-        }
-      }
-    }
-  }
-#endif
+
   if (IsHaveUsbWork())
   {
     int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
@@ -1365,7 +1445,6 @@ void CmdmfastbootDlg::OnDestroy()
 {
 	CDialog::OnDestroy();
 
-	// TODO: 在此处添加消息处理程序代码
 	::RemoveProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP);	//for single instance
 	//Shutdown the thread pool
 	//m_dlWorkerPool.Shutdown();
@@ -1376,8 +1455,44 @@ void CmdmfastbootDlg::OnDestroy()
 
 
 void CmdmfastbootDlg::OnBnClickedSetting()
+{
+
+	//m_pMainWnd = &dlg;
+	m_SetDlg.Create(IDD_SETTINGS, NULL);
+	    m_SetDlg.ModifyStyle(
+              WS_CHILD | WS_VISIBLE | DS_CENTER,
+              WS_POPUP | DS_MODALFRAME | WS_CAPTION | WS_SYSMENU,
+              SWP_SHOWWINDOW);
+      # if 0
+	INT_PTR nResponse = m_SetDlg.DoModal();
+	if (nResponse == IDOK)
 	{
-	// TODO: 在此添加控件通知处理程序代码
+	}
+	else if (nResponse == IDCANCEL)
+	{
 
 	}
+  #endif
+}
 
+
+void CmdmfastbootDlg::OnSizing(UINT fwSide, LPRECT pRect)
+	{
+	//CDialog::OnSizing(fwSide, pRect);
+
+	// TODO: 在此处添加消息处理程序代码
+	}
+
+void CmdmfastbootDlg::HtmlHelp(DWORD_PTR dwData, UINT nCmd)
+	{
+	// TODO: 在此添加专用代码和/或调用基类
+
+	CDialog::HtmlHelp(dwData, nCmd);
+	}
+
+void CmdmfastbootDlg::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct)
+	{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+
+	CDialog::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
+	}

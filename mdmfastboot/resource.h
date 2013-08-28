@@ -7,9 +7,13 @@
 #define IDS_ABOUTBOX                    101
 #define IDD_MDMFASTBOOT_DIALOG          102
 #define IDS_STOPBTN                     102
+#define IDS_TIP_FORCEUPDATE             103
+#define IDS_TIP_FASTBOOT_ONLY           104
+#define IDS_TIP_SCHE                    105
 #define IDR_MAINFRAME                   128
 #define IDD_PORT_STATE                  129
 #define IDR_MENU_MAIN                   130
+#define IDD_SETTINGS                    132
 #define IDC_BTN_STOP                    1000
 #define IDC_ST_TITLE                    1001
 #define IDC_STATIC_USERDATA_VER         1002
@@ -39,8 +43,11 @@
 #define IDC_SETTING                     1031
 #define IDC_STATIC_PKG                  1032
 #define IDC_IMAGE_LIST                  1033
-#define IDC_LIST1                       1035
-#define IDC_LIST_PORT                   1035
+#define IDC_CHECK_FORCEUPDATE           1036
+#define IDC_FASTBOOT_ONLY               1037
+#define IDC_SCHE_REMOVE                 1038
+#define IDC_SPIN1                       1039
+#define IDC_STATIC_SETTING              1040
 #define ID_ABOUT_ABOUT                  32771
 #define ID_HELP_HELP                    32772
 #define ID_ABOUT_                       32773
@@ -50,9 +57,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        132
+#define _APS_NEXT_RESOURCE_VALUE        133
 #define _APS_NEXT_COMMAND_VALUE         32775
-#define _APS_NEXT_CONTROL_VALUE         1036
+#define _APS_NEXT_CONTROL_VALUE         1041
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

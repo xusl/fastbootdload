@@ -16,6 +16,8 @@
 
 #include "adbhost.h"
 
+#include "SettingsDlg.h"
+
 enum
 {
 	// UI Messages
@@ -75,6 +77,7 @@ protected:
   BOOL m_bInit;
   volatile BOOL m_bWork;
 
+ friend CSettingsDlg;
   //configuration
   BOOL m_schedule_remove;
   BOOL m_flashdirect;
@@ -90,6 +93,7 @@ protected:
   UsbWorkData m_workdata[PORT_NUM_MAX];
   CListCtrl  *m_imglist;
   //CListCtrl  *m_port;
+  CSettingsDlg m_SetDlg;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -113,7 +117,8 @@ public:
 
 	BOOL RegisterAdbDeviceNotification(void);
   BOOL AdbUsbHandler(BOOL update_device);
-  BOOL SetPortDialogs(UINT nType, int x, int y, int w, int h);
+  BOOL SetPortDialogs(int x, int y, int w, int h);
+  BOOL SetDlgItemPos(UINT nID, int x, int y);
   BOOL UpdatePackageInfo(void);
 	void SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
@@ -138,16 +143,22 @@ private:
     static UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg);
 
 private:
+    BOOL InitSettingDlg(void);
     BOOL InitUsbWorkData(void);
     UsbWorkData * GetUsbWorkData(long usb_sn );
     UsbWorkData * FindUsbWorkData(long usb_sn);
     BOOL SetUsbWorkData(UsbWorkData *data, usb_handle * usb);
-    BOOL CleanUsbWorkData(UsbWorkData *data);
+    BOOL CleanUsbWorkData(UsbWorkData *data, BOOL schedule = TRUE);
     BOOL SwitchUsbWorkData(UsbWorkData *data);
     BOOL FinishUsbWorkData(UsbWorkData *data);
     BOOL AbortUsbWorkData(UsbWorkData *data);
+    BOOL ResetUsbWorkData(void);
     BOOL IsHaveUsbWork(void);
     UINT UsbWorkStat(UsbWorkData *data);
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
     BOOL InitSettingConfig(void);
+public:
+	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);
+	virtual void HtmlHelp(DWORD_PTR dwData, UINT nCmd = 0x000F);
+	afx_msg void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
 	};
