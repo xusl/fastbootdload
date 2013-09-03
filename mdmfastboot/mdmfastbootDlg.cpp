@@ -361,6 +361,7 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
     ResetUsbWorkData();
 
   GetDlgItem(IDC_BTN_START)->EnableWindow(!bwork);
+  GetDlgItem(IDCANCEL)->EnableWindow(!bwork);
   GetDlgItem(IDC_BTN_BROWSE)->EnableWindow(!bwork);
   GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
   m_bWork = bwork;
@@ -447,6 +448,7 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   m_image = new flash_image(lpFileName);
 
   //init app setting.
+  m_pack_img = GetPrivateProfileInt(L"app", L"pack_img", 1,lpFileName);;
   m_schedule_remove = GetPrivateProfileInt(L"app", L"schedule_remove",1,lpFileName);
   switch_timeout = GetPrivateProfileInt(L"app", L"switch_timeout", 300,lpFileName);
   work_timeout = GetPrivateProfileInt(L"app", L"work_timeout",600,lpFileName);
@@ -468,6 +470,10 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   else if (m_nPortRow > m_nPort)
     m_nPortRow =  m_nPort;
 
+  if (m_pack_img) {
+    m_forceupdate = TRUE; /*Now fw build system can not handle config.xml, so set it to true*/
+  }
+
   return TRUE;
 }
 
@@ -480,6 +486,9 @@ BOOL CmdmfastbootDlg::InitSettingDlg(void) {
     //m_SetDlg.ModifyStyle(WS_POPUP | DS_MODALFRAME | WS_CAPTION | WS_SYSMENU,
     //          WS_CHILD | WS_VISIBLE | DS_CENTER, 0);
     //m_SetDlg.EnableWindow(TRUE);
+    if (m_pack_img)
+      return FALSE;
+
     m_SetDlg.SetFlashDirectData(&m_flashdirect);
     m_SetDlg.SetScheduleData(&m_schedule_remove);
     m_SetDlg.SetForeUpdateData(&m_forceupdate);
@@ -540,7 +549,11 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   m_imglist->InsertColumn(0, _T("Partition"),LVCFMT_LEFT, 50);
   m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 600);
 
-  //GetDlgItem(IDC_EDIT_PACKAGE_PATH)->SetWindowText(m_image->get_package_dir());
+  if (m_pack_img) {
+    GetDlgItem(IDC_BTN_BROWSE)->ShowWindow(SW_HIDE);
+    GetDlgItem(IDC_EDIT_PACKAGE_PATH)->ShowWindow(SW_HIDE);
+    GetDlgItem(IDC_STATIC_PKG)->ShowWindow(SW_HIDE);
+  }
   m_PackagePath = m_image->get_package_dir();
   UpdatePackageInfo();
 
@@ -1271,7 +1284,7 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
   if (m_nPort > 1 && (800 > cx || 800 > cy))
   {
     return;
-  } else if (m_nPort == 1 && ( 500 > cx || 500 > cy)) {
+  } else if (m_nPort == 1 && ( 500 > cx || 400 > cy)) {
     return;
   }
   CDialog::OnSize(nType, cx, cy);
@@ -1280,27 +1293,40 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
     RECT rect;
 
     GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
-    dx = rect.right + 10;
 
     if (m_nPort == 1) {
-      dy = cy - 50;
-      SetDlgItemPos(IDC_BTN_BROWSE, cx - 80, dy);
-      SetDlgItemPos(IDC_EDIT_PACKAGE_PATH, 60, dy);
-      SetDlgItemPos(IDC_STATIC_PKG, 00, dy);
+      dx = rect.right + 20;
+      if (m_pack_img ) {
+        dy = cy - 100;
+        SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
+        SetDlgItemPos(IDCANCEL, dx + 120, dy);
+        SetDlgItemPos(IDC_BTN_START, dx , dy);
+        //SetDlgItemPos(IDC_SETTING, dx, dy);
 
-      dy = cy - 100;
-      SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
-      SetDlgItemPos(IDCANCEL, dx + 120, dy);
-      SetDlgItemPos(IDC_BTN_START, dx , dy);
-      //SetDlgItemPos(IDC_SETTING, dx, dy);
+        dy = 5;
+        dw = cx - dx - 10;
+        dh = cy -dy - 120;
+      } else {
+        dy = cy - 50;
+        SetDlgItemPos(IDC_BTN_BROWSE, cx - 80, dy);
+        SetDlgItemPos(IDC_EDIT_PACKAGE_PATH, 60, dy);
+        SetDlgItemPos(IDC_STATIC_PKG, 00, dy);
 
-      dy = 5;
-      m_SetDlg.SetWindowPos(NULL, dx, dy, 280, 220, 0);
+        dy = cy - 100;
+        SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
+        SetDlgItemPos(IDCANCEL, dx + 120, dy);
+        SetDlgItemPos(IDC_BTN_START, dx , dy);
+        //SetDlgItemPos(IDC_SETTING, dx, dy);
 
-      dy = 230;
-      dw = cx - dx - 10;
-      dh = cy -dy - 100 -20;
+        dy = 5;
+        m_SetDlg.SetWindowPos(NULL, dx, dy, 280, 220, 0);
+
+        dy = 230;
+        dw = cx - dx - 10;
+        dh = cy -dy - 100 -20;
+      }
     } else {
+      dx = rect.right + 8;
       dy = cy - 90;
       SetDlgItemPos(IDC_BTN_STOP, (cx + 800) /2, dy);
       SetDlgItemPos(IDCANCEL, (cx + 1000 ) /2, dy);
@@ -1311,7 +1337,10 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
       SetDlgItemPos(IDC_STATIC_PKG, 20, dy);
 
       dy = rect.bottom + 20;
-      m_SetDlg.SetWindowPos(NULL, rect.left, dy, 280, 220, 0);
+
+      if (m_pack_img == FALSE) {
+        m_SetDlg.SetWindowPos(NULL, rect.left, dy, 280, 220, 0);
+      }
 
       dy = 5;
       dw = cx - dx - 10;
@@ -1321,7 +1350,6 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
     SetPortDialogs(dx, dy, dw, dh);
   }
   //Invalidate(TRUE);
-
 }
 
 void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
@@ -1330,12 +1358,21 @@ void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
     lpMMI->ptMinTrackSize.x   = 800 ;
     lpMMI->ptMinTrackSize.y   = 800 ;
   } else {
-    lpMMI->ptMaxSize.x   = 700 ;
-    lpMMI->ptMaxSize.y   = 650 ;
-    lpMMI->ptMaxTrackSize.x   = 700 ;
-    lpMMI->ptMaxTrackSize.y   = 650 ;
-    lpMMI->ptMinTrackSize.x   = 700 ;
-    lpMMI->ptMinTrackSize.y   = 650 ;
+    if (m_pack_img ) {
+      lpMMI->ptMaxSize.x   = 700 ;
+      lpMMI->ptMaxSize.y   = 500 ;
+      lpMMI->ptMaxTrackSize.x   = 700 ;
+      lpMMI->ptMaxTrackSize.y   = 500 ;
+      lpMMI->ptMinTrackSize.x   = 700 ;
+      lpMMI->ptMinTrackSize.y   = 500 ;
+    } else {
+      lpMMI->ptMaxSize.x   = 700 ;
+      lpMMI->ptMaxSize.y   = 650 ;
+      lpMMI->ptMaxTrackSize.x   = 700 ;
+      lpMMI->ptMaxTrackSize.y   = 650 ;
+      lpMMI->ptMinTrackSize.x   = 700 ;
+      lpMMI->ptMinTrackSize.y   = 650 ;
+    }
   }
   CDialog::OnGetMinMaxInfo(lpMMI);
 }

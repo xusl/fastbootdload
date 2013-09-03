@@ -80,6 +80,7 @@ protected:
 
  friend CSettingsDlg;
   //configuration
+  BOOL m_pack_img;
   BOOL m_schedule_remove;
   BOOL m_flashdirect;
   BOOL m_forceupdate; // do not check version, if not exist config.xml or version rule is not match

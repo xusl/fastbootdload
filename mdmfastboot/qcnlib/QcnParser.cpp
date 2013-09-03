@@ -38,7 +38,7 @@ uint8* QcnParser::OpenDocument(LPCWSTR pDocName, DWORD* lens) {
                     &spRoot);
 
   if (FAILED(hr)) {
-    ERROR( "Failed to open <%s>, hr = 0x%08X", pDocName, hr);
+    ERROR( "Failed to open <%S>, hr = 0x%08X", pDocName, hr);
     return NULL;
   }
 
