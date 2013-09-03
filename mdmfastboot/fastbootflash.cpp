@@ -81,8 +81,12 @@ flash_image::flash_image(const wchar_t* config):
   wcsncpy(pkg_conf_file, pkg_dir, data_len+1);
   wcsncat(pkg_conf_file, PKG_CONFIG_XML, sizeof(pkg_conf_file) / sizeof(pkg_conf_file[0]) - data_len);
 
+  wcsncpy(pkg_qcn_file, pkg_dir, data_len+1);
+  wcsncat(pkg_qcn_file, PKG_STATIC_QCN, sizeof(pkg_qcn_file) / sizeof(pkg_qcn_file[0]) - data_len);
+
   read_config(config);
   read_package_version(pkg_conf_file);
+  qcn_enum_init();
 }
 
 flash_image::~flash_image() {
@@ -208,6 +212,11 @@ const wchar_t * flash_image::get_package_config(void) {
     return pkg_conf_file;
 }
 
+
+const wchar_t * flash_image::get_package_qcn_path(void) {
+  return pkg_qcn_file;
+}
+
 BOOL flash_image::set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL release) {
     if(dir == NULL) {
         ERROR("Bad Parameter.");
@@ -261,6 +270,24 @@ const FlashImageInfo* flash_image::image_enum_next (const FlashImageInfo* img) {
         return NULL;
 
     return img->next;
+}
+
+int flash_image::qcn_enum_init (void) {
+  QcnParser chQcn;
+  DWORD dwLens = 0;
+  unsigned char * nvBuf;
+  nvBuf = (unsigned char *)chQcn.OpenDocument(pkg_qcn_file, &dwLens);
+  if (dwLens == 0)
+  {
+    //	AfxMessageBox("parse qcn error !");
+    return 0;
+  }
+
+  return 0;
+}
+
+int flash_image::qcn_enum_next (void) {
+    return NULL;
 }
 
 void flash_image::read_package_version(const wchar_t * package_conf){

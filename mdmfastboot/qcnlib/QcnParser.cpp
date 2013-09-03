@@ -5,420 +5,284 @@
 #include <Objidl.h>
 #include <comutil.h>
 #include "QcnParser.h"
-#include "memmgr.h"
-//#include "log.h"
+//#include "memmgr.h"
+#include "log.h"
 #include "..\utils.h"
 
 
-QcnParser::QcnParser()
-{
-	pdata = NULL;
-
-	//add by jie.li 2012-02-21 for LTE NV >20000
-	strName1 = ""; 
-	bBackup = false;
-	bEfsDir = false;
-	bEfsData = false;
-	bProvisioning = false;
-	NVdata = NULL;
-	//end add
+QcnParser::QcnParser() {
+  m_NVNumberedItems = 0;
+  m_NVItemArray = NULL;
+  m_StatStorageName = STAT_UNKNOWN;
 }
 
 QcnParser::~QcnParser()
 {
-
+  free(m_NVItemArray);
 }
 
-uint8* QcnParser::OpenDocument(LPCTSTR pDocName, DWORD* lens)
+uint8* QcnParser::OpenDocument(LPCWSTR pDocName, DWORD* lens) {
+  IStorage* spRoot = NULL;
+  HRESULT hr;
+
+  if (pDocName == NULL || lens == NULL) {
+    ERROR("Invalid parameter.");
+    return NULL;
+  }
+
+  hr= StgOpenStorage(pDocName,
+                    NULL,
+                    STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE,
+                    NULL,
+                    0,
+                    &spRoot);
+
+  if (FAILED(hr)) {
+    ERROR( "Failed to open <%s>, hr = 0x%08X", pDocName, hr);
+    return NULL;
+  }
+
+  IterateStorage(spRoot, 0);
+  MergeEFSBackup();
+
+  spRoot->Release();
+
+ // *lens = m_readLens;
+  return NULL;
+}
+
+void QcnParser::IterateStorage(IStorage* spStorage, int depth) {
+  STATSTG stat;
+  IEnumSTATSTG* spEnum=NULL;
+  HRESULT hr = spStorage->Stat(&stat, STATFLAG_DEFAULT);
+
+  if (FAILED(hr)){
+    INFO("Failed to Stat storage, hr = 0x%08X", hr);
+    return;
+  }
+
+  //INFO("stg <%ls>", stat.pwcsName);
+  CoTaskMemFree(stat.pwcsName);
+
+  hr = spStorage->EnumElements(0, NULL, 0, &spEnum);
+
+  if (FAILED(hr)) {
+    ERROR("Failed to EnumElements, hr = 0x%08X", hr);
+    return;
+  }
+
+  while (spEnum->Next(1, &stat, NULL) == S_OK) {
+    ExamineBranch(spStorage, stat, depth);
+    // pls refer STATSTG Structure in MSDN.
+    //pwcsName
+    // A pointer to a NULL-terminated Unicode string that contains the name.
+    //Space for this string is allocated by the method called and freed by the caller
+    //(for more information, see CoTaskMemFree). To not return this member,
+    //specify the STATFLAG_NONAME value when you call a method that returns a
+    //STATSTG structure, except for calls to IEnumSTATSTG::Next, which provides
+    //no way to specify this value.
+    CoTaskMemFree(stat.pwcsName);
+  }
+
+  spEnum->Release();
+}
+
+void QcnParser::ExamineBranch(IStorage* spStorage, STATSTG& stat, int depth)
 {
-	IStorage* spRoot = NULL;
-	_bstr_t bsRoot(pDocName);
-	const HRESULT hr = StgOpenStorage(bsRoot, NULL,
-		STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE, NULL, 0, &spRoot);
-	if (SUCCEEDED(hr))
-	{
-		vecEFS_Data.clear();
-		vecEFS_Dir.clear();
-		vecEFS_Backup.clear();
+  LPOLESTR ItemName = stat.pwcsName;
+  DWORD size = stat.cbSize.LowPart; /* equal to  stat.cbSize.LowPart */
+  DEBUG("Depth %d, pItemName:%S, TYPE : %d, size :%d",depth,  ItemName, stat.type, size);
 
-		IterateStorage(spRoot, 0, true);
-		spRoot = NULL;
-		*lens = m_readLens;
+  switch(stat.type) {
+  case STGTY_STORAGE:
+    {
+      IStorage* spRoot=NULL;
+      HRESULT hr;
 
-		MergeEFSBackup();
+      hr= spStorage->OpenStorage(stat.pwcsName,
+                                 NULL,
+                                 STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE,
+                                 NULL,
+                                 0,
+                                 &spRoot);
 
-		return pdata;
-	}
-	else
-	{			
-		//ERROR(FILE_LINE, "Failed to open <%s>, hr = 0x%08X\n", pDocName, hr);
-	}
-	return NULL;
+      if (FAILED(hr)) {
+        ERROR("Failed to OpenStorage <%ls>, hr = 0x%08X.", stat.pwcsName, hr);
+        return;
+      }
+
+      // m_StatStorageName = STAT_UNKNOWN;
+      if (depth == 2) {
+        if (wcscmp(ItemName, L"NV_Items") == 0) {
+          m_StatStorageName |= STAT_NV_Items;
+        } else if (wcscmp(ItemName, L"EFS_Backup") == 0) {
+          m_StatStorageName |= STAT_EFS_Backup;
+        //} else if (wcscmp(ItemName, L"Provisioning_Item_Files") == 0) {
+        //  m_StatStorageName |= STAT_Provisioning_Item_Files;
+        } else if (wcscmp(ItemName, L"NV_NUMBERED_ITEMS") == 0) {
+          m_StatStorageName |= STAT_NV_NUMBERED_ITEMS;
+        } else {
+          //m_StatStorageName &= ~STAT_LEVEL_2_MASK;
+          spRoot ->Release();
+          break;
+        }
+      } else if (depth == 3) {
+        if (wcscmp(ItemName, L"EFS_Dir") == 0) {
+          m_StatStorageName |= STAT_EFS_Dir;
+        } else if (wcscmp(ItemName, L"EFS_Data") == 0) {
+          m_StatStorageName |= STAT_EFS_Data;
+        } else {
+          m_StatStorageName &= ~STAT_LEVEL_3_MASK;
+        }
+      }
+
+      IterateStorage(spRoot, depth + 1);
+      spRoot ->Release();
+      if (depth == 2 ) {
+        m_StatStorageName &= ~STAT_LEVEL_2_MASK;
+      } else if (depth == 3){
+        m_StatStorageName &= ~STAT_LEVEL_3_MASK;
+      }
+    }
+    break ;
+
+  case STGTY_STREAM:
+    //DEBUG("*****strName = %S stat.cbSize = %d", ItemName, size);
+    if (m_StatStorageName & STAT_EFS_Dir) {
+      //EFS_Dir_Data *efsDirData ;
+      char *path;
+      EFS_Backups bknv;
+      map<int, EFS_Backups> :: iterator iter;
+      int item_index = wcstol(ItemName, NULL, 16);
+      /*size do not contain the NULL termination char*/
+      char*data = (char *)calloc(1, size + 1);
+      if (!data) {
+        ERROR("out of memory");
+        break;
+      }
+      //ZeroMemory(&efsDirData, sizeof(efsDirData));
+      DumpStreamContents(spStorage, ItemName, size, data);
+      if (m_StatStorageName & STAT_EFS_Backup) {
+        if (sizeof(EFS_Dir_Data) < size) {
+          ERROR("Size %d exceed EFS_Dir_Data size", size);
+          free(data);
+          break;
+        }
+        path = ((EFS_Dir_Data *)data)->stream;
+        //memcpy(&efsDirData ,data, size);
+      } else {
+        if (rest_of_stream < size) {
+          size = rest_of_stream;
+          WARN("size %d exceed rest_of_stream %d",size, rest_of_stream);
+        }
+        //strncpy(efsDirData.stream, data, size);
+        path = data;
+      }
+
+      if (strncmp(path, "/nv/", strlen("/nv/")) == 0) {
+        iter = m_BackupNV.find(item_index);
+        if (iter == m_BackupNV.end()) {
+          bknv.fileName = path;
+          m_BackupNV.insert(BackupNV(item_index, bknv));
+        } else {
+          iter->second.fileName = path;
+        }
+      } else {
+        WARN("%s NOT START WITH /nv/", path);
+      }
+      free(data);
+    }else if (m_StatStorageName & STAT_EFS_Data) { //read file contents
+      char* data = (char *)calloc(1, size);
+      int item_index = wcstol(ItemName, NULL, 16);
+      map<int, EFS_Backups> :: iterator iter;
+      EFS_Backups bknv;
+
+      if (data == NULL) {
+        ERROR("out of memory");
+        return;
+      }
+      DumpStreamContents(spStorage, ItemName, size, data);
+
+      iter = m_BackupNV.find(item_index);
+      if (iter == m_BackupNV.end()) {
+        bknv.NVdata = data;
+        bknv.dataLens = size;
+        m_BackupNV.insert(BackupNV(item_index, bknv));
+      } else {
+        iter->second.NVdata = data;
+        iter->second.dataLens = size;
+      }
+    }else if (m_StatStorageName & STAT_NV_NUMBERED_ITEMS
+              && (wcscmp(ItemName, L"NV_ITEM_ARRAY") == 0)) {
+      m_NVNumberedItems = size / sizeof(NV_ITEM_PACKET_INFO);
+      if (m_NVNumberedItems * sizeof(NV_ITEM_PACKET_INFO) != size) {
+        ERROR("ERROR SIZE %d", size);
+        break;
+      }
+      if (m_NVItemArray != NULL) {
+        WARN("FREE m_NVItemArray");
+        free(m_NVItemArray);
+      }
+
+      m_NVItemArray = (NV_ITEM_PACKET_INFO *)calloc(1, size);
+      if (m_NVItemArray == NULL) {
+        ERROR("out of memory.");
+        break;
+      }
+      DumpStreamContents(spStorage, ItemName, size, m_NVItemArray);
+    } else {
+      WARN("Do not handle stat %d, item %S", m_StatStorageName, ItemName);
+    }
+    break;
+
+  case STGTY_LOCKBYTES:
+    // ILockBytes
+    break;
+
+  case STGTY_PROPERTY:
+    //    IEnumSTATSTG,
+    break;
+  }
 }
 
-void QcnParser::EnumBranch(IStorage* spStorage, int indentCount, bool binDump)
+BOOL QcnParser::DumpStreamContents(IStorage* spStorage,
+								   LPWSTR pStreamName,DWORD buffer_len, PVOID buffer)
 {
-	STATSTG stat;
-	IEnumSTATSTG* spEnum=NULL;
-	const HRESULT hr = spStorage->EnumElements(0, NULL, 0, &spEnum);
-	
-	if (SUCCEEDED(hr))
-	{
-		while (spEnum->Next(1, &stat, NULL) == S_OK)
-		{			
-			ExamineBranch(spStorage, indentCount, stat, binDump);				
-			CoTaskMemFree(stat.pwcsName);			
-		}
-	}
-	else
-	{
-		std::string indent(indentCount, ' ');		
-		//ERROR(FILE_LINE, "%sFailed to EnumElements, hr = 0x%08X\n", indent.c_str(), hr);
-	}	
+  IStream* spData=NULL;
+  ULONG streamRead = 0;
+  BOOL result = FALSE;
+  HRESULT hr;
+
+  if (buffer == NULL) {
+    ERROR("Invalid paramater.");
+    return result;
+  }
+
+  hr = spStorage->OpenStream(pStreamName,
+                             NULL,
+                             STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE,
+                             0,
+                             &spData);
+  if (FAILED(hr)) {
+    ERROR("Failed to OpenStream <%ls>, hr = 0x%08X.", pStreamName, hr);
+    return result;
+  }
+
+  if (spData->Read(buffer, buffer_len, &streamRead) == S_OK) {
+    if (streamRead == buffer_len) {
+      result = TRUE;
+    } else {
+      ERROR("Read QCN length incorrect!");
+    }
+  }
+  spData->Release();
+  return result;
 }
 
-void QcnParser::ExamineBranch(IStorage* spStorage, int indentCount, 
-							  STATSTG& stat, bool binDump)
-{
-	std::string indent(indentCount, ' ');
-	
-	switch(stat.type)
-	{
-	case STGTY_STORAGE:
-		//add by jie.li 2012-02-21 for LTE NV>20000
-		{
-			int tLen1 = wcslen(stat.pwcsName);
-			char* pChar1 = (char *)stat.pwcsName;
-			char nameBuf1[100] = {0};
-			int i = 0;
-			while ( i < tLen1)
-			{
-				nameBuf1[i] = *pChar1;
-				pChar1 = pChar1 + 2;			
-				i++;
-			}
+void QcnParser::MergeEFSBackup() {
+  map<int, EFS_Backups> :: const_iterator iter;
+  for ( iter = m_BackupNV.begin( ) ; iter != m_BackupNV.end( ) ; iter++ ){
+    DEBUG("ITEM %X, PATH %S, datalen %d",iter->first, iter->second.fileName, iter->second.dataLens);
+  }
 
-			strName1 = nameBuf1;	
-			TRACE("pItemName:%s\n", strName1);
-			if (strName1.Compare(L"EFS_Backup") == 0)
-			{
-				bBackup = true;
-				TRACE("akskdfkasdf\n");
-			}
-
-			if (strName1.Compare(L"EFS_Dir") == 0)
-			{
-				bEfsDir = true;
-				bEfsData = false;
-			}
-
-			if (strName1.Compare(L"EFS_Data") == 0)
-			{
-				bEfsData = true;
-				bEfsDir = false;
-			}
-
-			if ((strName1.Compare(L"EFS_Backup") != 0) && (strName1.Compare(L"EFS_Dir") != 0)
-				&& (strName1.Compare(L"EFS_Data") != 0))
-			{
-				bBackup = false;
-				bEfsData = false;
-				bEfsDir = false;
-			}
-
-			if ((strName1.Compare(L"Provisioning_Item_Files") == 0))
-			{
-				bProvisioning = true;
-			}
-		}
-		//end add
-		ExamineStorage(spStorage, indentCount, stat, binDump);
-		break ;
-	case STGTY_STREAM:		
-		//INFO(FILE_LINE, "%s str <%ls> %I64d\n", indent.c_str(), stat.pwcsName, stat.cbSize);
-		int tLen = wcslen(stat.pwcsName);
-		char* pChar = (char *)stat.pwcsName;
-		char nameBuf[100] = {0};
-		int i = 0;
-		while ( i < tLen)
-		{
-			nameBuf[i] = *pChar;
-			pChar = pChar + 2;			
-			i++;
-		}
-
-		CString strName = MultiStrToWideStr(nameBuf);
-		if (strName.Compare(L"NV_ITEM_ARRAY") == 0)
-		{			
-			if (binDump)
-			{
-				DumpStreamContents(spStorage, indentCount, stat.pwcsName, stat.cbSize.LowPart);
-			}			
-		}	
-
-		//add by jie.li 2012-2-17 for LTE NV>20000
-		if (strName.Compare(L"Feature_Mask") != 0 && strName.Compare(L"File_Version") != 0 && !bProvisioning)
-		{
-			//read file name
-			if (bEfsDir)
-			{
-				//TRACE("*****strName = %s\n stat.cbSize = %I64d\n", strName, stat.cbSize);
-				NVdata = NULL;
-				DumpStreamEfsBackupContents(spStorage, indentCount, stat.pwcsName, stat.cbSize.LowPart);
-				EFS_Dir eFS_Dir;
-				eFS_Dir.fileName = strName;
-				eFS_Dir.dirLens = m_NVreadLens;
-
-				EFS_Dir_Data *efsDirData = NULL;
-				NEW_ARRAY(efsDirData, EFS_Dir_Data, sizeof(EFS_Dir_Data));
-				if (bBackup)
-				{
-					efsDirData = (EFS_Dir_Data*)NVdata;
-				}
-				else
-				{
-					//modify by yanbin.wan 2013-03-18 for QCN structon change
-					//int tLen = strlen(NVdata);
-					int tLen = stat.cbSize.LowPart;
-					int i = 0;
-					while ( i < tLen)
-					{
-						efsDirData->stream[i] = *NVdata;
-						NVdata++;			
-						i++;
-					}
-					//efsDirData->stream = NVdata;
-				}
-				//EFS_Dir_Data *efsDirData = (EFS_Dir_Data*)NVdata;
-				if (!efsDirData)
-				{
-					TRACE("DumpStreamEfsBackupContents read NVData Error.\r\n");
-					return;
-				}
-
-				//modify by yanbin.wan 2013-03-18 for QCN structon change
-				CString strTemp = L"";
-				strTemp = efsDirData->stream;
-
-				TRACE("strTemp1 = %s", strTemp);
-				
-				if (strTemp.Find(L"/nv/") >= 0)
-				{
-
-					eFS_Dir.pathFileName = strTemp;
-					TRACE(" strTemp2 = %s\n", strTemp);
-
-					vecEFS_Dir.push_back(eFS_Dir);
-					delete efsDirData;
-				}
-
-				/*if (strTemp.Find("/nv/item_files/rfnv/") >= 0)
-				{
-					int iTest = strTemp.GetLength();
-					strTemp = strTemp.Mid(20);
-					strTemp = strTemp.Left(8);
-					eFS_Dir.pathFileName = strTemp;
-					TRACE(" strTemp2 = %s\n", strTemp);
-
-					vecEFS_Dir.push_back(eFS_Dir);
-					delete efsDirData;
-				}
-				else
-				{
-					int iLen = strTemp.GetLength();
-					int iFind = strTemp.ReverseFind('/');
-					strTemp = strTemp.Right(iLen-iFind-1);
-					eFS_Dir.pathFileName = strTemp;
-					TRACE(" strTemp2 = %s\n", strTemp);
-
-					vecEFS_Dir.push_back(eFS_Dir);
-					delete efsDirData;
-				}*/
-				//DumpStreamContents(spStorage, indentCount, stat.pwcsName, stat.cbSize.LowPart);
-			}
-			//read file contents
-			if (bEfsData)
-			{
-				TRACE("*****strName = %s\n stat.cbSize = %I64d\n", strName, stat.cbSize);
-				NVdata = NULL;
-				DumpStreamEfsBackupContents(spStorage, indentCount, stat.pwcsName, stat.cbSize.LowPart);
-				EFS_Data eFS_Data;
-				eFS_Data.fileName = strName;
-				eFS_Data.dataLens = m_NVreadLens;
-				if (!NVdata)
-				{
-					TRACE("DumpStreamEfsBackupContents read NVData Error.\r\n");
-					return;
-				}
-				eFS_Data.NVdata = (char*)NVdata;
-
-				bool bFirst = false;
-				/*if (bBackup && (strName == "00000000"))
-				{
-					bFirst = true;
-				}*/
-
-				if (!bFirst)
-				{
-					vecEFS_Data.push_back(eFS_Data);
-				}
-				//DumpStreamContents(spStorage, indentCount, stat.pwcsName, stat.cbSize.LowPart);
-			}
-			int icount1 = vecEFS_Dir.size();
-			int icount2 = vecEFS_Data.size();
-			//TRACE("icount1 = %d, icount2 = %d\n", icount1, icount2);
-		}
-		//end add
-
-		break ;
-	}	
 }
-
-void QcnParser::IterateStorage(IStorage* spStorage, int indentCount, bool binDump)
-{
-	STATSTG stat;
-	std::string indent(indentCount, ' ');	
-	const HRESULT hr = spStorage->Stat(&stat, STATFLAG_DEFAULT);
-	if (SUCCEEDED (hr))
-	{		
-		//INFO(FILE_LINE, "%sstg <%ls>\n", indent.c_str(), stat.pwcsName);
-		CoTaskMemFree(stat.pwcsName);
-		EnumBranch(spStorage, indentCount, binDump);
-	}
-	else
-	{		
-		//INFO(FILE_LINE, "%sFailed to Stat storage, hr = 0x%08X\n", indent.c_str(), hr);
-	}	
-}
-
-void QcnParser::ExamineStorage(IStorage* spStorage, int indentCount, 
-							   STATSTG& stat, bool binDump)
-{
-	IStorage* spRoot=NULL;
-	const HRESULT hr = spStorage->OpenStorage(stat.pwcsName, NULL,
-		STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE, NULL, 0, &spRoot);
-	if (SUCCEEDED(hr))
-	{
-		IterateStorage(spRoot, indentCount + 1, binDump);
-	}
-	else
-	{
-		std::string indent(indentCount, ' ');	
-		//ERROR(FILE_LINE, "%sFailed to OpenStorage <%ls>, hr = 0x%08X\n",
-		//	  indent.c_str(), stat.pwcsName, hr);
-	}
-	spRoot = NULL;	
-}
-
-void QcnParser::DumpStreamContents(IStorage* spStorage, int indentCount,
-								   LPWSTR pStreamName,DWORD readSize)
-{
-	IStream* spData=NULL;
-	std::string indent(indentCount, ' ');
-	const HRESULT hr = spStorage->OpenStream(pStreamName, NULL,
-		STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE, 0, &spData);
-	if (SUCCEEDED(hr))
-	{		
-		ULONG streamRead = 0;	
-		pdata = NULL;
-		NEW_ARRAY(pdata,uint8,readSize);
-		if (pdata == NULL)
-		{				
-			//ERROR(FILE_LINE, "GlobaAlloc failed!\n");			
-		}
-		if (spData->Read(pdata, readSize, &streamRead) == S_OK)
-		{
-			if (streamRead == readSize)
-			{
-				m_readLens = readSize;
-				return;
-			}
-			else
-			{
-				//ERROR(FILE_LINE, "Read QCN length incorrect!\n");
-			}			
-		}	
-		return;				
-	}
-	else
-	{		
-		//ERROR(FILE_LINE, "%sFailed to OpenStream <%ls>, hr = 0x%08X\n",
-		//	  indent.c_str(), pStreamName, hr);		
-	}
-}
-
-//add by jie.li 2012-02-21 for LTW NV >20000
-void QcnParser::DumpStreamEfsBackupContents(IStorage* spStorage, int indentCount,
-											LPWSTR pStreamName,DWORD readSize)
-{
-	IStream* spData=NULL;
-	std::string indent(indentCount, ' ');
-	const HRESULT hr = spStorage->OpenStream(pStreamName, NULL,
-		STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE, 0, &spData);
-	if (SUCCEEDED(hr))
-	{		
-		ULONG streamRead = 0;	
-		NVdata = NULL;
-		//NEW_ARRAY(NVdata,uint8,readSize);
-		NEW_ARRAY(NVdata,char,readSize);
-		if (NVdata == NULL)
-		{				
-			//ERROR(FILE_LINE, "GlobaAlloc failed!\n");			
-		}
-		if (spData->Read(NVdata, readSize, &streamRead) == S_OK)
-		{
-			if (streamRead == readSize)
-			{
-				m_NVreadLens = readSize;
-				return;
-			}
-			else
-			{
-				//ERROR(FILE_LINE, "Read QCN length incorrect!\n");
-			}			
-		}	
-		return;				
-	}
-	else
-	{		
-		//ERROR(FILE_LINE, "%sFailed to OpenStream <%ls>, hr = 0x%08X\n",
-			//indent.c_str(), pStreamName, hr);		
-	}
-}
-//end add
-
-//add by jie.li 2012-02-21 for LTE NV>20000
-void QcnParser::MergeEFSBackup()
-{
-	int iCount = vecEFS_Dir.size();
-	int iCount2 = vecEFS_Data.size();
-
-	if (iCount == 0 || iCount2 == 0)
-	{
-		return;
-	}
-
-	if (iCount != iCount2)
-	{
-		return;
-	}
-
-	vecEFS_Backup.clear();
-	EFS_Backups efsBackup;
-	for (int i=0; i<iCount; i++)
-	{
-		if (vecEFS_Dir.at(i).fileName == vecEFS_Data.at(i).fileName)
-		{
-			/*for (int j=0; j<rest_of_stream; j++)
-			{
-				efsBackup.fileName[j] = vecEFS_Dir.at(i).pathFileName[j];
-			}*/
-			efsBackup.fileName = vecEFS_Dir.at(i).pathFileName;
-			efsBackup.NVdata = vecEFS_Data.at(i).NVdata;
-			efsBackup.dataLens = vecEFS_Data.at(i).dataLens;
-
-			vecEFS_Backup.push_back(efsBackup);
-		}
-	}
-}
-//end add

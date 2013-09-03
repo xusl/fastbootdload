@@ -38,7 +38,10 @@
 #define FB_COMMAND_SZ 64
 #define FB_RESPONSE_SZ 64
 #define VERSION_STR_LEN 16
+
 #define PKG_CONFIG_XML          L"config.xml"
+#define PKG_STATIC_QCN          L"static.qcn"
+
 #define PARTITIONTBL_SECTION    L"partition_table"
 #define PKG_SECTION             L"package"
 #define PKG_PATH                L"path"
@@ -63,7 +66,12 @@ class flash_image{
     const FlashImageInfo* image_enum_init (void) ;
     const FlashImageInfo* image_enum_next (const FlashImageInfo* img);
     const wchar_t * get_package_dir(void);
+    //config.xml file path
     const wchar_t * get_package_config(void);
+    //static qcn file path
+    const wchar_t * get_package_qcn_path(void);
+    int qcn_enum_init (void);
+    int qcn_enum_next (void);
     BOOL set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL reset=FALSE);
     BOOL get_pkg_a5sw_sys_ver(CString &version);
     BOOL get_pkg_a5sw_usr_ver(CString &version);
@@ -87,6 +95,7 @@ class flash_image{
     FlashImageInfo *image_last;
     wchar_t pkg_dir[MAX_PATH];
     wchar_t pkg_conf_file[MAX_PATH];
+    wchar_t pkg_qcn_file[MAX_PATH];
     CString a5sw_kern_ver;
     CString a5sw_usr_ver;
     CString a5sw_sys_ver;

@@ -220,7 +220,8 @@ BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data, BOOL schedule) {
   }
 
   data->usb = NULL;
-  data->usb_sn = ~1L;
+  if (schedule == FALSE)
+    data->usb_sn = ~1L;
   data->stat = USB_STAT_IDLE;
   data->work = NULL;
   data->update_qcn = FALSE;
@@ -279,8 +280,11 @@ BOOL CmdmfastbootDlg::SwitchUsbWorkData(UsbWorkData *data) {
 
 /*
 * Get usbworkdata that in free or in switch.
+* fix_map means whether logical port (portstatui) fix map physical port.
+* this feature will be useful when multiport port download, it help operator
+* to make sure whether the device in a specific is flashed.
 */
-UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn) {
+UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn, BOOL fix_map) {
   int i= 0;
 
   // first search the before, for switch device.
@@ -293,6 +297,9 @@ UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn) {
   for (i=0; i < m_nPort; i++) {
     //if (m_workdata[i].usb_sn == ~1L && m_workdata[i].usb == NULL)
     if ((m_workdata + i)->stat == USB_STAT_IDLE)
+      if (fix_map == FALSE ||
+        (m_workdata + i)->usb_sn == usb_sn ||
+        (m_workdata + i)->usb_sn == ~1L)
       return m_workdata + i;
   }
 
@@ -300,15 +307,16 @@ UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn) {
 }
 
 /*
-* get usbworkdata by usb_sn, so the device is in switch or in working
-* or done?
+* get usbworkdata by usb_sn, the device is in switch or in working
+* or done, but not idle.
 */
 UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(long usb_sn) {
   int i= 0;
 
   // first search the before, for switch device.
   for (; i < m_nPort; i++) {
-    if ((m_workdata+i)->usb_sn == usb_sn)
+    if ((m_workdata+i)->usb_sn == usb_sn &&
+      ((m_workdata+i)->stat != USB_STAT_IDLE))
       return m_workdata + i;
   }
 
@@ -822,11 +830,11 @@ UINT CmdmfastbootDlg::adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH co
 
 //"nv read %d" , id
 //"nv write %d %s" ,id, value
-UINT CmdmfastbootDlg::adb_update_NV(adbhost& adb, UsbWorkData* data) {
-  if (!data->update_qcn)
-    return 0;
+UINT CmdmfastbootDlg::adb_update_NV(adbhost& adb, UsbWorkData* data, LPCWSTR pDocName) {
+ // if (!data->update_qcn)
+ //   return 0;
+  //TODO:: first enter offline-mode.
 
-  //first enter offline-mode.
 
   return 0;
 }
@@ -1046,7 +1054,7 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     }
 
     //prepare , do something that before flash image.
-    adb_update_NV(adb, data);
+    adb_update_NV(adb, data, img->get_package_qcn_path());
     adb_write_IMEI(adb, data);
     adb_shell_command(adb,data, "trace -r");
     adb_shell_command(adb,data, "backup");
@@ -1107,7 +1115,7 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
        handle != NULL ;
        handle = usb_handle_next(handle)) {
     if (!usb_is_work(handle)) {
-      data = GetUsbWorkData(usb_port_address(handle));
+      data = GetUsbWorkData(usb_port_address(handle), m_schedule_remove);
 
       if (data == NULL)
         return FALSE;

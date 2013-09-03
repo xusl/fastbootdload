@@ -17,6 +17,7 @@
 #include "adbhost.h"
 
 #include "SettingsDlg.h"
+#include "qcnlib/QcnParser.h"
 
 enum
 {
@@ -139,13 +140,13 @@ private:
     static UINT adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH command,
                                 UI_INFO_TYPE info = UI_DEFAULT);
     static UINT adb_write_IMEI(adbhost& adb, UsbWorkData* data);
-    static UINT adb_update_NV(adbhost& adb, UsbWorkData* data);
+    static UINT adb_update_NV(adbhost& adb, UsbWorkData* data, LPCWSTR pDocName);
     static UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg);
 
 private:
     BOOL InitSettingDlg(void);
     BOOL InitUsbWorkData(void);
-    UsbWorkData * GetUsbWorkData(long usb_sn );
+    UsbWorkData * GetUsbWorkData(long usb_sn, BOOL fix_map);
     UsbWorkData * FindUsbWorkData(long usb_sn);
     BOOL SetUsbWorkData(UsbWorkData *data, usb_handle * usb);
     BOOL CleanUsbWorkData(UsbWorkData *data, BOOL schedule = TRUE);
