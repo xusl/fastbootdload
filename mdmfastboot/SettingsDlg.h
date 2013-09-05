@@ -17,6 +17,7 @@ public:
   BOOL SetScheduleData(int *pData);
   BOOL SetFlashDirectData(int *pData);
   BOOL SetForeUpdateData(int *pData);
+  void EnableSettings(BOOL enable);
 
 // 对话框数据
 	enum { IDD = IDD_SETTINGS };

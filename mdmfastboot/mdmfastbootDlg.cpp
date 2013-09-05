@@ -65,6 +65,7 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 {
   m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
   m_bInit = FALSE;
+  m_updated_number = 0;
   InitSettingConfig();
 }
 
@@ -200,6 +201,10 @@ BOOL CmdmfastbootDlg::FinishUsbWorkData(UsbWorkData *data) {
   //data->work = NULL;
   //KILL work timer.
   KillTimer(data->usb_sn);
+  m_updated_number ++;
+  if (NULL == usb_handle_enum_init()) {
+    AfxMessageBox(L"All devices is updated!");
+  }
   return TRUE;
 }
 
@@ -324,6 +329,7 @@ UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(long usb_sn) {
 }
 
 BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
+  const wchar_t * qcn = m_image->get_package_qcn_path();
   const FlashImageInfo* img = m_image->image_enum_init();
   int item = 0;
   m_imglist->DeleteAllItems();
@@ -332,6 +338,18 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
     m_imglist->SetItemText(item,1,img->lpath);
     item ++;
     img = m_image->image_enum_next(img);
+  }
+
+  if (qcn != NULL) {
+    HANDLE    file;
+    file = CreateFile( qcn,GENERIC_READ,FILE_SHARE_READ,
+                       NULL, OPEN_EXISTING,
+                       0, NULL );
+    if (file != INVALID_HANDLE_VALUE) {
+      m_imglist->InsertItem(item,L"qcn");
+      m_imglist->SetItemText(item,1,qcn);
+      CloseHandle(file);
+    }
   }
 
   m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
@@ -364,6 +382,9 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
   GetDlgItem(IDCANCEL)->EnableWindow(!bwork);
   GetDlgItem(IDC_BTN_BROWSE)->EnableWindow(!bwork);
   GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
+   if (m_pack_img == FALSE) {
+    m_SetDlg.EnableSettings(!bwork);
+   }
   m_bWork = bwork;
   return TRUE;
 
@@ -449,7 +470,7 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
 
   //init app setting.
   m_pack_img = GetPrivateProfileInt(L"app", L"pack_img", 1,lpFileName);;
-  m_schedule_remove = GetPrivateProfileInt(L"app", L"schedule_remove",1,lpFileName);
+  m_fix_port_map = GetPrivateProfileInt(L"app", L"fix_port_map",1,lpFileName);
   switch_timeout = GetPrivateProfileInt(L"app", L"switch_timeout", 300,lpFileName);
   work_timeout = GetPrivateProfileInt(L"app", L"work_timeout",600,lpFileName);
 
@@ -490,7 +511,7 @@ BOOL CmdmfastbootDlg::InitSettingDlg(void) {
       return FALSE;
 
     m_SetDlg.SetFlashDirectData(&m_flashdirect);
-    m_SetDlg.SetScheduleData(&m_schedule_remove);
+    m_SetDlg.SetScheduleData(&m_fix_port_map);
     m_SetDlg.SetForeUpdateData(&m_forceupdate);
     //m_SetDlg.UpdateData();
     m_SetDlg.Create(IDD_SETTINGS, this);
@@ -546,7 +567,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   #endif
 
   m_imglist = ((CListCtrl*)GetDlgItem(IDC_IMAGE_LIST));
-  m_imglist->InsertColumn(0, _T("Partition"),LVCFMT_LEFT, 50);
+  m_imglist->InsertColumn(0, _T("Partition/QCN"),LVCFMT_LEFT, 50);
   m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 600);
 
   if (m_pack_img) {
@@ -684,7 +705,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       UINT stat;
 
       if (data == NULL) {
-        WARN("Can not find usbworkdata for %d, schedule remove is %d", sn, m_schedule_remove);
+        WARN("Can not find usbworkdata for %d, schedule remove is %d", sn, m_fix_port_map);
         return FALSE;
       }
 
@@ -699,8 +720,8 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         KillTimer(data->usb_sn);
         usb_close(data->usb);
       } else if (stat == USB_STAT_FINISH) {
-         if (!m_schedule_remove) {
-            ERROR("We do not set m_schedule_remove, "
+         if (!m_fix_port_map) {
+            ERROR("We do not set m_fix_port_map, "
                 "but in device remove event we can found usb work data");
             return TRUE;
         }
@@ -749,6 +770,7 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 
     SwitchUsbWorkData(data);
     data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
+    data->ctl.SetInfo(PROMPT_TITLE, CString(""));
     break;
 
   case FLASH_DONE:
@@ -757,9 +779,10 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 
     if (!uiInfo->sVal.IsEmpty()) {
       data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
+      data->ctl.SetInfo(PROMPT_TITLE, CString(""));
     }
 
-    if (!m_schedule_remove) {
+    if (m_fix_port_map) {
     // schedule next port now, and when  app receice device remove event,
     // the current finished port is not in workdata set, for new device in the
     // same port can not bootstrap in 1 seconds, even when there are no more
@@ -812,6 +835,9 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
 UINT CmdmfastbootDlg::ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg) {
   UIInfo* info = new UIInfo();
 
+  //if (FLASH_DONE && data->hWnd->m_fix_port_map)
+  //  sleep(1);
+
   info->infoType = info_type;
   info->sVal = msg;
   data->hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
@@ -843,11 +869,35 @@ UINT CmdmfastbootDlg::adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH co
 
 //"nv read %d" , id
 //"nv write %d %s" ,id, value
-UINT CmdmfastbootDlg::adb_update_NV(adbhost& adb, UsbWorkData* data, LPCWSTR pDocName) {
- // if (!data->update_qcn)
- //   return 0;
+UINT CmdmfastbootDlg::adb_update_NV(adbhost& adb, UsbWorkData* data,  flash_image  *const image) {
+  unsigned int index = 0;
+  const char* cmd;
+    PCHAR resp = NULL;
+  int  resp_len;
+  int ret;
+
+  if (data == NULL || NULL == image) {
+    ERROR("Bad parameter.");
+    return -1;
+  }
+
+  if (!data->update_qcn) {
+    INFO("Do not need update qcn.");
+    return -1;
+  }
   //TODO:: first enter offline-mode.
 
+  if (image->qcn_cmds_enum_init(NULL) == FALSE) {
+    ERROR("qcn_cmds_enum_init FAILED.");
+    return -1;
+  }
+
+  while ((cmd = image->qcn_cmds_enum_next(index)) != NULL) {
+    //DEBUG("cmd is %s", cmd);
+    ret = adb.shell(cmd, (void **)&resp, &resp_len);
+    FREE_IF(resp);
+   index++;
+  }
 
   return 0;
 }
@@ -858,14 +908,13 @@ UINT CmdmfastbootDlg::adb_write_IMEI(adbhost& adb, UsbWorkData* data) {
   int ret;
   ret = adb.shell("nv write 15002 1", (void **)&resp, &resp_len);
 
-  if (resp)
-    free(resp);
+ FREE_IF(resp);
 
   //imei 15 letters.
   adb.shell("imeiop write 860440020101686", (void **)&resp, &resp_len);
-
+FREE_IF(resp);
   ret = adb.shell("nv write 15002 0", (void **)&resp, &resp_len);
-
+FREE_IF(resp);
   return 0;
 }
 
@@ -1067,7 +1116,7 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     }
 
     //prepare , do something that before flash image.
-    adb_update_NV(adb, data, img->get_package_qcn_path());
+    adb_update_NV(adb, data, img);
     adb_write_IMEI(adb, data);
     adb_shell_command(adb,data, "trace -r");
     adb_shell_command(adb,data, "backup");
@@ -1128,7 +1177,7 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
        handle != NULL ;
        handle = usb_handle_next(handle)) {
     if (!usb_is_work(handle)) {
-      data = GetUsbWorkData(usb_port_address(handle), m_schedule_remove);
+      data = GetUsbWorkData(usb_port_address(handle), m_fix_port_map);
 
       if (data == NULL)
         return FALSE;

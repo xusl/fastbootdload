@@ -70,8 +70,10 @@ class flash_image{
     const wchar_t * get_package_config(void);
     //static qcn file path
     const wchar_t * get_package_qcn_path(void);
-    int qcn_enum_init (void);
-    int qcn_enum_next (void);
+
+    BOOL qcn_cmds_enum_init (char *cmd);
+    const char* qcn_cmds_enum_next (unsigned int index);
+
     BOOL set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL reset=FALSE);
     BOOL get_pkg_a5sw_sys_ver(CString &version);
     BOOL get_pkg_a5sw_usr_ver(CString &version);
@@ -96,6 +98,9 @@ class flash_image{
     wchar_t pkg_dir[MAX_PATH];
     wchar_t pkg_conf_file[MAX_PATH];
     wchar_t pkg_qcn_file[MAX_PATH];
+    unsigned int nv_num;
+    char ** nv_buffer;
+    char * nv_cmd;
     CString a5sw_kern_ver;
     CString a5sw_usr_ver;
     CString a5sw_sys_ver;

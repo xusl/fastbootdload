@@ -39,6 +39,14 @@ typedef int socklen_t;
 #define OS_PATH_SEPARATOR '\\'
 #define OS_PATH_SEPARATOR_STR "\\"
 
+#define FREE_IF(x)  do {\
+                      if ((x) != NULL) {\
+                        free((x));\
+                        (x) = NULL;\
+                      } \
+                    }while(0)
+
+
 typedef CRITICAL_SECTION          adb_mutex_t;
 
 #define  ADB_MUTEX_DEFINE(x)     adb_mutex_t   x

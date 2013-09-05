@@ -77,11 +77,12 @@ protected:
 	HICON m_hIcon;
   BOOL m_bInit;
   volatile BOOL m_bWork;
+  unsigned int m_updated_number;
 
  friend CSettingsDlg;
   //configuration
   BOOL m_pack_img;
-  BOOL m_schedule_remove;
+  BOOL m_fix_port_map;
   BOOL m_flashdirect;
   BOOL m_forceupdate; // do not check version, if not exist config.xml or version rule is not match
   int m_nPort;
@@ -141,7 +142,7 @@ private:
     static UINT adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH command,
                                 UI_INFO_TYPE info = UI_DEFAULT);
     static UINT adb_write_IMEI(adbhost& adb, UsbWorkData* data);
-    static UINT adb_update_NV(adbhost& adb, UsbWorkData* data, LPCWSTR pDocName);
+    static UINT adb_update_NV(adbhost& adb, UsbWorkData* data,  flash_image  *const image);
     static UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg);
 
 private:

@@ -51,7 +51,10 @@ flash_image::flash_image(const wchar_t* config):
   a5sw_sys_ver("Unknown"),
   a5sw_usr_ver("Unknown"),
   fw_ver("Unknown"),
-  qcn_ver("Unknown")
+  qcn_ver("Unknown"),
+  nv_buffer(NULL),
+  nv_num(0),
+  nv_cmd(NULL)
 {
   CString path;
   int data_len;
@@ -86,7 +89,6 @@ flash_image::flash_image(const wchar_t* config):
 
   read_config(config);
   read_package_version(pkg_conf_file);
-  qcn_enum_init();
 }
 
 flash_image::~flash_image() {
@@ -272,22 +274,52 @@ const FlashImageInfo* flash_image::image_enum_next (const FlashImageInfo* img) {
     return img->next;
 }
 
-int flash_image::qcn_enum_init (void) {
-  QcnParser chQcn;
-  DWORD dwLens = 0;
-  unsigned char * nvBuf;
-  nvBuf = (unsigned char *)chQcn.OpenDocument(pkg_qcn_file, &dwLens);
-  if (dwLens == 0)
-  {
-    //	AfxMessageBox("parse qcn error !");
-    return 0;
+BOOL flash_image::qcn_cmds_enum_init (char *cmd) {
+  if (cmd == NULL)
+    cmd = "nv write";
+
+  if (nv_cmd == NULL || strcmp(nv_cmd, cmd) != 0)  {
+     FREE_IF(nv_cmd);
+     nv_cmd = strdup(cmd);
+     if(nv_cmd == NULL) {
+      ERROR("OUT OF MEMORY");
+      return FALSE;
+     }
+
+     if (nv_buffer != NULL) {
+      QcnParser::PutNVWriteCommands(nv_buffer, nv_num);
+      nv_buffer = NULL;
+      nv_num = 0;
+      }
   }
 
-  return 0;
+  if (nv_buffer == NULL)
+   {
+  QcnParser chQcn;
+
+  if (chQcn.OpenDocument(pkg_qcn_file) == FALSE)
+  {
+    return FALSE;
+  }
+  return chQcn.GetNVWriteCommands(nv_cmd, &nv_buffer, &nv_num);
+ // chQcn.PutNVWriteCommands(nvBuf, dwLens);
+  }
+
+    return TRUE;
 }
 
-int flash_image::qcn_enum_next (void) {
+const char* flash_image::qcn_cmds_enum_next (unsigned int index) {
+  if (nv_buffer == NULL) {
+    ERROR("No nv cmds buffer, may be should call qcn_cmds_enum_init first!");
     return NULL;
+  }
+
+  if (index >= nv_num) {
+    ERROR("index (%d) is exceed nv number (%d)!", index, nv_num);
+    return NULL;
+  }
+
+  return *(nv_buffer + index);
 }
 
 void flash_image::read_package_version(const wchar_t * package_conf){
@@ -437,6 +469,12 @@ BOOL flash_image::reset(BOOL free_only) {
       a5sw_usr_ver=("Unknown"),
       fw_ver=("Unknown"),
       qcn_ver=("Unknown");
+      if (nv_buffer != NULL) {
+      QcnParser::PutNVWriteCommands(nv_buffer, nv_num);
+      nv_buffer = NULL;
+      nv_num = 0;
+      }
+      FREE_IF (nv_cmd);
     }
 
 	return TRUE;

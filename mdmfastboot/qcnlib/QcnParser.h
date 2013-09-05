@@ -55,7 +55,7 @@ enum {
 
 //NV item packet struct
 typedef struct _NV_ITEM_PACKET_INFO{
-	USHORT packetLen;			//Packet length
+	USHORT packetLen;			//Packet length, size of NV_ITEM_PACKET_INFO structure
 	USHORT packetReserve;		//reserve
 	USHORT nvItemID;			//NV ID
 	USHORT nvItemIndex;			//NV Index
@@ -73,16 +73,16 @@ typedef struct _EFS_Dir_Data{
 	char	stream[rest_of_stream];		//Unterminated filename for this sequence number
 }EFS_Dir_Data;
 
-typedef struct _EFS_Backups{
+typedef struct _EFS_NV{
 	CString	  fileName; 			//file name
 	DWORD	  dataLens;				//EFS_Data lens
 	char*	  NVdata;				//the data of NV
-}EFS_Backups;
+}EFS_NV;
 
 //end add
 
 
-typedef pair <int, EFS_Backups> BackupNV;
+typedef pair <int, EFS_NV> INT_EFSNV_PAIR;
 class QcnParser
 {
 public:
@@ -91,8 +91,8 @@ public:
 private:
   ULONG m_NVNumberedItems;
   NV_ITEM_PACKET_INFO *m_NVItemArray;
-  UINT m_StatStorageName;
-  map<int, EFS_Backups> m_BackupNV;
+  UINT m_StorageStat;
+  map<int, EFS_NV> m_EFSNVs;
 
 public:
 	/*********************************************************
@@ -101,8 +101,12 @@ public:
 	pointer to the root IStorage interface to IterateStorage.
 	The function releases the IStorage object by setting
 	the smart pointer spRoot to NULL before exiting.
+	CComPtr<IStorage> is smart pointer, IStorage is not smart pointer.
 	**********************************************************/
-    uint8* OpenDocument(LPCWSTR pDocName, DWORD* lens);
+    BOOL OpenDocument(LPCWSTR pDocName);
+
+	BOOL GetNVWriteCommands(char *nv_cmd, char *** cmds_ptr,unsigned  int *nr_ptr);
+  static BOOL PutNVWriteCommands(char **cmds,unsigned int nr);
 
 private:
 	/*********************************************************
@@ -131,8 +135,10 @@ private:
 	*********************************************************/
 	BOOL DumpStreamContents(IStorage* spStorage, LPWSTR pStreamName,DWORD   buffer_len, PVOID buffer);
 
+  BOOL UpdateEFSNV(LPOLESTR item, PCCH path, PCHAR data, int len);
 
-	void  MergeEFSBackup();
+  BOOL Clear(void);
+
 };
 
 #endif  //CHANGE_QCN_H

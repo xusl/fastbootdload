@@ -5,7 +5,6 @@
 #include <Objidl.h>
 #include <comutil.h>
 #include "QcnParser.h"
-//#include "memmgr.h"
 #include "log.h"
 #include "..\utils.h"
 
@@ -13,21 +12,21 @@
 QcnParser::QcnParser() {
   m_NVNumberedItems = 0;
   m_NVItemArray = NULL;
-  m_StatStorageName = STAT_UNKNOWN;
+  m_StorageStat = STAT_UNKNOWN;
 }
 
 QcnParser::~QcnParser()
 {
-  free(m_NVItemArray);
+  Clear();
 }
 
-uint8* QcnParser::OpenDocument(LPCWSTR pDocName, DWORD* lens) {
+BOOL QcnParser::OpenDocument(LPCWSTR pDocName) {
   IStorage* spRoot = NULL;
   HRESULT hr;
 
-  if (pDocName == NULL || lens == NULL) {
+  if (pDocName == NULL ) {
     ERROR("Invalid parameter.");
-    return NULL;
+    return FALSE;
   }
 
   hr= StgOpenStorage(pDocName,
@@ -39,16 +38,17 @@ uint8* QcnParser::OpenDocument(LPCWSTR pDocName, DWORD* lens) {
 
   if (FAILED(hr)) {
     ERROR( "Failed to open <%S>, hr = 0x%08X", pDocName, hr);
-    return NULL;
+    return FALSE;
   }
 
+  Clear();
+
   IterateStorage(spRoot, 0);
-  MergeEFSBackup();
+  //MergeEFSBackup();
 
   spRoot->Release();
 
- // *lens = m_readLens;
-  return NULL;
+  return TRUE;
 }
 
 void QcnParser::IterateStorage(IStorage* spStorage, int depth) {
@@ -91,7 +91,7 @@ void QcnParser::ExamineBranch(IStorage* spStorage, STATSTG& stat, int depth)
 {
   LPOLESTR ItemName = stat.pwcsName;
   DWORD size = stat.cbSize.LowPart; /* equal to  stat.cbSize.LowPart */
-  DEBUG("Depth %d, pItemName:%S, TYPE : %d, size :%d",depth,  ItemName, stat.type, size);
+  //DEBUG("Depth %d, pItemName:%S, TYPE : %d, size :%d",depth,  ItemName, stat.type, size);
 
   switch(stat.type) {
   case STGTY_STORAGE:
@@ -111,108 +111,82 @@ void QcnParser::ExamineBranch(IStorage* spStorage, STATSTG& stat, int depth)
         return;
       }
 
-      // m_StatStorageName = STAT_UNKNOWN;
       if (depth == 2) {
         if (wcscmp(ItemName, L"NV_Items") == 0) {
-          m_StatStorageName |= STAT_NV_Items;
+          m_StorageStat |= STAT_NV_Items;
         } else if (wcscmp(ItemName, L"EFS_Backup") == 0) {
-          m_StatStorageName |= STAT_EFS_Backup;
+          m_StorageStat |= STAT_EFS_Backup;
         //} else if (wcscmp(ItemName, L"Provisioning_Item_Files") == 0) {
-        //  m_StatStorageName |= STAT_Provisioning_Item_Files;
+        //  m_StorageStat |= STAT_Provisioning_Item_Files;
         } else if (wcscmp(ItemName, L"NV_NUMBERED_ITEMS") == 0) {
-          m_StatStorageName |= STAT_NV_NUMBERED_ITEMS;
+          m_StorageStat |= STAT_NV_NUMBERED_ITEMS;
         } else {
-          //m_StatStorageName &= ~STAT_LEVEL_2_MASK;
+          //m_StorageStat &= ~STAT_LEVEL_2_MASK;
           spRoot ->Release();
           break;
         }
       } else if (depth == 3) {
         if (wcscmp(ItemName, L"EFS_Dir") == 0) {
-          m_StatStorageName |= STAT_EFS_Dir;
+          m_StorageStat |= STAT_EFS_Dir;
         } else if (wcscmp(ItemName, L"EFS_Data") == 0) {
-          m_StatStorageName |= STAT_EFS_Data;
+          m_StorageStat |= STAT_EFS_Data;
         } else {
-          m_StatStorageName &= ~STAT_LEVEL_3_MASK;
+          m_StorageStat &= ~STAT_LEVEL_3_MASK;
         }
       }
 
       IterateStorage(spRoot, depth + 1);
       spRoot ->Release();
       if (depth == 2 ) {
-        m_StatStorageName &= ~STAT_LEVEL_2_MASK;
+        m_StorageStat &= ~STAT_LEVEL_2_MASK;
       } else if (depth == 3){
-        m_StatStorageName &= ~STAT_LEVEL_3_MASK;
+        m_StorageStat &= ~STAT_LEVEL_3_MASK;
       }
     }
     break ;
 
   case STGTY_STREAM:
-    //DEBUG("*****strName = %S stat.cbSize = %d", ItemName, size);
-    if (m_StatStorageName & STAT_EFS_Dir) {
-      //EFS_Dir_Data *efsDirData ;
+    if (m_StorageStat & STAT_EFS_Dir) {
       char *path;
-      EFS_Backups bknv;
-      map<int, EFS_Backups> :: iterator iter;
-      int item_index = wcstol(ItemName, NULL, 16);
       /*size do not contain the NULL termination char*/
       char*data = (char *)calloc(1, size + 1);
       if (!data) {
         ERROR("out of memory");
         break;
       }
-      //ZeroMemory(&efsDirData, sizeof(efsDirData));
       DumpStreamContents(spStorage, ItemName, size, data);
-      if (m_StatStorageName & STAT_EFS_Backup) {
+      if (m_StorageStat & STAT_EFS_Backup) {
         if (sizeof(EFS_Dir_Data) < size) {
           ERROR("Size %d exceed EFS_Dir_Data size", size);
           free(data);
           break;
         }
         path = ((EFS_Dir_Data *)data)->stream;
-        //memcpy(&efsDirData ,data, size);
       } else {
         if (rest_of_stream < size) {
           size = rest_of_stream;
           WARN("size %d exceed rest_of_stream %d",size, rest_of_stream);
         }
-        //strncpy(efsDirData.stream, data, size);
         path = data;
       }
 
-      if (strncmp(path, "/nv/", strlen("/nv/")) == 0) {
-        iter = m_BackupNV.find(item_index);
-        if (iter == m_BackupNV.end()) {
-          bknv.fileName = path;
-          m_BackupNV.insert(BackupNV(item_index, bknv));
-        } else {
-          iter->second.fileName = path;
-        }
+      if (((strncmp(path, "/nv/", 4) == 0) && (m_StorageStat & STAT_NV_Items))
+        ||( m_StorageStat & STAT_EFS_Backup)) {
+        UpdateEFSNV(ItemName, path, NULL, 0);
       } else {
         WARN("%s NOT START WITH /nv/", path);
       }
       free(data);
-    }else if (m_StatStorageName & STAT_EFS_Data) { //read file contents
+    }else if (m_StorageStat & STAT_EFS_Data) { //read file contents
       char* data = (char *)calloc(1, size);
-      int item_index = wcstol(ItemName, NULL, 16);
-      map<int, EFS_Backups> :: iterator iter;
-      EFS_Backups bknv;
 
       if (data == NULL) {
         ERROR("out of memory");
         return;
       }
       DumpStreamContents(spStorage, ItemName, size, data);
-
-      iter = m_BackupNV.find(item_index);
-      if (iter == m_BackupNV.end()) {
-        bknv.NVdata = data;
-        bknv.dataLens = size;
-        m_BackupNV.insert(BackupNV(item_index, bknv));
-      } else {
-        iter->second.NVdata = data;
-        iter->second.dataLens = size;
-      }
-    }else if (m_StatStorageName & STAT_NV_NUMBERED_ITEMS
+      UpdateEFSNV(ItemName, NULL, data, size);
+    }else if (m_StorageStat & STAT_NV_NUMBERED_ITEMS
               && (wcscmp(ItemName, L"NV_ITEM_ARRAY") == 0)) {
       m_NVNumberedItems = size / sizeof(NV_ITEM_PACKET_INFO);
       if (m_NVNumberedItems * sizeof(NV_ITEM_PACKET_INFO) != size) {
@@ -231,7 +205,7 @@ void QcnParser::ExamineBranch(IStorage* spStorage, STATSTG& stat, int depth)
       }
       DumpStreamContents(spStorage, ItemName, size, m_NVItemArray);
     } else {
-      WARN("Do not handle stat %d, item %S", m_StatStorageName, ItemName);
+      WARN("Do not handle stat %d, item %S", m_StorageStat, ItemName);
     }
     break;
 
@@ -240,7 +214,7 @@ void QcnParser::ExamineBranch(IStorage* spStorage, STATSTG& stat, int depth)
     break;
 
   case STGTY_PROPERTY:
-    //    IEnumSTATSTG,
+    // IEnumSTATSTG,
     break;
   }
 }
@@ -279,10 +253,148 @@ BOOL QcnParser::DumpStreamContents(IStorage* spStorage,
   return result;
 }
 
-void QcnParser::MergeEFSBackup() {
-  map<int, EFS_Backups> :: const_iterator iter;
-  for ( iter = m_BackupNV.begin( ) ; iter != m_BackupNV.end( ) ; iter++ ){
-    DEBUG("ITEM %X, PATH %S, datalen %d",iter->first, iter->second.fileName, iter->second.dataLens);
+BOOL QcnParser::UpdateEFSNV(LPOLESTR item, PCCH path, PCHAR data, int size) {
+  int item_index;
+  map<int, EFS_NV> :: iterator iter;
+  EFS_NV bknv;
+
+  if (item == NULL) {
+    return FALSE;
   }
 
+  item_index = wcstol(item, NULL, 16);
+
+  iter = m_EFSNVs.find(item_index);
+  if (iter == m_EFSNVs.end()) {
+    bknv.NVdata = data;
+    bknv.dataLens = size;
+    bknv.fileName = (path != NULL ? path : "");
+    m_EFSNVs.insert(INT_EFSNV_PAIR(item_index, bknv));
+  } else {
+    if (NULL != data && size > 0) {
+      iter->second.NVdata = data;
+      iter->second.dataLens = size;
+    }
+    if (path != NULL) {
+      iter->second.fileName = path;
+    }
+  }
+  return TRUE;
+}
+
+BOOL QcnParser::Clear(void) {
+  map<int, EFS_NV> :: const_iterator iter;
+  for ( iter = m_EFSNVs.begin( ) ; iter != m_EFSNVs.end( ) ; iter++ ){
+    if (iter->second.NVdata) {
+      free(iter->second.NVdata);
+    }
+  }
+  m_EFSNVs.clear();
+
+  if (m_NVItemArray != NULL) {
+    free(m_NVItemArray);
+    m_NVItemArray = NULL;
+  }
+  return TRUE;
+}
+
+#define HEX_UP(val) (((val) > 9) ? ((val) + 0x40 - 9): ((val) + 0x30))
+#define HEX_LOW(val) (((val) > 9) ? ((val) + 0x60 - 9): ((val) + 0x30))
+BOOL QcnParser::GetNVWriteCommands(char *nv_cmd, char *** cmds_ptr,unsigned int *nr_ptr) {
+  map <int, EFS_NV> :: const_iterator iter;
+  NV_ITEM_PACKET_INFO *nv = m_NVItemArray;
+  unsigned int cmd_len;
+  unsigned int nv_cmd_len;
+  unsigned int size;
+  unsigned int used;
+  unsigned int offset;
+  char ** cmds;
+  if (nv_cmd == NULL || cmds_ptr == NULL || nr_ptr == NULL) {
+    ERROR("Bad parameters!");
+    return FALSE;
+  }
+
+  size = m_NVNumberedItems + m_EFSNVs.size();
+  cmds = (char **)calloc(sizeof(char*), size);
+  if (cmds == NULL) {
+    ERROR("Out of memory");
+    return FALSE;
+  }
+
+  nv_cmd_len = strlen(nv_cmd);
+
+  for (size = 0; size < m_NVNumberedItems && nv != NULL; size++, nv++) {
+    cmd_len = nv_cmd_len + 12 + sizeof(nv->itemData) * 2;
+    *(cmds + size) = (char*)calloc(sizeof(char), cmd_len);
+    if (*(cmds + size) == NULL) {
+      ERROR("Out of memory");
+      break;
+    }
+    used = _snprintf(*(cmds + size), cmd_len,"%s %8d ", nv_cmd, nv->nvItemID);
+
+    for (offset = 0;offset < sizeof(nv->itemData); used++, offset++) {
+      if (used > cmd_len - 3) {
+        ERROR("Buffer length is shorter than data.");
+        break;
+      }
+    *(*(cmds + size) + used) = HEX_UP(((*(nv->itemData + offset))>> 4) & 0x0f);
+    used++;
+    *(*(cmds + size) + used) = HEX_UP((*(nv->itemData + offset)) & 0x0f);
+    }
+    *(*(cmds + size) + used) = '\0';
+
+    //DEBUG("nvItemID %d, nvItemIndex %d, packetLen %d", nv->nvItemID, nv->nvItemIndex, nv->packetLen);
+    //DEBUG("COMMMAND IS %s", *(cmds + size));
+  }
+
+  for ( iter = m_EFSNVs.begin( ) ; iter != m_EFSNVs.end( ) ; iter++, size++){
+    cmd_len = nv_cmd_len + wcslen(iter->second.fileName.GetString()) + 4;
+   cmd_len += iter->second.dataLens * 2;
+    *(cmds + size) = (char*)calloc(sizeof(char), cmd_len);
+    if (*(cmds + size) == NULL) {
+      ERROR("Out of memory");
+      break;
+    }
+    used = _snprintf(*(cmds + size), cmd_len,"%s %S ", nv_cmd, iter->second.fileName.GetString());
+
+    for (offset = 0;offset < iter->second.dataLens; offset++,used++) {
+      if (used > cmd_len - 3) {
+        ERROR("Buffer length is shorter than data.");
+        break;
+      }
+    *(*(cmds + size) + used) = HEX_UP((*(iter->second.NVdata + offset)>> 4) & 0x0f);
+    used++;
+    *(*(cmds + size) + used) = HEX_UP(*(iter->second.NVdata + offset) & 0x0f);
+    }
+    *(*(cmds + size) + used) = '\0';
+
+     //DEBUG("ITEM %08X, PATH %S, datalen %d",iter->first, iter->second.fileName, iter->second.dataLens);
+     //DEBUG("COMMMAND IS %s", *(cmds + size));
+  }
+
+  *nr_ptr = size;
+  *cmds_ptr = cmds;
+
+  return TRUE;
+}
+
+BOOL QcnParser::PutNVWriteCommands(char **cmds,unsigned int nr) {
+  unsigned int i = 0;
+  char* cmd;
+  if (cmds == NULL || nr == NULL) {
+    ERROR("Bad parameters!");
+    return FALSE;
+  }
+
+  for ( i = 0;i < nr; i++) {
+    cmd = *(cmds +i);
+    if (cmd != NULL) {
+      free(cmd);
+      *cmd = NULL;
+    }
+  }
+
+  free(cmds);
+
+  return TRUE;
 }

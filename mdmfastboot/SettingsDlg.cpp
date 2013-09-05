@@ -138,3 +138,17 @@ void CSettingsDlg::OnBnClickedScheRemove()
    if (pBtn != NULL)
     *m_pSchedule = pBtn->GetCheck();
 }
+
+void CSettingsDlg::EnableSettings(BOOL enable) {
+   CButton* pBtn = (CButton*)GetDlgItem(IDC_CHECK_FORCEUPDATE);
+   if (pBtn != NULL)
+    pBtn->EnableWindow(enable);
+
+   pBtn = (CButton*)GetDlgItem(IDC_FASTBOOT_ONLY);
+   if (pBtn != NULL)
+    pBtn->EnableWindow(enable);
+
+   pBtn = (CButton*)GetDlgItem(IDC_SCHE_REMOVE);
+   if (pBtn != NULL)
+    pBtn->EnableWindow(enable);
+}
