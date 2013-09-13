@@ -135,7 +135,7 @@ void check_regedit_usbflags(usbid_t USBIds[], unsigned count){
   BYTE szValue;
   DWORD dwCount = sizeof(szValue);
 
-  long lResult = reg.Open(HKEY_LOCAL_MACHINE, L"SYSTEM\\ControlSet001\\Control\\UsbFlags");
+  long lResult = reg.Open(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\UsbFlags");
   if (lResult != ERROR_SUCCESS) {
     ERROR("error code:%d",lResult);
     return ;
