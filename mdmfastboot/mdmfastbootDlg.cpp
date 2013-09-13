@@ -1116,10 +1116,10 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     }
 
     //prepare , do something that before flash image.
-    adb_update_NV(adb, data, img);
-    adb_write_IMEI(adb, data);
-    adb_shell_command(adb,data, "trace -r");
-    adb_shell_command(adb,data, "backup");
+    //adb_update_NV(adb, data, img);
+    //adb_write_IMEI(adb, data);
+    //adb_shell_command(adb,data, "trace -r");
+    //adb_shell_command(adb,data, "backup");
     if (data->partition_nr > 0) {
       adb.reboot_bootloader();
       ui_text_msg(data, REBOOT_DEVICE, "reboot bootloader");
