@@ -71,6 +71,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				UseLibraryDependencyInputs="true"
+				AdditionalDependencies="Psapi.lib"
 				ShowProgress="0"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories=".\zipfile;.\driver"

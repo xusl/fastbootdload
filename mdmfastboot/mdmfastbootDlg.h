@@ -160,6 +160,8 @@ private:
     UINT UsbWorkStat(UsbWorkData *data);
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
     BOOL InitSettingConfig(void);
+	DWORD FindProcess(wchar_t *strProcessName, CString &AppPath);
+	BOOL UnableAdb();
 public:
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);
 	virtual void HtmlHelp(DWORD_PTR dwData, UINT nCmd = 0x000F);

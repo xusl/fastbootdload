@@ -10,6 +10,7 @@
 #include "adbhost.h"
 #include "usb_vendors.h"
 #include "devguid.h"
+#include "Psapi.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -525,6 +526,12 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 {
   CDialog::OnInitDialog();
   ::SetProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP, (HANDLE)1);//for single instance
+
+  if (!UnableAdb())
+  {
+	  EndDialog(0);
+	  return TRUE;
+  }
 
   // 将“关于...”菜单项添加到系统菜单中。
 
@@ -1590,3 +1597,49 @@ void CmdmfastbootDlg::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureIte
 
 	CDialog::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 	}
+
+DWORD CmdmfastbootDlg::FindProcess(wchar_t *strProcessName, CString &AppPath)
+{
+	DWORD aProcesses[1024], cbNeeded, cbMNeeded;
+	HMODULE hMods[1024];
+	HANDLE hProcess;
+	wchar_t szProcessName[MAX_PATH];
+
+	if ( !EnumProcesses( aProcesses, sizeof(aProcesses), &cbNeeded ) )  return 0;
+	for(int i=0; i< (int) (cbNeeded / sizeof(DWORD)); i++)
+	{
+		hProcess = OpenProcess(  PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, aProcesses[i]);
+		EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbMNeeded);
+		GetModuleFileNameEx( hProcess, hMods[0], szProcessName,sizeof(szProcessName));
+
+		if(wcsstr(szProcessName, strProcessName))
+		{
+			AppPath = szProcessName;
+			return(aProcesses[i]);
+		}
+	}
+	return 0;
+}
+
+BOOL CmdmfastbootDlg::UnableAdb()
+{
+	int iTemp = 0;
+	DWORD adbProcID;
+	CString adbPath;
+	adbProcID = FindProcess(L"adb.exe", adbPath);
+	if (0 != adbProcID)
+	{
+		//stop adb;
+		//If the function succeeds, the return value is greater than 31.
+		iTemp = WinExec(adbPath + " kill-server", SW_HIDE);
+		if (31 < iTemp)
+		{
+			return TRUE;
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
