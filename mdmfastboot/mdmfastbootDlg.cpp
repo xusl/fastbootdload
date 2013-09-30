@@ -1266,7 +1266,7 @@ void CmdmfastbootDlg::SetUpAdbDevice(
       }
     }
 
-    _snwprintf_s(key, MAX_PATH,L"SYSTEM\\ControlSet001\\Enum\\%s", buf);
+    _snwprintf_s(key, MAX_PATH,L"SYSTEM\\CurrentControlSet\\Enum\\%s", buf);
     lResult = reg.Open(HKEY_LOCAL_MACHINE,key, KEY_READ);
     if (lResult == ERROR_SUCCESS) {
       nSize = MAX_PATH;
