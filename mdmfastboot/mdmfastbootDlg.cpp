@@ -585,7 +585,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   m_PackagePath = m_image->get_package_dir();
   UpdatePackageInfo();
 
-  //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回78.
+  //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回87,因为构造函数中m_hWnd还没被初始化为有效值.
   RegisterAdbDeviceNotification();
   SetWorkStatus(m_bWork, TRUE);
   adb_usb_init();
