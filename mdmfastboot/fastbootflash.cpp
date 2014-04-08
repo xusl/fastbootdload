@@ -791,6 +791,7 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
     double start = -1;
     unsigned total_size = image_size();
     unsigned flashed_size = 0;
+	bool bIsBreak = false;
 
     a = action_list;
     resp[FB_RESPONSE_SZ] = 0;
@@ -805,12 +806,14 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
         if (a->op == OP_DOWNLOAD) {
             status = fb_download_data(usb, a->data, a->size);
             status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
-            if (status) break;
+            if (status)
+				bIsBreak = true;
             flashed_size += a->size;
         } else if (a->op == OP_COMMAND) {
             status = fb_command(usb, a->cmd);
-            status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
-            if (status) break;
+			status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
+			if (status)
+				bIsBreak = true;
 
             if (total_size == 0) {
               CRITICAL("Error total_size is 0");
@@ -820,17 +823,29 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
             port_progress(hWnd, data, (int) (100.0 * (double) flashed_size / total_size ));
         } else if (a->op == OP_QUERY) {
             status = fb_command_response(usb, a->cmd, resp);
-            status = a->func(hWnd, data, a, status, status ? fb_get_error() : resp);
-            if (status) break;
+			status = a->func(hWnd, data, a, status, status ? fb_get_error() : resp);
+			if (status)
+				bIsBreak = true;
         } else if (a->op == OP_NOTICE) {
             //fprintf(stderr,"%s\n",(char*)a->data);
             port_text_msg(hWnd, data, "%s\n",(char*)a->data);
         } else {
             ERROR("bogus action");
         }
+		if (bIsBreak) {
+			break;
+		}
+		
     }
 
-    port_text_msg(hWnd, data, "finished. total time: %.3fs\n", (now() - start));
+	if (bIsBreak)
+	{
+		port_text_msg(hWnd, data, "download breaked. total time: %.3fs\n", (now() - start));
+	}
+	else
+	{
+		port_text_msg(hWnd, data, "finished. total time: %.3fs\n", (now() - start));
+	}
 }
 
 /////////////////////////////////////////////////////////////////////////////

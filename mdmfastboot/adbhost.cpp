@@ -480,8 +480,15 @@ int adbhost::shell(const char * command, void **response, int *responselen) {
   return 0;
 }
 
-int adbhost::reboot_bootloader(void) {
-   return shell("reboot-bootloader", NULL, NULL);
+int adbhost::reboot_bootloader(MODULE_NAME module_name) {
+	if (MODULE_M850==module_name)
+	{
+		return shell("sys_reboot bootloader", NULL, NULL);
+	}
+	else
+	{
+		return shell("reboot-bootloader", NULL, NULL);
+	}
 }
 
 

@@ -27,6 +27,7 @@ static const GUID usb_class_id[] = {
 };
 
 static UINT usb_work(LPVOID wParam);
+MODULE_NAME CmdmfastbootDlg::m_module_name;
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -67,6 +68,7 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
   m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
   m_bInit = FALSE;
   m_updated_number = 0;
+  m_module_name = MODULE_M801;
   InitSettingConfig();
 }
 
@@ -357,6 +359,10 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
   m_image->get_pkg_qcn_ver(m_QCNVer);
   m_image->get_pkg_fw_ver(m_FwVer);
 
+  if (-1 != m_LinuxVer.Find(L"M850"))
+  {
+	  m_module_name = MODULE_M850;
+  }  
   UpdateData(FALSE);
   return TRUE;
 }
@@ -1128,7 +1134,7 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     //adb_shell_command(adb,data, "trace -r");
     //adb_shell_command(adb,data, "backup");
     if (data->partition_nr > 0) {
-      adb.reboot_bootloader();
+	  adb.reboot_bootloader(m_module_name);
       ui_text_msg(data, REBOOT_DEVICE, "reboot bootloader");
     } else {
       // that is mean just update qcn

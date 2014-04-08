@@ -111,6 +111,7 @@ protected:
 public:
 	//port UI
 
+	static MODULE_NAME m_module_name;
 	CString m_FwVer;
 	CString m_QCNVer;
 	CString m_LinuxVer;

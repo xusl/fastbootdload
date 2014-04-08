@@ -45,6 +45,11 @@ typedef struct {
     const char *lpath;
 } sync_ls_build_list_cb_args;
 
+typedef enum {
+	MODULE_M801,
+	MODULE_M850
+}MODULE_NAME;
+
 class adbhost
 {
 	public:
@@ -53,7 +58,7 @@ class adbhost
 		~adbhost(void);
 
 		void process(void);
-    int reboot_bootloader(void);
+    int reboot_bootloader(MODULE_NAME module_name);
     //
     int shell(const char * command, void **response, int *len);
 
