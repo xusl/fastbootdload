@@ -83,7 +83,7 @@ CAPTION "关于 mdmfastboot"
 FONT 9, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,14,14,20,20
-    LTEXT           "mdmfastboot，1.0 版",IDC_STATIC,42,14,114,8,SS_NOPREFIX
+    LTEXT           "mdmfastboot，1.01 版",IDC_STATIC,42,14,114,8,SS_NOPREFIX
     LTEXT           "Copyright (C) 2013  TCT SCD MBB\r\n\r\n Developer: \r\n\tshenlong.xu.sz@tcl.com\r\n\tshaopan.sun2@tcl.com",IDC_STATIC,42,26,142,43
     DEFPUSHBUTTON   "确定",IDOK,107,77,50,14,WS_GROUP
 END
