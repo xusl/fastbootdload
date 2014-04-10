@@ -126,6 +126,13 @@ const char * basename(const char * f_name) {
 	return f_name + i;
 }
 
+CString GetFileNameFromFullPath(CString FullPath)   
+{   
+	int Where;   
+	Where = FullPath.ReverseFind('\\');
+	CString FileName = FullPath.Right(FullPath.GetLength() - 1 - Where);
+	return FileName;   
+}
 
 CString GetAppPath(CString & sPath )
 {

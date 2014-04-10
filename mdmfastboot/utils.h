@@ -183,6 +183,7 @@ char*   buff_add  (char*  buff, char*  buffEnd, const char*  format, ... );
     char   _buff[_size], *_cursor=_buff, *_end = _cursor + (_size)
 
 const char * basename(const char * f_name);
+CString GetFileNameFromFullPath(CString FullPath);
 void get_my_path(char *s, size_t maxLen);
 CString GetAppPath(CString & sPath );
 void sleep(int seconds);

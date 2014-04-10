@@ -6,6 +6,8 @@ SETTING_REMOVE,
 };
 // CSettingsDlg 对话框
 
+class CmdmfastbootDlg;
+
 class CSettingsDlg : public CDialog
 {
 	DECLARE_DYNAMIC(CSettingsDlg)
@@ -22,6 +24,7 @@ public:
 // 对话框数据
 	enum { IDD = IDD_SETTINGS };
 
+	CmdmfastbootDlg* m_pParent;
 private:
   int *m_pSchedule;
   int *m_pFlashdirect;

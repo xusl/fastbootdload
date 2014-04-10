@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "mdmfastboot.h"
 #include "SettingsDlg.h"
+#include "mdmfastbootDlg.h"
 
 
 // CSettingsDlg ¶Ô»°¿ò
@@ -122,14 +123,17 @@ void CSettingsDlg::OnBnClickedCheckForceupdate()
 {
    CButton* pBtn = (CButton*)GetDlgItem(IDC_CHECK_FORCEUPDATE);
    if (pBtn != NULL)
-    *m_pForceupdate = pBtn->GetCheck();
+   {
+	   *m_pForceupdate = pBtn->GetCheck();
+	   WritePrivateProfileString(L"app",L"forceupdate",*m_pForceupdate?L"1":L"0",m_pParent->m_ConfigPath.GetBuffer());
+   }
 }
 
 void CSettingsDlg::OnBnClickedFastbootOnly()
 {
     CButton* pBtn = (CButton*)GetDlgItem(IDC_FASTBOOT_ONLY);
    if (pBtn != NULL)
-    *m_pFlashdirect = pBtn->GetCheck();
+	 *m_pFlashdirect = pBtn->GetCheck();
 }
 
 void CSettingsDlg::OnBnClickedScheRemove()

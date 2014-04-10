@@ -154,7 +154,7 @@ int flash_image::read_config(const wchar_t* config) {
         path = pkg_dir;
         //path += L'\\';
         path += filename;
-      add_image(partition, path.GetBuffer());
+      add_image(partition, path.GetBuffer(), 0, config);
       path.ReleaseBuffer();
     }
 
@@ -167,6 +167,7 @@ int flash_image::read_config(const wchar_t* config) {
 
 int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write, const wchar_t* config)
 {
+
   FlashImageInfo* img = NULL;
 
   if (partition == NULL || lpath == NULL) {
@@ -185,7 +186,12 @@ int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write
     free(img);
     return -1;
   }
+  int iDl = GetPrivateProfileInt(PARTITIONTBL_DL,
+									  partition,
+									  1,
+									  config);
 
+  img->need_download = (1==iDl)?true:false;
   img->partition = wcsdup(partition);
   img->partition_str = WideStrToMultiStr(partition);
   img->lpath = wcsdup(lpath);
@@ -431,6 +437,21 @@ BOOL flash_image::get_pkg_qcn_ver(CString &version) {
 BOOL flash_image::get_pkg_fw_ver(CString &version) {
     version = fw_ver;
     return TRUE;
+}
+
+BOOL flash_image::set_download_flag(CString strPartitionName, bool bDownload) {
+	BOOL bRet = 0;
+	FlashImageInfo* img = image_list;
+	for(;img != NULL; ) {
+		if (0 == wcscmp(img->partition, strPartitionName.GetBuffer()))
+		{
+			img->need_download = bDownload;
+			bRet = 1;
+			break;
+		}
+		img = img->next;
+	}
+	return bRet;
 }
 
 BOOL flash_image::reset(BOOL free_only) {

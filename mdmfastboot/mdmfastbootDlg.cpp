@@ -69,6 +69,7 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
   m_bInit = FALSE;
   m_updated_number = 0;
   m_module_name = MODULE_M801;
+  m_SetDlg.m_pParent = this;
   InitSettingConfig();
 }
 
@@ -102,6 +103,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_BN_CLICKED(IDC_SETTING, &CmdmfastbootDlg::OnBnClickedSetting)
 	ON_WM_SIZING()
 	ON_WM_MEASUREITEM()
+	ON_NOTIFY(LVN_ITEMCHANGED, IDC_IMAGE_LIST, &CmdmfastbootDlg::OnLvnItemchanged)
 END_MESSAGE_MAP()
 
 void CmdmfastbootDlg::OnHelp()
@@ -338,7 +340,8 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
   m_imglist->DeleteAllItems();
   for(;img != NULL; ) {
     m_imglist->InsertItem(item,img->partition);
-    m_imglist->SetItemText(item,1,img->lpath);
+    m_imglist->SetItemText(item,1,GetFileNameFromFullPath(img->lpath));
+	m_imglist->SetCheck(item, img->need_download);
     item ++;
     img = m_image->image_enum_next(img);
   }
@@ -580,8 +583,9 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   #endif
 
   m_imglist = ((CListCtrl*)GetDlgItem(IDC_IMAGE_LIST));
-  m_imglist->InsertColumn(0, _T("Partition/QCN"),LVCFMT_LEFT, 50);
-  m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 600);
+  m_imglist->InsertColumn(0, _T("Partition/QCN"),LVCFMT_LEFT, 90);
+  m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 280);  
+  m_imglist->SetExtendedStyle(LVS_EX_CHECKBOXES);//设置控件有勾选功能
 
   if (m_pack_img) {
     GetDlgItem(IDC_BTN_BROWSE)->ShowWindow(SW_HIDE);
@@ -1001,8 +1005,9 @@ UINT CmdmfastbootDlg::adb_sw_version_cmp(adbhost& adb, UsbWorkData* data){
 }
 
 UINT CmdmfastbootDlg::sw_version_parse(UsbWorkData* data,PCCH key, PCCH value) {
-   PWCHAR a5_partition[] = {L"boot", L"system", L"userdata", L"aboot"};
-   PWCHAR q6_partition[] = {L"dsp1", L"dsp2", L"dsp3", L"mibib", L"sbl2", L"rpm"};
+   PWCHAR a5_partition[] = {L"boot", L"system", L"userdata", L"aboot", L"recovery", L"recoveryfs"};
+   PWCHAR q6_partition[] = {L"dsp1", L"dsp2", L"dsp3", L"mibib", L"sbl2", L"rpm", 
+							L"adsp", L"qdsp", L"mba", L"tz", L"sdi", L"sbl"};
    PWCHAR *partition;
    int count,i;
   // int index;
@@ -1149,16 +1154,22 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     fb.fb_queue_display("serialno","serialno");
     fb.fb_queue_display("kernel","kernel");
 
-    for (int index = 0; index < data->partition_nr; index++) {
-      image = data->flash_partition[index];
-      fb.fb_queue_flash(image->partition_str, image->data, image->size);
+	for (int index = 0; index < data->partition_nr; index++) {
+		image = data->flash_partition[index];
+		if (image->need_download)
+		{
+			fb.fb_queue_flash(image->partition_str, image->data, image->size);
+		}
     }
 
     if (data->partition_nr == 0 && ignore_version) {
         image = img->image_enum_init();
 
         for(;image != NULL ; ) {
-           fb.fb_queue_flash(image->partition_str, image->data, image->size);
+		  if (image->need_download)
+		  {
+		    fb.fb_queue_flash(image->partition_str, image->data, image->size);
+    	  }
           image = img->image_enum_next(image);
         }
     }
@@ -1500,6 +1511,7 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 
 void CmdmfastbootDlg::OnBnClickedStart()
 {
+  m_imglist->EnableWindow(FALSE);
   if (SetWorkStatus(TRUE, FALSE)) {
     AdbUsbHandler(true);
   }
@@ -1507,9 +1519,9 @@ void CmdmfastbootDlg::OnBnClickedStart()
   //::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
 }
 
-
 void CmdmfastbootDlg::OnBnClickedButtonStop()
 {
+	m_imglist->EnableWindow(TRUE);
     SetWorkStatus(FALSE, FALSE);
 }
 
@@ -1648,4 +1660,42 @@ BOOL CmdmfastbootDlg::UnableAdb()
 		}
 	}
 	return TRUE;
+}
+
+void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	// TODO: 在此添加控件通知处理程序代码
+	CString strPartitionName;
+	bool bSelected = false;
+	bool bSelectStatChange = false;
+	if((pNMLV->uOldState & INDEXTOSTATEIMAGEMASK(1)) /* old state : unchecked */ 
+		&& (pNMLV->uNewState & INDEXTOSTATEIMAGEMASK(2)) /* new state : checked */ 
+		) 
+	{ 
+		bSelectStatChange = true;
+		bSelected = true;
+		TRACE("Item %d is checked\n", pNMLV->iItem); 
+	} 
+	else if((pNMLV->uOldState & INDEXTOSTATEIMAGEMASK(2)) /* old state : checked */ 
+		&& (pNMLV->uNewState & INDEXTOSTATEIMAGEMASK(1)) /* new state : unchecked */ 
+		) 
+	{ 
+		bSelectStatChange = true;
+		bSelected = false;
+		TRACE("Item %d is unchecked\n", pNMLV->iItem); 
+	} 
+	else 
+	{ 
+		TRACE("Item %d does't change the check-status\n", pNMLV->iItem); 
+	} 
+
+	if (bSelectStatChange)
+	{
+		strPartitionName = m_imglist->GetItemText(pNMLV->iItem, 0);
+		m_image->set_download_flag(strPartitionName, bSelected);
+		WritePrivateProfileString(PARTITIONTBL_DL,strPartitionName.GetBuffer(),bSelected?L"1":L"0",m_ConfigPath.GetBuffer());
+	}
+
+	*pResult = 0;
 }

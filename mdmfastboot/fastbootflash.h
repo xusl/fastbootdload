@@ -43,6 +43,7 @@
 #define PKG_STATIC_QCN          L"static.qcn"
 
 #define PARTITIONTBL_SECTION    L"partition_table"
+#define PARTITIONTBL_DL		    L"partition_dl"
 #define PKG_SECTION             L"package"
 #define PKG_PATH                L"path"
 static const int PARTITION_NUM_MAX = 32;
@@ -54,8 +55,9 @@ typedef struct FlashImageInfo {
     wchar_t *partition;
     char *partition_str;
     wchar_t *lpath;
-    void *data;
-    unsigned size;
+	void *data;
+	unsigned size;
+	bool need_download;
 }FlashImageInfo;
 
 class flash_image{
@@ -80,6 +82,7 @@ class flash_image{
     BOOL get_pkg_a5sw_kern_ver(CString &version);
     BOOL get_pkg_fw_ver(CString &version);
     BOOL get_pkg_qcn_ver(CString &version);
+	BOOL set_download_flag(CString strPartitionName, bool bDownload);
     int read_config(const wchar_t* config);
 
   protected:
