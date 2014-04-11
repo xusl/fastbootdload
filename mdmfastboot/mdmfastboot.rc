@@ -234,6 +234,11 @@ END
 
 IDR_MENU_MAIN MENU 
 BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "M850",                        ID_FILE_M850
+        MENUITEM "M801",                        ID_FILE_M801
+    END
     POPUP "&Help"
     BEGIN
         MENUITEM "&Help",                       ID_HELP

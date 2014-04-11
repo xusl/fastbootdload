@@ -89,6 +89,7 @@ protected:
   int m_nPortRow;
   int switch_timeout;
   int work_timeout;
+  CString m_strModuleName;
 
 	//CThreadPool<CDlWorker> m_dlWorkerPool;
   CString m_ConfigPath;
@@ -163,9 +164,12 @@ private:
     BOOL InitSettingConfig(void);
 	DWORD FindProcess(wchar_t *strProcessName, CString &AppPath);
 	BOOL UnableAdb();
+	void UpdatePackage();
 public:
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);
 	virtual void HtmlHelp(DWORD_PTR dwData, UINT nCmd = 0x000F);
 	afx_msg void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
 	afx_msg void OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult);
-	};
+	afx_msg void OnFileM850();
+	afx_msg void OnFileM801();
+};

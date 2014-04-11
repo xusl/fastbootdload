@@ -70,6 +70,7 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
   m_updated_number = 0;
   m_module_name = MODULE_M801;
   m_SetDlg.m_pParent = this;
+  m_image = NULL;
   InitSettingConfig();
 }
 
@@ -104,6 +105,8 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_WM_SIZING()
 	ON_WM_MEASUREITEM()
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_IMAGE_LIST, &CmdmfastbootDlg::OnLvnItemchanged)
+	ON_COMMAND(ID_FILE_M850, &CmdmfastbootDlg::OnFileM850)
+	ON_COMMAND(ID_FILE_M801, &CmdmfastbootDlg::OnFileM801)
 END_MESSAGE_MAP()
 
 void CmdmfastbootDlg::OnHelp()
@@ -362,10 +365,20 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
   m_image->get_pkg_qcn_ver(m_QCNVer);
   m_image->get_pkg_fw_ver(m_FwVer);
 
-  if (-1 != m_LinuxVer.Find(L"M850"))
+  wchar_t moduleName[MAX_PATH];
+  GetPrivateProfileString(L"app",L"module",L"M850",moduleName, MAX_PATH,m_ConfigPath);
+  m_strModuleName = moduleName;
+  if (-1 != m_strModuleName.Find(L"M850"))
   {
 	  m_module_name = MODULE_M850;
-  }  
+	  GetMenu()->GetSubMenu(0)->CheckMenuItem(0,MF_BYPOSITION|MF_CHECKED);
+	  GetMenu()->GetSubMenu(0)->CheckMenuItem(1,MF_BYPOSITION|MF_UNCHECKED);
+  }
+  else
+  {
+	  GetMenu()->GetSubMenu(0)->CheckMenuItem(1,MF_BYPOSITION|MF_CHECKED);
+	  GetMenu()->GetSubMenu(0)->CheckMenuItem(0,MF_BYPOSITION|MF_UNCHECKED);
+  }
   UpdateData(FALSE);
   return TRUE;
 }
@@ -476,6 +489,10 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   if(log_level) delete log_level;
 
   //construct update software package. get configuration about partition information.
+  if (NULL!=m_image)
+  {
+	  delete m_image;
+  }
   m_image = new flash_image(lpFileName);
 
   //init app setting.
@@ -1511,10 +1528,17 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 
 void CmdmfastbootDlg::OnBnClickedStart()
 {
-  m_imglist->EnableWindow(FALSE);
-  if (SetWorkStatus(TRUE, FALSE)) {
-    AdbUsbHandler(true);
-  }
+	if (m_imglist->GetItemCount()<1)
+	{
+		AfxMessageBox(L"Please select a valid package directory!",MB_OK);
+		return;
+	}
+	m_imglist->EnableWindow(FALSE);
+	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_DISABLED|MF_GRAYED);
+	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_DISABLED|MF_GRAYED);
+	if (SetWorkStatus(TRUE, FALSE)) {
+	AdbUsbHandler(true);
+	}
 
   //::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
 }
@@ -1522,6 +1546,8 @@ void CmdmfastbootDlg::OnBnClickedStart()
 void CmdmfastbootDlg::OnBnClickedButtonStop()
 {
 	m_imglist->EnableWindow(TRUE);
+	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_ENABLED);
+	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_ENABLED);
     SetWorkStatus(FALSE, FALSE);
 }
 
@@ -1538,8 +1564,7 @@ void CmdmfastbootDlg::OnClose()
       return;
     }
   }
-
-  CDialog::OnClose();
+  OnCancel();
 }
 
 void CmdmfastbootDlg::OnBnClickedCancel()
@@ -1698,4 +1723,38 @@ void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 
 	*pResult = 0;
+}
+
+void CmdmfastbootDlg::UpdatePackage()
+{
+	if (m_PackagePath.IsEmpty())
+	{
+		return;
+	}
+	m_image->set_package_dir(m_PackagePath.GetBuffer(),
+		m_ConfigPath.GetBuffer(MAX_PATH));
+	if (NULL!=m_image)
+	{
+		delete m_image;
+	}
+	m_image =  new flash_image(m_ConfigPath.GetString());
+	UpdatePackageInfo();
+}
+
+void CmdmfastbootDlg::OnFileM850()
+{
+	CopyFile(L".\\mdmconfig_M850.ini", L".\\mdmconfig.ini", FALSE);
+	GetMenu()->GetSubMenu(0)->CheckMenuItem(0,MF_BYPOSITION|MF_CHECKED);
+	GetMenu()->GetSubMenu(0)->CheckMenuItem(1,MF_BYPOSITION|MF_UNCHECKED);
+	InitSettingConfig();
+	UpdatePackage();
+}
+
+void CmdmfastbootDlg::OnFileM801()
+{
+	CopyFile(L".\\mdmconfig_M801.ini", L".\\mdmconfig.ini", FALSE);
+	GetMenu()->GetSubMenu(0)->CheckMenuItem(1,MF_BYPOSITION|MF_CHECKED);
+	GetMenu()->GetSubMenu(0)->CheckMenuItem(0,MF_BYPOSITION|MF_UNCHECKED);
+	InitSettingConfig();
+	UpdatePackage();
 }
