@@ -25,7 +25,7 @@
 #define   TRACE_TAG  TRACE_USB
 #include "adb.h"
 #include "adbhost.h"
-#include "fastbootflash.h"
+//#include "fastbootflash.h"
 #include "usb_vendors.h"
 
 

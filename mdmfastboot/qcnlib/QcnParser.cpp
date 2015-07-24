@@ -6,7 +6,7 @@
 #include <comutil.h>
 #include "QcnParser.h"
 #include "log.h"
-#include "..\utils.h"
+#include "utils.h"
 
 
 QcnParser::QcnParser() {
