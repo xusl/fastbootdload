@@ -2,7 +2,7 @@
 //
 
 #pragma once
-
+#include "adb_dev_register.h"
 
 // CGetProfileDlg 对话框
 class CGetProfileDlg : public CDialog
@@ -17,6 +17,8 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
+private:
+  VOID DoGetProfile(VOID);
 
 // 实现
 protected:
@@ -26,6 +28,8 @@ protected:
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
+	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
 	afx_msg HCURSOR OnQueryDragIcon();
+  afx_msg void CGetProfileDlg::OnDestroy();
 	DECLARE_MESSAGE_MAP()
 };

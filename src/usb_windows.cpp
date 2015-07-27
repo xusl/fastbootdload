@@ -55,7 +55,7 @@ struct usb_handle {
 
   int interface_protocol;
   usb_dev_t status;
-  bool work;
+  BOOL work;
   long usb_sn;
   long dummy_sn;
 
@@ -802,7 +802,7 @@ int recognized_device(usb_handle* handle) {
   if (sn != 0) {
     handle->dummy_sn = sn;
     handle->usb_sn = get_adb_composite_device_sn(sn);
-    //DEBUG("%S serial number %x", interface_name, sn);
+    DEBUG("%S serial number %x", handle->interface_name, sn);
   }  else {
     //if we do not support multiple, sn is not from host allocation.
     // todo:: add a judge?
@@ -896,6 +896,7 @@ void find_devices(BOOL flashdirect) {
             free(handle);
           }
         }else {
+        ERROR("DO NOT recognized_device: %S.", handle->interface_name);
           usb_cleanup_handle(handle);
           free(handle);
         }
@@ -926,9 +927,9 @@ void usb_set_work(usb_handle* usb,  BOOL bwork) {
       usb->work = bwork;
 }
 
-bool usb_is_work(usb_handle* usb) {
+BOOL usb_is_work(usb_handle* usb) {
      if (usb != NULL)
         return usb->work;
 
-     return false;
+     return FALSE;
 }

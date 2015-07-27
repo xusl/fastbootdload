@@ -45,13 +45,15 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				PreprocessorDefinitions="WIN32;_WINDOWS;_DEBUG"
+				AdditionalIncludeDirectories="..\inc;..\libs\AdbWinApi"
+				PreprocessorDefinitions="WIN32;_WINDOWS;_DEBUG;ADB_HOST;HAVE_WINSOCK;HAVE_WIN32_PROC;HAVE_WIN32_IPC;HAVE_WIN32_THREADS;FEATURE_LOG_SYS;FEATURE_LOG_FILE;FEATURE_THREAD_SYNC"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
 				DebugInformationFormat="4"
+				CompileAs="2"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -186,11 +188,23 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath="..\src\adbhost.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\GetProfile.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\GetProfileDlg.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\list.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\log.cpp"
 				>
 			</File>
 			<File
@@ -213,12 +227,40 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath="..\src\utils.cpp"
+				>
+			</File>
+			<Filter
+				Name="adbusb"
+				>
+				<File
+					RelativePath="..\src\adb_dev_register.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\src\transport_usb.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\src\usb_vendors.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\src\usb_windows.cpp"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Í·ÎÄ¼þ"
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
+			<File
+				RelativePath="..\inc\adb_dev_register.h"
+				>
+			</File>
 			<File
 				RelativePath=".\GetProfile.h"
 				>
@@ -264,5 +306,9 @@
 		</File>
 	</Files>
 	<Globals>
+		<Global
+			Name="RESOURCE_FILE"
+			Value="GetProfile.rc"
+		/>
 	</Globals>
 </VisualStudioProject>

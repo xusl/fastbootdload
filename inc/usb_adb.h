@@ -9,6 +9,7 @@
 #define A_OKAY 0x59414b4f
 #define A_CLSE 0x45534c43
 #define A_WRTE 0x45545257
+#define A_AUTH 0x48545541
 
 #define A_VERSION 0x01000000        // ADB protocol version
 
@@ -73,6 +74,6 @@ void build_port_map(CListCtrl *  port_list) ;
 
 const wchar_t *usb_name(usb_handle* handle);
 usb_dev_t usb_status(usb_handle* handle);
-bool usb_is_work(usb_handle* usb);
+BOOL usb_is_work(usb_handle* usb);
 
 #endif /* _USB_ADB_H */

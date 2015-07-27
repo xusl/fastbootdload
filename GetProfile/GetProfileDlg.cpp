@@ -4,6 +4,8 @@
 #include "stdafx.h"
 #include "GetProfile.h"
 #include "GetProfileDlg.h"
+#include "log.h"
+#include "adbhost.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -61,7 +63,9 @@ BEGIN_MESSAGE_MAP(CGetProfileDlg, CDialog)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_WM_DEVICECHANGE()
 	//}}AFX_MSG_MAP
+	ON_WM_DESTROY()
 END_MESSAGE_MAP()
 
 
@@ -95,6 +99,10 @@ BOOL CGetProfileDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	// TODO: 在此添加额外的初始化代码
+	StartLogging(L"GetProfile.log", "all", "all");
+  RegisterAdbDeviceNotification(this->m_hWnd);
+  adb_usb_init();
+  DoGetProfile();
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -148,3 +156,73 @@ HCURSOR CGetProfileDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+
+  VOID CGetProfileDlg::DoGetProfile(VOID) {
+            usb_handle* handle;
+        //SetUpAdbDevice(pDevInf, dwData);
+
+  find_devices(true);
+    for (handle = usb_handle_enum_init();
+       handle != NULL ;
+       handle = usb_handle_next(handle)) {
+          PCHAR resp = NULL;
+  int  resp_len;
+  int ret;
+        adbhost adb(handle , usb_port_address(handle));
+  ret = adb.shell("cat /proc/version", (void **)&resp, &resp_len);
+  LOG("Version %s", resp);
+  free(resp);
+  }
+  }
+
+BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
+{
+  if (dwData == 0)
+  {
+    WARN("OnDeviceChange, dwData == 0 .EventType: 0x%x", nEventType);
+    return FALSE;
+  }
+
+  DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
+  PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
+
+  DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
+        nEventType, phdr->dbch_devicetype);
+
+  if (nEventType == DBT_DEVICEARRIVAL) {
+    switch( phdr->dbch_devicetype ) {
+    case DBT_DEVTYP_DEVNODE:
+      WARN("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
+      break;
+    case DBT_DEVTYP_VOLUME:
+      {
+        /* enumerate devices and shiftdevice
+        */
+        break;
+      }
+    case DBT_DEVTYP_DEVICEINTERFACE:
+      {
+DoGetProfile();
+       }
+        break;
+      }
+  } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
+    if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
+
+      ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+
+      long sn = usb_host_sn(pDevInf->dbcc_name);
+      sn = get_adb_composite_device_sn(sn);
+    }
+  }
+
+  return TRUE;
+	}
+
+void CGetProfileDlg::OnDestroy()
+	{
+	CDialog::OnDestroy();
+
+	// TODO: 在此处添加消息处理程序代码
+	StopLogging();
+	}

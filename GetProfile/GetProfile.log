@@ -1,0 +1,107 @@
+15:43:20     INFO               log.cpp 0150 ===== Start logging =====
+16:00:16     INFO               log.cpp 0150 ===== Start logging =====
+16:31:03     INFO               log.cpp 0066 ***** Stop logging *****
+16:32:22     INFO               log.cpp 0150 ===== Start logging =====
+17:47:48     INFO               log.cpp 0150 ===== Start logging =====
+17:47:59      DBG       usb_windows.cpp 0805 \\?\usb#vid_04e8&pid_6866&mi_01#6&284877b7&0&0001#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b} serial number 284877b7
+17:48:36      ERR       usb_windows.cpp 0899 DO NOT recognized_device: \\?\usb#vid_04e8&pid_6866&mi_01#6&284877b7&0&0001#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b}.
+17:49:38     INFO               log.cpp 0066 ***** Stop logging *****
+18:04:12     INFO               log.cpp 0150 ===== Start logging =====
+18:04:16      DBG       usb_windows.cpp 0805 \\?\usb#vid_04e8&pid_6866&mi_01#6&284877b7&0&0001#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b} serial number 284877b7
+18:04:19      DBG       usb_windows.cpp 0880 adding a new device \
+18:04:19      DBG     transport_usb.cpp 0125 transport: usb
+18:04:19      DBG           adbhost.cpp 0166 Calling connect 
+18:04:19      DBG       usb_windows.cpp 0680 usb_read got: 24, expected: 24, errno: 997, ret: 1
+18:04:19      DBG       usb_windows.cpp 0680 usb_read got: 20, expected: 20, errno: 997, ret: 1
+18:04:19      LOG     getprofiledlg.cpp 0173 Version (null)
+18:04:19      DBG     transport_usb.cpp 0125 transport: usb
+18:04:19      DBG           adbhost.cpp 0166 Calling connect 
+18:04:19      DBG     transport_usb.cpp 0100 remote usb: 1 - write terminated
+18:04:19      DBG       usb_windows.cpp 0680 usb_read got: 0, expected: 24, errno: 6, ret: 0
+18:04:19     WARN       usb_windows.cpp 0702 usb_read failed: 6
+18:04:19      DBG     transport_usb.cpp 0067 remote usb: read terminated (message)
+18:04:19      ERR           adbhost.cpp 0102 from_remote: remote read failed for transport 01556ED0
+18:04:19      LOG     getprofiledlg.cpp 0173 Version (null)
+18:04:41     INFO               log.cpp 0066 ***** Stop logging *****
+20:55:04     INFO               log.cpp 0150 ===== Start logging =====
+20:55:10      DBG       usb_windows.cpp 0805 \\?\usb#vid_1bbb&pid_0192&mi_04#6&173699b5&2&0004#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b} serial number 173699b5
+20:55:11      DBG       usb_windows.cpp 0880 adding a new device \
+20:55:11      DBG     transport_usb.cpp 0125 transport: usb
+20:55:11      DBG           adbhost.cpp 0206 Calling connect 
+20:55:11      DBG           adbhost.cpp 0039 write_packet:  [4e584e43 CNXN] 01000000 00001000 (7) 
+20:55:11      DBG           adbhost.cpp 0053 686f73743a3a00  
+20:55:11      DBG           adbhost.cpp 0064 host::.
+
+20:55:11      DBG       usb_windows.cpp 0680 usb_read got: 24, expected: 24, errno: 997, ret: 1
+20:55:11      DBG       usb_windows.cpp 0680 usb_read got: 9, expected: 9, errno: 997, ret: 1
+20:55:11      DBG           adbhost.cpp 0039 read_packet:  [4e584e43 CNXN] 01000000 00001000 (9) 
+20:55:11      DBG           adbhost.cpp 0053 6465766963653a3a00  
+20:55:11      DBG           adbhost.cpp 0064 device::.
+
+20:55:11      DBG           adbhost.cpp 0395 parse_banner: device::
+20:55:11      DBG           adbhost.cpp 0423 setting connection_state to CS_DEVICE
+
+20:55:11      DBG           adbhost.cpp 0221 Connect_to_remote call 
+20:55:11      DBG           adbhost.cpp 0227 LS(389454261): connect('shell:cat /proc/version')
+20:55:11      DBG           adbhost.cpp 0039 write_packet:  [4e45504f OPEN] 173699b5 00000000 (24) 
+20:55:11      DBG           adbhost.cpp 0053 7368656c6c3a636174202f70726f632f  
+20:55:11      DBG           adbhost.cpp 0064 shell:cat /proc/
+
+20:55:11      DBG       usb_windows.cpp 0680 usb_read got: 24, expected: 24, errno: 997, ret: 1
+20:55:11      DBG           adbhost.cpp 0039 read_packet:  [59414b4f OKAY] 00000055 173699b5 (0) 
+20:55:11      DBG           adbhost.cpp 0053   
+20:55:11      DBG           adbhost.cpp 0064 
+
+20:55:11      DBG           adbhost.cpp 0355 handle receive: local-id=85, remote-id=389454261
+20:55:11      DBG       usb_windows.cpp 0680 usb_read got: 24, expected: 24, errno: 997, ret: 1
+20:55:11      DBG       usb_windows.cpp 0680 usb_read got: 142, expected: 142, errno: 997, ret: 1
+20:55:11      DBG           adbhost.cpp 0039 read_packet:  [45545257 WRTE] 00000055 173699b5 (142) 
+20:55:11      DBG           adbhost.cpp 0053 4c696e75782076657273696f6e20332e  
+20:55:11      DBG           adbhost.cpp 0064 Linux version 3.
+
+20:55:11      DBG           adbhost.cpp 0307 shell return 142 bytes data.
+20:55:11      DBG           adbhost.cpp 0255 Calling remote_socket_ready
+20:55:11      DBG           adbhost.cpp 0039 write_packet:  [59414b4f OKAY] 173699b5 00000055 (0) 
+20:55:11      DBG           adbhost.cpp 0053   
+20:55:11      DBG           adbhost.cpp 0064 
+
+20:55:11      DBG       usb_windows.cpp 0680 usb_read got: 24, expected: 24, errno: 997, ret: 1
+20:55:11      DBG       usb_windows.cpp 0680 usb_read got: 2, expected: 2, errno: 997, ret: 1
+20:55:11      DBG           adbhost.cpp 0039 read_packet:  [45545257 WRTE] 00000055 173699b5 (2) 
+20:55:11      DBG           adbhost.cpp 0053 0d0a  
+20:55:11      DBG           adbhost.cpp 0064 ..
+
+20:55:11      DBG           adbhost.cpp 0307 shell return 2 bytes data.
+20:55:11      DBG           adbhost.cpp 0255 Calling remote_socket_ready
+20:55:11      DBG           adbhost.cpp 0039 write_packet:  [59414b4f OKAY] 173699b5 00000055 (0) 
+20:55:11      DBG           adbhost.cpp 0053   
+20:55:11      DBG           adbhost.cpp 0064 
+
+20:55:11      DBG       usb_windows.cpp 0680 usb_read got: 24, expected: 24, errno: 997, ret: 1
+20:55:11      DBG           adbhost.cpp 0039 read_packet:  [45534c43 CLSE] 00000000 173699b5 (0) 
+20:55:11      DBG           adbhost.cpp 0053   
+20:55:11      DBG           adbhost.cpp 0064 
+
+20:55:11     INFO           adbhost.cpp 0324 shell close
+20:55:11      DBG           adbhost.cpp 0255 Calling remote_socket_ready
+20:55:11      DBG           adbhost.cpp 0039 write_packet:  [59414b4f OKAY] 173699b5 00000055 (0) 
+20:55:11      DBG           adbhost.cpp 0053   
+20:55:11      DBG           adbhost.cpp 0064 
+
+20:55:11      DBG           adbhost.cpp 0333 shell return :Linux version 3.0.21 (linux@linux-HP-Z400-Workstation) (gcc version 4.6.3 20111117 (prerelease) (GCC) ) #1 PREEMPT Thu Apr 2 12:49:21 CST 2015
+.
+20:55:11      LOG     getprofiledlg.cpp 0173 Version Linux version 3.0.21 (linux@linux-HP-Z400-Workstation) (gcc version 4.6.3 20111117 (prerelease) (GCC) ) #1 PREEMPT Thu Apr 2 12:49:21 CST 2015
+
+20:55:11      DBG     transport_usb.cpp 0125 transport: usb
+20:55:11      DBG           adbhost.cpp 0206 Calling connect 
+20:55:11      DBG           adbhost.cpp 0039 write_packet:  [4e584e43 CNXN] 01000000 00001000 (7) 
+20:55:11      DBG           adbhost.cpp 0053 686f73743a3a00  
+20:55:11      DBG           adbhost.cpp 0064 host::.
+
+20:55:11      DBG     transport_usb.cpp 0100 remote usb: 1 - write terminated
+20:55:11      DBG       usb_windows.cpp 0680 usb_read got: 0, expected: 24, errno: 6, ret: 0
+20:55:11     WARN       usb_windows.cpp 0702 usb_read failed: 6
+20:55:11      DBG     transport_usb.cpp 0067 remote usb: read terminated (message)
+20:55:11      ERR           adbhost.cpp 0102 from_remote: remote read failed for transport 01555E70
+20:55:11      LOG     getprofiledlg.cpp 0173 Version (null)
+20:55:17     INFO               log.cpp 0066 ***** Stop logging *****

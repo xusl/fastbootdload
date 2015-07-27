@@ -73,6 +73,9 @@ class adbhost
 		int write_packet(apacket** ppacket);
 		void send_packet(apacket *p, atransport *t);
 
+    void send_auth_response(UINT8 *token, size_t token_size, atransport *t);
+    void send_auth_publickey(atransport *t);
+
 		bool handle_connect_response(void);
 		bool handle_open_response(void);
 		bool handle_shell_response (void **response, int *len);
