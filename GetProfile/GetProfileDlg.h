@@ -28,8 +28,10 @@ public:
 private:
   BOOL ParseProfileContent(char *content , PCHAR lineDelim);
   BOOL ParseProfilesList(char * content , PCHAR lineDelim, PCHAR recordDelim);
+  VOID GetProfilesList(VOID);
   VOID DoGetProfilesList(usb_handle* handle);
   BOOL DoPokeProfile(usb_handle* handle, PCHAR profileName, PCHAR *data);
+  BOOL CheckDeviceProfilePath(usb_handle* handle);
   usb_handle* GetUsbHandle();
 
 // й╣ож

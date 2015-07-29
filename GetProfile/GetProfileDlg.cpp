@@ -121,8 +121,7 @@ BOOL CGetProfileDlg::OnInitDialog()
   if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
     SetTimer(0, 1000, NULL);
   } else {
-    m_hUSBHandle = GetUsbHandle();
-    DoGetProfilesList(m_hUSBHandle);
+    GetProfilesList();
   }
 
   //PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
@@ -230,9 +229,57 @@ BOOL CGetProfileDlg::ParseProfileContent(char * content ,
   return TRUE;
 }
 
+
+BOOL CGetProfileDlg::CheckDeviceProfilePath(usb_handle* handle) {
+#define BUFFER_LEN (PATH_MAX + 64)
+  const char *candidate[] = {
+    "/usr/bin/profile/cust",
+    "/usr/bin/profile/match",
+    NULL
+  };
+  const char * path =candidate[0];
+  CHAR buffer[BUFFER_LEN];
+  PCHAR resp = NULL;
+  BOOL got = FALSE;
+  int resp_len;
+  if (handle == NULL) {
+    ERROR("No adb device found.");
+    return FALSE;
+  }
+  adbhost adb(handle , usb_port_address(handle));
+  for (int index = 0; path != NULL; path= candidate[++index])
+  {
+    memset(buffer, 0, BUFFER_LEN);
+    snprintf(buffer,BUFFER_LEN, "if [ -e %s ]; then echo T ; else echo F; fi", path);
+    adb.shell(buffer, (void **)&resp, &resp_len);
+    if (resp == NULL) {
+      LOG("Occur adb error! No response get.");
+      return FALSE;
+    } else if (strncmp(resp, "T", 1) == 0) {
+      LOG("Set profile path as %s.", path);
+      m_DeviceProfilePath = path;
+      got = TRUE;
+    } else {
+      WARN("Path '%s' is not exit in device",  path);
+    }
+    free(resp);
+    resp = NULL;
+    if (got)
+      break;
+  }
+
+  return got;
+}
+
+VOID CGetProfileDlg::GetProfilesList(VOID) {
+  m_hUSBHandle = GetUsbHandle();
+  CheckDeviceProfilePath(m_hUSBHandle);
+  DoGetProfilesList(m_hUSBHandle);
+}
+
 VOID CGetProfileDlg::DoGetProfilesList(usb_handle* handle) {
   PCHAR resp = NULL;
-  int  resp_len;
+  int resp_len;
   int ret;
 
   if (handle == NULL) {
@@ -320,8 +367,7 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       }
     case DBT_DEVTYP_DEVICEINTERFACE:
       {
-        m_hUSBHandle = GetUsbHandle();
-        DoGetProfilesList(m_hUSBHandle);
+        GetProfilesList();
       }
       break;
     }
@@ -388,8 +434,7 @@ void CGetProfileDlg::OnTimer(UINT_PTR nIDEvent)
   // TODO: 在此添加消息处理程序代码和/或调用默认值
   CDialog::OnTimer(nIDEvent);
 
-  m_hUSBHandle = GetUsbHandle();
-  DoGetProfilesList(m_hUSBHandle);
+  GetProfilesList();
 
   KillTimer(nIDEvent);
 }
