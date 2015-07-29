@@ -15,9 +15,12 @@
  */
 #include "stdafx.h"
 #include "utils.h"
+#include "log.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+
+#pragma comment(lib, "ws2_32.lib")
 
 char*
 buff_addc (char*  buff, char*  buffEnd, int  c)
@@ -126,12 +129,12 @@ const char * basename(const char * f_name) {
 	return f_name + i;
 }
 
-CString GetFileNameFromFullPath(CString FullPath)   
-{   
-	int Where;   
+CString GetFileNameFromFullPath(CString FullPath)
+{
+	int Where;
 	Where = FullPath.ReverseFind('\\');
 	CString FileName = FullPath.Right(FullPath.GetLength() - 1 - Where);
-	return FileName;   
+	return FileName;
 }
 
 CString GetAppPath(CString & sPath )
@@ -365,4 +368,69 @@ void *load_file(LPCWSTR fn, unsigned *_sz)
 
     *_sz = (unsigned) file_size;
     return  data;
+}
+
+static int  _winsock_init;
+
+static void
+_cleanup_winsock( void )
+{
+    WSACleanup();
+}
+
+static void
+_init_winsock( void )
+{
+    if (!_winsock_init) {
+        WSADATA  wsaData;
+        int      rc = WSAStartup( MAKEWORD(2,2), &wsaData);
+        if (rc != 0) {
+            fatal( "adb: could not initialize Winsock\n" );
+        }
+        atexit( _cleanup_winsock );
+        _winsock_init = 1;
+    }
+}
+
+int kill_adb_server(int port )
+{
+  struct sockaddr_in addr;
+  SOCKET  s;
+  int type = SOCK_STREAM;
+
+  if (!_winsock_init)
+    _init_winsock();
+
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(port);
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+  s = socket(AF_INET, type, 0);
+  if(s == INVALID_SOCKET) {
+    DEBUG("kill_adb_server: could not create socket\n" );
+    return -1;
+  }
+
+  if(connect(s, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+    DEBUG("kill_adb_server: could not connect to %s:%d", type != SOCK_STREAM ? "udp" : "tcp", port );
+    return -1;
+  }
+  //snprintf( f->name, sizeof(f->name), "%d(lo-client:%s%d)", _fh_to_int(f), type != SOCK_STREAM ? "udp:" : "", port );
+  //D( "socket_loopback_client: port %d type %s => fd %d", port, type != SOCK_STREAM ? "udp" : "tcp", _fh_to_int(f) );
+  // return _fh_to_int(f);
+  const char *service = "host:kill";
+  char tmp[5];
+  int len= strlen(service);
+
+  DEBUG("kill_adb_server: %s", service);
+
+  snprintf(tmp, sizeof tmp, "%04x", len);
+  send(s, tmp, 4, 0);
+  send(s, service, len, 0);
+
+  shutdown( s, SD_BOTH );
+  closesocket( s );
+  _cleanup_winsock();
+  return  0;
 }

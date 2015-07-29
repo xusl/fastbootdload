@@ -5,6 +5,13 @@
 #include "adb_dev_register.h"
 #include <vector>
 
+enum
+{
+	// UI Messages
+	UI_MESSAGE_BASE = (WM_USER + 1000),
+	UI_MESSAGE_INIT_DEVICE,
+};
+
 // CGetProfileDlg 对话框
 class CGetProfileDlg : public CDialog
 {
@@ -39,6 +46,7 @@ protected:
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
+	LRESULT OnInitDevice(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
 	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
@@ -48,4 +56,5 @@ protected:
 public:
 	afx_msg void OnLvnItemchangedListProfile(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnNMClickListProfile(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	};

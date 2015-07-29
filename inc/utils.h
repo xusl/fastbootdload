@@ -29,6 +29,8 @@
 #include <direct.h>
 #include <afxwin.h>
 
+#  define DEFAULT_ADB_PORT 5037
+
 #define __inline__
 typedef int socklen_t;
 
@@ -80,14 +82,14 @@ static __inline__ void  adb_sleep_ms( int  mseconds )
 
 static __inline__  int    adb_unlink(const char*  path)
 {
-    int  rc = unlink(path);
+    int  rc = _unlink(path);
 
     if (rc == -1 && errno == EACCES) {
         /* unlink returns EACCES when the file is read-only, so we first */
         /* try to make it writable, then unlink again...                  */
-        rc = chmod(path, _S_IREAD|_S_IWRITE );
+        rc = _chmod(path, _S_IREAD|_S_IWRITE );
         if (rc == 0)
-            rc = unlink(path);
+            rc = _unlink(path);
     }
     return rc;
 }
@@ -194,5 +196,5 @@ PCHAR WideStrToMultiStr(PCWCH WideStr);
 
 /* normally provided by <cutils/misc.h> */
 extern void* load_file(LPCWSTR pathname, unsigned*  psize);
-
+int kill_adb_server(int port );
 #endif /* _ADB_UTILS_H */

@@ -877,7 +877,7 @@ void find_devices(BOOL flashdirect) {
         if (recognized_device(handle)) {
           char serial_number[512];
           unsigned long serial_number_len = sizeof(serial_number);
-          DEBUG("adding a new device %s", next_interface->device_name);
+          DEBUG("adding a new device %S", next_interface->device_name);
           if (AdbGetSerialNumber(handle->adb_interface,
                                 serial_number,
                                 &serial_number_len,

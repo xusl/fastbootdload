@@ -412,7 +412,7 @@ void RedirectStdIO(const wchar_t *filename)
 
     stdout[0] = flog[0];
     stderr[0] = flog[0];
-    fprintf(stderr,"\n\n--- adb starting (pid %d) ---\n", getpid());
+    fprintf(stderr,"\n\n--- adb starting (pid %d) ---\n", _getpid());
 
 }
 

@@ -68,8 +68,10 @@ BEGIN_MESSAGE_MAP(CGetProfileDlg, CDialog)
 	ON_WM_DEVICECHANGE()
 	//}}AFX_MSG_MAP
 	ON_WM_DESTROY()
+	ON_WM_TIMER()
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST_PROFILE, &CGetProfileDlg::OnLvnItemchangedListProfile)
 	ON_NOTIFY(NM_CLICK, IDC_LIST_PROFILE, &CGetProfileDlg::OnNMClickListProfile)
+	ON_MESSAGE(UI_MESSAGE_INIT_DEVICE, &CGetProfileDlg::OnInitDevice)
 END_MESSAGE_MAP()
 
 
@@ -103,6 +105,7 @@ BOOL CGetProfileDlg::OnInitDialog()
   SetIcon(m_hIcon, FALSE);		// 设置小图标
 
   // TODO: 在此添加额外的初始化代码
+  StartLogging(L"GetProfile.log", "all", "all");
   m_DeviceProfilePath = "/usr/bin/profile/match";
   m_hProfileList = ((CListCtrl*)GetDlgItem(IDC_LIST_PROFILE));
   m_hProfileList->InsertColumn(0, _T("Profiles"),LVCFMT_LEFT, 80);
@@ -112,12 +115,17 @@ BOOL CGetProfileDlg::OnInitDialog()
   m_hProfileName = (CStatic *)GetDlgItem(IDC_STATIC_PROFILE_NAME);
   GetDlgItem(IDOK)->ShowWindow(SW_HIDE);
 
-  StartLogging(L"GetProfile.log", "all", "all");
   RegisterAdbDeviceNotification(this->m_hWnd);
   adb_usb_init();
-  m_hUSBHandle = GetUsbHandle();
-  DoGetProfilesList(m_hUSBHandle);
 
+  if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
+    SetTimer(0, 1000, NULL);
+  } else {
+    m_hUSBHandle = GetUsbHandle();
+    DoGetProfilesList(m_hUSBHandle);
+  }
+
+  //PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -373,4 +381,20 @@ void CGetProfileDlg::OnNMClickListProfile(NMHDR *pNMHDR, LRESULT *pResult)
     m_hProfileName->SetWindowText(profile);
     free(data);
   }
+}
+
+void CGetProfileDlg::OnTimer(UINT_PTR nIDEvent)
+{
+  // TODO: 在此添加消息处理程序代码和/或调用默认值
+  CDialog::OnTimer(nIDEvent);
+
+  m_hUSBHandle = GetUsbHandle();
+  DoGetProfilesList(m_hUSBHandle);
+
+  KillTimer(nIDEvent);
+}
+
+
+LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
+  return 0;
 }
