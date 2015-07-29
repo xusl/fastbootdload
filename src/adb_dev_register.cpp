@@ -2,6 +2,7 @@
 #include "adb_dev_register.h"
 #include "comdef.h"
 #include "Psapi.h"
+#include "log.h"
 
 #pragma	 comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")

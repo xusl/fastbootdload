@@ -133,7 +133,8 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				PreprocessorDefinitions="WIN32;_WINDOWS;NDEBUG"
+				AdditionalIncludeDirectories="..\inc;..\libs\AdbWinApi"
+				PreprocessorDefinitions="WIN32;_WINDOWS;NDEBUG;ADB_HOST;HAVE_WINSOCK;HAVE_WIN32_PROC;HAVE_WIN32_IPC;HAVE_WIN32_THREADS;FEATURE_LOG_SYS;FEATURE_LOG_FILE;FEATURE_THREAD_SYNC"
 				MinimalRebuild="false"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
@@ -155,6 +156,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="Psapi.lib"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				SubSystem="2"
