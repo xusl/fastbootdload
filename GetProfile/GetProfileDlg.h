@@ -19,6 +19,7 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
 private:
+  BOOL ParseProfileContent(char *content , PCHAR lineDelim);
   BOOL ParseProfilesList(char * content , PCHAR lineDelim, PCHAR recordDelim);
   VOID DoGetProfilesList(usb_handle* handle);
   BOOL DoPokeProfile(usb_handle* handle, PCHAR profileName, PCHAR *data);
@@ -30,7 +31,10 @@ protected:
   usb_handle* m_hUSBHandle;
   //adbhost m_AdbHost;
   CListCtrl *m_hProfileList;
+  CListBox *m_hProfileDataList;
+  CStatic *m_hProfileName;
   std::vector<PCCH> m_pProfiles;
+  std::vector<PCCH> m_pProfileData;
   CStringA m_DeviceProfilePath;
 
 	// 生成的消息映射函数
