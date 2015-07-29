@@ -178,11 +178,12 @@ void CLog::WriteLog
 {
 #ifdef FEATURE_LOG_SYS
 
-#define MAX_BUF_LEN     (512)
+#define MAX_BUF_LEN     (4096 * 8)
+#define FORMAT_SIZE     (256)
 
 	int   nBuf;
 	char  szBuffer[MAX_BUF_LEN] = {0};
-	char  buf[MAX_BUF_LEN] = {0};
+	char  szFormat[FORMAT_SIZE] = {0};
 
     if (this == NULL)
 	{
@@ -203,12 +204,7 @@ void CLog::WriteLog
 		return;
 	}
 
-	if (strlen(fmtstr) > MAX_BUF_LEN)
-	{
-		return;
-	}
-
-    	va_list args;
+  va_list args;
 	va_start(args, fmtstr);
 
 	SYSTEMTIME time;
@@ -217,14 +213,20 @@ void CLog::WriteLog
 	 //_snprintf(buf,MAX_BUF_LEN, "%4d-%02d-%02d %02d:%02d:%02d.%03d  %8s  %s",
 	//			time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
 	//			time.wSecond, time.wMilliseconds,  msg, fmtstr);
-	 	 _snprintf(buf,MAX_BUF_LEN, "%02d:%02d:%02d %8s %s",
+	nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %8s %s",
 				 time.wHour, time.wMinute,time.wSecond, msg, fmtstr);
 
-	nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), buf, args);
-
+	if (nBuf < COUNTOF(szFormat)) {
+	nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), szFormat, args);
+	} else {
+	nBuf = _snprintf(szBuffer, COUNTOF(szBuffer), "Log Error, format buffer length is smaller than format.");
+	}
     va_end(args);
 
-	ASSERT(nBuf >= 0);
+	//ASSERT(nBuf >= 0);
+	if (nBuf == -1) {
+   _snprintf(szBuffer, COUNTOF(szBuffer), "Log Error, data buffer is smaller than data.");
+	}
 
 #ifdef FEATURE_LOG_FILE
 	#ifdef FEATURE_THREAD_SYNC
@@ -238,9 +240,9 @@ void CLog::WriteLog
 	#endif
 #endif //FEATURE_LOG_FILE
 
-	strcat(szBuffer, "\n");
 
 #if _DEBUG
+	strcat(szBuffer, "\n");
 	afxDump << szBuffer;
 #endif // _DEBUG
 

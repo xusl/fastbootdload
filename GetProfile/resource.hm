@@ -1,0 +1,4 @@
+// Microsoft Visual C++ generated Help ID include file.
+// Used by GetProfile.rc
+//
+#define HIDC_STATIC_PROFILE_NAME        0x806603ea    // IDD_GETPROFILE_DIALOG

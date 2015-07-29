@@ -308,8 +308,8 @@ bool adbhost::handle_shell_response (void **response, int *len) {
 
       if (capacity < p->msg.data_length) {
         if (NULL != realloc(data, data_len + capacity + MAX_PAYLOAD)) {
-          capacity += MAX_PAYLOAD;
           memset(data + data_len + capacity, 0, MAX_PAYLOAD);
+          capacity += MAX_PAYLOAD;
         } else {
           ERROR("No Memory!");
           return false;
@@ -330,7 +330,7 @@ bool adbhost::handle_shell_response (void **response, int *len) {
   if (response != NULL && len != NULL) {
     *response = data;
     *len = data_len;
-    DEBUG("shell return :%s.", data);
+   // DEBUG("shell return :%s.", data);
   }
 
   put_apacket(p);

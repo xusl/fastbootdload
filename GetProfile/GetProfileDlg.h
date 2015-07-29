@@ -3,6 +3,7 @@
 
 #pragma once
 #include "adb_dev_register.h"
+#include <vector>
 
 // CGetProfileDlg 对话框
 class CGetProfileDlg : public CDialog
@@ -18,11 +19,19 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
 private:
-  VOID DoGetProfile(VOID);
+  BOOL ParseProfilesList(char * content , PCHAR lineDelim, PCHAR recordDelim);
+  VOID DoGetProfilesList(usb_handle* handle);
+  BOOL DoPokeProfile(usb_handle* handle, PCHAR profileName, PCHAR *data);
+  usb_handle* GetUsbHandle();
 
 // 实现
 protected:
 	HICON m_hIcon;
+  usb_handle* m_hUSBHandle;
+  //adbhost m_AdbHost;
+  CListCtrl *m_hProfileList;
+  std::vector<PCCH> m_pProfiles;
+  CStringA m_DeviceProfilePath;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -32,4 +41,7 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
   afx_msg void CGetProfileDlg::OnDestroy();
 	DECLARE_MESSAGE_MAP()
-};
+public:
+	afx_msg void OnLvnItemchangedListProfile(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnNMClickListProfile(NMHDR *pNMHDR, LRESULT *pResult);
+	};

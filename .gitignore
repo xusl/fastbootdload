@@ -1,3 +1,5 @@
+*.db
+*.log
 *.user
 *.ncb
 *.suo

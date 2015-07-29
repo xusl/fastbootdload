@@ -6,6 +6,8 @@
 #include "GetProfileDlg.h"
 #include "log.h"
 #include "adbhost.h"
+#include <string.h>
+#include <algorithm>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -66,6 +68,8 @@ BEGIN_MESSAGE_MAP(CGetProfileDlg, CDialog)
 	ON_WM_DEVICECHANGE()
 	//}}AFX_MSG_MAP
 	ON_WM_DESTROY()
+	ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST_PROFILE, &CGetProfileDlg::OnLvnItemchangedListProfile)
+	ON_NOTIFY(NM_CLICK, IDC_LIST_PROFILE, &CGetProfileDlg::OnNMClickListProfile)
 END_MESSAGE_MAP()
 
 
@@ -99,10 +103,16 @@ BOOL CGetProfileDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	// TODO: 在此添加额外的初始化代码
-	StartLogging(L"GetProfile.log", "all", "all");
+m_DeviceProfilePath = "/usr/bin/profile/match";
+  m_hProfileList = ((CListCtrl*)GetDlgItem(IDC_LIST_PROFILE));
+  m_hProfileList->InsertColumn(0, _T("Profiles"),LVCFMT_LEFT, 80);
+  //m_hProfileList->SetExtendedStyle(LVS_EX_CHECKBOXES);//设置控件有勾选功能
+
+  StartLogging(L"GetProfile.log", "all", "all");
   RegisterAdbDeviceNotification(this->m_hWnd);
   adb_usb_init();
-  DoGetProfile();
+  m_hUSBHandle = GetUsbHandle();
+  DoGetProfilesList(m_hUSBHandle);
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -157,23 +167,101 @@ HCURSOR CGetProfileDlg::OnQueryDragIcon()
 }
 
 
-  VOID CGetProfileDlg::DoGetProfile(VOID) {
+  usb_handle* CGetProfileDlg::GetUsbHandle() {
             usb_handle* handle;
-        //SetUpAdbDevice(pDevInf, dwData);
-
-  find_devices(true);
+      find_devices(true);
     for (handle = usb_handle_enum_init();
        handle != NULL ;
        handle = usb_handle_next(handle)) {
+        break;
+       }
+       return handle;
+  }
+
+  BOOL CGetProfileDlg::ParseProfilesList(char * content ,
+	  PCHAR lineDelim, PCHAR recordDelim) {
+     char *str1, *str2, *token, *subtoken;
+           char *saveptr1, *saveptr2;
+           int j;
+
+               for (j = 1, str1 = content; ; j++, str1 = NULL) {
+               token = strtok_s(str1, lineDelim, &saveptr1);
+               if (token == NULL)
+                   break;
+             //  printf("%d: %s\n", j, token);
+
+               for (str2 = token; ; str2 = NULL) {
+                   subtoken = strtok_s(str2, recordDelim, &saveptr2);
+                   if (subtoken == NULL)
+                       break;
+				   m_pProfiles.push_back(subtoken);
+                  // LOG(" --> %s", subtoken);
+               }
+           }
+			   return TRUE;
+	  }
+
+  VOID CGetProfileDlg::DoGetProfilesList(usb_handle* handle) {
           PCHAR resp = NULL;
   int  resp_len;
   int ret;
+
+  if (handle == NULL) {
+    ERROR("No adb device found.");
+    return;
+  }
         adbhost adb(handle , usb_port_address(handle));
-  ret = adb.shell("cat /proc/version", (void **)&resp, &resp_len);
-  LOG("Version %s", resp);
+  //ret = adb.shell("cat /proc/version", (void **)&resp, &resp_len);
+
+		CStringA command = "ls -1 ";
+		command += m_DeviceProfilePath;
+		//LOG("xxxxxxxxxxxxxxxxxxxxx %s", WideStrToMultiStr(command ));
+		LOG("xxxxxxxxxxxxxxxxxxxxx %s", command);
+  ret = adb.shell(command, (void **)&resp, &resp_len);
+  if (resp == NULL)
+    return;
+ ParseProfilesList(resp, " \t", "\r\n");
+ //sort(m_pProfiles.begin(), m_pProfiles.end());
+ for (size_t index= 0; index < m_pProfiles.size(); index++) {
+ m_hProfileList->InsertItem(index, MultiStrToWideStr(m_pProfiles[index]));
+ // LOG(" --> %s", m_pProfiles[index]);
+	 }
   free(resp);
   }
+
+BOOL CGetProfileDlg::DoPokeProfile(usb_handle* handle, PCHAR profileName, PCHAR *data) {
+    if (handle == NULL) {
+    ERROR("DoPokeProfile: No adb device found.");
+    return FALSE;
   }
+    if (profileName == NULL || data == NULL) {
+    ERROR("DoPokeProfile: Bad parameter.");
+    return FALSE;
+    }
+
+    adbhost adb(handle , usb_port_address(handle));
+#if 1
+          PCHAR resp = NULL;
+  int  resp_len;
+  int ret;
+    	CStringA command = "cat ";
+		command += m_DeviceProfilePath;
+		command += "/";
+    command += profileName;
+    ret = adb.shell(command, (void **)&resp, &resp_len);
+  //LOG("Response %s", resp);
+  if (resp == NULL)
+    return FALSE;
+  *data = resp;
+#else
+    CStringA path = m_DeviceProfilePath;
+		path += "/";
+    path += profileName;
+    LOG("Profile path is %s", path);
+    adb.sync_pull(path, ".");
+ #endif
+  return TRUE;
+}
 
 BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 {
@@ -202,7 +290,8 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       }
     case DBT_DEVTYP_DEVICEINTERFACE:
       {
-DoGetProfile();
+  m_hUSBHandle = GetUsbHandle();
+        DoGetProfilesList(m_hUSBHandle);
        }
         break;
       }
@@ -226,3 +315,27 @@ void CGetProfileDlg::OnDestroy()
 	// TODO: 在此处添加消息处理程序代码
 	StopLogging();
 	}
+
+void CGetProfileDlg::OnLvnItemchangedListProfile(NMHDR *pNMHDR, LRESULT *pResult)
+	{
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	// TODO: 在此添加控件通知处理程序代码
+	*pResult = 0;
+	}
+
+void CGetProfileDlg::OnNMClickListProfile(NMHDR *pNMHDR, LRESULT *pResult)
+	{
+	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
+	// TODO: 在此添加控件通知处理程序代码
+	*pResult = 0;
+	CString profile = m_hProfileList->GetItemText(pNMLV->iItem, 0);
+	//CString profile = m_pProfiles->GetItemText(pNMLV->iItem, 0);
+
+  LOG("Click item %s", WideStrToMultiStr(profile));
+  PCHAR data = NULL;
+  DoPokeProfile(m_hUSBHandle, WideStrToMultiStr(profile), &data);
+  if (data != NULL) {
+  LOG("Profile data %s", data);
+    free(data);
+  }
+}
