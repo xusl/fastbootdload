@@ -301,7 +301,7 @@ VOID CGetProfileDlg::DoGetProfilesList(usb_handle* handle) {
   //sort(m_pProfiles.begin(), m_pProfiles.end());
   for (size_t index= 0; index < m_pProfiles.size(); index++) {
     m_hProfileList->InsertItem(index, MultiStrToWideStr(m_pProfiles[index]));
-    // LOG(" --> %s", m_pProfiles[index]);
+    //LOG(" %d --> %s", index, m_pProfiles[index]);
   }
   free(resp);
 }

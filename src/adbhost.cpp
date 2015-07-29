@@ -286,6 +286,7 @@ bool adbhost::handle_shell_response (void **response, int *len) {
   int data_len = 0;
   int ret;
   char *data = (char *)malloc(MAX_PAYLOAD);
+  char *temp;
   int capacity = MAX_PAYLOAD;
   if (p == NULL || data == NULL) {
     ERROR("No Memory!");
@@ -304,20 +305,25 @@ bool adbhost::handle_shell_response (void **response, int *len) {
     if (p->msg.command == A_OKAY) {
       INFO("okay response");
     } else if (p->msg.command == A_WRTE) {
-      DEBUG("shell return %d bytes data.", p->msg.data_length);
+      DEBUG("shell return %d bytes data. data_len %d, capatity %d",
+        p->msg.data_length, data_len, capacity);
 
       if (capacity < p->msg.data_length) {
-        if (NULL != realloc(data, data_len + capacity + MAX_PAYLOAD)) {
+        if (NULL != (temp = (char *)realloc(data, data_len + capacity + MAX_PAYLOAD))) {
           memset(data + data_len + capacity, 0, MAX_PAYLOAD);
           capacity += MAX_PAYLOAD;
+          data = temp;
         } else {
           ERROR("No Memory!");
+          free(data);
           return false;
         }
       }
       memcpy(data + data_len, p->data, p->msg.data_length);
       data_len += p->msg.data_length;
       capacity -= p->msg.data_length;
+      //DEBUG(" %d bytes data. data_len %d, capatity %d",
+      //  p->msg.data_length, data_len, capacity);
 
       notify_ready_to_remote();
     } else if (p->msg.command == A_CLSE) {
