@@ -297,6 +297,10 @@ VOID CGetProfileDlg::DoGetProfilesList(usb_handle* handle) {
   ret = adb.shell(command, (void **)&resp, &resp_len);
   if (resp == NULL)
     return;
+
+  m_hProfileList->DeleteAllItems();
+  m_pProfiles.clear();
+
   ParseProfilesList(resp, " \t", "\r\n");
   //sort(m_pProfiles.begin(), m_pProfiles.end());
   for (size_t index= 0; index < m_pProfiles.size(); index++) {
@@ -375,9 +379,13 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
     if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
 
       ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+      if (m_hUSBHandle != NULL)
+        usb_close(m_hUSBHandle);
 
-      long sn = usb_host_sn(pDevInf->dbcc_name);
-      sn = get_adb_composite_device_sn(sn);
+      m_hProfileDataList->ResetContent();
+      m_hProfileName->SetWindowText(_T(""));
+      m_hProfileList->DeleteAllItems();
+      m_pProfiles.clear();
     }
   }
 
