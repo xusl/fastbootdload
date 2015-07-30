@@ -21,9 +21,11 @@ when        who        what
 #ifdef FEATURE_LOG_FILE
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 
 using std::ios_base;
 using std::ofstream;
+using std::setw;
 using std::endl;
 #endif //FEATURE_LOG_FILE
 

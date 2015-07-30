@@ -16,7 +16,6 @@ when        who        what
 #include "StdAfx.h"
 
 #include "log.h"
-
 #include <process.h>//for getpid()
 //-----------------------------------------------------------------------------
 
@@ -179,71 +178,94 @@ void CLog::WriteLog
 #ifdef FEATURE_LOG_SYS
 
 #define MAX_BUF_LEN     (4096 * 8)
+
+  int   nBuf;
+  char  szBuffer[MAX_BUF_LEN] = {0};
+#define OPT_LOG
+#ifndef OPT_LOG
 #define FORMAT_SIZE     (256)
+  char  szFormat[FORMAT_SIZE] = {0};
+#endif
+  if (this == NULL)
+  {
+    return;
+  }
 
-	int   nBuf;
-	char  szBuffer[MAX_BUF_LEN] = {0};
-	char  szFormat[FORMAT_SIZE] = {0};
+  if (!(this->mask & type))
+  {
+    return;
+  }
 
-    if (this == NULL)
-	{
-		return;
-	}
+  if(!((AdbTraceMask() & (1 << tag)) != 0)) {
+    return;
+  }
 
-    if (!(this->mask & type))
-	{
-		return;
-	}
-
-    if(!((AdbTraceMask() & (1 << tag)) != 0)) {
-        return;
-    }
-
-	if (fmtstr == NULL || msg == NULL)
-	{
-		return;
-	}
+  if (fmtstr == NULL || msg == NULL)
+  {
+    return;
+  }
 
   va_list args;
-	va_start(args, fmtstr);
+  va_start(args, fmtstr);
 
-	SYSTEMTIME time;
-	GetLocalTime(&time);
+  SYSTEMTIME time;
+  GetLocalTime(&time);
 
-	 //_snprintf(buf,MAX_BUF_LEN, "%4d-%02d-%02d %02d:%02d:%02d.%03d  %8s  %s",
-	//			time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
-	//			time.wSecond, time.wMilliseconds,  msg, fmtstr);
-	nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %8s %s",
-				 time.wHour, time.wMinute,time.wSecond, msg, fmtstr);
+  //_snprintf(buf,MAX_BUF_LEN, "%4d-%02d-%02d %02d:%02d:%02d.%03d  %8s  %s",
+  //			time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
+  //			time.wSecond, time.wMilliseconds,  msg, fmtstr);
+#ifndef OPT_LOG
+  nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %8s %s",
+                   time.wHour, time.wMinute,time.wSecond, msg, fmtstr);
+#else
+#ifdef FEATURE_LOG_FILE
+#ifdef FEATURE_THREAD_SYNC
+  g_Lock.Lock();
+#endif
 
-	if (nBuf < COUNTOF(szFormat)) {
-	nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), szFormat, args);
-	} else {
-	nBuf = _snprintf(szBuffer, COUNTOF(szBuffer), "Log Error, format buffer length is smaller than format.");
-	}
-    va_end(args);
+  stream << setw(2) << time.wHour ;
+  stream << ":" << setw(2) << time.wMinute ;
+  stream << ":" << setw(2) << time.wSecond;
+  stream << " " << setw(8) << msg;
 
-	//ASSERT(nBuf >= 0);
-	if (nBuf == -1) {
-   _snprintf(szBuffer, COUNTOF(szBuffer), "Log Error, data buffer is smaller than data.");
-	}
+#ifdef FEATURE_THREAD_SYNC
+  g_Lock.Unlock();
+#endif
+#endif //FEATURE_LOG_FILE
+#endif
+#ifndef OPT_LOG
+  if (nBuf < COUNTOF(szFormat)) {
+    nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), szFormat, args);
+  } else {
+    nBuf = _snprintf(szBuffer, COUNTOF(szBuffer), "Log Error, format buffer length is smaller than format.");
+  }
+#else
+  nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), fmtstr, args);
+#endif
+
+  va_end(args);
+
+  //ASSERT(nBuf >= 0);
+
 
 #ifdef FEATURE_LOG_FILE
-	#ifdef FEATURE_THREAD_SYNC
-		g_Lock.Lock();
-	#endif
-
-		stream << szBuffer << endl;
-
-	#ifdef FEATURE_THREAD_SYNC
-		g_Lock.Unlock();
-	#endif
+#ifdef FEATURE_THREAD_SYNC
+  g_Lock.Lock();
+#endif
+  if (nBuf == -1) {
+    stream << basename(__FILE__)<< ", " <<__LINE__ << "Log Error, data buffer is smaller than data." << endl;
+  } else {
+    stream << szBuffer << endl;
+  }
+#ifdef FEATURE_THREAD_SYNC
+  g_Lock.Unlock();
+#endif
 #endif //FEATURE_LOG_FILE
 
 
 #if _DEBUG
-	strcat(szBuffer, "\n");
-	afxDump << szBuffer;
+  strcat(szBuffer, "\n");
+  afxDump << szBuffer;
 #endif // _DEBUG
 
 #endif // FEATURE_LOG_SYS

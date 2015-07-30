@@ -35,6 +35,7 @@
 usbid_t builtInIds[] = {
 
     //VENDOR_ID_QUALCOMM
+    {VENDOR_ID_ALCATEL, 0x0196},
     {VENDOR_ID_ALCATEL, 0x0192},  //9x15 adb
     {VENDOR_ID_ALCATEL, 0x007b},  //9x15 adb only
     {VENDOR_ID_GOOGLE,0xd00d},    //fastboot

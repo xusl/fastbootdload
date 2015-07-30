@@ -235,6 +235,8 @@ BOOL CGetProfileDlg::CheckDeviceProfilePath(usb_handle* handle) {
   const char *candidate[] = {
     "/usr/bin/profile/cust",
     "/usr/bin/profile/match",
+    "/jrd-resource/resource/profile/cust",
+    "/jrd-resource/resource/profile/match",
     NULL
   };
   const char * path =candidate[0];
