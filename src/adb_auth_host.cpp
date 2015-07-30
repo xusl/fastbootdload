@@ -20,6 +20,7 @@
 #  define WIN32_LEAN_AND_MEAN
 #  include "windows.h"
 #  include "shlobj.h"
+#  include "dirent.h"
 #else
 #  include <sys/types.h>
 #  include <sys/stat.h>
@@ -27,23 +28,29 @@
 #endif
 #include <string.h>
 
+#include <list.h>
 //#include "sysdeps.h"
 #include "adb.h"
 #include "adb_auth.h"
 
+#ifdef AUTH_SIGNATURE
 /* HACK: we need the RSAPublicKey struct
  * but RSA_verify conflits with openssl */
 #define RSA_verify RSA_verify_mincrypt
 #include "mincrypt/rsa.h"
 #undef RSA_verify
 
-#include <list.h>
 
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
+struct adb_private_key {
+    struct listnode node;
+    RSA *rsa;
+};
+#endif
 
 #define TRACE_TAG TRACE_AUTH
 
@@ -51,14 +58,10 @@
 #define ADB_KEY_FILE   "adbkey"
 
 
-struct adb_private_key {
-    struct listnode node;
-    RSA *rsa;
-};
 
 static struct listnode key_list;
 
-
+#ifdef AUTH_SIGNATURE
 /* Convert OpenSSL RSA private key to android pre-computed RSAPublicKey format */
 static int RSA_to_RSAPublicKey(RSA *rsa, RSAPublicKey *pkey)
 {
@@ -256,6 +259,7 @@ static int read_key(const char *file, struct listnode *list)
     list_add_tail(list, &key->node);
     return 1;
 }
+#endif
 
 static int get_user_keyfilepath(char *filename, size_t len)
 {
@@ -266,7 +270,7 @@ static int get_user_keyfilepath(char *filename, size_t len)
     char path[PATH_MAX];
     home = getenv("ANDROID_SDK_HOME");
     if (!home) {
-        SHGetFolderPath(NULL, CSIDL_PROFILE, NULL, 0, path);
+        SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, 0, path);
         home = path;
     }
     format = "%s\\%s";
@@ -292,7 +296,7 @@ static int get_user_keyfilepath(char *filename, size_t len)
 
     return snprintf(filename, len, format, android_dir, ADB_KEY_FILE);
 }
-
+#ifdef AUTH_SIGNATURE
 static int get_user_key(struct listnode *list)
 {
     struct stat buf;
@@ -316,7 +320,8 @@ static int get_user_key(struct listnode *list)
 
     return read_key(path, list);
 }
-
+#endif
+#ifdef HAVE_VENDOR_KEYS
 static void get_vendor_keys(struct listnode *list)
 {
     const char *adb_keys_path;
@@ -342,7 +347,8 @@ static void get_vendor_keys(struct listnode *list)
         path = adb_strtok_r(NULL, ENV_PATH_SEPARATOR_STR, &save);
     }
 }
-
+#endif
+#ifdef AUTH_SIGNATURE
 int adb_auth_sign(void *node, void *token, size_t token_size, void *sig)
 {
     unsigned int len;
@@ -355,7 +361,7 @@ int adb_auth_sign(void *node, void *token, size_t token_size, void *sig)
     D("adb_auth_sign len=%d\n", len);
     return (int)len;
 }
-
+#endif
 void *adb_auth_nextkey(void *current)
 {
     struct listnode *item;
@@ -383,6 +389,7 @@ int adb_auth_get_userkey(unsigned char *data, size_t len)
     char path[PATH_MAX];
     char *file;
     int ret;
+    PWCH wPath;
 
     ret = get_user_keyfilepath(path, sizeof(path) - 4);
     if (ret < 0 || ret >= (signed)(sizeof(path) - 4)) {
@@ -391,7 +398,12 @@ int adb_auth_get_userkey(unsigned char *data, size_t len)
     }
     strcat(path, ".pub");
 
-    file = load_file(path, (unsigned*)&ret);
+    wPath = MultiStrToWideStr(path);
+    if (wPath == NULL)
+      return 0;
+
+    file = (char *)load_file(wPath, (unsigned*)&ret);
+    delete [] wPath;
     if (!file) {
         D("Can't load '%s'\n", path);
         return 0;
@@ -415,12 +427,14 @@ void adb_auth_init(void)
     D("adb_auth_init\n");
 
     list_init(&key_list);
-
+#ifdef AUTH_SIGNATURE
     ret = get_user_key(&key_list);
     if (!ret) {
         D("Failed to get user key\n");
         return;
     }
-
+#endif
+#ifdef HAVE_VENDOR_KEYS
     get_vendor_keys(&key_list);
+#endif
 }

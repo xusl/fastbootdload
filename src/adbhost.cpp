@@ -159,7 +159,7 @@ void adbhost::send_auth_response(UINT8 *token, size_t token_size, atransport *t)
 {
     DEBUG("Calling send_auth_response\n");
     apacket *p = get_apacket();
-    int ret;
+    int ret = 0;
 
 #if 0
     ret = adb_auth_sign(t->key, token, token_size, p->data);
@@ -181,14 +181,14 @@ void adbhost::send_auth_publickey(atransport *t)
     DEBUG("Calling send_auth_publickey\n");
     apacket *p = get_apacket();
     int ret;
-#if 0
+
     ret = adb_auth_get_userkey(p->data, sizeof(p->data));
     if (!ret) {
         DEBUG("Failed to get user public key\n");
         put_apacket(p);
         return;
     }
-#endif
+
     p->msg.command = A_AUTH;
     p->msg.arg0 = ADB_AUTH_RSAPUBLICKEY;
     p->msg.data_length = ret;
@@ -366,17 +366,16 @@ bool adbhost::handle_open_response (void) {
          this->peer_id = p->msg.arg0;
       }
    } else if (p->msg.command == A_AUTH) {
-           if (p->msg.arg0 == ADB_AUTH_TOKEN) {
-#if 0
-            //t->connection_state = CS_UNAUTHORIZED;
-            t->key = adb_auth_nextkey(t->key);
-            if (t->key) {
-                send_auth_response(p->data, p->msg.data_length, t);
+        if (p->msg.arg0 == ADB_AUTH_TOKEN) {
+            INFO("ADB_AUTH_TOKEN");
+            t.connection_state = CS_UNAUTHORIZED;
+            t.key = adb_auth_nextkey(t.key);
+            if (t.key) {
+                send_auth_response(p->data, p->msg.data_length, &t);
             } else {
                 /* No more private keys to try, send the public key */
-                send_auth_publickey(t);
+                send_auth_publickey(&t);
             }
-#endif
         } else {
           ERROR("Get bad authentication message");
         }

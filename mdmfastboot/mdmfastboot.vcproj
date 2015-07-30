@@ -196,11 +196,19 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath="..\src\adb_auth_host.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\src\adbhost.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\fastbootflash.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\src\list.cpp"
 				>
 			</File>
 			<File

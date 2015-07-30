@@ -76,6 +76,7 @@ typedef struct atransport
     unsigned sync_token;
     int connection_state;
     transport_type type;
+    void *key;
 
     /* usb handle or socket fd as needed */
     usb_handle *usb;
@@ -114,6 +115,7 @@ int is_fastboot_interface(int vid, int pid, int usb_class, int usb_subclass, int
 #define CS_HOST       3
 #define CS_RECOVERY   4
 #define CS_NOPERM     5 /* Insufficient permissions to communicate with the device */
+#define CS_UNAUTHORIZED 7
 
 #define CHUNK_SIZE (64*1024)
 
