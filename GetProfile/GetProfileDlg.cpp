@@ -106,6 +106,7 @@ BOOL CGetProfileDlg::OnInitDialog()
 
   // TODO: 在此添加额外的初始化代码
   StartLogging(L"GetProfile.log", "all", "all");
+  m_bSwitchDisk = FALSE;
   m_DeviceProfilePath = "/usr/bin/profile/match";
   m_hProfileList = ((CListCtrl*)GetDlgItem(IDC_LIST_PROFILE));
   m_hProfileList->InsertColumn(0, _T("Profiles"),LVCFMT_LEFT, 80);
@@ -119,12 +120,11 @@ BOOL CGetProfileDlg::OnInitDialog()
   adb_usb_init();
 
   if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
-    SetTimer(0, 1000, NULL);
+    SetTimer(TIMER_PROFILE_LIST, 1000, NULL);
   } else {
-    GetProfilesList();
+    GetProfilesList(TRUE);
   }
 
-  PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -273,10 +273,14 @@ BOOL CGetProfileDlg::CheckDeviceProfilePath(usb_handle* handle) {
   return got;
 }
 
-VOID CGetProfileDlg::GetProfilesList(VOID) {
+VOID CGetProfileDlg::GetProfilesList(BOOL trySwitchDisk) {
   m_hUSBHandle = GetUsbHandle();
+  if (m_hUSBHandle != NULL) {
   CheckDeviceProfilePath(m_hUSBHandle);
   DoGetProfilesList(m_hUSBHandle);
+  } else if (trySwitchDisk) {
+  PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
+  }
 }
 
 VOID CGetProfileDlg::DoGetProfilesList(usb_handle* handle) {
@@ -372,11 +376,28 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         PDEV_BROADCAST_DEVICEINTERFACE pDevInf =
                (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
         //    UpdateDevice(pDevInf, dwData);
+        WARN("OnDeviceChange, get DBT_DEVTYP_VOLUME");
+        //we handle this event when app is launched,
+        //if device plug in before app start, we receive this, because we switch device,
+        // and volumn (disk device) will enumerate with adb interface.
+        // We do this, for if device is release build, it run without adb, so we need to switch.
+        // test 1: launch app, plug in device, to see whether switch device.
+        // test 2: run adb server, plugin device , luanch app.
+        // test 3: run adb server, launch app, plugin device (if app launcher, adb can not start server).
+        // test 3 is not necessary, because user can not very quick to pulgin device after launcher the app.
+        if (m_bSwitchDisk == FALSE) {
+          SetTimer(TIMER_SWITCH_DISK, 5000, NULL);
+        }
         break;
       }
     case DBT_DEVTYP_DEVICEINTERFACE:
       {
-        GetProfilesList();
+        if (m_bSwitchDisk == FALSE) {
+          KillTimer(TIMER_SWITCH_DISK);
+        } else {
+        m_bSwitchDisk = FALSE;
+        }
+        GetProfilesList(FALSE);
       }
       break;
     }
@@ -446,8 +467,10 @@ void CGetProfileDlg::OnTimer(UINT_PTR nIDEvent)
 {
   // TODO: 在此添加消息处理程序代码和/或调用默认值
   CDialog::OnTimer(nIDEvent);
-
-  GetProfilesList();
+  if (TIMER_PROFILE_LIST) {
+    GetProfilesList(TRUE);
+  } else if (TIMER_SWITCH_DISK){
+  }
 
   KillTimer(nIDEvent);
 }
@@ -488,6 +511,7 @@ LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
         CSCSICmd scsi = CSCSICmd();
         LOG("do switch device %S", devicePath[i]);
         scsi.SwitchToDebugDevice(devicePath[i]);
+        m_bSwitchDisk = TRUE;
         //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
         break;
       }

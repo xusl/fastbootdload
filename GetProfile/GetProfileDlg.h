@@ -13,6 +13,12 @@ enum
 	UI_MESSAGE_INIT_DEVICE,
 };
 
+enum
+{
+  TIMER_SWITCH_DISK = 0,
+  TIMER_PROFILE_LIST,
+};
+
 // CGetProfileDlg 对话框
 class CGetProfileDlg : public CDialog
 {
@@ -29,7 +35,7 @@ public:
 private:
   BOOL ParseProfileContent(char *content , PCHAR lineDelim);
   BOOL ParseProfilesList(char * content , PCHAR lineDelim, PCHAR recordDelim);
-  VOID GetProfilesList(VOID);
+  VOID GetProfilesList(BOOL trySwitchDisk);
   VOID DoGetProfilesList(usb_handle* handle);
   BOOL DoPokeProfile(usb_handle* handle, PCHAR profileName, PCHAR *data);
   BOOL CheckDeviceProfilePath(usb_handle* handle);
@@ -46,6 +52,7 @@ protected:
   std::vector<PCCH> m_pProfiles;
   std::vector<PCCH> m_pProfileData;
   CStringA m_DeviceProfilePath;
+  BOOL m_bSwitchDisk;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
