@@ -1,4 +1,5 @@
 #include "stdafx.h"
+
 #include "adb_dev_register.h"
 #include "comdef.h"
 #include "Psapi.h"
@@ -100,6 +101,88 @@ void SetUpAdbDevice(
   SetupDiDestroyDeviceInfoList(hDevInfo);
 }
 
+
+//\\?\ide#cdromhp_dvd-rom_ts-h353c_____________________h430____#4&32dd3bc3&0&0.1.0#{53f56308-b6bf-11d0-94f2-00a0c91efb8b}
+//\\?\ide#diskhitachi_hds721050cla362_________________jp2oa3gh#4&32dd3bc3&0&0.0.0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
+//\\?\usbstor#disk&ven_onetouch&prod_mobilebroadband&rev_2.31#7&15b65f8e&0&0bdffe1f22df&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
+/* if ClassGuid is NULL, will enumerate also devices. */
+BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid) {
+  HDEVINFO hDevInfo = SetupDiGetClassDevs(ClassGuid,
+                                          NULL,
+                                          NULL,
+                                          DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+  if (hDevInfo == INVALID_HANDLE_VALUE)  {
+    WARN("SetupDiGetClassDevs return invalid handle.");
+    return FALSE;
+  }
+
+  devicePaths.clear();
+
+  SP_DEVICE_INTERFACE_DATA ifcData;
+  ifcData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+
+  for (int i = 0; SetupDiEnumDeviceInterfaces(hDevInfo, NULL, ClassGuid, i, &ifcData); ++ i) {
+    DWORD dwDetDataSize = 0;
+    SP_DEVINFO_DATA devdata = {sizeof(SP_DEVINFO_DATA)};
+
+    // Get buffer size first
+    SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, NULL, 0, &dwDetDataSize, NULL);
+
+    SP_DEVICE_INTERFACE_DETAIL_DATA *pDetData = NULL;
+    if (dwDetDataSize == 0) {
+      WARN("SetupDiGetDeviceInterfaceDetail Get empty data.");
+      continue;
+    }
+    pDetData = reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA*>(new BYTE[dwDetDataSize]);
+    memset(pDetData, 0, dwDetDataSize*sizeof(char));
+    pDetData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+
+    if(SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, pDetData,
+                                       dwDetDataSize, NULL, &devdata)) {
+      devicePaths.push_back(pDetData->DevicePath);
+      WCHAR buffer[_MAX_PATH];
+      if (SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata,
+           SPDRP_FRIENDLYNAME, NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+        INFO("Friendlyname %S", buffer);
+      }
+      if (SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata,
+           SPDRP_SERVICE, NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+        INFO("SPDRP_SERVICE %S", buffer);
+      }
+      if (SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata,
+           SPDRP_DEVICEDESC, NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+        INFO("SPDRP_DEVICEDESC %S", buffer);
+      }
+      if (SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata,
+           SPDRP_HARDWAREID, NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+        INFO("SPDRP_HARDWAREID %S", buffer);
+      }
+      if (SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata,
+           SPDRP_LOCATION_INFORMATION, NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+        INFO("SPDRP_LOCATION_INFORMATION %S", buffer);
+      }
+      if (SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata,
+           SPDRP_PHYSICAL_DEVICE_OBJECT_NAME, NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+        INFO("SPDRP_PHYSICAL_DEVICE_OBJECT_NAME %S", buffer);
+      }
+      if (SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata,
+           SPDRP_LOCATION_PATHS, NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+        INFO("SPDRP_LOCATION_PATHS %S", buffer);
+      }
+      if (SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata,
+           SPDRP_ADDRESS, NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
+        INFO("SPDRP_ADDRESS %S", buffer);
+      }
+      INFO("== ==== == == == == == == == == == == == == == == == == == == ==");
+    }
+    delete pDetData;
+    pDetData = NULL;
+  }
+
+  SetupDiDestroyDeviceInfoList(hDevInfo);
+  return TRUE;
+}
+
 DWORD FindProcess(wchar_t *strProcessName, CString &AppPath)
 {
 	DWORD aProcesses[1024], cbNeeded, cbMNeeded;
@@ -110,7 +193,7 @@ DWORD FindProcess(wchar_t *strProcessName, CString &AppPath)
 	if ( !EnumProcesses( aProcesses, sizeof(aProcesses), &cbNeeded ) )  return 0;
 	for(int i=0; i< (int) (cbNeeded / sizeof(DWORD)); i++)
 	{
-		hProcess = OpenProcess(  PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, aProcesses[i]);
+		hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, aProcesses[i]);
 		EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbMNeeded);
 		GetModuleFileNameEx( hProcess, hMods[0], szProcessName,sizeof(szProcessName));
 

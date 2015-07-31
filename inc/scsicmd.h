@@ -1,11 +1,10 @@
 #ifndef __SCSICMD_H__
 #define __SCSICMD_H__
 #include <windows.h>
-#include <winioctl.h>
 
-#include <devioctl.h> 
-#include <ntdddisk.h> 
-#include <ntddscsi.h> 
+#include <devioctl.h>
+#include <ntdddisk.h>
+#include <ntddscsi.h>
 #define _NTSCSI_USER_MODE_
 #include <scsi.h>
 

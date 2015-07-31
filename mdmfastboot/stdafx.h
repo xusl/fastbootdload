@@ -38,7 +38,7 @@
 
 
 
-
+#include <winioctl.h>
 
 
 

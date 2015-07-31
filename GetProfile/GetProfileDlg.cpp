@@ -371,7 +371,7 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         */
         PDEV_BROADCAST_DEVICEINTERFACE pDevInf =
                (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
-            UpdateDevice(pDevInf, dwData);
+        //    UpdateDevice(pDevInf, dwData);
         break;
       }
     case DBT_DEVTYP_DEVICEINTERFACE:
@@ -452,8 +452,8 @@ void CGetProfileDlg::OnTimer(UINT_PTR nIDEvent)
   KillTimer(nIDEvent);
 }
 
-
 LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
+#if 0
   size_t count = GetLogicalDriveStrings(0,NULL);
   TCHAR *pDriveStrings = new TCHAR[count+sizeof(_T(""))];
   GetLogicalDriveStrings(count,pDriveStrings);
@@ -468,26 +468,36 @@ LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
     }
   }
   delete[]   pDriveStrings;
+#endif
 
-  std::vector<CString> cdromList;
-  cdromList.clear();
-  EnumCDROM(cdromList);
-  int cdromSize = cdromList.size();
-  //for(int i = 0; i < cdromSize; i++)
+  std::vector<CString> devicePath;
+  GetDeviceByGUID(devicePath, &GUID_DEVINTERFACE_DISK);
+  int cdromSize = devicePath.size();
+
+  for(int i = 0; i < cdromSize; i++)
   {
+    CString path = devicePath[i];
+    if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
+      LOG("Fix DISK %S:", path);
+    } else {
+
+      path.MakeUpper();
+      if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1)
+        LOG("USB Stor %S is not alcatel",path);
+      else {
+        CSCSICmd scsi = CSCSICmd();
+        LOG("do switch device %S", devicePath[i]);
+        scsi.SwitchToDebugDevice(devicePath[i]);
+        //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
+        break;
+      }
+    }
   }
-  cdromList.clear();
-
-
-  CSCSICmd scsi = CSCSICmd();
-  scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
+  devicePath.clear();
 
   return 0;
 }
-
-
-void CGetProfileDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
-{
+#if 0
   // dbcc_name:
   // \\?\USB#Vid_04e8&Pid_503b#0002F9A9828E0F06#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
   // convert to
@@ -504,155 +514,4 @@ void CGetProfileDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM
   idx = szDevId.Find(_T('\\'));
   ASSERT(-1 != idx );
   szClass = szDevId.Left(idx);
-
-  // if we are adding device, we only need present devices
-  // otherwise, we need all devices
-  DWORD dwFlag = DBT_DEVICEARRIVAL != wParam
-    ? DIGCF_ALLCLASSES : (DIGCF_ALLCLASSES | DIGCF_PRESENT);
-  HDEVINFO hDevInfo = SetupDiGetClassDevs(NULL, szClass, NULL, dwFlag);
-  if(INVALID_HANDLE_VALUE == hDevInfo) {
-    AfxMessageBox(CString("SetupDiGetClassDevs(): ")
-                  + _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);
-    return;
-  }
-
-  SP_DEVINFO_DATA* pspDevInfoData = (SP_DEVINFO_DATA*)HeapAlloc(
-                                        GetProcessHeap(), 0, sizeof(SP_DEVINFO_DATA));
-  pspDevInfoData->cbSize = sizeof(SP_DEVINFO_DATA);
-  for(int i=0; SetupDiEnumDeviceInfo(hDevInfo,i,pspDevInfoData); i++) {
-    DWORD DataT ;
-    DWORD nSize=0 ;
-    TCHAR buf[MAX_PATH];
-
-    if (!SetupDiGetDeviceInstanceId(hDevInfo, pspDevInfoData, buf, sizeof(buf), &nSize)) {
-      AfxMessageBox(CString("SetupDiGetDeviceInstanceId(): ")
-                    + _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);
-      break;
-    }
-
-    if ( szDevId == buf ) {
-      // device found
-      if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
-                                            SPDRP_LOCATION_INFORMATION,
-                                            &DataT, (PBYTE)buf, sizeof(buf), &nSize) ) {
-        DEBUG("LOCATEION %S(datatype %d)", buf,DataT);
-        // do nothing
-      }
-      if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
-                                            SPDRP_ADDRESS, &DataT,
-                                            (PBYTE)buf, sizeof(buf), &nSize) ) {
-        DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
-
-      }
-      if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
-                                            SPDRP_BUSNUMBER, &DataT,
-                                            (PBYTE)buf, sizeof(buf), &nSize) ) {
-        DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
-
-      }
-      else {
-        lstrcpy(buf, _T("Unknown"));
-      }
-      // update UI
-      break;
-    }
-  }
-
-  if ( pspDevInfoData ) {
-    HeapFree(GetProcessHeap(), 0, pspDevInfoData);
-  }
-
-  SetupDiDestroyDeviceInfoList(hDevInfo);
-}
-
-void CGetProfileDlg::GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet)
-{
-  BOOL bResult;
-  PSP_DEVICE_INTERFACE_DETAIL_DATA   pDetail   =NULL;
-  SP_DEVICE_INTERFACE_DATA   ifdata;
-  WCHAR ch[MAX_PATH];
-  int i;
-  ULONG predictedLength = 0;
-  ULONG requiredLength = 0;
-
-  ifdata.cbSize = sizeof(ifdata);
-
-  //   取得该设备接口的细节(设备路径)
-  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
-                                            &ifdata,   /*设备接口信息*/
-                                            NULL,   /*设备接口细节(设备路径)*/
-                                            0,   /*输出缓冲区大小*/
-                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
-                                            NULL);   /*不需额外的设备描述*/
-  /*   取得该设备接口的细节(设备路径)*/
-  predictedLength=requiredLength;
-
-  pDetail = (PSP_INTERFACE_DEVICE_DETAIL_DATA)GlobalAlloc(LMEM_ZEROINIT,   predictedLength);
-  pDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
-  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
-                                            &ifdata,   /*设备接口信息*/
-                                            pDetail,   /*设备接口细节(设备路径)*/
-                                            predictedLength,   /*输出缓冲区大小*/
-                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
-                                            NULL);   /*不需额外的设备描述*/
-
-  if(bResult) {
-    memset(ch, 0, MAX_PATH);
-    /*复制设备路径到输出缓冲区*/
-    for(i=0; i<requiredLength; i++) {
-      ch[i]=*(pDetail->DevicePath+8+i);
-    }
-    printf("%s\r\n", ch);
-  }
-}
-
-
-void CGetProfileDlg::EnumCDROM(std::vector<CString>& m_Cdroms) {
-  m_Cdroms.clear();
-  char szDevDesc[256] = {0};
-  GUID guidDev = {0x53f56308L, 0xb6bf, 0x11d0,{0x94, 0xf2, 0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b}};
-
-  HDEVINFO hDevInfo = INVALID_HANDLE_VALUE;
-
-  hDevInfo = SetupDiGetClassDevs(&guidDev,
-                                 NULL,
-                                 NULL,
-                                 DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
-  if (hDevInfo == INVALID_HANDLE_VALUE)  {
-    return ;
-  }
-
-  if ( INVALID_HANDLE_VALUE == hDevInfo)
-    return;
-
-  SP_DEVINFO_DATA devInfoElem;
-  devInfoElem.cbSize = sizeof(SP_DEVINFO_DATA);
-  SP_DEVICE_INTERFACE_DATA ifcData;
-  ifcData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
-  DWORD dwDetDataSize = 0;
-
-  SP_DEVICE_INTERFACE_DETAIL_DATA *pDetData = NULL;
-
-  for (int i = 0; SetupDiEnumDeviceInterfaces(hDevInfo, NULL, &guidDev, i, &ifcData); ++ i) {
-    SP_DEVINFO_DATA devdata = {sizeof(SP_DEVINFO_DATA)};
-
-    // Get buffer size first
-    SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, NULL, 0, &dwDetDataSize, NULL);
-
-    if (dwDetDataSize != 0) {
-      pDetData = reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA*>(new char[dwDetDataSize]);
-      pDetData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
-    }
-
-    BOOL bOk = SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, pDetData, dwDetDataSize, NULL, &devdata);
-    if(bOk) {
-      WCHAR buf[512] = {0};
-      memcpy(buf, pDetData->DevicePath, sizeof (WCHAR) * wcslen(pDetData->DevicePath));
-      m_Cdroms.push_back(buf);
-      delete pDetData;
-      pDetData = NULL;
-    }
-  }
-
-  SetupDiDestroyDeviceInfoList(hDevInfo);
-}
+#endif

@@ -23,7 +23,7 @@
 #include <afxext.h>         // MFC À©Õ¹
 
 
-
+#include <winioctl.h>
 
 
 #ifndef _AFX_NO_OLE_SUPPORT

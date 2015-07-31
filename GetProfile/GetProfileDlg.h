@@ -35,10 +35,6 @@ private:
   BOOL CheckDeviceProfilePath(usb_handle* handle);
   usb_handle* GetUsbHandle();
 
-  void UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
-  void EnumCDROM(std::vector<CString>& m_Cdroms);
-  void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet);
-
 // й╣ож
 protected:
 	HICON m_hIcon;
