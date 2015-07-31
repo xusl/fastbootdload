@@ -62,10 +62,16 @@ public:
 	~CSCSICmd();
 
 public:
-  BOOL Send(const WCHAR* devname);
+  //In debug mode, adb interface will enumerated.
+  //devname : such as "\\\\?\\H:" or "\\\\.\\PhysicalDrive1"
+  //refer to DeviceIoControl Function
+  BOOL SwitchToDebugDevice(const WCHAR* devname);
+  //switch TPST, USB TPST devcie will enumerated. So ADSU or TPST can update the device.
+  BOOL SwitchToTPSTDeivce(const WCHAR* devname);
 
 private:
-	BOOL SendCmd(HANDLE handle, uint8* cmd, uint32 len, uint64 timeout);
+	BOOL SendCmd(HANDLE handle, PUCHAR cmd, size_t len, ULONG timeout);
+	BOOL Send(LPCWSTR devname, PUCHAR cmd, size_t cmdLen);
 };
 
 #endif //__SCSICMD_H__

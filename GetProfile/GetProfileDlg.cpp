@@ -472,85 +472,19 @@ LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
   std::vector<CString> cdromList;
   cdromList.clear();
   EnumCDROM(cdromList);
-
-  uint8 cmdBuf[CDB6GENERIC_LENGTH] = {0x16, 0xf5, 0x0, 0x0, 0x0, 0x0};
-  cmdBuf[1] = 0xf9;
-  BOOL bOk = false;
   int cdromSize = cdromList.size();
   //for(int i = 0; i < cdromSize; i++)
   {
-    bOk = Send(_T("\\\\?\\H:"), cmdBuf, sizeof(cmdBuf));
   }
   cdromList.clear();
 
 
-  //CSCSICmd scsi = CSCSICmd();
-  //scsi.Send("\\\\?\\H:");
+  CSCSICmd scsi = CSCSICmd();
+  scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
 
   return 0;
 }
 
-BOOL CGetProfileDlg::Send(LPCWSTR devname,const uint8* cmd,uint32 cmdLen)
-{
-	BOOL result = FALSE;
-	HANDLE handle = NULL;
-
-	handle = CreateFile(devname,
-                      GENERIC_WRITE | GENERIC_READ,
-                      FILE_SHARE_READ | FILE_SHARE_WRITE,
-                      NULL, OPEN_EXISTING, 0, NULL);
-
-	if (handle == INVALID_HANDLE_VALUE) {
-    ERROR("Open device %S failed.", devname);
-		return result;
-	}
-
-	result = SendCmd(handle, cmd, cmdLen, 10);
-
-	CloseHandle(handle);
-
-	return result;
-}
-
-BOOL CGetProfileDlg::SendCmd(HANDLE handle, const uint8* cmd, uint32 len, uint64 timeout)
-{
-  BOOL result = FALSE;
-  SCSI_PASS_THROUGH_WITH_BUFFERS sptdwb;
-  uint64 length = 0;
-  uint64 returned = 0;
-
-  ZeroMemory(&sptdwb,sizeof(SCSI_PASS_THROUGH_WITH_BUFFERS));
-  sptdwb.spt.Length = sizeof(SCSI_PASS_THROUGH);
-  sptdwb.spt.PathId = 0;
-  sptdwb.spt.TargetId = 1;
-  sptdwb.spt.Lun = 0;
-  sptdwb.spt.DataIn = SCSI_IOCTL_DATA_IN;
-  sptdwb.spt.DataTransferLength = 192;
-  sptdwb.spt.TimeOutValue = timeout;
-  sptdwb.spt.DataBufferOffset = offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS,ucDataBuf);
-  sptdwb.spt.SenseInfoLength = SPT_SENSE_LENGTH;
-  sptdwb.spt.SenseInfoOffset = offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS,ucSenseBuf);
-  sptdwb.spt.CdbLength = CDB6GENERIC_LENGTH;
-  memcpy(sptdwb.spt.Cdb, cmd, len);
-  length = offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS,ucDataBuf)
-    + sptdwb.spt.DataTransferLength;
-
-  result = DeviceIoControl(handle,
-                        IOCTL_SCSI_PASS_THROUGH,
-                        &sptdwb,
-                        sizeof(SCSI_PASS_THROUGH),
-                        &sptdwb,
-                        length,
-                        &returned,
-                        NULL);
-  if (result) {
-    ERROR("##DeviceIoControl OK!");
-  } else {
-    ERROR("**DeviceIoControl fails!");
-  }
-
-  return result;
-}
 
 void CGetProfileDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
 {
