@@ -385,7 +385,8 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         // test 2: run adb server, plugin device , luanch app.
         // test 3: run adb server, launch app, plugin device (if app launcher, adb can not start server).
         // test 3 is not necessary, because user can not very quick to pulgin device after launcher the app.
-        if (m_bSwitchDisk == FALSE) {
+        if (m_bSwitchDisk == FALSE && m_hUSBHandle == NULL) {
+          DEBUG("SET TIMER_SWITCH_DISK");
           SetTimer(TIMER_SWITCH_DISK, 5000, NULL);
         }
         break;
@@ -393,9 +394,10 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
     case DBT_DEVTYP_DEVICEINTERFACE:
       {
         if (m_bSwitchDisk == FALSE) {
+          DEBUG("KILL TIMER_SWITCH_DISK");
           KillTimer(TIMER_SWITCH_DISK);
         } else {
-        m_bSwitchDisk = FALSE;
+          m_bSwitchDisk = FALSE;
         }
         GetProfilesList(FALSE);
       }
@@ -405,8 +407,10 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
     if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
 
       ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
-      if (m_hUSBHandle != NULL)
+      if (m_hUSBHandle != NULL) {
         usb_close(m_hUSBHandle);
+        m_hUSBHandle = NULL;
+      }
 
       m_hProfileDataList->ResetContent();
       m_hProfileName->SetWindowText(_T(""));
@@ -467,9 +471,12 @@ void CGetProfileDlg::OnTimer(UINT_PTR nIDEvent)
 {
   // TODO: 在此添加消息处理程序代码和/或调用默认值
   CDialog::OnTimer(nIDEvent);
-  if (TIMER_PROFILE_LIST) {
+  if (nIDEvent == TIMER_PROFILE_LIST) {
+    DEBUG("HANDLE TIMER_PROFILE_LIST TIMER");
     GetProfilesList(TRUE);
-  } else if (TIMER_SWITCH_DISK){
+  } else if (nIDEvent == TIMER_SWITCH_DISK){
+    DEBUG("HANDLE TIMER_SWITCH_DISK TIMER");
+    PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   }
 
   KillTimer(nIDEvent);
