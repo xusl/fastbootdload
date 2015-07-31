@@ -25,6 +25,7 @@ when        who        what
 
 using std::ios_base;
 using std::ofstream;
+using std::setfill;
 using std::setw;
 using std::endl;
 #endif //FEATURE_LOG_FILE

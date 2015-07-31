@@ -219,10 +219,10 @@ void CLog::WriteLog
   g_Lock.Lock();
 #endif
 
-  stream << setw(2) << time.wHour ;
+  stream << setfill('0') << setw(2) << time.wHour ;
   stream << ":" << setw(2) << time.wMinute ;
   stream << ":" << setw(2) << time.wSecond;
-  stream << " " << setw(8) << msg;
+  stream << " " << setfill(' ') << setw(6) << msg;
 
 #ifdef FEATURE_THREAD_SYNC
   g_Lock.Unlock();
