@@ -33,7 +33,7 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV Ö§³Ö
 
 private:
-  BOOL ParseProfileContent(char *content , PCHAR lineDelim);
+  BOOL ParseContent(char *content , PCHAR lineDelim,  std::vector<PCCH>& dataOut);
   BOOL ParseProfilesList(char * content , PCHAR lineDelim, PCHAR recordDelim);
   VOID GetProfilesList(BOOL trySwitchDisk);
   VOID DoGetProfilesList(usb_handle* handle);
@@ -50,7 +50,6 @@ protected:
   CListBox *m_hProfileDataList;
   CStatic *m_hProfileName;
   std::vector<PCCH> m_pProfiles;
-  std::vector<PCCH> m_pProfileData;
   CStringA m_DeviceProfilePath;
   BOOL m_bSwitchDisk;
 

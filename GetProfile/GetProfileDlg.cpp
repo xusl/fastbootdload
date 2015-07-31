@@ -213,8 +213,7 @@ BOOL CGetProfileDlg::ParseProfilesList(char * content ,
 }
 
 
-BOOL CGetProfileDlg::ParseProfileContent(char * content ,
-                                         PCHAR lineDelim) {
+BOOL CGetProfileDlg::ParseContent(char * content,  PCHAR lineDelim, std::vector<PCCH>& dataOut) {
   char *str1, *token;
   char *saveptr1;
   int j;
@@ -223,7 +222,7 @@ BOOL CGetProfileDlg::ParseProfileContent(char * content ,
     token = strtok_s(str1, lineDelim, &saveptr1);
     if (token == NULL)
       break;
-    m_pProfileData.push_back(token);
+    dataOut.push_back(token);
 
   }
   return TRUE;
@@ -307,7 +306,11 @@ VOID CGetProfileDlg::DoGetProfilesList(usb_handle* handle) {
   m_hProfileList->DeleteAllItems();
   m_pProfiles.clear();
 
-  ParseProfilesList(resp, " \t", "\r\n");
+  //ParseProfilesList(resp, " \t", "\r\n");
+  /*
+  * Profile name may contains blank space, such as " "
+  */
+  ParseContent(resp, "\r\n", m_pProfiles);
   //sort(m_pProfiles.begin(), m_pProfiles.end());
   for (size_t index= 0; index < m_pProfiles.size(); index++) {
     m_hProfileList->InsertItem(index, MultiStrToWideStr(m_pProfiles[index]));
@@ -331,10 +334,7 @@ BOOL CGetProfileDlg::DoPokeProfile(usb_handle* handle, PCHAR profileName, PCHAR 
   PCHAR resp = NULL;
   int  resp_len;
   int ret;
-  CStringA command = "cat ";
-  command += m_DeviceProfilePath;
-  command += "/";
-  command += profileName;
+  CStringA command = "cat \"" + m_DeviceProfilePath + "/" + profileName + "\"";
   ret = adb.shell(command, (void **)&resp, &resp_len);
   //LOG("Response %s", resp);
   if (resp == NULL)
