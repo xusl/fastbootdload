@@ -26,10 +26,6 @@ CCriticalSection g_Lock;
 
 //-----------------------------------------------------------------------------
 
-/* Get array element count
- */
-#define COUNTOF(array) (sizeof(array)/sizeof(array[0]))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 //-----------------------------------------------------------------------------
 

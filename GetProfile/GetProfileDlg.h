@@ -3,6 +3,7 @@
 
 #pragma once
 #include "adb_dev_register.h"
+#include "scsicmd.h"
 #include <vector>
 
 enum
@@ -33,6 +34,12 @@ private:
   BOOL DoPokeProfile(usb_handle* handle, PCHAR profileName, PCHAR *data);
   BOOL CheckDeviceProfilePath(usb_handle* handle);
   usb_handle* GetUsbHandle();
+
+  void UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+  void EnumCDROM(std::vector<CString>& m_Cdroms);
+  void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet);
+  BOOL Send(LPCWSTR devname,const uint8* cmd,uint32 cmdLen);
+  BOOL SendCmd(HANDLE handle, const uint8* cmd, uint32 len, uint64 timeout);
 
 // й╣ож
 protected:

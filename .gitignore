@@ -5,4 +5,5 @@
 *.suo
 *.aps
 Debug/
+Release/
 doc/

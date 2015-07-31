@@ -213,6 +213,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\src\scsicmd.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\stdafx.cpp"
 				>
 				<FileConfiguration

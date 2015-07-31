@@ -124,7 +124,7 @@ BOOL CGetProfileDlg::OnInitDialog()
     GetProfilesList();
   }
 
-  //PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
+  PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -369,6 +369,9 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       {
         /* enumerate devices and shiftdevice
         */
+        PDEV_BROADCAST_DEVICEINTERFACE pDevInf =
+               (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
+            UpdateDevice(pDevInf, dwData);
         break;
       }
     case DBT_DEVTYP_DEVICEINTERFACE:
@@ -451,5 +454,271 @@ void CGetProfileDlg::OnTimer(UINT_PTR nIDEvent)
 
 
 LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
+  size_t count = GetLogicalDriveStrings(0,NULL);
+  TCHAR *pDriveStrings = new TCHAR[count+sizeof(_T(""))];
+  GetLogicalDriveStrings(count,pDriveStrings);
+  for (TCHAR* sDrivePath = pDriveStrings; *sDrivePath; sDrivePath += _tcslen(sDrivePath)+1)
+  {
+    LOG("Drive %s:", sDrivePath);
+    if (GetDriveType(sDrivePath) == DRIVE_REMOVABLE) {
+      TCHAR szPath[100] = _T("////.//");
+      ::_tcscat(szPath,sDrivePath);
+      int nSize = ::_tcslen(szPath);
+      szPath[nSize-1] = '/0';
+    }
+  }
+  delete[]   pDriveStrings;
+
+  std::vector<CString> cdromList;
+  cdromList.clear();
+  EnumCDROM(cdromList);
+
+  uint8 cmdBuf[CDB6GENERIC_LENGTH] = {0x16, 0xf5, 0x0, 0x0, 0x0, 0x0};
+  cmdBuf[1] = 0xf9;
+  BOOL bOk = false;
+  int cdromSize = cdromList.size();
+  //for(int i = 0; i < cdromSize; i++)
+  {
+    bOk = Send(_T("\\\\?\\H:"), cmdBuf, sizeof(cmdBuf));
+  }
+  cdromList.clear();
+
+
+  //CSCSICmd scsi = CSCSICmd();
+  //scsi.Send("\\\\?\\H:");
+
   return 0;
+}
+
+BOOL CGetProfileDlg::Send(LPCWSTR devname,const uint8* cmd,uint32 cmdLen)
+{
+	BOOL result = FALSE;
+	HANDLE handle = NULL;
+
+	handle = CreateFile(devname,
+                      GENERIC_WRITE | GENERIC_READ,
+                      FILE_SHARE_READ | FILE_SHARE_WRITE,
+                      NULL, OPEN_EXISTING, 0, NULL);
+
+	if (handle == INVALID_HANDLE_VALUE) {
+    ERROR("Open device %S failed.", devname);
+		return result;
+	}
+
+	result = SendCmd(handle, cmd, cmdLen, 10);
+
+	CloseHandle(handle);
+
+	return result;
+}
+
+BOOL CGetProfileDlg::SendCmd(HANDLE handle, const uint8* cmd, uint32 len, uint64 timeout)
+{
+  BOOL result = FALSE;
+  SCSI_PASS_THROUGH_WITH_BUFFERS sptdwb;
+  uint64 length = 0;
+  uint64 returned = 0;
+
+  ZeroMemory(&sptdwb,sizeof(SCSI_PASS_THROUGH_WITH_BUFFERS));
+  sptdwb.spt.Length = sizeof(SCSI_PASS_THROUGH);
+  sptdwb.spt.PathId = 0;
+  sptdwb.spt.TargetId = 1;
+  sptdwb.spt.Lun = 0;
+  sptdwb.spt.DataIn = SCSI_IOCTL_DATA_IN;
+  sptdwb.spt.DataTransferLength = 192;
+  sptdwb.spt.TimeOutValue = timeout;
+  sptdwb.spt.DataBufferOffset = offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS,ucDataBuf);
+  sptdwb.spt.SenseInfoLength = SPT_SENSE_LENGTH;
+  sptdwb.spt.SenseInfoOffset = offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS,ucSenseBuf);
+  sptdwb.spt.CdbLength = CDB6GENERIC_LENGTH;
+  memcpy(sptdwb.spt.Cdb, cmd, len);
+  length = offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS,ucDataBuf)
+    + sptdwb.spt.DataTransferLength;
+
+  result = DeviceIoControl(handle,
+                        IOCTL_SCSI_PASS_THROUGH,
+                        &sptdwb,
+                        sizeof(SCSI_PASS_THROUGH),
+                        &sptdwb,
+                        length,
+                        &returned,
+                        NULL);
+  if (result) {
+    ERROR("##DeviceIoControl OK!");
+  } else {
+    ERROR("**DeviceIoControl fails!");
+  }
+
+  return result;
+}
+
+void CGetProfileDlg::UpdateDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
+{
+  // dbcc_name:
+  // \\?\USB#Vid_04e8&Pid_503b#0002F9A9828E0F06#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+  // convert to
+  // USB\Vid_04e8&Pid_503b\0002F9A9828E0F06
+  ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+  CString szDevId = pDevInf->dbcc_name+4;
+  int idx = szDevId.ReverseFind(_T('#'));
+  ASSERT( -1 != idx );
+  szDevId.Truncate(idx);
+  szDevId.Replace(_T('#'), _T('\\'));
+  szDevId.MakeUpper();
+
+  CString szClass;
+  idx = szDevId.Find(_T('\\'));
+  ASSERT(-1 != idx );
+  szClass = szDevId.Left(idx);
+
+  // if we are adding device, we only need present devices
+  // otherwise, we need all devices
+  DWORD dwFlag = DBT_DEVICEARRIVAL != wParam
+    ? DIGCF_ALLCLASSES : (DIGCF_ALLCLASSES | DIGCF_PRESENT);
+  HDEVINFO hDevInfo = SetupDiGetClassDevs(NULL, szClass, NULL, dwFlag);
+  if(INVALID_HANDLE_VALUE == hDevInfo) {
+    AfxMessageBox(CString("SetupDiGetClassDevs(): ")
+                  + _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);
+    return;
+  }
+
+  SP_DEVINFO_DATA* pspDevInfoData = (SP_DEVINFO_DATA*)HeapAlloc(
+                                        GetProcessHeap(), 0, sizeof(SP_DEVINFO_DATA));
+  pspDevInfoData->cbSize = sizeof(SP_DEVINFO_DATA);
+  for(int i=0; SetupDiEnumDeviceInfo(hDevInfo,i,pspDevInfoData); i++) {
+    DWORD DataT ;
+    DWORD nSize=0 ;
+    TCHAR buf[MAX_PATH];
+
+    if (!SetupDiGetDeviceInstanceId(hDevInfo, pspDevInfoData, buf, sizeof(buf), &nSize)) {
+      AfxMessageBox(CString("SetupDiGetDeviceInstanceId(): ")
+                    + _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);
+      break;
+    }
+
+    if ( szDevId == buf ) {
+      // device found
+      if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
+                                            SPDRP_LOCATION_INFORMATION,
+                                            &DataT, (PBYTE)buf, sizeof(buf), &nSize) ) {
+        DEBUG("LOCATEION %S(datatype %d)", buf,DataT);
+        // do nothing
+      }
+      if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
+                                            SPDRP_ADDRESS, &DataT,
+                                            (PBYTE)buf, sizeof(buf), &nSize) ) {
+        DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
+
+      }
+      if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData,
+                                            SPDRP_BUSNUMBER, &DataT,
+                                            (PBYTE)buf, sizeof(buf), &nSize) ) {
+        DEBUG("ADDRESS %d(datatype %d, size %d)", (unsigned int)buf[0],DataT,nSize);
+
+      }
+      else {
+        lstrcpy(buf, _T("Unknown"));
+      }
+      // update UI
+      break;
+    }
+  }
+
+  if ( pspDevInfoData ) {
+    HeapFree(GetProcessHeap(), 0, pspDevInfoData);
+  }
+
+  SetupDiDestroyDeviceInfoList(hDevInfo);
+}
+
+void CGetProfileDlg::GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet)
+{
+  BOOL bResult;
+  PSP_DEVICE_INTERFACE_DETAIL_DATA   pDetail   =NULL;
+  SP_DEVICE_INTERFACE_DATA   ifdata;
+  WCHAR ch[MAX_PATH];
+  int i;
+  ULONG predictedLength = 0;
+  ULONG requiredLength = 0;
+
+  ifdata.cbSize = sizeof(ifdata);
+
+  //   取得该设备接口的细节(设备路径)
+  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
+                                            &ifdata,   /*设备接口信息*/
+                                            NULL,   /*设备接口细节(设备路径)*/
+                                            0,   /*输出缓冲区大小*/
+                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
+                                            NULL);   /*不需额外的设备描述*/
+  /*   取得该设备接口的细节(设备路径)*/
+  predictedLength=requiredLength;
+
+  pDetail = (PSP_INTERFACE_DEVICE_DETAIL_DATA)GlobalAlloc(LMEM_ZEROINIT,   predictedLength);
+  pDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
+                                            &ifdata,   /*设备接口信息*/
+                                            pDetail,   /*设备接口细节(设备路径)*/
+                                            predictedLength,   /*输出缓冲区大小*/
+                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
+                                            NULL);   /*不需额外的设备描述*/
+
+  if(bResult) {
+    memset(ch, 0, MAX_PATH);
+    /*复制设备路径到输出缓冲区*/
+    for(i=0; i<requiredLength; i++) {
+      ch[i]=*(pDetail->DevicePath+8+i);
+    }
+    printf("%s\r\n", ch);
+  }
+}
+
+
+void CGetProfileDlg::EnumCDROM(std::vector<CString>& m_Cdroms) {
+  m_Cdroms.clear();
+  char szDevDesc[256] = {0};
+  GUID guidDev = {0x53f56308L, 0xb6bf, 0x11d0,{0x94, 0xf2, 0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b}};
+
+  HDEVINFO hDevInfo = INVALID_HANDLE_VALUE;
+
+  hDevInfo = SetupDiGetClassDevs(&guidDev,
+                                 NULL,
+                                 NULL,
+                                 DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+  if (hDevInfo == INVALID_HANDLE_VALUE)  {
+    return ;
+  }
+
+  if ( INVALID_HANDLE_VALUE == hDevInfo)
+    return;
+
+  SP_DEVINFO_DATA devInfoElem;
+  devInfoElem.cbSize = sizeof(SP_DEVINFO_DATA);
+  SP_DEVICE_INTERFACE_DATA ifcData;
+  ifcData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+  DWORD dwDetDataSize = 0;
+
+  SP_DEVICE_INTERFACE_DETAIL_DATA *pDetData = NULL;
+
+  for (int i = 0; SetupDiEnumDeviceInterfaces(hDevInfo, NULL, &guidDev, i, &ifcData); ++ i) {
+    SP_DEVINFO_DATA devdata = {sizeof(SP_DEVINFO_DATA)};
+
+    // Get buffer size first
+    SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, NULL, 0, &dwDetDataSize, NULL);
+
+    if (dwDetDataSize != 0) {
+      pDetData = reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA*>(new char[dwDetDataSize]);
+      pDetData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+    }
+
+    BOOL bOk = SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, pDetData, dwDetDataSize, NULL, &devdata);
+    if(bOk) {
+      WCHAR buf[512] = {0};
+      memcpy(buf, pDetData->DevicePath, sizeof (WCHAR) * wcslen(pDetData->DevicePath));
+      m_Cdroms.push_back(buf);
+      delete pDetData;
+      pDetData = NULL;
+    }
+  }
+
+  SetupDiDestroyDeviceInfoList(hDevInfo);
 }

@@ -49,6 +49,12 @@ typedef int socklen_t;
                     }while(0)
 
 
+
+/* Get array element count
+ */
+#define COUNTOF(array) (sizeof(array)/sizeof(array[0]))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 typedef CRITICAL_SECTION          adb_mutex_t;
 
 #define  ADB_MUTEX_DEFINE(x)     adb_mutex_t   x
