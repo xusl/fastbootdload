@@ -72,6 +72,7 @@ BEGIN_MESSAGE_MAP(CGetProfileDlg, CDialog)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_LIST_PROFILE, &CGetProfileDlg::OnLvnItemchangedListProfile)
 	ON_NOTIFY(NM_CLICK, IDC_LIST_PROFILE, &CGetProfileDlg::OnNMClickListProfile)
 	ON_MESSAGE(UI_MESSAGE_INIT_DEVICE, &CGetProfileDlg::OnInitDevice)
+	ON_COMMAND(ID_ABOUT, &CGetProfileDlg::OnAbout)
 END_MESSAGE_MAP()
 
 
@@ -139,6 +140,12 @@ void CGetProfileDlg::OnSysCommand(UINT nID, LPARAM lParam)
 	{
 		CDialog::OnSysCommand(nID, lParam);
 	}
+}
+
+void CGetProfileDlg::OnAbout()
+{
+	CAboutDlg dlgAbout;
+	dlgAbout.DoModal();
 }
 
 // 如果向对话框添加最小化按钮，则需要下面的代码

@@ -66,4 +66,5 @@ public:
 	afx_msg void OnLvnItemchangedListProfile(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnNMClickListProfile(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnAbout();
 	};

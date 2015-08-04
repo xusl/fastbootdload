@@ -82,9 +82,9 @@ STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSM
 CAPTION "关于 GetProfile"
 FONT 9, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
-    ICON            IDR_MAINFRAME,IDC_STATIC,14,14,21,20
-    LTEXT           "GetProfile，1.0 版",IDC_STATIC,42,14,114,8,SS_NOPREFIX
-    LTEXT           "Copyright (C) 2015",IDC_STATIC,42,26,114,8
+    ICON            IDR_MAINFRAME,IDC_STATIC,14,14,20,20
+    LTEXT           "GetProfile，1.0.0 版",IDC_STATIC,42,14,114,8,SS_NOPREFIX
+    LTEXT           "Copyright JRD MBB(C) 2015",IDC_STATIC,42,26,114,8
     DEFPUSHBUTTON   "确定",IDOK,113,41,50,14,WS_GROUP
 END
 
@@ -92,6 +92,7 @@ IDD_GETPROFILE_DIALOG DIALOGEX 0, 0, 397, 254
 STYLE DS_SETFONT | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
 EXSTYLE WS_EX_APPWINDOW
 CAPTION "Alcatel Onetouch GetProfile"
+MENU IDR_MENU_MAIN
 FONT 12, "Microsoft Sans Serif", 400, 0, 0x0
 BEGIN
     DEFPUSHBUTTON   "确定",IDOK,209,233,50,14,NOT WS_VISIBLE
@@ -127,13 +128,13 @@ BEGIN
         BEGIN
             VALUE "Comments", "获取数据卡产品的配置。"
             VALUE "CompanyName", "Alcatel Onetouch"
-            VALUE "FileDescription", "使用adb协议。如果adb服务运行，会停止。"
-            VALUE "FileVersion", "1.0.0.1"
+            VALUE "FileDescription", "本程序使用USB adb接口和 adb 的协议。只支持有adb接口的产品查询profile。"
+            VALUE "FileVersion", "1.0.0"
             VALUE "InternalName", "GetProfile.exe"
             VALUE "LegalCopyright", "TCL Communication Ltd. (C) 保留所有权利。"
             VALUE "OriginalFilename", "GetProfile.exe"
             VALUE "ProductName", "GetProfile"
-            VALUE "ProductVersion", "1.0.0.1"
+            VALUE "ProductVersion", "1.0.0"
         END
     END
     BLOCK "VarFileInfo"
@@ -168,6 +169,20 @@ BEGIN
     END
 END
 #endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MENU_MAIN MENU 
+BEGIN
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About",                      ID_ABOUT
+    END
+END
 
 
 /////////////////////////////////////////////////////////////////////////////
