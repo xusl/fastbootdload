@@ -1,24 +1,13 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mdmfastboot", "mdmfastboot\mdmfastboot.vcproj", "{69D24EE3-01F4-4200-A2BC-44C060FFA997}"
-	ProjectSection(ProjectDependencies) = postProject
-		{684F913D-4714-42EA-B3DC-802600048316} = {684F913D-4714-42EA-B3DC-802600048316}
-		{BA9608A3-AAE5-45B9-874B-15971CA5926F} = {BA9608A3-AAE5-45B9-874B-15971CA5926F}
-	EndProjectSection
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mdmfastboot", "mdmfastboot\mdmfastboot.vcxproj", "{69D24EE3-01F4-4200-A2BC-44C060FFA997}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AdbWinApi", "libs\AdbWinApi\AdbWinApi.vcproj", "{684F913D-4714-42EA-B3DC-802600048316}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AdbWinApi", "libs\AdbWinApi\AdbWinApi.vcxproj", "{684F913D-4714-42EA-B3DC-802600048316}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AdbWinUsbApi", "libs\AdbWinUsbApi\AdbWinUsbApi.vcproj", "{BA9608A3-AAE5-45B9-874B-15971CA5926F}"
-	ProjectSection(ProjectDependencies) = postProject
-		{684F913D-4714-42EA-B3DC-802600048316} = {684F913D-4714-42EA-B3DC-802600048316}
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AdbWinUsbApi", "libs\AdbWinUsbApi\AdbWinUsbApi.vcxproj", "{BA9608A3-AAE5-45B9-874B-15971CA5926F}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GetProfile", "GetProfile\GetProfile.vcproj", "{C01764DF-3690-4D8E-9D3C-F7BE08BAC90B}"
-	ProjectSection(ProjectDependencies) = postProject
-		{684F913D-4714-42EA-B3DC-802600048316} = {684F913D-4714-42EA-B3DC-802600048316}
-		{BA9608A3-AAE5-45B9-874B-15971CA5926F} = {BA9608A3-AAE5-45B9-874B-15971CA5926F}
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GetProfile", "GetProfile\GetProfile.vcxproj", "{C01764DF-3690-4D8E-9D3C-F7BE08BAC90B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
