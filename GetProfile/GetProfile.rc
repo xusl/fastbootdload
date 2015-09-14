@@ -16,13 +16,11 @@
 #undef APSTUDIO_READONLY_SYMBOLS
 
 /////////////////////////////////////////////////////////////////////////////
-// 中文(中华人民共和国) resources
+// Chinese (Simplified, PRC) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
-#ifdef _WIN32
 LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
 #pragma code_page(936)
-#endif //_WIN32
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -97,10 +95,11 @@ FONT 12, "Microsoft Sans Serif", 400, 0, 0x0
 BEGIN
     DEFPUSHBUTTON   "确定",IDOK,209,233,50,14,NOT WS_VISIBLE
     PUSHBUTTON      "取消",IDCANCEL,340,233,50,14
-    LTEXT           "Profiles",IDC_STATIC_PROFILE_LIST,18,7,136,8
+    LTEXT           "Profiles",IDC_STATIC_PROFILE_LIST,18,6,136,8
     CONTROL         "",IDC_LIST_PROFILE,"SysListView32",LVS_LIST | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP,19,18,135,217
     LISTBOX         IDC_LIST_PROFILE_DATA,186,34,184,94,NOT LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_HSCROLL | WS_TABSTOP
-    LTEXT           "",IDC_STATIC_PROFILE_NAME,187,20,86,11
+    LTEXT           "",IDC_STATIC_PROFILE_NAME,189,21,86,11
+    EDITTEXT        IDC_FILTERWORDS_EDIT,186,135,65,12,ES_AUTOHSCROLL
 END
 
 
@@ -150,7 +149,7 @@ END
 //
 
 #ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO 
+GUIDELINES DESIGNINFO
 BEGIN
     IDD_ABOUTBOX, DIALOG
     BEGIN
@@ -164,7 +163,7 @@ BEGIN
     BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 390
-        TOPMARGIN, 7
+        TOPMARGIN, 6
         BOTTOMMARGIN, 247
     END
 END
@@ -176,7 +175,7 @@ END
 // Menu
 //
 
-IDR_MENU_MAIN MENU 
+IDR_MENU_MAIN MENU
 BEGIN
     POPUP "&Help"
     BEGIN
@@ -190,12 +189,12 @@ END
 // String Table
 //
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_ABOUTBOX            "关于 GetProfile(&A)..."
 END
 
-#endif    // 中文(中华人民共和国) resources
+#endif    // Chinese (Simplified, PRC) resources
 /////////////////////////////////////////////////////////////////////////////
 
 

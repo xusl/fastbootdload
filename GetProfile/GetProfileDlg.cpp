@@ -52,13 +52,22 @@ END_MESSAGE_MAP()
 
 CGetProfileDlg::CGetProfileDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CGetProfileDlg::IDD, pParent)
+	, m_filterWords(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+}
+CGetProfileDlg::~CGetProfileDlg()
+{
+	for (unsigned int i = 0; i < m_pProfiles.size(); i++) // 避免多次申请(初次不会执行)，内存泄漏，当第二次进来的时候需要释放前面的内容
+	{
+		delete m_pProfiles[i];
+	}
 }
 
 void CGetProfileDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
+	DDX_Text(pDX, IDC_FILTERWORDS_EDIT, m_filterWords);
 }
 
 BEGIN_MESSAGE_MAP(CGetProfileDlg, CDialog)
@@ -73,6 +82,9 @@ BEGIN_MESSAGE_MAP(CGetProfileDlg, CDialog)
 	ON_NOTIFY(NM_CLICK, IDC_LIST_PROFILE, &CGetProfileDlg::OnNMClickListProfile)
 	ON_MESSAGE(UI_MESSAGE_INIT_DEVICE, &CGetProfileDlg::OnInitDevice)
 	ON_COMMAND(ID_ABOUT, &CGetProfileDlg::OnAbout)
+	ON_LBN_SELCHANGE(IDC_LIST_PROFILE_DATA, &CGetProfileDlg::OnLbnSelchangeListProfileData)
+	ON_BN_CLICKED(IDOK, &CGetProfileDlg::OnBnClickedOk)
+	ON_EN_CHANGE(IDC_FILTERWORDS_EDIT, &CGetProfileDlg::OnEnChangeFilterwordsEdit)
 END_MESSAGE_MAP()
 
 
@@ -219,22 +231,37 @@ BOOL CGetProfileDlg::ParseProfilesList(char * content ,
   return TRUE;
 }
 
+int CGetProfileDlg::FilterProfiles(std::vector<PCCH> src, PCHAR filterWords, std::vector<PCCH> &outData) {
+	int matchCount = 0;
+	std::string tmpPrefix(filterWords);
+	size_t fWordsLenth = tmpPrefix.length();
+
+	for (size_t index = 0; index < src.size(); index++) {			
+		if (strncmp(src[index], filterWords, fWordsLenth) == 0) {
+			matchCount++;
+			outData.push_back(src[index]);
+		}
+	}
+	return matchCount;
+}
 
 BOOL CGetProfileDlg::ParseContent(char * content,  PCHAR lineDelim, std::vector<PCCH>& dataOut) {
   char *str1, *token;
   char *saveptr1;
   int j;
-
+  char* chTemp;
   for (j = 1, str1 = content; ; j++, str1 = NULL) {
     token = strtok_s(str1, lineDelim, &saveptr1);
     if (token == NULL)
       break;
-    dataOut.push_back(token);
-
+	
+	chTemp = new char[MAX_PATH];
+	memset(chTemp,0,MAX_PATH);
+	strcpy_s(chTemp,MAX_PATH,token);
+    dataOut.push_back(chTemp);
   }
   return TRUE;
 }
-
 
 BOOL CGetProfileDlg::CheckDeviceProfilePath(usb_handle* handle) {
 #define BUFFER_LEN (PATH_MAX + 64)
@@ -311,14 +338,19 @@ VOID CGetProfileDlg::DoGetProfilesList(usb_handle* handle) {
     return;
 
   m_hProfileList->DeleteAllItems();
+  for (unsigned int i = 0; i < m_pProfiles.size(); i++) // 避免多次申请(初次不会执行)，内存泄漏，当第二次进来的时候需要释放前面的内容
+  {
+	  delete m_pProfiles[i];
+  }
   m_pProfiles.clear();
 
   //ParseProfilesList(resp, " \t", "\r\n");
   /*
   * Profile name may contains blank space, such as " "
   */
-  ParseContent(resp, "\r\n", m_pProfiles);
+  ParseContent(resp, "\r\n", m_pProfiles); // resp为从adb读过来(一段字符串)的原生总数据源 m_pProfiles为从resp解析后的数据源()
   //sort(m_pProfiles.begin(), m_pProfiles.end());
+
   for (size_t index= 0; index < m_pProfiles.size(); index++) {
     m_hProfileList->InsertItem(index, MultiStrToWideStr(m_pProfiles[index]));
     //LOG(" %d --> %s", index, m_pProfiles[index]);
@@ -553,3 +585,52 @@ LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
   ASSERT(-1 != idx );
   szClass = szDevId.Left(idx);
 #endif
+
+
+  void CGetProfileDlg::OnLbnSelchangeListProfileData()
+  {
+	  // TODO: Add your control notification handler code here
+  }
+
+
+  void CGetProfileDlg::OnBnClickedOk()
+  {
+	  // TODO: Add your control notification handler code here
+	  CDialog::OnOK();
+  }
+
+
+  void CGetProfileDlg::OnEnChangeFilterwordsEdit()
+  {
+	  // TODO:  If this is a RICHEDIT control, the control will not
+	  // send this notification unless you override the CDialog::OnInitDialog()
+	  // function and call CRichEditCtrl().SetEventMask()
+	  // with the ENM_CHANGE flag ORed into the mask.
+
+	  // TODO:  Add your control notification handler code here
+	  UpdateData(TRUE); // 将最新输入的数据从控件更新到变量中(即这一操作后最新字符串已存到m_filterWords中)
+	  std::vector<PCCH> profiles;
+
+	  m_pFilterProfiles.clear(); // added by zhoujun
+	  PCHAR newKeyWord = WideStrToMultiStr(m_filterWords);
+
+	  if ("" == newKeyWord)
+	  {
+		  profiles = m_pProfiles;
+	  }
+	  else if (0 == FilterProfiles(m_pProfiles, newKeyWord, m_pFilterProfiles))
+	  {
+		  m_hProfileList->DeleteAllItems();
+		  return;
+	  }
+	  else
+	  {
+		  profiles = m_pFilterProfiles;
+	  }
+
+	  m_hProfileList->DeleteAllItems();
+	  for (size_t index = 0; index < profiles.size(); index++) {
+		  m_hProfileList->InsertItem(index, MultiStrToWideStr(profiles[index]));
+	  }
+	  //UpdateData(FALSE);
+  }

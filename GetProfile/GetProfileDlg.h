@@ -5,6 +5,7 @@
 #include "adb_dev_register.h"
 #include "scsicmd.h"
 #include <vector>
+#include "afxwin.h"
 
 enum
 {
@@ -25,6 +26,7 @@ class CGetProfileDlg : public CDialog
 // 构造
 public:
 	CGetProfileDlg(CWnd* pParent = NULL);	// 标准构造函数
+	~CGetProfileDlg();
 
 // 对话框数据
 	enum { IDD = IDD_GETPROFILE_DIALOG };
@@ -33,6 +35,7 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
 private:
+  int FilterProfiles(std::vector<PCCH> src, PCHAR filterWords, std::vector<PCCH> &outData); 
   BOOL ParseContent(char *content , PCHAR lineDelim,  std::vector<PCCH>& dataOut);
   BOOL ParseProfilesList(char * content , PCHAR lineDelim, PCHAR recordDelim);
   VOID GetProfilesList(BOOL trySwitchDisk);
@@ -43,13 +46,15 @@ private:
 
 // 实现
 protected:
-	HICON m_hIcon;
+  HICON m_hIcon;
   usb_handle* m_hUSBHandle;
   //adbhost m_AdbHost;
+  CString m_filterWords;
   CListCtrl *m_hProfileList;
   CListBox *m_hProfileDataList;
   CStatic *m_hProfileName;
   std::vector<PCCH> m_pProfiles;
+  std::vector<PCCH> m_pFilterProfiles; // 装载过滤后的profiles
   CStringA m_DeviceProfilePath;
   BOOL m_bSwitchDisk;
 
@@ -60,11 +65,14 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
 	afx_msg HCURSOR OnQueryDragIcon();
-  afx_msg void CGetProfileDlg::OnDestroy();
+	afx_msg void CGetProfileDlg::OnDestroy();
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnLvnItemchangedListProfile(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnNMClickListProfile(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnAbout();
-	};
+	afx_msg void OnLbnSelchangeListProfileData();
+	afx_msg void OnBnClickedOk();
+	afx_msg void OnEnChangeFilterwordsEdit();
+};
