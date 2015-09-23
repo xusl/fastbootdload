@@ -53,6 +53,7 @@ protected:
   CListCtrl *m_hProfileList;
   CListBox *m_hProfileDataList;
   CStatic *m_hProfileName;
+  CStatic *m_hDevchangeTips;
   std::vector<PCCH> m_pProfiles;
   std::vector<PCCH> m_pFilterProfiles; // 装载过滤后的profiles
   CStringA m_DeviceProfilePath;

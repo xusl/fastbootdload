@@ -56,6 +56,7 @@ CGetProfileDlg::CGetProfileDlg(CWnd* pParent /*=NULL*/)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
+
 CGetProfileDlg::~CGetProfileDlg()
 {
 	for (unsigned int i = 0; i < m_pProfiles.size(); i++) // 避免多次申请(初次不会执行)，内存泄漏，当第二次进来的时候需要释放前面的内容
@@ -127,6 +128,7 @@ BOOL CGetProfileDlg::OnInitDialog()
 
   m_hProfileDataList = ((CListBox*)GetDlgItem(IDC_LIST_PROFILE_DATA));
   m_hProfileName = (CStatic *)GetDlgItem(IDC_STATIC_PROFILE_NAME);
+  m_hDevchangeTips = (CStatic *)GetDlgItem(IDC_STATIC_DEVCHANGE_TIPS);
   GetDlgItem(IDOK)->ShowWindow(SW_HIDE);
 
   RegisterAdbDeviceNotification(this->m_hWnd);
@@ -281,7 +283,7 @@ BOOL CGetProfileDlg::CheckDeviceProfilePath(usb_handle* handle) {
     ERROR("No adb device found.");
     return FALSE;
   }
-  adbhost adb(handle , usb_port_address(handle));
+  adbhost adb(handle, usb_port_address(handle));
   for (int index = 0; path != NULL; path= candidate[++index])
   {
     memset(buffer, 0, BUFFER_LEN);
@@ -426,6 +428,7 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         // test 3 is not necessary, because user can not very quick to pulgin device after launcher the app.
         if (m_bSwitchDisk == FALSE && m_hUSBHandle == NULL) {
           DEBUG("SET TIMER_SWITCH_DISK");
+		  m_hDevchangeTips->SetWindowText(_T("检测到设备，请稍候，正在切换设备当中..."));
           SetTimer(TIMER_SWITCH_DISK, 5000, NULL);
         }
         break;
@@ -437,6 +440,7 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
           KillTimer(TIMER_SWITCH_DISK);
         } else {
           m_bSwitchDisk = FALSE;
+		  m_hDevchangeTips->SetWindowText(_T(""));
         }
         GetProfilesList(FALSE);
       }
@@ -453,6 +457,7 @@ BOOL CGetProfileDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 
       m_hProfileDataList->ResetContent();
       m_hProfileName->SetWindowText(_T(""));
+	  m_hDevchangeTips->SetWindowText(_T("设备已被拔出！"));
       m_hProfileList->DeleteAllItems();
       m_pProfiles.clear();
     }
@@ -549,7 +554,6 @@ LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
     if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
       LOG("Fix DISK %S:", path);
     } else {
-
       path.MakeUpper();
       if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1)
         LOG("USB Stor %S is not alcatel",path);
