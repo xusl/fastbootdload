@@ -46,10 +46,6 @@ END_MESSAGE_MAP()
 
 
 // CGetProfileDlg 对话框
-
-
-
-
 CGetProfileDlg::CGetProfileDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CGetProfileDlg::IDD, pParent)
 	, m_filterWords(_T(""))
@@ -489,26 +485,33 @@ void CGetProfileDlg::OnNMClickListProfile(NMHDR *pNMHDR, LRESULT *pResult)
   CString profile = m_hProfileList->GetItemText(pNMLV->iItem, 0);
   //CString profile = m_pProfiles->GetAt(pNMLV->iItem);
 
-  //LOG("Click item %s", WideStrToMultiStr(profile));
-  PCHAR data = NULL;
-  DoPokeProfile(m_hUSBHandle, WideStrToMultiStr(profile), &data);
-  if (data != NULL) {
-    LOG("Profile data %s", data);
-    CString profileData = MultiStrToWideStr(data);
-    m_hProfileDataList->ResetContent();
+  ShowSpecficProfile(profile);
+}
 
-    // ParseProfileContent(data, " \t", "\r\n");
+VOID CGetProfileDlg::ShowSpecficProfile(CString profile)
+{
+	if (profile.IsEmpty())
+	{
+		return;
+	}
 
-    int curPos = 0;
-    CString resToken = profileData.Tokenize(_T("\r\n"),curPos);
-    while (resToken != _T("")){
-      m_hProfileDataList->AddString(resToken);
-      resToken = profileData.Tokenize(_T("\r\n"), curPos);
-    };
+	PCHAR data = NULL;
+	DoPokeProfile(m_hUSBHandle, WideStrToMultiStr(profile), &data);
+	if (data != NULL)
+	{
+		CString profileData = MultiStrToWideStr(data);
+		m_hProfileDataList->ResetContent();
 
-    m_hProfileName->SetWindowText(profile);
-    free(data);
-  }
+		int curPos = 0;
+		CString resToken = profileData.Tokenize(_T("\r\n"), curPos);
+		while (resToken != _T("")){
+			m_hProfileDataList->AddString(resToken);
+			resToken = profileData.Tokenize(_T("\r\n"), curPos);
+		};
+
+		m_hProfileName->SetWindowText(profile);
+		free(data);
+	}
 }
 
 void CGetProfileDlg::OnTimer(UINT_PTR nIDEvent)
@@ -590,19 +593,22 @@ LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
   szClass = szDevId.Left(idx);
 #endif
 
-
   void CGetProfileDlg::OnLbnSelchangeListProfileData()
   {
 	  // TODO: Add your control notification handler code here
   }
 
-
   void CGetProfileDlg::OnBnClickedOk()
   {
 	  // TODO: Add your control notification handler code here
-	  CDialog::OnOK();
-  }
+	  //CDialog::OnOK();
+	  if (m_pFilterProfiles.size() == 0)
+	  {
+		  return;
+	  }
 
+	  ShowSpecficProfile(MultiStrToWideStr(m_pFilterProfiles[0]));
+  }
 
   void CGetProfileDlg::OnEnChangeFilterwordsEdit()
   {
@@ -614,6 +620,9 @@ LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
 	  // TODO:  Add your control notification handler code here
 	  UpdateData(TRUE); // 将最新输入的数据从控件更新到变量中(即这一操作后最新字符串已存到m_filterWords中)
 	  std::vector<PCCH> profiles;
+
+	  m_hProfileDataList->ResetContent();
+	  m_hProfileName->SetWindowText(_T(""));
 
 	  m_pFilterProfiles.clear(); // added by zhoujun
 	  PCHAR newKeyWord = WideStrToMultiStr(m_filterWords);
@@ -630,6 +639,10 @@ LRESULT  CGetProfileDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
 	  else
 	  {
 		  profiles = m_pFilterProfiles;
+		  if (1 == m_pFilterProfiles.size())
+		  {
+			  ShowSpecficProfile(MultiStrToWideStr(m_pFilterProfiles[0]));
+		  }
 	  }
 
 	  m_hProfileList->DeleteAllItems();

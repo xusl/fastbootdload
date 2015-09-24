@@ -42,6 +42,7 @@ private:
   VOID DoGetProfilesList(usb_handle* handle);
   BOOL DoPokeProfile(usb_handle* handle, PCHAR profileName, PCHAR *data);
   BOOL CheckDeviceProfilePath(usb_handle* handle);
+  VOID ShowSpecficProfile(CString profile);
   usb_handle* GetUsbHandle();
 
 // й╣ож
