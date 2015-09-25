@@ -52,7 +52,7 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
-  StartLogging(L"FreeportLiveDeploy.log", "all", "all");
+  StartLogging(L"FreeportLiveDeploy.log", "log,info,warn,error", "all");
   m_bSwitchDisk = FALSE;
 
   m_hDevchangeTips = (CStatic *)GetDlgItem(IDC_STATIC_DEVCHANGE_TIPS);
