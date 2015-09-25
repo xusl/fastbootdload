@@ -15,9 +15,9 @@ when        who          what
               //      #endif
 
 #include "dirent.h"
-#include "file_sync_service.h"
 #include "adb.h"
 #include "stdio.h"
+#include "file_sync_service.h"
 
 typedef unsigned short mode_t;
 

@@ -77,7 +77,7 @@ typedef union {
 
 typedef struct syncsendbuf syncsendbuf;
 
-#define SYNC_DATA_MAX (64*1024)
+#define SYNC_DATA_MAX (MAX_PAYLOAD - 8)//(64*1024)
 struct syncsendbuf {
     unsigned id;
     unsigned size;

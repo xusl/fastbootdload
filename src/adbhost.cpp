@@ -1142,7 +1142,7 @@ fail:
 int adbhost::write_data_file(int fd, const char *path, syncsendbuf *sbuf)
 {
     int err = 0;
-	FILE* lfd;
+    FILE* lfd;
 
     lfd = adb_open(path, "rb");
     if(lfd < 0) {
@@ -1152,9 +1152,7 @@ int adbhost::write_data_file(int fd, const char *path, syncsendbuf *sbuf)
 
     sbuf->id = ID_DATA;
     for(;;) {
-        int ret;
-
-        ret = adb_read(lfd, sbuf->data, SYNC_DATA_MAX);
+        int ret = adb_read(lfd, sbuf->data, SYNC_DATA_MAX);
         if(!ret)
             break;
 
@@ -1256,6 +1254,11 @@ int adbhost::readx(int fd, void *ptr, size_t len) {
 }
 
 int adbhost::writex(int fd, const void *ptr, size_t len){
+   if (len > MAX_PAYLOAD) {
+    ERROR("Data length (%d) is larger than MAX_PAYLOAD. ", len);
+    ERROR("===============NOT SEND PACKAGE!================");
+    return -1;
+   }
    apacket *p = get_apacket();
    p->len = len;
    memcpy(p->data, ptr, len);

@@ -119,12 +119,12 @@ VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
   m_hUSBHandle = GetUsbHandle();
   if (m_hUSBHandle != NULL) {
     adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
-    //m_hDevchangeTips->SetWindowText(_T("Get adb interface, now do send files."));
-    //adb.sync_push("data\\fatlabel", "/usr/sbin/fatlabel");
-    //
+    m_hDevchangeTips->SetWindowText(_T("Get adb interface, now do send files."));
+    PushFile(adb, "data\\fatlabel", "/usr/sbin/fatlabel");
     PushFile(adb, "data\\formatsdcard.sh", "/usr/oem/formatsdcard.sh");
     PushFile(adb, "data\\umount.sh", "/usr/oem/umount.sh");
     PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
+    m_hDevchangeTips->SetWindowText(_T("Deploy finish!"));
   } else if (trySwitchDisk) {
     PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   }
@@ -132,6 +132,8 @@ VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
 
 LRESULT CFreeportLiveDeployDlg::PushFile(adbhost & adb, const char *lpath, const char *rpath) {
   CString prompt;
+  PCHAR resp = NULL;
+  int resp_len;
   //m_hDevchangeTips->GetWindowText(prompt);
   //prompt += _T("\n"); //this result in none text display
   prompt += lpath;
@@ -140,6 +142,11 @@ LRESULT CFreeportLiveDeployDlg::PushFile(adbhost & adb, const char *lpath, const
   m_hDevchangeTips->SetWindowText(prompt);
   LOG("%S", prompt);
   adb.sync_push(lpath, rpath);
+
+  CStringA command = "chmod 755 ";
+  command += rpath;
+
+  adb.shell(command, (void **)&resp, &resp_len);
   return 0;
 }
 BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
