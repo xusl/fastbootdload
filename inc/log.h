@@ -28,6 +28,7 @@ using std::ofstream;
 using std::setfill;
 using std::setw;
 using std::endl;
+using std::locale;
 #endif //FEATURE_LOG_FILE
 
 //-----------------------------------------------------------------------------
@@ -103,7 +104,7 @@ private:
 
 	unsigned int     mask;
 	unsigned int     adb_trace_mask;
-	std::locale		   loc;
+	locale		   loc;
 };
 
 extern CLog* g_pLogInstance;
