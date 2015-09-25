@@ -7,7 +7,6 @@
 #include "FreeportLiveDeployDlg.h"
 #include "afxdialogex.h"
 #include "log.h"
-#include "adbhost.h"
 #include <string.h>
 #include <algorithm>
 
@@ -61,9 +60,9 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
   adb_usb_init();
 
   if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
-    SetTimer(TIMER_PROFILE_LIST, 1000, NULL);
+    SetTimer(TIMER_PUSH_FILES, 1000, NULL);
   } else {
-    GetProfilesList(TRUE);
+    LiveDeploy(TRUE);
   }
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -115,24 +114,33 @@ usb_handle* CFreeportLiveDeployDlg::GetUsbHandle() {
   }
   return handle;
 }
-VOID CFreeportLiveDeployDlg::GetProfilesList(BOOL trySwitchDisk) {
+
+VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
   m_hUSBHandle = GetUsbHandle();
   if (m_hUSBHandle != NULL) {
-  adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
-       // conf_file_char = WideStrToMultiStr(conf_file);
-      
-            
-
-      //adb.sync_push("data\\fatlabel", "/usr/sbin/fatlabel");
-      adb.sync_push("data\\formatsdcard.sh",  "/usr/oem/formatsdcard.sh");
-      adb.sync_push("data\\umount.sh", "/usr/oem/umount.sh");
-      adb.sync_push("data\\restartusb.sh", "/usr/oem/restartusb.sh");
-
-  //CheckDeviceProfilePath(m_hUSBHandle);
-  //DoGetProfilesList(m_hUSBHandle);
+    adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
+    //m_hDevchangeTips->SetWindowText(_T("Get adb interface, now do send files."));
+    //adb.sync_push("data\\fatlabel", "/usr/sbin/fatlabel");
+    //
+    PushFile(adb, "data\\formatsdcard.sh", "/usr/oem/formatsdcard.sh");
+    PushFile(adb, "data\\umount.sh", "/usr/oem/umount.sh");
+    PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
   } else if (trySwitchDisk) {
-  PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
+    PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   }
+}
+
+LRESULT CFreeportLiveDeployDlg::PushFile(adbhost & adb, const char *lpath, const char *rpath) {
+  CString prompt;
+  //m_hDevchangeTips->GetWindowText(prompt);
+  //prompt += _T("\n"); //this result in none text display
+  prompt += lpath;
+  prompt += _T(" => ");
+  prompt += rpath;
+  m_hDevchangeTips->SetWindowText(prompt);
+  LOG("%S", prompt);
+  adb.sync_push(lpath, rpath);
+  return 0;
 }
 BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 {
@@ -171,7 +179,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         // test 3 is not necessary, because user can not very quick to pulgin device after launcher the app.
         if (m_bSwitchDisk == FALSE && m_hUSBHandle == NULL) {
           DEBUG("SET TIMER_SWITCH_DISK");
-		  m_hDevchangeTips->SetWindowText(_T("检测到设备，请稍候，正在切换设备当中..."));
+          m_hDevchangeTips->SetWindowText(_T("Device Detected"));
           SetTimer(TIMER_SWITCH_DISK, 5000, NULL);
         }
         break;
@@ -183,9 +191,9 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
           KillTimer(TIMER_SWITCH_DISK);
         } else {
           m_bSwitchDisk = FALSE;
-		  m_hDevchangeTips->SetWindowText(_T(""));
+          m_hDevchangeTips->SetWindowText(_T(""));
         }
-        GetProfilesList(FALSE);
+        LiveDeploy(FALSE);
       }
       break;
     }
@@ -198,7 +206,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         m_hUSBHandle = NULL;
       }
 
-	  m_hDevchangeTips->SetWindowText(_T("设备已被拔出！"));
+      m_hDevchangeTips->SetWindowText(_T("Device is removed."));
     }
   }
 
@@ -207,9 +215,9 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 void CFreeportLiveDeployDlg::OnTimer(UINT_PTR nIDEvent)
 {
   CDialog::OnTimer(nIDEvent);
-  if (nIDEvent == TIMER_PROFILE_LIST) {
+  if (nIDEvent == TIMER_PUSH_FILES) {
     DEBUG("HANDLE TIMER_PROFILE_LIST TIMER");
-    GetProfilesList(TRUE);
+    LiveDeploy(TRUE);
   } else if (nIDEvent == TIMER_SWITCH_DISK){
     DEBUG("HANDLE TIMER_SWITCH_DISK TIMER");
     PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
@@ -235,6 +243,8 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
         CSCSICmd scsi = CSCSICmd();
         LOG("do switch device %S", devicePath[i]);
         scsi.SwitchToDebugDevice(devicePath[i]);
+
+        m_hDevchangeTips->SetWindowText(_T("Switch Device USB port"));
         m_bSwitchDisk = TRUE;
         //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
         break;

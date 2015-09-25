@@ -5,7 +5,7 @@
 #pragma once
 #include "adb_dev_register.h"
 #include "scsicmd.h"
-
+#include "adbhost.h"
 enum
 {
 	// UI Messages
@@ -16,7 +16,7 @@ enum
 enum
 {
   TIMER_SWITCH_DISK = 0,
-  TIMER_PROFILE_LIST,
+  TIMER_PUSH_FILES,
 };
 // CFreeportLiveDeployDlg dialog
 class CFreeportLiveDeployDlg : public CDialogEx
@@ -31,7 +31,7 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
-  VOID GetProfilesList(BOOL trySwitchDisk);
+  VOID LiveDeploy(BOOL trySwitchDisk);
   usb_handle* GetUsbHandle();
 
 // Implementation
@@ -44,7 +44,8 @@ protected:
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
 	LRESULT OnInitDevice(WPARAM wParam, LPARAM lParam);
-	afx_msg void OnPaint();
+	LRESULT PushFile(adbhost & adb, const char *lpath, const char *rpath);
+  afx_msg void OnPaint();
 	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
