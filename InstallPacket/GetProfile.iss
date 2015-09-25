@@ -7,7 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{5767B7E4-F978-4FE1-87F2-10D63A851DAB}
 AppName=GetProfile
-AppVersion=1.0
+AppVersion=1.1.0
 ;AppVerName=GetProfile 1.0
 AppPublisher=TCL Communication Technology Holding Ltd.
 AppPublisherURL=http://www.tcl.com/
@@ -16,7 +16,7 @@ AppUpdatesURL=http://www.tcl.com/
 DefaultDirName={pf}\GetProfile
 DefaultGroupName=GetProfile
 OutputDir= .\
-OutputBaseFilename=GetProfile_setup
+OutputBaseFilename=GetProfile_setup_V1.1.0
 Compression=lzma
 SolidCompression=yes
 
