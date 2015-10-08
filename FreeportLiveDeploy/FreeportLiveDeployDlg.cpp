@@ -14,11 +14,7 @@
 #define new DEBUG_NEW
 #endif
 
-
 // CFreeportLiveDeployDlg dialog
-
-
-
 
 CFreeportLiveDeployDlg::CFreeportLiveDeployDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CFreeportLiveDeployDlg::IDD, pParent)
@@ -244,9 +240,10 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
       LOG("Fix DISK %S:", path);
     } else {
       path.MakeUpper();
-      if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1)
-        LOG("USB Stor %S is not alcatel",path);
-      else {
+      if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1 && 
+        path.Find(_T("VEN_AT&T&PROD_MODIO")) == -1) {
+        LOG("USB Stor %S is not target device.",path);      
+      } else {
         CSCSICmd scsi = CSCSICmd();
         LOG("do switch device %S", devicePath[i]);
         scsi.SwitchToDebugDevice(devicePath[i]);

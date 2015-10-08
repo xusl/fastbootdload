@@ -7,8 +7,8 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{2B410A37-D183-4496-AB6C-C0DC16D9E53F}
 AppName=Freeport Living Deploy
-AppVersion=0.0.1
-;AppVerName=Freeport Living Deploy 0.0.1
+AppVersion=0.0.2
+;AppVerName=Freeport Living Deploy 0.0.2
 AppPublisher=TCL Communication Technology Holdings Limited
 AppPublisherURL=http://www.tcl.com/
 AppSupportURL=http://www.tcl.com/
@@ -16,7 +16,7 @@ AppUpdatesURL=http://www.tcl.com/
 DefaultDirName={pf}\Freeport Living Deploy
 DefaultGroupName=Freeport Living Deploy
 OutputDir= .\
-OutputBaseFilename=FreeportLivingDeploy_setup_V0.0.1
+OutputBaseFilename=FreeportLivingDeploy_setup_V0.0.2
 Compression=lzma
 SolidCompression=yes
 
