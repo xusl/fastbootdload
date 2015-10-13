@@ -6,6 +6,7 @@
 #include "FreeportLiveDeploy.h"
 #include "FreeportLiveDeployDlg.h"
 #include "afxdialogex.h"
+#include "Difxapi.h"
 #include "log.h"
 #include <string.h>
 #include <algorithm>
@@ -13,6 +14,37 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+#pragma 	  comment(lib,"Difxapi.lib")
+
+//void (WINAPI * DIFXLOGCALLBACK) DIFLOGCALLBACK;
+
+ void WINAPI AdbDifLog(
+   DIFXAPI_LOG Event,
+   DWORD       Error,
+   PCWSTR      EventDescription,
+   PVOID       CallbackContext
+)
+{
+CFreeportLiveDeployDlg* dlg =  (CFreeportLiveDeployDlg* )CallbackContext;
+INFO("Error %d, %S", Error, EventDescription);
+dlg->m_hDevchangeTips->SetWindowText(_T("Switch Device USB port"));
+switch(Event) {
+ case DIFXAPI_SUCCESS:
+ dlg->m_hDevchangeTips->SetWindowText(_T("adb driver installed."));
+ break;
+ case DIFXAPI_INFO:
+ case DIFXAPI_WARNING:
+  dlg->m_hDevchangeTips->SetWindowText(EventDescription);
+  break;
+ break;
+ case DIFXAPI_ERROR: 
+  dlg->m_hDevchangeTips->SetWindowText(_T("adb driver is not installed. Please check the log."));
+ break;
+ default:
+ break;
+ }
+
+ }
 
 // CFreeportLiveDeployDlg dialog
 
@@ -197,6 +229,9 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
           m_bSwitchDisk = FALSE;
           m_hDevchangeTips->SetWindowText(_T(""));
         }
+        
+        //KillTimer(TIMER_INSTALL_ADB_DRIVER);
+        
         LiveDeploy(FALSE);
       }
       break;
@@ -225,10 +260,56 @@ void CFreeportLiveDeployDlg::OnTimer(UINT_PTR nIDEvent)
   } else if (nIDEvent == TIMER_SWITCH_DISK){
     DEBUG("HANDLE TIMER_SWITCH_DISK TIMER");
     PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
+  } else if(nIDEvent == TIMER_INSTALL_ADB_DRIVER) {
+    //InstallAdbDriver();
   }
 
   KillTimer(nIDEvent);
 }
+
+
+LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
+  BOOL reboot;
+  PCTSTR DriverPackageInfPath  = _T("usb_driver\\android_winusb.inf");
+  SetDifxLogCallback(AdbDifLog, this);
+  m_hDevchangeTips->SetWindowText(_T("Install adb driver"));
+  
+  DEBUG("Install adb driver");
+  DWORD retCode = DriverPackageInstall(DriverPackageInfPath ,  
+                        //DRIVER_PACKAGE_FORCE | DRIVER_PACKAGE_LEGACY_MODE ,
+                        DRIVER_PACKAGE_ONLY_IF_DEVICE_PRESENT  | DRIVER_PACKAGE_LEGACY_MODE,
+                        NULL,
+                        &reboot); 
+   switch(retCode) {
+    case CERT_E_EXPIRED:
+   DEBUG("DriverPackageInstall:  The signing certificate is expired.");
+   break; 
+   case CRYPT_E_FILE_ERROR:   
+   DEBUG("DriverPackageInstall:  The catalog file for the specified driver package was not found.");
+   break;
+   case ERROR_FILE_NOT_FOUND:
+   DEBUG("DriverPackageInstall:  The INF file that was %s was not found.", DriverPackageInfPath);
+   break;
+   case ERROR_FILENAME_EXCED_RANGE:
+   DEBUG("DriverPackageInstall:  The INF file path, in characters,  is greater than the maximum supported path length.");
+   break;
+   case ERROR_INVALID_NAME:   
+   DEBUG("DriverPackageInstall:  The specified INF file path is not valid.");
+   break;
+   case TRUST_E_NOSIGNATURE:
+   DEBUG("DriverPackageInstall:  The driver package is not signed.");
+   break;
+   case ERROR_NO_DEVICE_ID:
+   DEBUG("DriverPackageInstall:  The driver package does not specify a hardware identifier or "
+   "compatible identifier that is supported by the current platform. ");
+   break;
+   default:     
+   DEBUG("DriverPackageInstall:  return code %d.", retCode);
+   break;
+   }
+   return 0;
+}
+
 LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
   std::vector<CString> devicePath;
   GetDeviceByGUID(devicePath, &GUID_DEVINTERFACE_DISK);
@@ -247,10 +328,12 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
       } else {
         CSCSICmd scsi = CSCSICmd();
         LOG("do switch device %S", devicePath[i]);
+        //SetTimer(TIMER_INSTALL_ADB_DRIVER, 1000, NULL);
         scsi.SwitchToDebugDevice(devicePath[i]);
-
         m_hDevchangeTips->SetWindowText(_T("Switch Device USB port"));
         m_bSwitchDisk = TRUE;
+        
+        InstallAdbDriver();
         //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
         break;
       }

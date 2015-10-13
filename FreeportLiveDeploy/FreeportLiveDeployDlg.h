@@ -17,6 +17,7 @@ enum
 {
   TIMER_SWITCH_DISK = 0,
   TIMER_PUSH_FILES,
+  TIMER_INSTALL_ADB_DRIVER,
 };
 // CFreeportLiveDeployDlg dialog
 class CFreeportLiveDeployDlg : public CDialogEx
@@ -38,17 +39,20 @@ public:
 protected:
 	HICON m_hIcon;
   usb_handle* m_hUSBHandle;
-  CStatic *m_hDevchangeTips;
   BOOL m_bSwitchDisk;
-
+  
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
 	LRESULT OnInitDevice(WPARAM wParam, LPARAM lParam);
-	LRESULT PushFile(adbhost & adb, const char *lpath, const char *rpath);
-  afx_msg void OnPaint();
+	LRESULT PushFile(adbhost & adb, const char *lpath, const char *rpath);    
+	LRESULT InstallAdbDriver(void);
+    afx_msg void OnPaint();
 	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+
+public:    
+  CStatic *m_hDevchangeTips;
 };
