@@ -279,7 +279,7 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
   DEBUG("Install adb driver");
   DWORD retCode = DriverPackageInstall(DriverPackageInfPath ,  
                         //DRIVER_PACKAGE_FORCE | DRIVER_PACKAGE_LEGACY_MODE ,
-                        DRIVER_PACKAGE_ONLY_IF_DEVICE_PRESENT  | DRIVER_PACKAGE_LEGACY_MODE,
+                        0x00000000,
                         NULL,
                         &reboot); 
    switch(retCode) {
@@ -290,7 +290,7 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
    DEBUG("DriverPackageInstall:  The catalog file for the specified driver package was not found.");
    break;
    case ERROR_FILE_NOT_FOUND:
-   DEBUG("DriverPackageInstall:  The INF file that was %S was not found.", DriverPackageInfPath);
+   DEBUG("DriverPackageInstall:  The INF file  %S was not found.", DriverPackageInfPath);
    break;
    case ERROR_FILENAME_EXCED_RANGE:
    DEBUG("DriverPackageInstall:  The INF file path, in characters,  is greater than the maximum supported path length.");
