@@ -81,7 +81,8 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
-  StartLogging(L"ModioDataCase_microSDPatch.log", "log,info,warn,error", "all");
+  //StartLogging(L"ModioDataCase_microSDPatch.log", "log,info,warn,error", "all");
+  StartLogging(L"ModioDataCase_microSDPatch.log", "all", "all");
   m_bSwitchDisk = FALSE;
 
   m_hDevchangeTips = (CStatic *)GetDlgItem(IDC_STATIC_DEVCHANGE_TIPS);
@@ -289,7 +290,7 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
    DEBUG("DriverPackageInstall:  The catalog file for the specified driver package was not found.");
    break;
    case ERROR_FILE_NOT_FOUND:
-   DEBUG("DriverPackageInstall:  The INF file that was %s was not found.", DriverPackageInfPath);
+   DEBUG("DriverPackageInstall:  The INF file that was %S was not found.", DriverPackageInfPath);
    break;
    case ERROR_FILENAME_EXCED_RANGE:
    DEBUG("DriverPackageInstall:  The INF file path, in characters,  is greater than the maximum supported path length.");
