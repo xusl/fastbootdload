@@ -26,21 +26,22 @@
 )
 {
 CFreeportLiveDeployDlg* dlg =  (CFreeportLiveDeployDlg* )CallbackContext;
-INFO("Error %d, %S", Error, EventDescription);
-dlg->m_hDevchangeTips->SetWindowText(_T("Switch Device USB port"));
+INFO("Error %d,  Event %d,  Description %S", Error, Event, EventDescription);
+
 switch(Event) {
  case DIFXAPI_SUCCESS:
- dlg->m_hDevchangeTips->SetWindowText(_T("adb driver installed."));
- break;
- case DIFXAPI_INFO:
- case DIFXAPI_WARNING:
   dlg->m_hDevchangeTips->SetWindowText(EventDescription);
-  break;
+ //dlg->m_hDevchangeTips->SetWindowText(_T("adb driver installed."));
  break;
- case DIFXAPI_ERROR: 
-  dlg->m_hDevchangeTips->SetWindowText(_T("adb driver is not installed. Please check the log."));
+
+ case DIFXAPI_ERROR:
+ case DIFXAPI_WARNING: 
+  dlg->m_hDevchangeTips->SetWindowText(_T("adb driver is not installed properly. Please check the log."));
  break;
+
+ //case DIFXAPI_INFO:
  default:
+// dlg->m_hDevchangeTips->SetWindowText(EventDescription);
  break;
  }
 

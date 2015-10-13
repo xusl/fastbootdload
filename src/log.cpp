@@ -179,7 +179,7 @@ void CLog::WriteLog
   char  szBuffer[MAX_BUF_LEN] = {0};
 #define OPT_LOG
 #ifndef OPT_LOG
-#define FORMAT_SIZE     (256)
+#define FORMAT_SIZE     (256*4)
   char  szFormat[FORMAT_SIZE] = {0};
 #endif
   if (this == NULL)
