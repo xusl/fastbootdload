@@ -30,13 +30,13 @@ INFO("Error %d,  Event %d,  Description %S", Error, Event, EventDescription);
 
 switch(Event) {
  case DIFXAPI_SUCCESS:
-  dlg->m_hDevchangeTips->SetWindowText(EventDescription);
+//  dlg->m_hDevchangeTips->SetWindowText(EventDescription);
  //dlg->m_hDevchangeTips->SetWindowText(_T("adb driver installed."));
  break;
 
  case DIFXAPI_ERROR:
  case DIFXAPI_WARNING: 
-  dlg->m_hDevchangeTips->SetWindowText(_T("adb driver is not installed properly. Please check the log."));
+ // dlg->m_hDevchangeTips->SetWindowText(_T("adb driver is not installed properly. Please check the log."));
  break;
 
  //case DIFXAPI_INFO:
@@ -81,12 +81,13 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
-  //StartLogging(L"ModioDataCase_microSDPatch.log", "log,info,warn,error", "all");
-  StartLogging(L"ModioDataCase_microSDPatch.log", "all", "all");
+  StartLogging(L"ModioDataCase_microSDPatch.log", "log,info,warn,error", "all");
+  //StartLogging(L"ModioDataCase_microSDPatch.log", "all", "all");
   m_bSwitchDisk = FALSE;
 
+  GetDlgItem(IDOK)->ShowWindow(SW_HIDE);
   m_hDevchangeTips = (CStatic *)GetDlgItem(IDC_STATIC_DEVCHANGE_TIPS);
-  m_hDevchangeTips->SetWindowText(_T("Please attach device"));
+  m_hDevchangeTips->SetWindowText(_T("Please Attach Modio"));
   RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
   adb_usb_init();
 
@@ -149,13 +150,21 @@ usb_handle* CFreeportLiveDeployDlg::GetUsbHandle() {
 VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
   m_hUSBHandle = GetUsbHandle();
   if (m_hUSBHandle != NULL) {
+    int result = 0;
+    GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
     adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
     m_hDevchangeTips->SetWindowText(_T("Get adb interface, now do send files."));
-    PushFile(adb, "data\\fatlabel", "/usr/sbin/fatlabel");
-    PushFile(adb, "data\\formatsdcard.sh", "/usr/oem/formatsdcard.sh");
-    PushFile(adb, "data\\umount.sh", "/usr/oem/umount.sh");
-    PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
-    m_hDevchangeTips->SetWindowText(_T("Deploy finish!"));
+    result += PushFile(adb, "data\\fatlabel", "/usr/sbin/fatlabel");
+    result += PushFile(adb, "data\\formatsdcard.sh", "/usr/oem/formatsdcard.sh");
+    result += PushFile(adb, "data\\umount.sh", "/usr/oem/umount.sh");
+    result += PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
+    if (result == 0) {
+        m_hDevchangeTips->SetWindowText(_T("Deploy microSDPatch in Modio!"));
+        GetDlgItem(IDOK)->ShowWindow(SW_SHOW);
+    } else {
+        m_hDevchangeTips->SetWindowText(_T("Failed To Apply Patch! Please check whether Modio attached."));
+        GetDlgItem(IDCANCEL)->ShowWindow(SW_SHOW);
+    }
   } else if (trySwitchDisk) {
     PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   }
@@ -165,6 +174,7 @@ LRESULT CFreeportLiveDeployDlg::PushFile(adbhost & adb, const char *lpath, const
   CString prompt;
   PCHAR resp = NULL;
   int resp_len;
+  int result = 0;
   //m_hDevchangeTips->GetWindowText(prompt);
   //prompt += _T("\n"); //this result in none text display
   prompt += lpath;
@@ -172,12 +182,20 @@ LRESULT CFreeportLiveDeployDlg::PushFile(adbhost & adb, const char *lpath, const
   prompt += rpath;
   m_hDevchangeTips->SetWindowText(prompt);
   LOG("%S", prompt);
-  adb.sync_push(lpath, rpath);
+  result = adb.sync_push(lpath, rpath);
+
+  if (result != 0) {
+    ERROR("PushFile %s failed", lpath);
+    return 1;
+  }
 
   CStringA command = "chmod 755 ";
   command += rpath;
 
-  adb.shell(command, (void **)&resp, &resp_len);
+  result = adb.shell(command, (void **)&resp, &resp_len); 
+  if (result != 0) {
+    result = 1;
+  }
   return 0;
 }
 BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
@@ -217,7 +235,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         // test 3 is not necessary, because user can not very quick to pulgin device after launcher the app.
         if (m_bSwitchDisk == FALSE && m_hUSBHandle == NULL) {
           DEBUG("SET TIMER_SWITCH_DISK");
-          m_hDevchangeTips->SetWindowText(_T("Device Detected"));
+          m_hDevchangeTips->SetWindowText(_T("Modio Detected"));
           SetTimer(TIMER_SWITCH_DISK, 5000, NULL);
         }
         break;
@@ -247,7 +265,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         m_hUSBHandle = NULL;
       }
 
-      m_hDevchangeTips->SetWindowText(_T("Device is removed."));
+      m_hDevchangeTips->SetWindowText(_T("Modio Removed."));
     }
   }
 
@@ -269,12 +287,12 @@ void CFreeportLiveDeployDlg::OnTimer(UINT_PTR nIDEvent)
   KillTimer(nIDEvent);
 }
 
-
+//https://msdn.microsoft.com/en-us/library/windows/hardware/ff544813%28v=vs.85%29.aspx
 LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
   BOOL reboot;
   PCTSTR DriverPackageInfPath  = _T("usb_driver\\android_winusb.inf");
   SetDifxLogCallback(AdbDifLog, this);
-  m_hDevchangeTips->SetWindowText(_T("Install adb driver"));
+  m_hDevchangeTips->SetWindowText(_T("Installing Adb Driver ... ..."));
   
   DEBUG("Installing adb driver");
   DWORD retCode = DriverPackageInstall(DriverPackageInfPath ,  
@@ -338,7 +356,7 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
         LOG("do switch device %S", devicePath[i]);
         //SetTimer(TIMER_INSTALL_ADB_DRIVER, 1000, NULL);
         scsi.SwitchToDebugDevice(devicePath[i]);
-        m_hDevchangeTips->SetWindowText(_T("Switch Device USB port"));
+        m_hDevchangeTips->SetWindowText(_T("Switch Modio USB Ports"));
         m_bSwitchDisk = TRUE;
         
         InstallAdbDriver();

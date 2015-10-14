@@ -570,6 +570,7 @@ int adbhost::sync_pull(const char *rpath, const char *lpath) {
 
 
 int adbhost::sync_push(const char *lpath, const char *rpath) {
+  int result = 0;
   if (rpath == NULL || lpath == NULL) {
     ERROR("Invalid parameter!");
     return -1;
@@ -579,10 +580,10 @@ int adbhost::sync_push(const char *lpath, const char *rpath) {
   if (!handle_connect_response()) {
     return -1;
   }
-  do_sync_push(lpath, rpath);
+  result = do_sync_push(lpath, rpath);
   close_remote();
 
-  return 0;
+  return result;
 }
 
 int adbhost::do_sync_pull(const char *rpath, const char *lpath)
