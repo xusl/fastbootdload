@@ -10,7 +10,7 @@
 #include <setupapi.h>
 #include <vector>
 
-BOOL RegisterAdbDeviceNotification(HWND hWnd);
+BOOL RegisterAdbDeviceNotification(IN HWND hWnd, OUT HDEVNOTIFY *phDeviceNotify = NULL);
 BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid);
 VOID SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 BOOL StopAdbServer();

@@ -40,6 +40,7 @@ protected:
 	HICON m_hIcon;
   usb_handle* m_hUSBHandle;
   BOOL m_bSwitchDisk;
+  HDEVNOTIFY hDeviceNotify;
   
 	// Generated message map functions
 	virtual BOOL OnInitDialog();

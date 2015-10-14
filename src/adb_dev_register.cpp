@@ -8,8 +8,8 @@
 #pragma	 comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")
 #pragma comment(lib, "Psapi.lib")
-
-BOOL RegisterAdbDeviceNotification(HWND hWnd) {
+//https://msdn.microsoft.com/en-us/library/windows/desktop/aa363432%28v=vs.85%29.aspx
+BOOL RegisterAdbDeviceNotification(IN HWND hWnd, OUT HDEVNOTIFY *phDeviceNotify) {
    //×¢²á²å°ÎÊÂ¼þ
    HDEVNOTIFY hDevNotify;
 
@@ -33,6 +33,9 @@ BOOL RegisterAdbDeviceNotification(HWND hWnd) {
          return FALSE;
       }
    }
+   //A bit ugly: usb_class_id must have only one element.
+   if (NULL != phDeviceNotify)
+        *phDeviceNotify = hDevNotify;
    return TRUE;
 }
 

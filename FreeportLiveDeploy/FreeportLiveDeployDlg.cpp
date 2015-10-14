@@ -87,7 +87,7 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
 
   m_hDevchangeTips = (CStatic *)GetDlgItem(IDC_STATIC_DEVCHANGE_TIPS);
   m_hDevchangeTips->SetWindowText(_T("Please attach device"));
-  RegisterAdbDeviceNotification(this->m_hWnd);
+  RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
   adb_usb_init();
 
   if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
@@ -276,7 +276,7 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
   SetDifxLogCallback(AdbDifLog, this);
   m_hDevchangeTips->SetWindowText(_T("Install adb driver"));
   
-  DEBUG("Install adb driver");
+  DEBUG("Installing adb driver");
   DWORD retCode = DriverPackageInstall(DriverPackageInfPath ,  
                         //DRIVER_PACKAGE_FORCE | DRIVER_PACKAGE_LEGACY_MODE ,
                         0x00000000,
@@ -309,15 +309,21 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
    DEBUG("DriverPackageInstall:  return code %d.", retCode);
    break;
    }
+
+   if (retCode == 0) {
+   //UnregisterDeviceNotification(hDeviceNotify);
+   //RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
+   LiveDeploy(FALSE);
+   }
    return 0;
 }
 
 LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
   std::vector<CString> devicePath;
   GetDeviceByGUID(devicePath, &GUID_DEVINTERFACE_DISK);
-  int cdromSize = devicePath.size();
+  size_t cdromSize = devicePath.size();
 
-  for(int i = 0; i < cdromSize; i++)
+  for(size_t i = 0; i < cdromSize; i++)
   {
     CString path = devicePath[i];
     if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
