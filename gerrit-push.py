@@ -31,8 +31,10 @@ def usage():
 Usage:
 ------
 python gerrit_push.py
+python gerrit_push.py -t
 or
 ./gerrit_push.py
+./gerrit_push.py -t
     ''')
 
 COLORS = {None     :-1,
@@ -213,13 +215,17 @@ def do_action(cmd, prompt, output=False):
             output = str(error)
             print "command is ", cmd
             print error
+            return os.system(cmd)
         return output
     else:
         return os.system(cmd)
         #return subprocess.call(cmd)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 1:
+    need_sync = True
+    if len(sys.argv) == 2 and sys.argv[1] == "-t":
+        need_sync = False
+    elif len(sys.argv) != 1:
         usage()
         sys.exit(2)
 
@@ -264,12 +270,14 @@ if __name__ == '__main__':
 
     choice = raw_input('Please Confirm it [Y/n] :')
     if len(choice) == 0 or choice.lower() == 'y' :
-        msg=do_action("git pull --rebase", "First Synchronize Server Status!\n")
-        if msg != 0:
-            sys.exit(msg)
+        if need_sync:
+            msg=do_action("git pull --rebase",
+                    "First Synchronize Server Status!\n")
+            if msg != 0:
+                sys.exit(msg)
 
         ret = do_action(cmd, "Now Push Commit to Gerrit\n", True)
-        print ret
+        #print ret
         if isinstance(ret, str) and ret.startswith("Permission denied (publickey)."):
             color_print('''Please login 'http://gerrit.tcl-ta.com:8081/login/',
 click user name on the right top corner, navigate 'Settings/SSH Public Keys',
