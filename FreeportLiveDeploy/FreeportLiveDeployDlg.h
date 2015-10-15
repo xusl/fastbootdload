@@ -25,7 +25,7 @@ class CFreeportLiveDeployDlg : public CDialogEx
 // Construction
 public:
 	CFreeportLiveDeployDlg(CWnd* pParent = NULL);	// standard constructor
-
+    ~CFreeportLiveDeployDlg();
 // Dialog Data
 	enum { IDD = IDD_FREEPORTLIVEDEPLOY_DIALOG };
 

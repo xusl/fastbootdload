@@ -55,6 +55,10 @@ CFreeportLiveDeployDlg::CFreeportLiveDeployDlg(CWnd* pParent /*=NULL*/)
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
 
+CFreeportLiveDeployDlg::~CFreeportLiveDeployDlg() {
+    StopLogging();
+}
+
 void CFreeportLiveDeployDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
@@ -150,7 +154,7 @@ usb_handle* CFreeportLiveDeployDlg::GetUsbHandle() {
 VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
   m_hUSBHandle = GetUsbHandle();
   if (m_hUSBHandle != NULL) {
-    int result = 0;
+    LRESULT result = 0;
     GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
     adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
     m_hDevchangeTips->SetWindowText(_T("Get adb interface, now do send files."));
@@ -294,10 +298,25 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
   SetDifxLogCallback(AdbDifLog, this);
   m_hDevchangeTips->SetWindowText(_T("Installing Adb Driver ... ..."));
   
+  DWORD  Flags = 0x00000000;
+
+  OSVERSIONINFOEX osver;  
+  osver.dwOSVersionInfoSize = sizeof(osver);  
+  //获取版本信息  
+  if (! GetVersionEx((LPOSVERSIONINFO)&osver))  {  
+      WARN("GetVersion failed");
+  } else {
+      INFO("OS Version %d.%d", osver.dwMajorVersion, osver.dwMinorVersion);
+      if (osver.dwMajorVersion == 5 && osver.dwMinorVersion == 1) {
+          //Win XP
+          Flags = DRIVER_PACKAGE_FORCE | DRIVER_PACKAGE_LEGACY_MODE;
+      }
+  }  
+
+
   DEBUG("Installing adb driver");
-  DWORD retCode = DriverPackageInstall(DriverPackageInfPath ,  
-                        //DRIVER_PACKAGE_FORCE | DRIVER_PACKAGE_LEGACY_MODE ,
-                        0x00000000,
+  DWORD retCode = DriverPackageInstall(DriverPackageInfPath ,                          
+                        Flags,
                         NULL,
                         &reboot); 
    switch(retCode) {
