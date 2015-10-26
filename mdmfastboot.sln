@@ -15,6 +15,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ModioDataCase_microSDPatch"
 		{BA9608A3-AAE5-45B9-874B-15971CA5926F} = {BA9608A3-AAE5-45B9-874B-15971CA5926F}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "deviceswitch", "deviceswitch\deviceswitch.vcxproj", "{0FF38839-DF7A-456C-82D7-CCF87E00C792}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -63,6 +65,12 @@ Global
 		{6DCC9E97-F827-4547-8F63-27D562DF530F}.Release|Win32.Build.0 = Release|Win32
 		{6DCC9E97-F827-4547-8F63-27D562DF530F}.Release|x64.ActiveCfg = Release|x64
 		{6DCC9E97-F827-4547-8F63-27D562DF530F}.Release|x64.Build.0 = Release|x64
+		{0FF38839-DF7A-456C-82D7-CCF87E00C792}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0FF38839-DF7A-456C-82D7-CCF87E00C792}.Debug|Win32.Build.0 = Debug|Win32
+		{0FF38839-DF7A-456C-82D7-CCF87E00C792}.Debug|x64.ActiveCfg = Debug|Win32
+		{0FF38839-DF7A-456C-82D7-CCF87E00C792}.Release|Win32.ActiveCfg = Release|Win32
+		{0FF38839-DF7A-456C-82D7-CCF87E00C792}.Release|Win32.Build.0 = Release|Win32
+		{0FF38839-DF7A-456C-82D7-CCF87E00C792}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
