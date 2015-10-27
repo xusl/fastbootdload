@@ -37,7 +37,7 @@ public:
 
 // Implementation
 protected:
-	HICON m_hIcon;
+  HICON m_hIcon;
   usb_handle* m_hUSBHandle;
   BOOL m_bSwitchDisk;
   HDEVNOTIFY hDeviceNotify;
@@ -47,13 +47,16 @@ protected:
 	LRESULT OnInitDevice(WPARAM wParam, LPARAM lParam);
 	LRESULT PushFile(adbhost & adb, const char *lpath, const char *rpath);    
 	LRESULT InstallAdbDriver(void);
+    VOID ConfirmMessage(VOID);
+    BOOL ToggleConfirmWindow(BOOL show);
     afx_msg void OnPaint();
 	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+    afx_msg void OnBnClickedOk();
 
 public:    
-  CStatic *m_hDevchangeTips;
+    CStatic *m_hDevchangeTips;  
 };

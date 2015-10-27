@@ -35,7 +35,7 @@ switch(Event) {
  break;
 
  case DIFXAPI_ERROR:
- case DIFXAPI_WARNING: 
+ case DIFXAPI_WARNING:
  // dlg->m_hDevchangeTips->SetWindowText(_T("adb driver is not installed properly. Please check the log."));
  break;
 
@@ -70,6 +70,7 @@ BEGIN_MESSAGE_MAP(CFreeportLiveDeployDlg, CDialogEx)
 	ON_WM_DEVICECHANGE()
 	ON_WM_TIMER()
 	ON_MESSAGE(UI_MESSAGE_INIT_DEVICE, &CFreeportLiveDeployDlg::OnInitDevice)
+    ON_BN_CLICKED(IDOK, &CFreeportLiveDeployDlg::OnBnClickedOk)
 END_MESSAGE_MAP()
 
 
@@ -85,13 +86,16 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
-  StartLogging(L"ModioDataCase_microSDPatch.log", "log,info,warn,error", "all");
-  //StartLogging(L"ModioDataCase_microSDPatch.log", "all", "all");
+  StartLogging(L"ModioLTECase_microSDPatch.log", "log,info,warn,error", "all");
+  //StartLogging(L"ModioLTECase_microSDPatch.log", "all", "all");
   m_bSwitchDisk = FALSE;
 
   GetDlgItem(IDOK)->ShowWindow(SW_HIDE);
+  GetDlgItem(IDC_CONFIRM_NOTE)->ShowWindow(SW_HIDE);
+
   m_hDevchangeTips = (CStatic *)GetDlgItem(IDC_STATIC_DEVCHANGE_TIPS);
-  m_hDevchangeTips->SetWindowText(_T("Please Attach Modio"));
+  m_hDevchangeTips->SetWindowText(_T("Please connect AT&T Modio LTE Case to computer via USB cable."));
+
   RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
   adb_usb_init();
 
@@ -163,10 +167,10 @@ VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
     result += PushFile(adb, "data\\umount.sh", "/usr/oem/umount.sh");
     result += PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
     if (result == 0) {
-        m_hDevchangeTips->SetWindowText(_T("Deploy microSDPatch in Modio!"));
+        m_hDevchangeTips->SetWindowText(_T("Patch successfully applied!"));
         GetDlgItem(IDOK)->ShowWindow(SW_SHOW);
     } else {
-        m_hDevchangeTips->SetWindowText(_T("Failed To Apply Patch! Please check whether Modio attached."));
+        m_hDevchangeTips->SetWindowText(_T("Failed To apply patch! Please check the log."));
         GetDlgItem(IDCANCEL)->ShowWindow(SW_SHOW);
     }
   } else if (trySwitchDisk) {
@@ -196,7 +200,7 @@ LRESULT CFreeportLiveDeployDlg::PushFile(adbhost & adb, const char *lpath, const
   CStringA command = "chmod 755 ";
   command += rpath;
 
-  result = adb.shell(command, (void **)&resp, &resp_len); 
+  result = adb.shell(command, (void **)&resp, &resp_len);
   if (result != 0) {
     result = 1;
   }
@@ -239,7 +243,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         // test 3 is not necessary, because user can not very quick to pulgin device after launcher the app.
         if (m_bSwitchDisk == FALSE && m_hUSBHandle == NULL) {
           DEBUG("SET TIMER_SWITCH_DISK");
-          m_hDevchangeTips->SetWindowText(_T("Modio Detected"));
+          m_hDevchangeTips->SetWindowText(_T("AT&T Modio LTE Case detected."));
           SetTimer(TIMER_SWITCH_DISK, 5000, NULL);
         }
         break;
@@ -253,9 +257,9 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
           m_bSwitchDisk = FALSE;
           m_hDevchangeTips->SetWindowText(_T(""));
         }
-        
+
         //KillTimer(TIMER_INSTALL_ADB_DRIVER);
-        
+
         LiveDeploy(FALSE);
       }
       break;
@@ -269,7 +273,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         m_hUSBHandle = NULL;
       }
 
-      m_hDevchangeTips->SetWindowText(_T("Modio Removed."));
+      m_hDevchangeTips->SetWindowText(_T("AT&T Modio LTE Case removed."));
     }
   }
 
@@ -296,14 +300,14 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
   BOOL reboot;
   PCTSTR DriverPackageInfPath  = _T("usb_driver\\android_winusb.inf");
   SetDifxLogCallback(AdbDifLog, this);
-  m_hDevchangeTips->SetWindowText(_T("Installing Adb Driver ... ..."));
-  
+  m_hDevchangeTips->SetWindowText(_T("Installing Adb driver ... ..."));
+
   DWORD  Flags = 0x00000000;
 
-  OSVERSIONINFOEX osver;  
-  osver.dwOSVersionInfoSize = sizeof(osver);  
-  //获取版本信息  
-  if (! GetVersionEx((LPOSVERSIONINFO)&osver))  {  
+  OSVERSIONINFOEX osver;
+  osver.dwOSVersionInfoSize = sizeof(osver);
+  //获取版本信息
+  if (! GetVersionEx((LPOSVERSIONINFO)&osver))  {
       WARN("GetVersion failed");
   } else {
       INFO("OS Version %d.%d", osver.dwMajorVersion, osver.dwMinorVersion);
@@ -311,19 +315,19 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
           //Win XP
           Flags = DRIVER_PACKAGE_FORCE | DRIVER_PACKAGE_LEGACY_MODE;
       }
-  }  
+  }
 
 
   DEBUG("Installing adb driver");
-  DWORD retCode = DriverPackageInstall(DriverPackageInfPath ,                          
+  DWORD retCode = DriverPackageInstall(DriverPackageInfPath ,
                         Flags,
                         NULL,
-                        &reboot); 
+                        &reboot);
    switch(retCode) {
     case CERT_E_EXPIRED:
    DEBUG("DriverPackageInstall:  The signing certificate is expired.");
-   break; 
-   case CRYPT_E_FILE_ERROR:   
+   break;
+   case CRYPT_E_FILE_ERROR:
    DEBUG("DriverPackageInstall:  The catalog file for the specified driver package was not found.");
    break;
    case ERROR_FILE_NOT_FOUND:
@@ -332,7 +336,7 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
    case ERROR_FILENAME_EXCED_RANGE:
    DEBUG("DriverPackageInstall:  The INF file path, in characters,  is greater than the maximum supported path length.");
    break;
-   case ERROR_INVALID_NAME:   
+   case ERROR_INVALID_NAME:
    DEBUG("DriverPackageInstall:  The specified INF file path is not valid.");
    break;
    case TRUST_E_NOSIGNATURE:
@@ -342,7 +346,7 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
    DEBUG("DriverPackageInstall:  The driver package does not specify a hardware identifier or "
    "compatible identifier that is supported by the current platform. ");
    break;
-   default:     
+   default:
    DEBUG("DriverPackageInstall:  return code %d.", retCode);
    break;
    }
@@ -367,17 +371,17 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
       LOG("Fix DISK %S:", path);
     } else {
       path.MakeUpper();
-      if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1 && 
+      if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1 &&
         path.Find(_T("VEN_AT&T&PROD_MODIO")) == -1) {
-        LOG("USB Stor %S is not target device.",path);      
+        LOG("USB Stor %S is not target device.",path);
       } else {
         CSCSICmd scsi = CSCSICmd();
         LOG("do switch device %S", devicePath[i]);
         //SetTimer(TIMER_INSTALL_ADB_DRIVER, 1000, NULL);
         scsi.SwitchToDebugDevice(devicePath[i]);
-        m_hDevchangeTips->SetWindowText(_T("Switch Modio USB Ports"));
+        m_hDevchangeTips->SetWindowText(_T("Toggle USB Ports of AT&T Modio LTE Case.."));
         m_bSwitchDisk = TRUE;
-        
+
         InstallAdbDriver();
         //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
         break;
@@ -388,3 +392,56 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
 
   return 0;
 }
+
+BOOL CFreeportLiveDeployDlg::ToggleConfirmWindow(BOOL show) {
+  int nCmdShow ;
+  if (show)
+    nCmdShow = SW_SHOW;
+  else
+    nCmdShow = SW_HIDE;
+
+  GetDlgItem(IDOK)->ShowWindow(nCmdShow);
+  GetDlgItem(IDC_CONFIRM_NOTE)->ShowWindow(nCmdShow);
+
+  GetDlgItem(IDC_STATIC_APPLY)->ShowWindow(nCmdShow);
+  GetDlgItem(IDC_STATIC_OK)->ShowWindow(nCmdShow);
+  GetDlgItem(IDC_STATIC_CLICK)->ShowWindow(nCmdShow);
+
+  if (show)
+    nCmdShow = SW_HIDE;
+  else
+    nCmdShow = SW_SHOW;
+  GetDlgItem(IDCANCEL)->ShowWindow(nCmdShow);
+  m_hDevchangeTips->ShowWindow(nCmdShow);
+
+  return TRUE;
+}
+
+VOID CFreeportLiveDeployDlg::ConfirmMessage(VOID)
+{
+  CStatic * emphasize = (CStatic *)GetDlgItem(IDC_STATIC_OK);
+  CFont * font = emphasize->GetFont();
+  if (font != NULL) {
+    CFont boldFont;
+    LOGFONT lf;
+    font->GetObject(sizeof(LOGFONT), & lf);
+    lf.lfWeight = FW_BOLD;
+    boldFont.CreateFontIndirect(&lf);
+    emphasize->SetFont(&boldFont);
+    boldFont.Detach();
+  }
+  ToggleConfirmWindow(TRUE);
+
+
+  //m_hConfirmNote->SetWindowText(_T("NOTE: You may be prompted to install device drivers, please accept these prompts."));
+  //m_hDevchangeTips->SetWindowText(_T("Click OK to apply patch."));
+}
+
+void CFreeportLiveDeployDlg::OnBnClickedOk()
+{
+  // TODO: Add your control notification handler code here
+  //CDialogEx::OnOK();
+  ToggleConfirmWindow(FALSE);
+  LiveDeploy(FALSE);
+}
+
