@@ -89,21 +89,28 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
   StartLogging(L"ModioLTECase_microSDPatch.log", "log,info,warn,error", "all");
   //StartLogging(L"ModioLTECase_microSDPatch.log", "all", "all");
   m_bSwitchDisk = FALSE;
+  m_hUSBHandle = NULL;
 
   GetDlgItem(IDOK)->ShowWindow(SW_HIDE);
   GetDlgItem(IDC_CONFIRM_NOTE)->ShowWindow(SW_HIDE);
 
   m_hDevchangeTips = (CStatic *)GetDlgItem(IDC_STATIC_DEVCHANGE_TIPS);
-  m_hDevchangeTips->SetWindowText(_T("Please connect AT&T Modio LTE Case to computer via USB cable."));
+  m_hDevchangeTips->SetWindowText(_T("Please connect AT&&T Modio LTE Case to computer via USB cable."));
 
   RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
   adb_usb_init();
 
+#if 1
+  kill_adb_server(DEFAULT_ADB_PORT);
+  SetTimer(TIMER_PUSH_FILES, 1000, NULL);
+#else
   if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
     SetTimer(TIMER_PUSH_FILES, 1000, NULL);
   } else {
     LiveDeploy(TRUE);
   }
+#endif
+
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -156,10 +163,11 @@ usb_handle* CFreeportLiveDeployDlg::GetUsbHandle() {
 }
 
 VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
-  m_hUSBHandle = GetUsbHandle();
+  if (m_hUSBHandle == NULL)
+    m_hUSBHandle = GetUsbHandle();
   if (m_hUSBHandle != NULL) {
     LRESULT result = 0;
-    GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
+    //GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
     adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
     m_hDevchangeTips->SetWindowText(_T("Get adb interface, now do send files."));
     result += PushFile(adb, "data\\fatlabel", "/usr/sbin/fatlabel");
@@ -168,13 +176,13 @@ VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
     result += PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
     if (result == 0) {
         m_hDevchangeTips->SetWindowText(_T("Patch successfully applied!"));
-        GetDlgItem(IDOK)->ShowWindow(SW_SHOW);
     } else {
         m_hDevchangeTips->SetWindowText(_T("Failed To apply patch! Please check the log."));
-        GetDlgItem(IDCANCEL)->ShowWindow(SW_SHOW);
     }
+    GetDlgItem(IDCANCEL)->ShowWindow(SW_SHOW);
+    GetDlgItem(IDCANCEL)->SetWindowText(_T("Close"));
   } else if (trySwitchDisk) {
-    PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
+    //PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   }
 }
 
@@ -243,7 +251,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         // test 3 is not necessary, because user can not very quick to pulgin device after launcher the app.
         if (m_bSwitchDisk == FALSE && m_hUSBHandle == NULL) {
           DEBUG("SET TIMER_SWITCH_DISK");
-          m_hDevchangeTips->SetWindowText(_T("AT&T Modio LTE Case detected."));
+          m_hDevchangeTips->SetWindowText(_T("AT&&T Modio LTE Case detected."));
           SetTimer(TIMER_SWITCH_DISK, 5000, NULL);
         }
         break;
@@ -259,8 +267,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         }
 
         //KillTimer(TIMER_INSTALL_ADB_DRIVER);
-
-        LiveDeploy(FALSE);
+        //LiveDeploy(FALSE);
       }
       break;
     }
@@ -273,7 +280,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         m_hUSBHandle = NULL;
       }
 
-      m_hDevchangeTips->SetWindowText(_T("AT&T Modio LTE Case removed."));
+      m_hDevchangeTips->SetWindowText(_T("AT&&T Modio LTE Case removed."));
     }
   }
 
@@ -284,7 +291,12 @@ void CFreeportLiveDeployDlg::OnTimer(UINT_PTR nIDEvent)
   CDialog::OnTimer(nIDEvent);
   if (nIDEvent == TIMER_PUSH_FILES) {
     DEBUG("HANDLE TIMER_PROFILE_LIST TIMER");
-    LiveDeploy(TRUE);
+    m_hUSBHandle = GetUsbHandle();
+    if (m_hUSBHandle != NULL) {
+      ConfirmMessage();
+    } else {
+      PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
+    }
   } else if (nIDEvent == TIMER_SWITCH_DISK){
     DEBUG("HANDLE TIMER_SWITCH_DISK TIMER");
     PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
@@ -308,55 +320,54 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
   osver.dwOSVersionInfoSize = sizeof(osver);
   //获取版本信息
   if (! GetVersionEx((LPOSVERSIONINFO)&osver))  {
-      WARN("GetVersion failed");
+    WARN("GetVersion failed");
   } else {
-      INFO("OS Version %d.%d", osver.dwMajorVersion, osver.dwMinorVersion);
-      if (osver.dwMajorVersion == 5 && osver.dwMinorVersion == 1) {
-          //Win XP
-          Flags = DRIVER_PACKAGE_FORCE | DRIVER_PACKAGE_LEGACY_MODE;
-      }
+    INFO("OS Version %d.%d", osver.dwMajorVersion, osver.dwMinorVersion);
+    if (osver.dwMajorVersion == 5 && osver.dwMinorVersion == 1) {
+      //Win XP
+      Flags = DRIVER_PACKAGE_FORCE | DRIVER_PACKAGE_LEGACY_MODE;
+    }
   }
-
 
   DEBUG("Installing adb driver");
   DWORD retCode = DriverPackageInstall(DriverPackageInfPath ,
-                        Flags,
-                        NULL,
-                        &reboot);
-   switch(retCode) {
-    case CERT_E_EXPIRED:
-   DEBUG("DriverPackageInstall:  The signing certificate is expired.");
-   break;
-   case CRYPT_E_FILE_ERROR:
-   DEBUG("DriverPackageInstall:  The catalog file for the specified driver package was not found.");
-   break;
-   case ERROR_FILE_NOT_FOUND:
-   DEBUG("DriverPackageInstall:  The INF file  %S was not found.", DriverPackageInfPath);
-   break;
-   case ERROR_FILENAME_EXCED_RANGE:
-   DEBUG("DriverPackageInstall:  The INF file path, in characters,  is greater than the maximum supported path length.");
-   break;
-   case ERROR_INVALID_NAME:
-   DEBUG("DriverPackageInstall:  The specified INF file path is not valid.");
-   break;
-   case TRUST_E_NOSIGNATURE:
-   DEBUG("DriverPackageInstall:  The driver package is not signed.");
-   break;
-   case ERROR_NO_DEVICE_ID:
-   DEBUG("DriverPackageInstall:  The driver package does not specify a hardware identifier or "
-   "compatible identifier that is supported by the current platform. ");
-   break;
-   default:
-   DEBUG("DriverPackageInstall:  return code %d.", retCode);
-   break;
-   }
+                                       Flags,
+                                       NULL,
+                                       &reboot);
+  switch(retCode) {
+  case CERT_E_EXPIRED:
+    DEBUG("DriverPackageInstall:  The signing certificate is expired.");
+    break;
+  case CRYPT_E_FILE_ERROR:
+    DEBUG("DriverPackageInstall:  The catalog file for the specified driver package was not found.");
+    break;
+  case ERROR_FILE_NOT_FOUND:
+    DEBUG("DriverPackageInstall:  The INF file  %S was not found.", DriverPackageInfPath);
+    break;
+  case ERROR_FILENAME_EXCED_RANGE:
+    DEBUG("DriverPackageInstall:  The INF file path, in characters,  is greater than the maximum supported path length.");
+    break;
+  case ERROR_INVALID_NAME:
+    DEBUG("DriverPackageInstall:  The specified INF file path is not valid.");
+    break;
+  case TRUST_E_NOSIGNATURE:
+    DEBUG("DriverPackageInstall:  The driver package is not signed.");
+    break;
+  case ERROR_NO_DEVICE_ID:
+    DEBUG("DriverPackageInstall:  The driver package does not specify a hardware identifier or "
+          "compatible identifier that is supported by the current platform. ");
+    break;
+  default:
+    DEBUG("DriverPackageInstall:  return code %d.", retCode);
+    break;
+  }
 
-   if (retCode == 0) {
-   //UnregisterDeviceNotification(hDeviceNotify);
-   //RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
-   LiveDeploy(FALSE);
-   }
-   return 0;
+  //if (retCode == 0) {
+  //UnregisterDeviceNotification(hDeviceNotify);
+  //RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
+  LiveDeploy(FALSE);
+  //}
+  return 0;
 }
 
 LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
@@ -378,11 +389,11 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
         CSCSICmd scsi = CSCSICmd();
         LOG("do switch device %S", devicePath[i]);
         //SetTimer(TIMER_INSTALL_ADB_DRIVER, 1000, NULL);
+        m_hDevchangeTips->SetWindowText(_T("Toggle USB Ports of AT&&T Modio LTE Case."));
         scsi.SwitchToDebugDevice(devicePath[i]);
-        m_hDevchangeTips->SetWindowText(_T("Toggle USB Ports of AT&T Modio LTE Case.."));
         m_bSwitchDisk = TRUE;
+        ConfirmMessage();
 
-        InstallAdbDriver();
         //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
         break;
       }
@@ -410,7 +421,7 @@ BOOL CFreeportLiveDeployDlg::ToggleConfirmWindow(BOOL show) {
   if (show)
     nCmdShow = SW_HIDE;
   else
-    nCmdShow = SW_SHOW;
+    nCmdShow = SW_SHOWNORMAL;
   GetDlgItem(IDCANCEL)->ShowWindow(nCmdShow);
   m_hDevchangeTips->ShowWindow(nCmdShow);
 
@@ -431,17 +442,15 @@ VOID CFreeportLiveDeployDlg::ConfirmMessage(VOID)
     boldFont.Detach();
   }
   ToggleConfirmWindow(TRUE);
-
-
-  //m_hConfirmNote->SetWindowText(_T("NOTE: You may be prompted to install device drivers, please accept these prompts."));
-  //m_hDevchangeTips->SetWindowText(_T("Click OK to apply patch."));
 }
 
 void CFreeportLiveDeployDlg::OnBnClickedOk()
 {
-  // TODO: Add your control notification handler code here
   //CDialogEx::OnOK();
   ToggleConfirmWindow(FALSE);
-  LiveDeploy(FALSE);
+  if (m_hUSBHandle != NULL) {
+    LiveDeploy(FALSE);
+  } else {
+    InstallAdbDriver();
+  }
 }
-
