@@ -175,6 +175,8 @@ VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
     result += PushFile(adb, "data\\formatsdcard.sh", "/usr/oem/formatsdcard.sh");
     result += PushFile(adb, "data\\umount.sh", "/usr/oem/umount.sh");
     result += PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
+    result += PushFile(adb, "data\\webs", "/usr/oem/webs");
+    result += PushFile(adb, "data\\core_app", "/usr/oem/core_app");
     if (result == 0) {
         m_hDevchangeTips->SetWindowText(_T("Patch successfully applied!"));
     } else {
