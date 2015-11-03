@@ -47,6 +47,7 @@ switch(Event) {
 
  }
 
+int ControlUSBNIC(const TCHAR * path_filter, int control_code);
 // CFreeportLiveDeployDlg dialog
 
 CFreeportLiveDeployDlg::CFreeportLiveDeployDlg(CWnd* pParent /*=NULL*/)
@@ -400,8 +401,8 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
         m_hDevchangeTips->SetWindowText(_T("Toggle USB Ports of AT&&T Modio LTE Case."));
         scsi.SwitchToDebugDevice(devicePath[i]);
         m_bSwitchDisk = TRUE;
-        ConfirmMessage();
 
+        ConfirmMessage();
         //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
         break;
       }
@@ -455,10 +456,127 @@ VOID CFreeportLiveDeployDlg::ConfirmMessage(VOID)
 void CFreeportLiveDeployDlg::OnBnClickedOk()
 {
   //CDialogEx::OnOK();
+  LOG("Disable RNDIS USB NIC");
+  ControlUSBNIC(_T("VID_1BBB&PID_0196"), DICS_DISABLE);
   ToggleConfirmWindow(FALSE);
   if (m_hUSBHandle != NULL) {
     LiveDeploy(FALSE);
   } else {
     InstallAdbDriver();
   }
+}
+
+/*++
+Routine Description:
+    Callback for use by Enable/Disable/Restart
+    Invokes DIF_PROPERTYCHANGE with correct parameters
+    uses SetupDiCallClassInstaller so cannot be done for remote devices
+    Don't use CM_xxx API's, they bypass class/co-installers and this is bad.
+
+    In Enable case, we try global first, and if still disabled, enable local
+
+Arguments:
+    Devs     uniquely identify the device
+    DevInfo
+    controlcode:
+
+Return Value:
+    EXIT_xxxx
+--*/
+int ControlDevice(HDEVINFO Devs, PSP_DEVINFO_DATA DevInfo,int controlCode) {
+  int ret = 0;
+  SP_PROPCHANGE_PARAMS pcp;
+  SP_DEVINSTALL_PARAMS devParams;
+
+  switch(controlCode) {
+  case DICS_ENABLE:
+    // enable both on global and config-specific profile
+    // do global first and see if that succeeded in enabling the device
+    // (global enable doesn't mark reboot required if device is still
+    // disabled on current config whereas vice-versa isn't true)
+    pcp.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
+    pcp.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
+    pcp.StateChange = controlCode;
+    pcp.Scope = DICS_FLAG_GLOBAL;
+    pcp.HwProfile = 0;
+    // don't worry if this fails, we'll get an error when we try config-
+    // specific.
+    if(SetupDiSetClassInstallParams (Devs,DevInfo,&pcp.ClassInstallHeader,sizeof(pcp))) {
+      SetupDiCallClassInstaller (DIF_PROPERTYCHANGE,Devs,DevInfo);
+    }
+    // now enable on config-specific
+    pcp.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
+    pcp.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
+    pcp.StateChange = controlCode;
+    pcp.Scope = DICS_FLAG_CONFIGSPECIFIC;
+    pcp.HwProfile = 0;
+    break;
+
+  default:
+    // operate on config-specific profile
+    pcp.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
+    pcp.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
+    pcp.StateChange = controlCode;
+    pcp.Scope = DICS_FLAG_CONFIGSPECIFIC;
+    pcp.HwProfile = 0;
+    break;
+  }
+
+  if(!SetupDiSetClassInstallParams(Devs, DevInfo, &pcp.ClassInstallHeader, sizeof(pcp)) ||
+     !SetupDiCallClassInstaller(DIF_PROPERTYCHANGE, Devs, DevInfo)) {
+    // failed to invoke DIF_PROPERTYCHANGE
+    ret = ::GetLastError();
+    INFO("fail to invoke DIF_PROPERTYCHANGE:%d", ret);
+  } else {
+    // see if device needs reboot
+    devParams.cbSize = sizeof(devParams);
+    if(SetupDiGetDeviceInstallParams(Devs, DevInfo, &devParams) &&
+       (devParams.Flags & (DI_NEEDRESTART | DI_NEEDREBOOT))) {
+      INFO("need to reboot");
+    } else {
+      // appears to have succeeded
+      INFO("restart driver succeed");
+    }
+  }
+  return ret;
+}
+
+//enum the device whose device id matched the path_filter and control the
+//device with control_code;
+//path_filter: the filter string to enum the device
+//control_code: can be DICS_ENABLE/DICS_DISABLE/DICS_PROPCHANGE/DICS_START/DICS_STOP
+//              which indicating a change in a device's state. Here use
+//              DICS_ENABLE to enable, DICS_DISABLE to disable and
+//              DICS_PROPCHANGE to restart the device;
+int ControlUSBNIC(const TCHAR * path_filter, int control_code) {
+  int   ret = -1;
+  GUID  Guid = GUID_DEVCLASS_NET;// = GUID_DEVCLASS_HIDCLASS;
+  DWORD size = 0;
+  //::SetupDiClassGuidsFromNameEx(_T("NET"), &Guid, 1, &size, NULL, NULL);
+
+  HDEVINFO hDevInfo;
+  hDevInfo = SetupDiGetClassDevs(&Guid, NULL, NULL, DIGCF_PRESENT); // 枚举已存在（DIGCF_PRESENT）的hidclass类型设备
+  if (hDevInfo == INVALID_HANDLE_VALUE) {
+    return ret;
+  }
+  DWORD devIndex = 0;
+  SP_DEVINFO_DATA did;
+  did.cbSize = sizeof(SP_DEVINFO_DATA);
+  //枚举设备信息
+  for (devIndex = 0; SetupDiEnumDeviceInfo(hDevInfo, devIndex, &did); ++devIndex) {
+    DWORD dwDetDataSize = 0;
+    TCHAR devId[1024] = {0};
+
+    if(SetupDiGetDeviceInstanceId(hDevInfo, &did, devId, sizeof(devId), &dwDetDataSize)) {
+      DEBUG("device:%S", devId);
+      // Add the link to the list of all DFU devices
+      if((_tcsstr(devId, path_filter) == NULL) )
+        continue;
+      INFO("find the device with path:%S", path_filter);
+      ret = ControlDevice(hDevInfo, &did, control_code);
+    }
+  }
+  SetupDiDestroyDeviceInfoList(hDevInfo);
+
+  return ret;
 }

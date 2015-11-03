@@ -150,15 +150,11 @@ void EnumCDROM(std::vector<string>& m_Cdroms)
 
 	HDEVINFO hDevInfo = INVALID_HANDLE_VALUE;
 
-	hDevInfo = SetupDiGetClassDevs(	&guidDev,
+	hDevInfo = SetupDiGetClassDevs(&guidDev,
 									NULL,
 									NULL,
 									DIGCF_PRESENT | DIGCF_DEVICEINTERFACE
 									);
-	if (hDevInfo == INVALID_HANDLE_VALUE)
-	{
-		return ;
-	}
 
 	if ( INVALID_HANDLE_VALUE == hDevInfo)
 		return;
