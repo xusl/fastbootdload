@@ -3,13 +3,8 @@
 #include <stdio.h>
 #include <shellapi.h>
 
-#include <Wbemidl.h>
-#include <Dbt.h>
 #include <mmsystem.h>
 #include <atlstr.h>
-
-#pragma comment(lib,"wbemuuid.lib")
-#pragma comment(lib,"winmm.lib")
 
 BOOL IsWow64(void);
 
@@ -50,7 +45,7 @@ int APIENTRY WinMain(HINSTANCE hInstance,
   ShExecInfo.hwnd = NULL;
   ShExecInfo.lpVerb = NULL;
   if (IsWow64()) {
-    _tcscat(strInstallPath, _T("\\ModioDataCase-x64\\"));
+    _tcscat(strInstallPath, _T("\\ModioLTECase-x64\\"));
   } else {
     _tcscat(strInstallPath, _T("\\ModioLTECase-win32\\"));
   }

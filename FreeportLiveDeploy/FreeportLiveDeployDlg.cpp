@@ -181,7 +181,10 @@ VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
     }
     GetDlgItem(IDCANCEL)->ShowWindow(SW_SHOW);
     GetDlgItem(IDCANCEL)->SetWindowText(_T("Close"));
-  } else if (trySwitchDisk) {
+  } else // if (trySwitchDisk) {
+  {
+  //if user remove the device when install driver.
+  m_hDevchangeTips->SetWindowText(_T("Please connect AT&&T Modio LTE Case to computer via USB cable."));
     //PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   }
 }
@@ -218,14 +221,14 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 {
   if (dwData == 0)
   {
-    WARN("OnDeviceChange, dwData == 0 .EventType: 0x%x", nEventType);
+    DEBUG("OnDeviceChange, dwData == 0 .EventType: 0x%x", nEventType);
     return FALSE;
   }
 
   DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
   PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
 
-  DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
+  INFO("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
         nEventType, phdr->dbch_devicetype);
 
   if (nEventType == DBT_DEVICEARRIVAL) {
@@ -262,8 +265,11 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
           DEBUG("KILL TIMER_SWITCH_DISK");
           KillTimer(TIMER_SWITCH_DISK);
         } else {
-          m_bSwitchDisk = FALSE;
-          m_hDevchangeTips->SetWindowText(_T(""));
+          //In win7 x64, when after InstallAdbDriver, the devmgmt.msc will
+          //rescan the device, and some product have always present mass
+          //storage devie, even do switch device status.
+          //m_bSwitchDisk = FALSE;
+          //m_hDevchangeTips->SetWindowText(_T(""));
         }
 
         //KillTimer(TIMER_INSTALL_ADB_DRIVER);
@@ -280,7 +286,9 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         m_hUSBHandle = NULL;
       }
 
-      m_hDevchangeTips->SetWindowText(_T("AT&&T Modio LTE Case removed."));
+      m_bSwitchDisk = FALSE;
+      //In win10 64, after install adb driver, system notify remove event.
+      //m_hDevchangeTips->SetWindowText(_T("AT&&T Modio LTE Case removed."));
     }
   }
 
