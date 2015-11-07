@@ -15,6 +15,8 @@
 #define new DEBUG_NEW
 #endif
 #pragma 	  comment(lib,"Difxapi.lib")
+#include  "cfgmgr32.h"
+#pragma comment(lib, "cfgmgr32.lib")
 
 //void (WINAPI * DIFXLOGCALLBACK) DIFLOGCALLBACK;
 
@@ -90,6 +92,9 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
   StartLogging(L"ModioLTECase_microSDPatch.log", "log,info,warn,error", "all");
   //StartLogging(L"ModioLTECase_microSDPatch.log", "all", "all");
   m_bSwitchDisk = FALSE;
+  m_bFirstClick = TRUE;
+  m_bDoDeploy = FALSE;
+  m_bInstallDriver = TRUE;
   m_hUSBHandle = NULL;
 
   GetDlgItem(IDOK)->ShowWindow(SW_HIDE);
@@ -163,11 +168,18 @@ usb_handle* CFreeportLiveDeployDlg::GetUsbHandle() {
   return handle;
 }
 
-VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
+LRESULT CFreeportLiveDeployDlg::LiveDeploy(BOOL bPrompt) {
+  LRESULT result = 0;
+  LOG("Request send patch files");
+  if (m_bDoDeploy)
+  {
+    INFO("Already send patch files.");
+    return -2;
+  }
   if (m_hUSBHandle == NULL)
     m_hUSBHandle = GetUsbHandle();
+
   if (m_hUSBHandle != NULL) {
-    LRESULT result = 0;
     //GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
     adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
     m_hDevchangeTips->SetWindowText(_T("Get adb interface, now do send files."));
@@ -184,12 +196,15 @@ VOID CFreeportLiveDeployDlg::LiveDeploy(BOOL trySwitchDisk) {
     }
     GetDlgItem(IDCANCEL)->ShowWindow(SW_SHOW);
     GetDlgItem(IDCANCEL)->SetWindowText(_T("Close"));
-  } else // if (trySwitchDisk) {
-  {
-  //if user remove the device when install driver.
-  m_hDevchangeTips->SetWindowText(_T("Please connect AT&&T Modio LTE Case to computer via USB cable."));
+  } else  if (bPrompt) {
+    //if user remove the device when install driver.
+    m_hDevchangeTips->SetWindowText(_T("Please connect AT&&T Modio LTE Case to computer via USB cable."));
     //PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
+  } else {
+    ERROR("None adb device found.");
+    result = -1;
   }
+  return result;
 }
 
 LRESULT CFreeportLiveDeployDlg::PushFile(adbhost & adb, const char *lpath, const char *rpath) {
@@ -257,6 +272,8 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         // test 3 is not necessary, because user can not very quick to pulgin device after launcher the app.
         if (m_bSwitchDisk == FALSE && m_hUSBHandle == NULL) {
           DEBUG("SET TIMER_SWITCH_DISK");
+          m_bDoDeploy = FALSE;
+          m_bInstallDriver = TRUE;
           m_hDevchangeTips->SetWindowText(_T("AT&&T Modio LTE Case detected."));
           SetTimer(TIMER_SWITCH_DISK, 5000, NULL);
         }
@@ -264,6 +281,7 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       }
     case DBT_DEVTYP_DEVICEINTERFACE:
       {
+        INFO("DEVICEINTERFACE ARRIVED");
         if (m_bSwitchDisk == FALSE) {
           DEBUG("KILL TIMER_SWITCH_DISK");
           KillTimer(TIMER_SWITCH_DISK);
@@ -274,6 +292,9 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
           //m_bSwitchDisk = FALSE;
           //m_hDevchangeTips->SetWindowText(_T(""));
         }
+        //在某些电脑，Win10 64，安装adb driver后，再安装adb driver会报错。
+        //并且获取不到adb 接口。
+        m_bInstallDriver = FALSE;
 
         //KillTimer(TIMER_INSTALL_ADB_DRIVER);
         //LiveDeploy(FALSE);
@@ -376,8 +397,43 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
   //if (retCode == 0) {
   //UnregisterDeviceNotification(hDeviceNotify);
   //RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
-  LiveDeploy(FALSE);
   //}
+
+  if (LiveDeploy(FALSE) != 0) {
+    /* Test case:
+     * 1. open tools, plugin device
+     * 2. Wait util adb device appears
+     * 3. Uninstall adb drivers
+     * 4. Press "Ok" button, reinstall
+     * 5. This situation, driver is not installed successfully.
+     */
+    RefreshDevice();
+    LiveDeploy(FALSE);
+  }
+
+  return 0;
+}
+
+LRESULT CFreeportLiveDeployDlg::RefreshDevice(VOID) {
+  DEVINST  devInst;
+  DWORD  status;
+
+  WARN("Refresh system attached device.");
+
+  //得到设备管理树的根结点
+  status = CM_Locate_DevNode(&devInst, NULL, CM_LOCATE_DEVNODE_NORMAL);
+  if(status != CR_SUCCESS) {
+    INFO("CM_Locate_DevNode  failed:  %x\n",status);
+    return -1;
+  }
+
+  //刷新
+  status = CM_Reenumerate_DevNode(devInst, 0);
+  if(status != CR_SUCCESS) {
+    INFO("CM_Reenumerate_DevNode  failed:  %x\n",status);
+    return -1;
+  }
+
   return 0;
 }
 
@@ -462,10 +518,17 @@ void CFreeportLiveDeployDlg::OnBnClickedOk()
   ControlUSBNIC(_T("VID_1BBB&PID_0196"), DICS_DISABLE);
   ToggleConfirmWindow(FALSE);
   if (m_hUSBHandle != NULL) {
-    LiveDeploy(FALSE);
-  } else {
+    LiveDeploy(m_bFirstClick);
+  } else if (m_bInstallDriver){
     InstallAdbDriver();
+  } else {
+    INFO("report device interface arrived, but no adb. Refresh devmgmt");
+    RefreshDevice();
+    LiveDeploy(FALSE);
   }
+
+  if (m_bFirstClick)
+    m_bFirstClick = FALSE;
 }
 
 /*++

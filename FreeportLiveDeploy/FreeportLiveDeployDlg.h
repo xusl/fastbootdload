@@ -32,7 +32,7 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
-  VOID LiveDeploy(BOOL trySwitchDisk);
+  LRESULT LiveDeploy(BOOL bPrompt);
   usb_handle* GetUsbHandle();
 
 // Implementation
@@ -40,6 +40,9 @@ protected:
   HICON m_hIcon;
   usb_handle* m_hUSBHandle;
   BOOL m_bSwitchDisk;
+  BOOL m_bFirstClick;
+  BOOL m_bInstallDriver;
+  BOOL m_bDoDeploy;
   HDEVNOTIFY hDeviceNotify;
   
 	// Generated message map functions
@@ -47,6 +50,7 @@ protected:
 	LRESULT OnInitDevice(WPARAM wParam, LPARAM lParam);
 	LRESULT PushFile(adbhost & adb, const char *lpath, const char *rpath);    
 	LRESULT InstallAdbDriver(void);
+    LRESULT RefreshDevice(VOID);
     VOID ConfirmMessage(VOID);
     BOOL ToggleConfirmWindow(BOOL show);
     afx_msg void OnPaint();
