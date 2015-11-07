@@ -6,6 +6,10 @@
 #include "adb_dev_register.h"
 #include "scsicmd.h"
 #include "adbhost.h"
+#include <map>
+#include <string>
+using std::map;
+using std::string;
 enum
 {
 	// UI Messages
@@ -33,6 +37,7 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
   LRESULT LiveDeploy(BOOL bPrompt);
+  BOOL GetConfig(LPCSTR lpFileName);
   usb_handle* GetUsbHandle();
 
 // Implementation
@@ -44,6 +49,7 @@ protected:
   BOOL m_bInstallDriver;
   BOOL m_bDoDeploy;
   HDEVNOTIFY hDeviceNotify;
+   map<string, string> m_PatchCmd;  
   
 	// Generated message map functions
 	virtual BOOL OnInitDialog();

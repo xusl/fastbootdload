@@ -10,6 +10,11 @@
 #include "log.h"
 #include <string.h>
 #include <algorithm>
+#include <map>
+#include <string>
+using std::map;
+using std::string;
+using std::pair;
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -51,6 +56,80 @@ switch(Event) {
 
 int ControlUSBNIC(const TCHAR * path_filter, int control_code);
 // CFreeportLiveDeployDlg dialog
+
+
+BOOL CFreeportLiveDeployDlg::GetConfig(LPCSTR lpFileName) {
+#define FILENAME_LEN 1024 * 10
+  char localdirs[FILENAME_LEN];
+  char locals[FILENAME_LEN];
+  char *localdir = NULL;
+
+  char path_buffer[MAX_PATH];
+  char drive[_MAX_DRIVE];
+  char dir[_MAX_DIR];
+  char filePath[MAX_PATH]={0};
+  DWORD got;
+  DWORD offset = 0;
+
+  if (lpFileName == NULL)
+    return FALSE;
+
+  //	GetCurrentDirectory(MAX_PATH, currdir);
+  GetModuleFileNameA(NULL, path_buffer, MAX_PATH);
+  _splitpath_s(path_buffer, drive, _MAX_DRIVE, dir, _MAX_DIR, 0, 0, 0, 0);
+  _makepath_s(filePath, drive, dir, lpFileName, NULL);
+
+  if (!PathFileExistsA(filePath))  {
+    WARN("config files %s is not exist", filePath);
+    return FALSE;
+  }
+  INFO("config file is %s", filePath);
+
+  //GetPrivateProfileStringA("config", "patchdir",  "data", localdir, MAX_PATH, filePath);
+  memset(localdirs, '\0', sizeof(localdirs));
+  got = GetPrivateProfileSectionA("patchdir", localdirs, FILENAME_LEN, filePath);
+  offset = 0;
+  while(offset < got) {
+    char *candidate = localdirs + offset;
+    offset += strlen(candidate) + 1;
+    if (PathFileExistsA(candidate)) {
+      localdir = candidate;
+      INFO("Patch data folder is %s", localdir);
+      break;
+    }
+  }
+
+  if (localdir == NULL) {
+    INFO("Patch data folder is not exist.");
+    return FALSE;
+  }
+
+  memset(locals, '\0', sizeof(locals));
+  got = GetPrivateProfileSectionA("files", locals, FILENAME_LEN, filePath);
+  offset = 0;
+
+  while(offset < got) {
+    char local[MAX_PATH];
+    char *pch;
+    char *next_token = NULL;
+    size_t len = strlen(locals+offset);
+    strcpy_s(local, localdir);
+    strcat_s(local, "\\");
+    pch = strtok_s(locals+offset, "=", &next_token);
+    if (pch != NULL) {
+      strncat_s(local,  pch, MAX_PATH);
+      //GetPrivateProfileStringA("files",locals+offset, NULL, remote, MAX_PATH, filePath);
+      pch = strtok_s(NULL, "=", &next_token);
+      if (pch != NULL) {
+        m_PatchCmd.insert(pair<string, string>(local, pch));
+      }
+    }
+    offset += len + 1;
+  }
+
+
+  return TRUE;
+}
 
 CFreeportLiveDeployDlg::CFreeportLiveDeployDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CFreeportLiveDeployDlg::IDD, pParent)
@@ -105,6 +184,9 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
 
   RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
   adb_usb_init();
+
+  //GetConfig("F:\\fastbootdload\\Win32\\Release\\patch.ini");
+  GetConfig("patch.ini");
 
 #if 1
   kill_adb_server(DEFAULT_ADB_PORT);
@@ -183,12 +265,23 @@ LRESULT CFreeportLiveDeployDlg::LiveDeploy(BOOL bPrompt) {
     //GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
     adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
     m_hDevchangeTips->SetWindowText(_T("Get adb interface, now do send files."));
-    result += PushFile(adb, "data\\fatlabel", "/usr/sbin/fatlabel");
-    result += PushFile(adb, "data\\formatsdcard.sh", "/usr/oem/formatsdcard.sh");
-    result += PushFile(adb, "data\\umount.sh", "/usr/oem/umount.sh");
-    result += PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
-    result += PushFile(adb, "data\\webs", "/usr/oem/webs");
-    result += PushFile(adb, "data\\core_app", "/usr/oem/core_app");
+    if (!m_PatchCmd.empty()) {
+      INFO("Do deploy patch according to configuration!");
+      map <string, string>::iterator it;
+      for ( it = m_PatchCmd.begin( ); it != m_PatchCmd.end( ); it++ ) {
+        //std::cout << it->first << " " << it->second <<endl;
+        INFO("local %s, remote %s", it->first.c_str(), it->second.c_str());
+        result += PushFile(adb, it->first.c_str(), it->second.c_str());
+      }
+    } else {
+      INFO("Do deploy patch by built-in settings!");
+      result += PushFile(adb, "data\\fatlabel", "/usr/sbin/fatlabel");
+      result += PushFile(adb, "data\\formatsdcard.sh", "/usr/oem/formatsdcard.sh");
+      result += PushFile(adb, "data\\umount.sh", "/usr/oem/umount.sh");
+      result += PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
+      result += PushFile(adb, "data\\webs", "/usr/oem/webs");
+      result += PushFile(adb, "data\\core_app", "/usr/oem/core_app");
+    }
     if (result == 0) {
         m_hDevchangeTips->SetWindowText(_T("Patch successfully applied!"));
     } else {
