@@ -37,5 +37,6 @@ adb push data\core_app  /usr/oem/core_app
 adb shell chmod 755 /usr/oem/core_app
 
 if %errorlevel% equ 0 echo Patch successfully applied!
+pause
 
 goto :eof

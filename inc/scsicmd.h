@@ -67,6 +67,7 @@ public:
   BOOL SwitchToDebugDevice(const WCHAR* devname);
   //switch TPST, USB TPST devcie will enumerated. So ADSU or TPST can update the device.
   BOOL SwitchToTPSTDeivce(const WCHAR* devname);
+  BOOL SwitchToAdbOnly(const WCHAR* devname);
 
 private:
 	BOOL SendCmd(HANDLE handle, PUCHAR cmd, size_t len, ULONG timeout);

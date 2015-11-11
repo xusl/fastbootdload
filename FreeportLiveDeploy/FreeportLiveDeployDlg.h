@@ -6,15 +6,20 @@
 #include "adb_dev_register.h"
 #include "scsicmd.h"
 #include "adbhost.h"
+#include "list.h"
 #include <map>
 #include <string>
 using std::map;
 using std::string;
+using std::greater;
+using std::hash;
 enum
 {
 	// UI Messages
 	UI_MESSAGE_BASE = (WM_USER + 1000),
 	UI_MESSAGE_INIT_DEVICE,
+    UI_MESSAGE_UPDATE_PROMPT,
+    UI_MESSAGE_PATCH,
 };
 
 enum
@@ -23,7 +28,21 @@ enum
   TIMER_PUSH_FILES,
   TIMER_INSTALL_ADB_DRIVER,
 };
+
+//#define PATCH_CONF
+typedef struct PatchFile {
+  struct listnode node;
+  char *local;
+  char *remote;
+}PatchFile;
+
+class CFreeportLiveDeployDlg;
+typedef struct WorkThreadParam{
+    CFreeportLiveDeployDlg  *hDlg;
+    CWinThread       *hWorkThread;
+} WorkThreadParam;
 // CFreeportLiveDeployDlg dialog
+
 class CFreeportLiveDeployDlg : public CDialogEx
 {
 // Construction
@@ -49,16 +68,28 @@ protected:
   BOOL m_bInstallDriver;
   BOOL m_bDoDeploy;
   HDEVNOTIFY hDeviceNotify;
-   map<string, string> m_PatchCmd;  
-  
+#ifdef PATCH_CONF
+#ifdef USE_CPP_MAP
+  map<string, string, greater<string>> m_PatchCmd;
+#else
+  struct listnode key_list;
+#endif
+#endif
+  WorkThreadParam mThreadparam;
+
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
 	LRESULT OnInitDevice(WPARAM wParam, LPARAM lParam);
-	LRESULT PushFile(adbhost & adb, const char *lpath, const char *rpath);    
-	LRESULT InstallAdbDriver(void);
+	LRESULT OnUpdatePrompt(WPARAM wParam, LPARAM lParam);
+	LRESULT OnPatch(WPARAM wParam, LPARAM lParam);
+	LRESULT PushFile(adbhost & adb, const char *lpath, const char *rpath);
+	static LRESULT InstallAdbDriver(CFreeportLiveDeployDlg   *hWnd);
     LRESULT RefreshDevice(VOID);
+    LRESULT InstallAndDeploy(VOID);
+    VOID SendSetTipsMsg(LPCTSTR lpszString);
     VOID ConfirmMessage(VOID);
     BOOL ToggleConfirmWindow(BOOL show);
+    static UINT WorkThread(LPVOID wParam);
     afx_msg void OnPaint();
 	afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
 	afx_msg HCURSOR OnQueryDragIcon();
@@ -67,6 +98,6 @@ public:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
     afx_msg void OnBnClickedOk();
 
-public:    
-    CStatic *m_hDevchangeTips;  
+public:
+    CStatic *m_hDevchangeTips;
 };

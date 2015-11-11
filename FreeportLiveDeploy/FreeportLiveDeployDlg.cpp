@@ -8,6 +8,7 @@
 #include "afxdialogex.h"
 #include "Difxapi.h"
 #include "log.h"
+#include "strsafe.h"
 #include <string.h>
 #include <algorithm>
 #include <map>
@@ -23,7 +24,55 @@ using std::pair;
 #include  "cfgmgr32.h"
 #pragma comment(lib, "cfgmgr32.lib")
 
+
+DEFINE_GUID( GUID_DEVCLASS_ANDROIDUSB,           0x3f966bd9L, 0xfa04, 0x4ec5, 0x99, 0x1c, 0xd3, 0x26, 0x97, 0x3b, 0x51, 0x28 );
 //void (WINAPI * DIFXLOGCALLBACK) DIFLOGCALLBACK;
+
+BOOL IsAdbDriverInstalled() {
+  BYTE PropertyBuffer[255];
+  DWORD DataType = 0;
+  DWORD RequiredSize = 0;
+  BOOL get = SetupDiGetClassRegistryProperty(&GUID_DEVCLASS_ANDROIDUSB,
+                                             SPCRP_DEVTYPE,
+                                             &DataType,
+                                             PropertyBuffer,
+                                             sizeof(PropertyBuffer),
+                                             &RequiredSize,
+                                             NULL,
+                                             NULL);
+
+  if (get)
+    INFO("ANDROID usb driver installed");
+  else {
+    INFO("ANDROID usb driver have not installed");
+
+    LPVOID lpMsgBuf;
+    LPVOID lpDisplayBuf;
+    DWORD dw = GetLastError();
+
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                  NULL,
+                  dw,
+                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                  (LPTSTR) &lpMsgBuf,
+                  0, NULL );
+
+    // Display the error message and exit the process
+
+    lpDisplayBuf = (LPVOID)LocalAlloc(LMEM_ZEROINIT,
+                                      (lstrlen((LPCTSTR)lpMsgBuf) + 40)*sizeof(TCHAR));
+
+    StringCchPrintf((LPTSTR)lpDisplayBuf,
+                    LocalSize(lpDisplayBuf),
+                    TEXT("failed with error %d: %s"),
+                    dw, lpMsgBuf);
+    INFO("Error:%S\n",(LPCTSTR)lpDisplayBuf);
+
+    LocalFree(lpMsgBuf);
+    LocalFree(lpDisplayBuf);
+  }
+  return get;
+}
 
  void WINAPI AdbDifLog(
    DIFXAPI_LOG Event,
@@ -32,7 +81,6 @@ using std::pair;
    PVOID       CallbackContext
 )
 {
-CFreeportLiveDeployDlg* dlg =  (CFreeportLiveDeployDlg* )CallbackContext;
 INFO("Error %d,  Event %d,  Description %S", Error, Event, EventDescription);
 
 switch(Event) {
@@ -59,6 +107,7 @@ int ControlUSBNIC(const TCHAR * path_filter, int control_code);
 
 
 BOOL CFreeportLiveDeployDlg::GetConfig(LPCSTR lpFileName) {
+#ifdef PATCH_CONF
 #define FILENAME_LEN 1024 * 10
   char localdirs[FILENAME_LEN];
   char locals[FILENAME_LEN];
@@ -117,16 +166,39 @@ BOOL CFreeportLiveDeployDlg::GetConfig(LPCSTR lpFileName) {
     strcat_s(local, "\\");
     pch = strtok_s(locals+offset, "=", &next_token);
     if (pch != NULL) {
-      strncat_s(local,  pch, MAX_PATH);
+      strncat_s(local, pch, MAX_PATH);
       //GetPrivateProfileStringA("files",locals+offset, NULL, remote, MAX_PATH, filePath);
       pch = strtok_s(NULL, "=", &next_token);
       if (pch != NULL) {
+#ifdef USE_CPP_MAP
         m_PatchCmd.insert(pair<string, string>(local, pch));
+#else
+        PatchFile *pf;
+        pf = (PatchFile *)malloc(sizeof(*pf));
+        if (pf != NULL) {
+          pf->local = _strdup(local);
+          if (pf->local != NULL) {
+            pf->remote = _strdup(pch);
+            if (pf->remote != NULL) {
+              list_add_tail(&key_list, &pf->node);
+            } else {
+              free(pf);
+              free(pf->local);
+              WARN("STRDUP remote failed");
+            }
+          } else {
+            free(pf);
+            WARN("STRDUP local failed");
+          }
+        } else {
+          WARN("PatchFile malloc memory failed");
+        }
+#endif
       }
     }
     offset += len + 1;
   }
-
+#endif
 
   return TRUE;
 }
@@ -138,6 +210,21 @@ CFreeportLiveDeployDlg::CFreeportLiveDeployDlg(CWnd* pParent /*=NULL*/)
 }
 
 CFreeportLiveDeployDlg::~CFreeportLiveDeployDlg() {
+#ifdef PATCH_CONF
+#ifndef USE_CPP_MAP
+  if (!list_empty(&key_list)) {
+    struct listnode *item;
+    list_for_each(item, &key_list) {
+      struct PatchFile *patch = node_to_item(item, struct PatchFile, node);
+      free(patch->local);
+      free(patch->remote);
+      patch->local = NULL;
+      patch->remote = NULL;
+      //TODO::xxx, how to free listnode?
+    }
+  }
+#endif
+#endif
     StopLogging();
 }
 
@@ -152,7 +239,9 @@ BEGIN_MESSAGE_MAP(CFreeportLiveDeployDlg, CDialogEx)
 	ON_WM_DEVICECHANGE()
 	ON_WM_TIMER()
 	ON_MESSAGE(UI_MESSAGE_INIT_DEVICE, &CFreeportLiveDeployDlg::OnInitDevice)
-    ON_BN_CLICKED(IDOK, &CFreeportLiveDeployDlg::OnBnClickedOk)
+	ON_MESSAGE(UI_MESSAGE_UPDATE_PROMPT, &CFreeportLiveDeployDlg::OnUpdatePrompt)
+	ON_MESSAGE(UI_MESSAGE_PATCH, &CFreeportLiveDeployDlg::OnPatch)
+  ON_BN_CLICKED(IDOK, &CFreeportLiveDeployDlg::OnBnClickedOk)
 END_MESSAGE_MAP()
 
 
@@ -175,6 +264,10 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
   m_bDoDeploy = FALSE;
   m_bInstallDriver = TRUE;
   m_hUSBHandle = NULL;
+  mThreadparam.hWorkThread = NULL;
+#ifdef PATCH_CONF
+  list_init(&key_list);
+#endif
 
   GetDlgItem(IDOK)->ShowWindow(SW_HIDE);
   GetDlgItem(IDC_CONFIRM_NOTE)->ShowWindow(SW_HIDE);
@@ -186,7 +279,9 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
   adb_usb_init();
 
   //GetConfig("F:\\fastbootdload\\Win32\\Release\\patch.ini");
+#ifdef PATCH_CONF
   GetConfig("patch.ini");
+#endif
 
 #if 1
   kill_adb_server(DEFAULT_ADB_PORT);
@@ -238,7 +333,6 @@ HCURSOR CFreeportLiveDeployDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-
 usb_handle* CFreeportLiveDeployDlg::GetUsbHandle() {
   usb_handle* handle;
   find_devices(true);
@@ -264,28 +358,42 @@ LRESULT CFreeportLiveDeployDlg::LiveDeploy(BOOL bPrompt) {
   if (m_hUSBHandle != NULL) {
     //GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
     adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
-    m_hDevchangeTips->SetWindowText(_T("Get adb interface, now do send files."));
+    INFO("Get adb interface, now do send files.");
+#ifdef PATCH_CONF
+#ifdef USE_CPP_MAP
     if (!m_PatchCmd.empty()) {
       INFO("Do deploy patch according to configuration!");
-      map <string, string>::iterator it;
-      for ( it = m_PatchCmd.begin( ); it != m_PatchCmd.end( ); it++ ) {
+      map <string, string, greater<string>>::iterator it;
+      for (it = m_PatchCmd.begin(); it != m_PatchCmd.end(); it++ ) {
         //std::cout << it->first << " " << it->second <<endl;
-        INFO("local %s, remote %s", it->first.c_str(), it->second.c_str());
         result += PushFile(adb, it->first.c_str(), it->second.c_str());
       }
-    } else {
+    }
+    else
+ #else
+    if (!list_empty(&key_list)) {
+        struct listnode *item;
+        list_for_each(item, &key_list) {
+          struct PatchFile *patch = node_to_item(item, struct PatchFile, node);
+          result += PushFile(adb, patch->local, patch->remote);
+        }
+      }
+    else
+#endif
+#endif
+    {
       INFO("Do deploy patch by built-in settings!");
       result += PushFile(adb, "data\\fatlabel", "/usr/sbin/fatlabel");
       result += PushFile(adb, "data\\formatsdcard.sh", "/usr/oem/formatsdcard.sh");
       result += PushFile(adb, "data\\umount.sh", "/usr/oem/umount.sh");
       result += PushFile(adb, "data\\restartusb.sh", "/usr/oem/restartusb.sh");
-      result += PushFile(adb, "data\\webs", "/usr/oem/webs");
-      result += PushFile(adb, "data\\core_app", "/usr/oem/core_app");
+      //result += PushFile(adb, "data\\webs", "/usr/oem/webs");
+      //result += PushFile(adb, "data\\core_app", "/usr/oem/core_app");
     }
     if (result == 0) {
-        m_hDevchangeTips->SetWindowText(_T("Patch successfully applied!"));
+      m_hDevchangeTips->SetWindowText(_T("Patch successfully applied!"));
     } else {
-        m_hDevchangeTips->SetWindowText(_T("Failed To apply patch! Please check the log."));
+      m_hDevchangeTips->SetWindowText(_T("Failed To apply patch! Please check log."));
     }
     GetDlgItem(IDCANCEL)->ShowWindow(SW_SHOW);
     GetDlgItem(IDCANCEL)->SetWindowText(_T("Close"));
@@ -301,7 +409,7 @@ LRESULT CFreeportLiveDeployDlg::LiveDeploy(BOOL bPrompt) {
 }
 
 LRESULT CFreeportLiveDeployDlg::PushFile(adbhost & adb, const char *lpath, const char *rpath) {
-  CString prompt;
+  CString prompt=_T("");
   PCHAR resp = NULL;
   int resp_len;
   int result = 0;
@@ -311,6 +419,7 @@ LRESULT CFreeportLiveDeployDlg::PushFile(adbhost & adb, const char *lpath, const
   prompt += _T(" => ");
   prompt += rpath;
   m_hDevchangeTips->SetWindowText(prompt);
+  //SendSetTipsMsg(prompt);
   LOG("%S", prompt);
   result = adb.sync_push(lpath, rpath);
 
@@ -426,21 +535,21 @@ void CFreeportLiveDeployDlg::OnTimer(UINT_PTR nIDEvent)
     DEBUG("HANDLE TIMER_SWITCH_DISK TIMER");
     PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   } else if(nIDEvent == TIMER_INSTALL_ADB_DRIVER) {
-    //InstallAdbDriver();
+    //InstallAdbDriver(this);
   }
 
   KillTimer(nIDEvent);
 }
 
 //https://msdn.microsoft.com/en-us/library/windows/hardware/ff544813%28v=vs.85%29.aspx
-LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
+LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(CFreeportLiveDeployDlg *hWnd) {
   BOOL reboot;
   PCTSTR DriverPackageInfPath  = _T("usb_driver\\android_winusb.inf");
-  SetDifxLogCallback(AdbDifLog, this);
-  m_hDevchangeTips->SetWindowText(_T("Installing Adb driver ... ..."));
+  SetDifxLogCallback(AdbDifLog, NULL);
+  //m_hDevchangeTips->SetWindowText(_T("Installing Adb driver ... ..."));
+  hWnd->PostMessage(UI_MESSAGE_UPDATE_PROMPT, (WPARAM)_T("Installing Adb driver ... ..."));
 
   DWORD  Flags = 0x00000000;
-
   OSVERSIONINFOEX osver;
   osver.dwOSVersionInfoSize = sizeof(osver);
   //获取版本信息
@@ -461,29 +570,29 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
                                        &reboot);
   switch(retCode) {
   case CERT_E_EXPIRED:
-    DEBUG("DriverPackageInstall:  The signing certificate is expired.");
+    DEBUG("DriverPackageInstall: The signing certificate is expired.");
     break;
   case CRYPT_E_FILE_ERROR:
-    DEBUG("DriverPackageInstall:  The catalog file for the specified driver package was not found.");
+    DEBUG("DriverPackageInstall: The catalog file for the specified driver package was not found.");
     break;
   case ERROR_FILE_NOT_FOUND:
-    DEBUG("DriverPackageInstall:  The INF file  %S was not found.", DriverPackageInfPath);
+    DEBUG("DriverPackageInstall: The INF file %S was not found.", DriverPackageInfPath);
     break;
   case ERROR_FILENAME_EXCED_RANGE:
-    DEBUG("DriverPackageInstall:  The INF file path, in characters,  is greater than the maximum supported path length.");
+    DEBUG("DriverPackageInstall: The INF file path, in characters,  is greater than the maximum supported path length.");
     break;
   case ERROR_INVALID_NAME:
-    DEBUG("DriverPackageInstall:  The specified INF file path is not valid.");
+    DEBUG("DriverPackageInstall: The specified INF file path is not valid.");
     break;
   case TRUST_E_NOSIGNATURE:
-    DEBUG("DriverPackageInstall:  The driver package is not signed.");
+    DEBUG("DriverPackageInstall: The driver package is not signed.");
     break;
   case ERROR_NO_DEVICE_ID:
-    DEBUG("DriverPackageInstall:  The driver package does not specify a hardware identifier or "
+    DEBUG("DriverPackageInstall: The driver package does not specify a hardware identifier or "
           "compatible identifier that is supported by the current platform. ");
     break;
   default:
-    DEBUG("DriverPackageInstall:  return code %d.", retCode);
+    DEBUG("DriverPackageInstall: return code %d.", retCode);
     break;
   }
 
@@ -492,17 +601,7 @@ LRESULT CFreeportLiveDeployDlg::InstallAdbDriver(void) {
   //RegisterAdbDeviceNotification(this->m_hWnd, &this->hDeviceNotify);
   //}
 
-  if (LiveDeploy(FALSE) != 0) {
-    /* Test case:
-     * 1. open tools, plugin device
-     * 2. Wait util adb device appears
-     * 3. Uninstall adb drivers
-     * 4. Press "Ok" button, reinstall
-     * 5. This situation, driver is not installed successfully.
-     */
-    RefreshDevice();
-    LiveDeploy(FALSE);
-  }
+  hWnd->PostMessage(UI_MESSAGE_PATCH);
 
   return 0;
 }
@@ -530,6 +629,34 @@ LRESULT CFreeportLiveDeployDlg::RefreshDevice(VOID) {
   return 0;
 }
 
+VOID CFreeportLiveDeployDlg::SendSetTipsMsg(LPCTSTR lpszString){
+  INFO("%x", lpszString);
+  PostMessage(UI_MESSAGE_UPDATE_PROMPT, (WPARAM)lpszString, NULL);
+}
+//deprecated
+LRESULT CFreeportLiveDeployDlg::OnUpdatePrompt(WPARAM wParam, LPARAM lParam){
+  LPCTSTR lpszString = (LPCTSTR)wParam;
+  INFO("yyyy%x", lpszString);
+  m_hDevchangeTips->SetWindowText(lpszString);
+  //free(lpszString);
+  return 0;
+}
+
+LRESULT CFreeportLiveDeployDlg::OnPatch(WPARAM wParam, LPARAM lParam) {
+  if (LiveDeploy(FALSE) != 0) {
+    /* Test case:
+     * 1. open tools, plugin device
+     * 2. Wait util adb device appears
+     * 3. Uninstall adb drivers
+     * 4. Press "Ok" button, reinstall
+     * 5. This situation, driver is not installed successfully.
+     */
+    RefreshDevice();
+    LiveDeploy(FALSE);
+  }
+  return 0;
+}
+
 LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
   std::vector<CString> devicePath;
   GetDeviceByGUID(devicePath, &GUID_DEVINTERFACE_DISK);
@@ -549,7 +676,7 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
         CSCSICmd scsi = CSCSICmd();
         LOG("do switch device %S", devicePath[i]);
         //SetTimer(TIMER_INSTALL_ADB_DRIVER, 1000, NULL);
-        m_hDevchangeTips->SetWindowText(_T("Toggle USB Ports of AT&&T Modio LTE Case."));
+        //m_hDevchangeTips->SetWindowText(_T("Toggle USB Ports of AT&&T Modio LTE Case."));
         scsi.SwitchToDebugDevice(devicePath[i]);
         m_bSwitchDisk = TRUE;
 
@@ -610,10 +737,16 @@ void CFreeportLiveDeployDlg::OnBnClickedOk()
   LOG("Disable RNDIS USB NIC");
   ControlUSBNIC(_T("VID_1BBB&PID_0196"), DICS_DISABLE);
   ToggleConfirmWindow(FALSE);
+  //IsAdbDriverInstalled();
+  InstallAndDeploy();
+}
+
+LRESULT CFreeportLiveDeployDlg::InstallAndDeploy(VOID) {
   if (m_hUSBHandle != NULL) {
     LiveDeploy(m_bFirstClick);
   } else if (m_bInstallDriver){
-    InstallAdbDriver();
+      mThreadparam.hDlg = this;
+      mThreadparam.hWorkThread = AfxBeginThread(WorkThread, &mThreadparam);
   } else {
     INFO("report device interface arrived, but no adb. Refresh devmgmt");
     RefreshDevice();
@@ -622,8 +755,17 @@ void CFreeportLiveDeployDlg::OnBnClickedOk()
 
   if (m_bFirstClick)
     m_bFirstClick = FALSE;
+
+  return 0;
 }
 
+UINT CFreeportLiveDeployDlg::WorkThread(LPVOID wParam) {
+  WorkThreadParam *param = (WorkThreadParam *)wParam;
+  CFreeportLiveDeployDlg *dlg = param->hDlg;
+  LOG("Start work thread");
+  dlg->InstallAdbDriver(dlg);
+  return 0;
+}
 /*++
 Routine Description:
     Callback for use by Enable/Disable/Restart
@@ -693,7 +835,7 @@ int ControlDevice(HDEVINFO Devs, PSP_DEVINFO_DATA DevInfo,int controlCode) {
       INFO("need to reboot");
     } else {
       // appears to have succeeded
-      INFO("restart driver succeed");
+      INFO("disable device succeed");
     }
   }
   return ret;

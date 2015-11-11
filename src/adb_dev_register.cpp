@@ -143,6 +143,7 @@ BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid) {
     if(SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, pDetData,
                                        dwDetDataSize, NULL, &devdata)) {
       devicePaths.push_back(pDetData->DevicePath);
+      #if 0
       WCHAR buffer[_MAX_PATH];
       if (SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata,
            SPDRP_FRIENDLYNAME, NULL, (PBYTE)buffer, sizeof(buffer), NULL)) {
@@ -177,6 +178,7 @@ BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid) {
         INFO("SPDRP_ADDRESS %S", buffer);
       }
       INFO("== ==== == == == == == == == == == == == == == == == == == == ==");
+      #endif
     }
     delete pDetData;
     pDetData = NULL;

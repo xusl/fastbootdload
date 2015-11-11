@@ -17,6 +17,11 @@ BOOL CSCSICmd::SwitchToDebugDevice(const WCHAR* devname) {
   return Send(devname, cmdBuf, sizeof(cmdBuf));
 }
 
+BOOL CSCSICmd::SwitchToAdbOnly(const WCHAR* devname) {
+  UCHAR cmdBuf[CDB6GENERIC_LENGTH] = {0x16, 0xfa, 0x0, 0x0, 0x0, 0x0};
+  return Send(devname, cmdBuf, sizeof(cmdBuf));
+}
+
   //switch TPST, USB TPST devcie will enumerated. So ADSU or TPST can update the device.
 BOOL CSCSICmd::SwitchToTPSTDeivce(const WCHAR* devname) {
   UCHAR cmdBuf[CDB6GENERIC_LENGTH] = {0x16, 0xf5, 0x0, 0x0, 0x0, 0x0};
