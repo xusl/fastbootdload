@@ -160,13 +160,6 @@ extern CLog* g_pLogInstance;
 #define  ADB_TRACING     0
 #endif
 
-
-#if !TRACE_PACKETS
-#define print_packet(tag,p) do {} while (0)
-#else
-void print_packet(const char *label, apacket *p);
-
-#endif
 /* util stuff */
 void die(const char *fmt, ...);
 void fatal(const char *fmt, ...);

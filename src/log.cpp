@@ -223,6 +223,7 @@ void CLog::WriteLog
   stream << ":" << setw(2) << time.wMinute ;
   stream << ":" << setw(2) << time.wSecond;
   stream << " " << setfill(' ') << setw(6) << msg;
+  stream.flush();
 
 #ifdef FEATURE_THREAD_SYNC
   g_Lock.Unlock();

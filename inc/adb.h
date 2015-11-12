@@ -69,8 +69,8 @@ typedef struct atransport
 
     int (*read_from_remote)(apacket *p, atransport *t);
     int (*write_to_remote)(apacket *p, atransport *t);
-   // void (*close)(atransport *t);
-   // void (*kick)(atransport *t);
+    void (*close)(atransport *t);
+    void (*kick)(atransport *t);
 
     int ref_count;
     unsigned sync_token;
@@ -84,11 +84,15 @@ typedef struct atransport
     /* used to identify transports for clients */
    // char *serial;
     char *product;
+    int kicked;
 } atransport;
 void send_packet(apacket *p, atransport *t);
 
 /* initialize a transport object's func pointers and state */
 void init_usb_transport(atransport *t, usb_handle *usb, int state);
+
+void   kick_transport( atransport*  t );
+void transport_unref(atransport *t);
 
 /* packet allocator */
 apacket *get_apacket(void);

@@ -260,9 +260,10 @@ BOOL CFreeportLiveDeployDlg::OnInitDialog()
   StartLogging(L"ModioLTECase_microSDPatch.log", "log,info,warn,error", "all");
   //StartLogging(L"ModioLTECase_microSDPatch.log", "all", "all");
   m_bSwitchDisk = FALSE;
-  m_bFirstClick = TRUE;
+  m_bAdbAlready = FALSE;
   m_bDoDeploy = FALSE;
   m_bInstallDriver = TRUE;
+  m_GetAdbHandleTicks = 0;
   m_hUSBHandle = NULL;
   mThreadparam.hWorkThread = NULL;
 #ifdef PATCH_CONF
@@ -345,12 +346,12 @@ usb_handle* CFreeportLiveDeployDlg::GetUsbHandle() {
 }
 
 LRESULT CFreeportLiveDeployDlg::LiveDeploy(BOOL bPrompt) {
-  LRESULT result = 0;
+  LRESULT result = DEPLOY_STAT_OK;
   LOG("Request send patch files");
   if (m_bDoDeploy)
   {
     INFO("Already send patch files.");
-    return -2;
+    return DEPLOY_STAT_DOING;
   }
   if (m_hUSBHandle == NULL)
     m_hUSBHandle = GetUsbHandle();
@@ -403,7 +404,7 @@ LRESULT CFreeportLiveDeployDlg::LiveDeploy(BOOL bPrompt) {
     //PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   } else {
     ERROR("None adb device found.");
-    result = -1;
+    result = DEPLOY_STAT_NONEDEVICE;
   }
   return result;
 }
@@ -473,11 +474,13 @@ BOOL CFreeportLiveDeployDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         // test 3: run adb server, launch app, plugin device (if app launcher, adb can not start server).
         // test 3 is not necessary, because user can not very quick to pulgin device after launcher the app.
         if (m_bSwitchDisk == FALSE && m_hUSBHandle == NULL) {
-          DEBUG("SET TIMER_SWITCH_DISK");
+          INFO("SET TIMER_SWITCH_DISK");
           m_bDoDeploy = FALSE;
           m_bInstallDriver = TRUE;
           m_hDevchangeTips->SetWindowText(_T("AT&&T Modio LTE Case detected."));
-          SetTimer(TIMER_SWITCH_DISK, 5000, NULL);
+          SetTimer(TIMER_SWITCH_DISK, 2000, NULL);
+        } else {
+            INFO("m_hUSBHandle 0x%x, switch status %d", m_hUSBHandle, m_bSwitchDisk);
         }
         break;
       }
@@ -527,6 +530,7 @@ void CFreeportLiveDeployDlg::OnTimer(UINT_PTR nIDEvent)
     DEBUG("HANDLE TIMER_PROFILE_LIST TIMER");
     m_hUSBHandle = GetUsbHandle();
     if (m_hUSBHandle != NULL) {
+      m_bAdbAlready = TRUE;
       ConfirmMessage();
     } else {
       PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
@@ -536,6 +540,23 @@ void CFreeportLiveDeployDlg::OnTimer(UINT_PTR nIDEvent)
     PostMessage(UI_MESSAGE_INIT_DEVICE, (WPARAM)0, (LPARAM)NULL);
   } else if(nIDEvent == TIMER_INSTALL_ADB_DRIVER) {
     //InstallAdbDriver(this);
+  } else if(nIDEvent == TIMER_ADB_HANDLER) {
+    //if tools start and then insert USB device, we should wait some second to get
+    //adb device, whereas, insert device first, adb interface will fast appear by
+    //switch.
+    //vice versa
+    m_GetAdbHandleTicks ++;
+    m_hUSBHandle = GetUsbHandle();
+
+    if (m_hUSBHandle != NULL || m_GetAdbHandleTicks >= 3) {
+      KillTimer(nIDEvent);
+      ToggleConfirmWindow(FALSE);
+      InstallAndDeploy();
+    } else {
+      INFO("Set timer again to search adb device");
+      SetTimer(TIMER_ADB_HANDLER, 500, NULL);
+    }
+    return;
   }
 
   KillTimer(nIDEvent);
@@ -674,11 +695,12 @@ LRESULT  CFreeportLiveDeployDlg::OnInitDevice(WPARAM wParam, LPARAM lParam) {
         LOG("USB Stor %S is not target device.",path);
       } else {
         CSCSICmd scsi = CSCSICmd();
+        m_bSwitchDisk = TRUE;
+        m_bAdbAlready = FALSE;
         LOG("do switch device %S", devicePath[i]);
         //SetTimer(TIMER_INSTALL_ADB_DRIVER, 1000, NULL);
         //m_hDevchangeTips->SetWindowText(_T("Toggle USB Ports of AT&&T Modio LTE Case."));
         scsi.SwitchToDebugDevice(devicePath[i]);
-        m_bSwitchDisk = TRUE;
 
         ConfirmMessage();
         //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
@@ -729,21 +751,30 @@ VOID CFreeportLiveDeployDlg::ConfirmMessage(VOID)
     boldFont.Detach();
   }
   ToggleConfirmWindow(TRUE);
+  LOG("Disable RNDIS USB NIC");
+  ControlUSBNIC(_T("VID_1BBB&PID_0196"), DICS_DISABLE);
 }
 
 void CFreeportLiveDeployDlg::OnBnClickedOk()
 {
   //CDialogEx::OnOK();
-  LOG("Disable RNDIS USB NIC");
-  ControlUSBNIC(_T("VID_1BBB&PID_0196"), DICS_DISABLE);
-  ToggleConfirmWindow(FALSE);
   //IsAdbDriverInstalled();
-  InstallAndDeploy();
+    //to fix always install adb drivers, if device remove and plugin again.
+  if (m_bAdbAlready) {
+    INFO("Find adb device already");
+    ToggleConfirmWindow(FALSE);
+    LiveDeploy(FALSE);
+    m_bAdbAlready = FALSE;
+  } else {
+    m_GetAdbHandleTicks = 0;
+    INFO("Set timer to search adb device");
+    SetTimer(TIMER_ADB_HANDLER, 500, NULL);
+  }
 }
 
 LRESULT CFreeportLiveDeployDlg::InstallAndDeploy(VOID) {
   if (m_hUSBHandle != NULL) {
-    LiveDeploy(m_bFirstClick);
+    LiveDeploy(FALSE);
   } else if (m_bInstallDriver){
       mThreadparam.hDlg = this;
       mThreadparam.hWorkThread = AfxBeginThread(WorkThread, &mThreadparam);
@@ -752,10 +783,6 @@ LRESULT CFreeportLiveDeployDlg::InstallAndDeploy(VOID) {
     RefreshDevice();
     LiveDeploy(FALSE);
   }
-
-  if (m_bFirstClick)
-    m_bFirstClick = FALSE;
-
   return 0;
 }
 

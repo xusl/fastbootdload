@@ -27,6 +27,14 @@ enum
   TIMER_SWITCH_DISK = 0,
   TIMER_PUSH_FILES,
   TIMER_INSTALL_ADB_DRIVER,
+  TIMER_ADB_HANDLER,
+};
+
+enum
+{
+  DEPLOY_STAT_OK = 0,
+  DEPLOY_STAT_DOING = -1,
+  DEPLOY_STAT_NONEDEVICE = -2,
 };
 
 //#define PATCH_CONF
@@ -64,9 +72,10 @@ protected:
   HICON m_hIcon;
   usb_handle* m_hUSBHandle;
   BOOL m_bSwitchDisk;
-  BOOL m_bFirstClick;
+  BOOL m_bAdbAlready;  //adb is present if device attach, do not need switch.
   BOOL m_bInstallDriver;
   BOOL m_bDoDeploy;
+  int  m_GetAdbHandleTicks;
   HDEVNOTIFY hDeviceNotify;
 #ifdef PATCH_CONF
 #ifdef USE_CPP_MAP

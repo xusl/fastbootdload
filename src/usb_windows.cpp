@@ -280,7 +280,7 @@ long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
   wchar_t * snb, *sne, * sn;
 
   size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
-  if(wcsnicmp(L"\\\\?\\usb#",dev_name,8) || len < 26 + 40) {
+  if(_wcsnicmp(L"\\\\?\\usb#",dev_name,8) || len < 26 + 40) {
     ERROR("Not invalid dev name.");
     return 0;
   }
@@ -335,7 +335,6 @@ int usb_switch_device(usb_handle* handle) {
 
   return 0;
 }
-
 
 static int switch_device_close(dev_switch_t* dev) {
     if (dev == NULL)
@@ -577,11 +576,11 @@ int usb_write(usb_handle* handle, const void* _data, int len) {
                                    &written,
                                    time_out);
             errno = GetLastError();
-            //DEBUG("AdbWriteEndpointSync returned %d, errno: %d\n", ret, errno);
             if (ret == 0) {
                 // assume ERROR_INVALID_HANDLE indicates we are disconnected
                 if (errno == ERROR_INVALID_HANDLE)
                 usb_kick(handle);
+                WARN("AdbWriteEndpointSync returned %d, errno: %d\n", ret, errno);
                 return -1;
             }
 
@@ -676,8 +675,6 @@ int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
                                   &read,
                                   time_out);
       errno = GetLastError();
-      DEBUG("usb_read got: %ld, expected: %d, errno: %d, ret: %d",
-	  	read, xfer, errno, ret);
       if (ret) {
         if (!fulfill)
             return read;
@@ -691,6 +688,7 @@ int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
         // assume ERROR_INVALID_HANDLE indicates we are disconnected
         if (errno == ERROR_INVALID_HANDLE)
           usb_kick(handle);
+        WARN("usb_read got: %ld, expected: %d, errno: %d, ret: %d", read, xfer, errno, ret);
         break;
       }
     }
@@ -699,7 +697,7 @@ int usb_read(usb_handle *handle, void* _data, int len, bool fulfill) {
     SetLastError(ERROR_INVALID_HANDLE);
   }
 
-  WARN("usb_read failed: %d", errno);
+  WARN("usb_read failed: %d(%s)", errno, strerror(errno));
 
   return -1;
 }
@@ -864,20 +862,25 @@ void find_devices(BOOL flashdirect) {
   ADBAPIHANDLE enum_handle =
     AdbEnumInterfaces(usb_class_id, true, true, true);
 
-  if (NULL == enum_handle)
+  if (NULL == enum_handle) {
+    WARN("find_devices: Enumeration initialize failed");
     return;
+  }
 
   while (AdbNextInterface(enum_handle, next_interface, &entry_buffer_size)) {
     // Lets see if we already have this device in the list
     if (!known_device(next_interface->device_name)) {
       // This seems to be a new device. Open it!
         handle = do_usb_open(next_interface->device_name);
-        if (NULL == handle) continue;
+        if (NULL == handle) {
+            WARN("Open %S failed", next_interface->device_name);
+            continue;
+        }
         // Lets see if this interface (device) belongs to us
         if (recognized_device(handle)) {
           char serial_number[512];
           unsigned long serial_number_len = sizeof(serial_number);
-          DEBUG("adding a new device %S", next_interface->device_name);
+          INFO("adding a new device %S", next_interface->device_name);
           if (AdbGetSerialNumber(handle->adb_interface,
                                 serial_number,
                                 &serial_number_len,
@@ -886,12 +889,12 @@ void find_devices(BOOL flashdirect) {
             if (register_new_device(handle, flashdirect)) {
          //    AfxBeginThread(run, (void*)handle);
             } else {
-              DEBUG("register_new_device failed for %s\n", next_interface->device_name);
+              WARN("register_new_device failed for %s\n", next_interface->device_name);
               usb_cleanup_handle(handle);
               free(handle);
             }
           } else {
-            DEBUG("cannot get serial number\n");
+            WARN("cannot get serial number\n");
             usb_cleanup_handle(handle);
             free(handle);
           }
@@ -900,6 +903,8 @@ void find_devices(BOOL flashdirect) {
           usb_cleanup_handle(handle);
           free(handle);
         }
+    }else {
+        INFO("%S is not ours adb interface.", next_interface->device_name);
     }
 
     entry_buffer_size = sizeof(entry_buffer);

@@ -123,8 +123,8 @@ static void remote_kick(atransport *t)
 void init_usb_transport(atransport *t, usb_handle *h, int state)
 {
     DEBUG("transport: usb");
-   // t->close = remote_close;
-   // t->kick = remote_kick;
+    t->close = remote_close;
+    t->kick = remote_kick;
     t->read_from_remote = remote_read;
     t->write_to_remote = remote_write;
     t->sync_token = 1;

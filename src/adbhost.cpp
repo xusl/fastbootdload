@@ -16,6 +16,51 @@ when        who          what
 #include "adbhost.h"
 #include "adb_auth.h"
 
+#define PRINT_PACKETS 0
+#if !PRINT_PACKETS
+#define print_packet(tag,p) do {} while (0)
+#else
+#define DUMPMAX 32
+void print_packet(const char *label, apacket *p)
+{
+   char *tag;
+   char *x;
+   unsigned count;
+
+   switch(p->msg.command){
+   case A_SYNC: tag = "SYNC"; break;
+   case A_CNXN: tag = "CNXN" ; break;
+   case A_OPEN: tag = "OPEN"; break;
+   case A_OKAY: tag = "OKAY"; break;
+   case A_CLSE: tag = "CLSE"; break;
+   case A_WRTE: tag = "WRTE"; break;
+   default: tag = "????"; break;
+   }
+
+   ERROR( "%s: %s %08x %08x %04x \"",
+           label, tag, p->msg.arg0, p->msg.arg1, p->msg.data_length);
+#if 0
+   count = p->msg.data_length;
+   x = (char*) p->data;
+   if(count > DUMPMAX) {
+      count = DUMPMAX;
+      tag = "\n";
+   } else {
+      tag = "\"\n";
+   }
+   while(count-- > 0){
+      if((*x >= ' ') && (*x < 127)) {
+         fputc(*x, stderr);
+      } else {
+         fputc('.', stderr);
+      }
+      x++;
+   }
+   ERROR( "%s", tag);
+#endif
+}
+#endif
+
 #if ADB_TRACE
 static void dump_packet( const char*  tag, apacket* const p)
 {
@@ -81,17 +126,51 @@ adbhost::adbhost(usb_handle *usb, unsigned address):
    memset(&this->t, 0 ,sizeof(atransport));
    init_usb_transport(&this->t, usb, CS_OFFLINE);
    packet_buffer = NULL;
+   t.ref_count = 1;
 }
 
 adbhost::~adbhost(void)
 {
    if (packet_buffer != NULL)
       put_apacket(packet_buffer);
-
-  // kick_transport(&this->t);
-   //    transport_unref(&this->t);
+   //we do not release the adb handle, client must take charge of
+   //release adb handle.
+   //kick_transport(&this->t);
+   //transport_unref(&this->t);
    if (this->t.product != NULL)
       free(this->t.product);
+}
+
+void kick_transport(atransport* t)
+{
+    if (t && !t->kicked)
+    {
+        int  kicked;
+
+        //adb_mutex_lock(&transport_lock);
+        kicked = t->kicked;
+        if (!kicked)
+            t->kicked = 1;
+        //adb_mutex_unlock(&transport_lock);
+
+        if (!kicked)
+            t->kick(t);
+    }
+}
+
+void transport_unref(atransport *t)
+{
+    t->ref_count--;
+    DEBUG("transport: %p R- (ref=%d)\n", t, t->ref_count);
+    if (t->ref_count == 0) {
+        DEBUG("transport: %p kicking and closing\n", t);
+        if (!t->kicked) {
+            t->kicked = 1;
+            t->kick(t);
+        }
+        t->close(t);
+        //remove_transport(t);
+    }
 }
 
 int adbhost::read_packet( apacket** ppacket)
@@ -213,18 +292,16 @@ void adbhost::connect(atransport *t)
    put_apacket(cp);
 }
 
-
 void adbhost::open_service(const char *destination)
 {
    apacket *p = get_apacket();
    int len = strlen(destination) + 1;
-   DEBUG("Connect_to_remote call ");
 
    if(len > (MAX_PAYLOAD-1)) {
       ERROR("destination oversized");
    }
 
-   DEBUG("LS(%d): connect('%s')", id, destination);
+   DEBUG("%d: connect('%s')", id, destination);
    p->msg.command = A_OPEN;
    p->msg.arg0 = this->id;
    p->msg.data_length = len;
@@ -236,7 +313,6 @@ void adbhost::open_service(const char *destination)
 
 int adbhost::enqueue_command(apacket *p)
 {
-   DEBUG("Calling remote_socket_enqueue");
    p->msg.command = A_WRTE;
    p->msg.arg0 = this->id;
    p->msg.arg1 = this->peer_id;
@@ -252,7 +328,6 @@ void adbhost::notify_ready_to_remote(void)
    p->msg.command = A_OKAY;
    p->msg.arg0 = this->id;
    p->msg.arg1 = this->peer_id;
-   DEBUG("Calling remote_socket_ready");
    send_packet(p, &this->t);
    put_apacket(p);
 }
@@ -344,44 +419,43 @@ bool adbhost::handle_shell_response (void **response, int *len) {
 }
 
 bool adbhost::handle_open_response (void) {
-   apacket *p =  get_apacket();
-   bool result = true;
+  apacket *p =  get_apacket();
+  bool result = true;
 
-   if (p == NULL)
-      return false;
+  if (p == NULL)
+    return false;
 
-   read_packet(&p);
+  read_packet(&p);
 
-   if ( p->msg.command == A_CLSE) {
-      close_remote();
+  if ( p->msg.command == A_CLSE) {
+    close_remote();
+    result = false;
+  } else if (p->msg.command == A_OKAY) {
+    /* READY(local-id, remote-id, "") */
+    DEBUG("handle receive: local-id=%d, remote-id=%d", p->msg.arg0, p->msg.arg1);
+    if(p->msg.arg1 != id) {
+      ERROR("p->msg.arg1 (%d) not euqal id (%d)", p->msg.arg1, id);
       result = false;
-   } else if (p->msg.command == A_OKAY) {
-      /* READY(local-id, remote-id, "") */
-      DEBUG("handle receive: local-id=%d, remote-id=%d",
-            p->msg.arg0,p->msg.arg1 );
-      if(p->msg.arg1 != id) {
-         ERROR("p->msg.arg1 (%d) not euqal id (%d)", p->msg.arg1, id);
-         result = false;
+    } else {
+      this->peer_id = p->msg.arg0;
+    }
+  } else if (p->msg.command == A_AUTH) {
+    if (p->msg.arg0 == ADB_AUTH_TOKEN) {
+      INFO("ADB_AUTH_TOKEN");
+      t.connection_state = CS_UNAUTHORIZED;
+      t.key = adb_auth_nextkey(t.key);
+      if (t.key) {
+        send_auth_response(p->data, p->msg.data_length, &t);
       } else {
-         this->peer_id = p->msg.arg0;
+        /* No more private keys to try, send the public key */
+        send_auth_publickey(&t);
       }
-   } else if (p->msg.command == A_AUTH) {
-        if (p->msg.arg0 == ADB_AUTH_TOKEN) {
-            INFO("ADB_AUTH_TOKEN");
-            t.connection_state = CS_UNAUTHORIZED;
-            t.key = adb_auth_nextkey(t.key);
-            if (t.key) {
-                send_auth_response(p->data, p->msg.data_length, &t);
-            } else {
-                /* No more private keys to try, send the public key */
-                send_auth_publickey(&t);
-            }
-        } else {
-          ERROR("Get bad authentication message");
-        }
-   }
-   put_apacket(p);
-   return result;
+    } else {
+      ERROR("Get bad authentication message");
+    }
+  }
+  put_apacket(p);
+  return result;
 }
 
 bool adbhost::handle_connect_response(void)
@@ -433,74 +507,71 @@ bool adbhost::handle_connect_response(void)
       t.connection_state = CS_RECOVERY;
    }
 
-
    put_apacket( p);
 
    return true;
 }
 
 void adbhost::process() {
-   apacket *p;
-   // 1. sync, just internal,  for input/output thread model sync,
-   // we just one thread. omit.
+  apacket *p;
+  // 1. sync, just internal,  for input/output thread model sync,
+  // we just one thread. omit.
 
-   // 2.  sync Handler will send connect message,
-   connect(&this->t);
-   // receive connect from remote
-   if (!handle_connect_response()) {
-      return;
-   }
+  // 2.  sync Handler will send connect message,
+  connect(&this->t);
+  // receive connect from remote
+  if (!handle_connect_response()) {
+    return;
+  }
 
-   // 3. if we receive connect message from remote, do open
-   open_service("shell:ls /");//("shell:cat build.prop");
-   //todo:: we should receive : OKAY(send_ready), mean success,
-   //                    or CLOSE(send_ready), which means failure.
-   if (!handle_open_response()) {
-      return;
-   }
-   // 4. do write what we want to do.
-   handle_shell_response(NULL, NULL);
-    // 5. close
-   //close_remote();
+  // 3. if we receive connect message from remote, do open
+  open_service("shell:ls /");//("shell:cat build.prop");
+  //todo:: we should receive : OKAY(send_ready), mean success,
+  //                    or CLOSE(send_ready), which means failure.
+  if (!handle_open_response()) {
+    return;
+  }
+  // 4. do write what we want to do.
+  handle_shell_response(NULL, NULL);
+  // 5. close
+  //close_remote();
 
+  //need close service now?
+  //or do not need close , util connection close?
+  connect(&this->t);
+  // receive connect from remote
+  if (!handle_connect_response()) {
+    return;
+  }
+  do_sync_push("./ReadMe.txt", "/usr");
+  close_remote();
 
+  connect(&this->t);
+  // receive connect from remote
+  if (!handle_connect_response()) {
+    return;
+  }
+  do_sync_pull("/usr/ReadMe.txt", "..");
+  // 5. close
+  close_remote();
 
-   //need close service now?
-   //or do not need close , util connection close?
-   connect(&this->t);
-   // receive connect from remote
-   if (!handle_connect_response()) {
-      return;
-   }
-   do_sync_push("./ReadMe.txt", "/usr");
-    close_remote();
+#if 0
+  connect(&this->t);
+  // receive connect from remote
+  if (!handle_connect_response()) {
+    return;
+  }
 
-   connect(&this->t);
-   // receive connect from remote
-   if (!handle_connect_response()) {
-      return;
-   }
-   do_sync_pull("/usr/ReadMe.txt", "..");
-   // 5. close
-   close_remote();
-
-    #if 0
-     connect(&this->t);
-   // receive connect from remote
-   if (!handle_connect_response()) {
-      return;
-   }
-
-   // 3. if we receive connect message from remote, do open
-   open_service("shell:reboot-bootloader");//("shell:cat build.prop");
-   //todo:: we should receive : OKAY(send_ready), mean success,
-   //                    or CLOSE(send_ready), which means failure.
-   if (!handle_open_response()) {
-      return;
-   }
-   // 4. do write what we want to do.
-   handle_shell_response();
-   #endif
+  // 3. if we receive connect message from remote, do open
+  open_service("shell:reboot-bootloader");//("shell:cat build.prop");
+  //todo:: we should receive : OKAY(send_ready), mean success,
+  //                    or CLOSE(send_ready), which means failure.
+  if (!handle_open_response()) {
+    return;
+  }
+  // 4. do write what we want to do.
+  handle_shell_response();
+#endif
 }
 
 
@@ -525,7 +596,6 @@ int adbhost::shell(const char * command, void **response, int *responselen) {
     return -1;
   }
   snprintf(shell, len, "shell:""%s", command);
-
 
   // 3. if we receive connect message from remote, do open
   open_service(shell);
@@ -588,128 +658,128 @@ int adbhost::sync_push(const char *lpath, const char *rpath) {
 
 int adbhost::do_sync_pull(const char *rpath, const char *lpath)
 {
-    unsigned mode;
-    struct stat st;
-	int  tmplen;
-	char *tmp;
-    int fd = 999;
+  unsigned mode;
+  struct stat st;
+  int  tmplen;
+  char *tmp;
+  int fd = 999;
 
-    open_service("sync:");
-    if(!handle_open_response()) {
-        ERROR("error: open sync failed");
-        return 1;
-    }
+  open_service("sync:");
+  if(!handle_open_response()) {
+    ERROR("error: open sync failed");
+    return 1;
+  }
 
-    if(sync_readmode(fd, rpath, &mode)) {
-        return 1;
-    }
-    if(mode == 0) {
-        ERROR("remote object '%s' does not exist", rpath);
-        return 1;
-    }
+  if(sync_readmode(fd, rpath, &mode)) {
+    return 1;
+  }
+  if(mode == 0) {
+    ERROR("remote object '%s' does not exist", rpath);
+    return 1;
+  }
 
-    if(S_ISREG(mode) || S_ISLNK(mode) || S_ISCHR(mode) || S_ISBLK(mode)) {
-        if(stat(lpath, &st) == 0) {
-            if(S_ISDIR(st.st_mode)) {
-                    /* if we're copying a remote file to a local directory,
-                    ** we *really* want to copy to localdir + "/" + remotefilename
-                    */
-                const char *name = adb_dirstop(rpath);
-                if(name == 0) {
-                    name = rpath;
-                } else {
-                    name++;
-                }
-                tmplen = strlen(name) + strlen(lpath) + 2;
-                tmp = (char *)malloc(tmplen);
-                if(tmp == 0) return 1;
-                snprintf(tmp, tmplen, "%s/%s", lpath, name);
-                lpath = tmp;
-            }
-        }
-        BEGIN();
-        if(sync_recv(fd, rpath, lpath)) {
-            return 1;
+  if(S_ISREG(mode) || S_ISLNK(mode) || S_ISCHR(mode) || S_ISBLK(mode)) {
+    if(stat(lpath, &st) == 0) {
+      if(S_ISDIR(st.st_mode)) {
+        /* if we're copying a remote file to a local directory,
+         ** we *really* want to copy to localdir + "/" + remotefilename
+         */
+        const char *name = adb_dirstop(rpath);
+        if(name == 0) {
+          name = rpath;
         } else {
-            END();
-            sync_quit();
-            return 0;
+          name++;
         }
-    } else if(S_ISDIR(mode)) {
-        BEGIN();
-        if (copy_remote_dir_local(fd, rpath, lpath, 0)) {
-            return 1;
-        } else {
-            END();
-            sync_quit();
-            return 0;
-        }
+        tmplen = strlen(name) + strlen(lpath) + 2;
+        tmp = (char *)malloc(tmplen);
+        if(tmp == 0) return 1;
+        snprintf(tmp, tmplen, "%s/%s", lpath, name);
+        lpath = tmp;
+      }
+    }
+    BEGIN();
+    if(sync_recv(fd, rpath, lpath)) {
+      return 1;
     } else {
-        ERROR("remote object '%s' not a file or directory", rpath);
-        return 1;
+      END();
+      sync_quit();
+      return 0;
     }
+  } else if(S_ISDIR(mode)) {
+    BEGIN();
+    if (copy_remote_dir_local(fd, rpath, lpath, 0)) {
+      return 1;
+    } else {
+      END();
+      sync_quit();
+      return 0;
+    }
+  } else {
+    ERROR("remote object '%s' not a file or directory", rpath);
+    return 1;
+  }
 }
 
 
 int adbhost::do_sync_push(const char *lpath, const char *rpath)
 {
-    struct stat st;
-    unsigned mode;
-    int fd = 1;
-	int  tmplen;
-	char *tmp;
+  struct stat st;
+  unsigned mode;
+  int fd = 1;
+  int  tmplen;
+  char *tmp;
 
-    open_service("sync:");
-    if(!handle_open_response()) {
-        //fprintf(stderr,"error: %s\n", adb_error());
-        return 1;
-    }
+  open_service("sync:");
+  if(!handle_open_response()) {
+    //fprintf(stderr,"error: %s\n", adb_error());
+    return 1;
+  }
 
-    if(stat(lpath, &st)) {
-        ERROR("cannot stat local file '%s'", lpath);
-        sync_quit();
-        return 1;
-    }
+  if(stat(lpath, &st)) {
+    ERROR("cannot stat local file '%s'", lpath);
+    sync_quit();
+    return 1;
+  }
 
-    if(S_ISDIR(st.st_mode)) {
-        BEGIN();
-        if(copy_local_dir_remote(fd, lpath, rpath, 0, 0)) {
-            return 1;
-        } else {
-            END();
-            sync_quit();
-        }
+  if(S_ISDIR(st.st_mode)) {
+    BEGIN();
+    if(copy_local_dir_remote(fd, lpath, rpath, 0, 0)) {
+      return 1;
     } else {
-        if(sync_readmode(fd, rpath, &mode)) {
-            return 1;
-        }
-        if((mode != 0) && S_ISDIR(mode)) {
-                /* if we're copying a local file to a remote directory,
-                ** we *really* want to copy to remotedir + "/" + localfilename
-                */
-            const char *name = adb_dirstop(lpath);
-            if(name == 0) {
-                name = lpath;
-            } else {
-                name++;
-            }
-            tmplen = strlen(name) + strlen(rpath) + 2;
-            tmp = (char *)malloc(strlen(name) + strlen(rpath) + 2);
-            if(tmp == 0) return 1;
-            snprintf(tmp, tmplen, "%s/%s", rpath, name);
-            rpath = tmp;
-        }
-        BEGIN();
-        if(sync_send(fd, lpath, rpath, st.st_mtime, st.st_mode)) {
-            return 1;
-        } else {
-            END();
-            sync_quit();
-            return 0;
-        }
+      END();
+      sync_quit();
     }
+  } else {
+    if(sync_readmode(fd, rpath, &mode)) {
+      return 1;
+    }
+    if((mode != 0) && S_ISDIR(mode)) {
+      /* if we're copying a local file to a remote directory,
+       ** we *really* want to copy to remotedir + "/" + localfilename
+       */
+      const char *name = adb_dirstop(lpath);
+      if(name == 0) {
+        name = lpath;
+      } else {
+        name++;
+      }
+      tmplen = strlen(name) + strlen(rpath) + 2;
+      tmp = (char *)malloc(strlen(name) + strlen(rpath) + 2);
+      if(tmp == 0) return 1;
+      snprintf(tmp, tmplen, "%s/%s", rpath, name);
+      rpath = tmp;
+    }
+    BEGIN();
+    if(sync_send(fd, lpath, rpath, st.st_mtime, st.st_mode)) {
+      return 1;
+    } else {
+      END();
+      sync_quit();
+      return 0;
+    }
+  }
 
-    return 0;
+  return 0;
 }
 
 int adbhost::sync_send(int fd, const char *lpath, const char *rpath,
@@ -1102,42 +1172,42 @@ int adbhost::remote_build_list(int syncfd, copyinfo **filelist,
 int adbhost::sync_ls(int fd, const char *path, //sync_ls_cb func,
 	void *cookie)
 {
-    syncmsg msg;
-    char buf[257];
-    int len;
+  syncmsg msg;
+  char buf[257];
+  int len;
 
-    len = strlen(path);
-    if(len > 1024) goto fail;
+  len = strlen(path);
+  if(len > 1024) goto fail;
 
-    msg.req.id = ID_LIST;
-    msg.req.namelen = htoll(len);
+  msg.req.id = ID_LIST;
+  msg.req.namelen = htoll(len);
 
-    if(writex(fd, &msg.req, sizeof(msg.req)) ||
-       writex(fd, path, len)) {
-        goto fail;
-    }
+  if(writex(fd, &msg.req, sizeof(msg.req)) ||
+     writex(fd, path, len)) {
+    goto fail;
+  }
 
-    for(;;) {
-        if(readx(fd, &msg.dent, sizeof(msg.dent))) break;
-        if(msg.dent.id == ID_DONE) return 0;
-        if(msg.dent.id != ID_DENT) break;
+  for(;;) {
+    if(readx(fd, &msg.dent, sizeof(msg.dent))) break;
+    if(msg.dent.id == ID_DONE) return 0;
+    if(msg.dent.id != ID_DENT) break;
 
-        len = ltohl(msg.dent.namelen);
-        if(len > 256) break;
+    len = ltohl(msg.dent.namelen);
+    if(len > 256) break;
 
-        if(readx(fd, buf, len)) break;
-        buf[len] = 0;
+    if(readx(fd, buf, len)) break;
+    buf[len] = 0;
 
-       // func TODO::
-		sync_ls_build_list_cb(ltohl(msg.dent.mode),
-             ltohl(msg.dent.size),
-             ltohl(msg.dent.time),
-             buf, cookie);
-    }
+    // func TODO::
+    sync_ls_build_list_cb(ltohl(msg.dent.mode),
+                          ltohl(msg.dent.size),
+                          ltohl(msg.dent.time),
+                          buf, cookie);
+  }
 
 fail:
-//    adb_close(fd);
-    return -1;
+  //adb_close(fd);
+  return -1;
 }
 
 int adbhost::write_data_file(int fd, const char *path, syncsendbuf *sbuf)
@@ -1167,6 +1237,7 @@ int adbhost::write_data_file(int fd, const char *path, syncsendbuf *sbuf)
         sbuf->size = htoll(ret);
         if(writex(fd, sbuf, sizeof(unsigned) * 2 + ret)){
             err = -1;
+            ERROR("write_data_file: write data failed");
             break;
         }
         total_bytes += ret;
@@ -1223,11 +1294,19 @@ int adbhost::readx(int fd, void *ptr, size_t len) {
 
          if (p->msg.command == A_OKAY) {
             memset(p, 0, sizeof(apacket));
+            //INFO("get A_OKAY command");
          } else if (p->msg.command == A_WRTE) {
             notify_ready_to_remote();
+            //INFO("get A_WRTE command");
             break;
          } else {
-            ERROR("COMMAND ERROR");
+#if PRINT_PACKETS
+            print_packet("readx: unhandle command", p);
+#else
+            char desc[5]={'\0'};
+            memcpy(desc, (const void *)&p->msg.command, 4);
+            ERROR("readx: unexpected command %d(%s)", p->msg.command, desc);
+#endif
             return 1;
          }
       }
@@ -1237,7 +1316,7 @@ int adbhost::readx(int fd, void *ptr, size_t len) {
    }
 
    if (len > p->msg.data_length) {
-      ERROR("ERROR");
+      ERROR("readx: data length %d short expected %d", p->msg.data_length, len);
       return 1;
    }
    memcpy(ptr, p->data, len);
@@ -1508,42 +1587,3 @@ void put_apacket(apacket *p)
     free(p);
 }
 
-#if TRACE_PACKETS
-#define DUMPMAX 32
-void print_packet(const char *label, apacket *p)
-{
-   char *tag;
-   char *x;
-   unsigned count;
-
-   switch(p->msg.command){
-   case A_SYNC: tag = "SYNC"; break;
-   case A_CNXN: tag = "CNXN" ; break;
-   case A_OPEN: tag = "OPEN"; break;
-   case A_OKAY: tag = "OKAY"; break;
-   case A_CLSE: tag = "CLSE"; break;
-   case A_WRTE: tag = "WRTE"; break;
-   default: tag = "????"; break;
-   }
-
-   ERROR( "%s: %s %08x %08x %04x \"",
-           label, tag, p->msg.arg0, p->msg.arg1, p->msg.data_length);
-   count = p->msg.data_length;
-   x = (char*) p->data;
-   if(count > DUMPMAX) {
-      count = DUMPMAX;
-      tag = "\n";
-   } else {
-      tag = "\"\n";
-   }
-   while(count-- > 0){
-      if((*x >= ' ') && (*x < 127)) {
-         fputc(*x, stderr);
-      } else {
-         fputc('.', stderr);
-      }
-      x++;
-   }
-   ERROR( tag);
-}
-#endif
