@@ -137,7 +137,7 @@ class adbhost
 		unsigned peer_id;
 
 		unsigned total_bytes;
-    long start_time;
+    long long start_time;
 	  syncsendbuf send_buffer;
 	  apacket *packet_buffer;
 };

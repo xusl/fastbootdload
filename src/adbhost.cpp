@@ -1561,17 +1561,23 @@ int adbhost::sync_finish_readtime(int fd, unsigned int *timestamp,
     start_time = now();
 }
 
+/*
+Big Bang, the "t" as time will over adbhost member "atransport t;"
+Maybe send big file and strange bug in AdbCreateInterfaceByName (
+the return value change automatic "ret = obj->CreateHandle();")
+*/
  void adbhost::END()
 {
-    long  t = now() - start_time;
+    long long  elapse = now() - start_time;
     if(total_bytes == 0) return;
 
-    if (t == 0)  /* prevent division by 0 :-) */
-        t = 1000000;
+    if (elapse == 0)  /* prevent division by 0 :-) */
+        elapse = 1000000;
 
+    INFO("Elapse time %lld", elapse);
     ERROR("%lld KB/s (%d bytes in %lld.%03llds)",
-            ((((long ) total_bytes) * 1000000LL) / t) / 1024LL,
-            total_bytes, (t / 1000000LL), (t % 1000000LL) / 1000LL);
+            ((((long ) total_bytes) * 1000000LL) / elapse) / 1024LL,
+            total_bytes, (elapse / 1000000LL), (elapse % 1000000LL) / 1000LL);
 }
 
 apacket *get_apacket(void)

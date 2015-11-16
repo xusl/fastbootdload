@@ -216,7 +216,7 @@ int gettimeofday(struct timeval *tv, struct timezone *tz)
   return 0;
 }
 
-long now(void)
+long long now(void)
 {
 #if 0
   struct timeval tv;
@@ -232,7 +232,7 @@ long now(void)
   tmpres |= ft.dwHighDateTime;
   tmpres <<= 32;
   tmpres |= ft.dwLowDateTime;
-  return (long)(tmpres / 10000000UL);
+  return (long long)(tmpres / 10);
 #endif
 }
 

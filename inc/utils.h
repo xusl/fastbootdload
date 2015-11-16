@@ -195,7 +195,7 @@ CString GetFileNameFromFullPath(CString FullPath);
 void get_my_path(char *s, size_t maxLen);
 CString GetAppPath(CString & sPath );
 void sleep(int seconds);
-long now(void);
+long long now(void);
  PWCH MultiStrToWideStr(PCCH pc);
 PCHAR WideStrToMultiStr(PCWCH WideStr);
 
