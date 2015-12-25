@@ -42,7 +42,7 @@ using namespace std;
 
 #include <msxml.h>
 #include <atlstr.h>
-#import "msxml.dll" raw_interfaces_only
+#import "msxml6.dll" raw_interfaces_only
 
 flash_image::flash_image(const wchar_t* config):
   image_list(NULL),
@@ -329,16 +329,16 @@ const char* flash_image::qcn_cmds_enum_next (unsigned int index) {
 }
 
 void flash_image::read_package_version(const wchar_t * package_conf){
-  CComPtr<MSXML::IXMLDOMDocument> spDoc;
-  CComPtr<MSXML::IXMLDOMNodeList> spNodeList;
-  CComPtr<MSXML::IXMLDOMElement> spElement;
+  CComPtr<MSXML2::IXMLDOMDocument> spDoc;
+  CComPtr<MSXML2::IXMLDOMNodeList> spNodeList;
+  CComPtr<MSXML2::IXMLDOMElement> spElement;
   CComBSTR strTagName;
   VARIANT_BOOL bFlag;
   long lCount;
   HRESULT hr;
 
   ::CoInitialize(NULL);
-  hr = spDoc.CoCreateInstance(__uuidof(MSXML::DOMDocument));    //创建文档对象
+  hr = spDoc.CoCreateInstance(__uuidof(MSXML2::DOMDocument));    //创建文档对象
   hr = spDoc->load(CComVariant(package_conf), &bFlag);       //load xml文件
   hr = spDoc->get_documentElement(&spElement);   //获取根结点
   if (spElement == NULL) {
@@ -354,9 +354,9 @@ void flash_image::read_package_version(const wchar_t * package_conf){
 
   for (long i=0; i<lCount; ++i) {
     CComVariant varNodeValue;
-    CComPtr<MSXML::IXMLDOMNode> spNode;
-    MSXML::DOMNodeType NodeType;
-    CComPtr<MSXML::IXMLDOMNodeList> spChildNodeList;
+    CComPtr<MSXML2::IXMLDOMNode> spNode;
+    MSXML2::DOMNodeType NodeType;
+    CComPtr<MSXML2::IXMLDOMNodeList> spChildNodeList;
 
     hr = spNodeList->get_item(i, &spNode);         //获取结点
     hr = spNode->get_nodeType(&NodeType);     //获取结点信息的类型
@@ -369,7 +369,7 @@ void flash_image::read_package_version(const wchar_t * package_conf){
       //cout << "------NodeList------" << endl;
 
       for (int j=0; j<childLen; ++j) {
-        CComPtr<MSXML::IXMLDOMNode> spChildNode;
+        CComPtr<MSXML2::IXMLDOMNode> spChildNode;
         CComBSTR value;
         CComBSTR name;
 
