@@ -30,6 +30,7 @@
 #include <afxwin.h>
 
 #  define DEFAULT_ADB_PORT 5037
+#  define MILLS_SECONDS (1000 * 1000)
 
 #define __inline__
 typedef int socklen_t;

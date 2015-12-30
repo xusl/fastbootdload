@@ -46,6 +46,7 @@ typedef struct UsbWorkData{
     //flash_image  *img;
     usb_handle       *usb;
     int              usb_sn;
+    int              usb_sn_port;
     int              stat;
     FlashImageInfo const * flash_partition[PARTITION_NUM_MAX];
     short           partition_nr;
@@ -150,8 +151,8 @@ private:
 private:
     BOOL InitSettingDlg(void);
     BOOL InitUsbWorkData(void);
-    UsbWorkData * GetUsbWorkData(long usb_sn, BOOL fix_map);
-    UsbWorkData * FindUsbWorkData(long usb_sn);
+    UsbWorkData * GetUsbWorkData(long usb_sn, long usb_sn_port, BOOL fix_map);
+    UsbWorkData * FindUsbWorkData(long usb_sn, long usb_sn_port);
     BOOL SetUsbWorkData(UsbWorkData *data, usb_handle * usb);
     BOOL CleanUsbWorkData(UsbWorkData *data, BOOL schedule = TRUE);
     BOOL SwitchUsbWorkData(UsbWorkData *data);

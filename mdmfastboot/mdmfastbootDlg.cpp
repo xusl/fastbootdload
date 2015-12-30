@@ -208,7 +208,7 @@ BOOL CmdmfastbootDlg::FinishUsbWorkData(UsbWorkData *data) {
   data->stat = USB_STAT_FINISH;
   //data->work = NULL;
   //KILL work timer.
-  KillTimer(data->usb_sn);
+  KillTimer((UINT_PTR)data);
   m_updated_number ++;
   if (NULL == usb_handle_enum_init()) {
     AfxMessageBox(L"All devices is updated!");
@@ -222,7 +222,7 @@ BOOL CmdmfastbootDlg::AbortUsbWorkData(UsbWorkData *data) {
     return FALSE;
   }
   data->stat = USB_STAT_ERROR;
-  KillTimer(data->usb_sn);
+  KillTimer((UINT_PTR)data);
   return TRUE;
 }
 
@@ -261,17 +261,18 @@ BOOL CmdmfastbootDlg::SetUsbWorkData(UsbWorkData *data, usb_handle * usb) {
 
   usb_set_work(usb, TRUE);
   data->usb = usb;
-  data->usb_sn =usb_port_address(usb);
+  data->usb_sn = usb_port_address(usb);
+  data->usb_sn_port = usb_port_subaddress(usb);
   data->stat = USB_STAT_WORKING;
   data->work = AfxBeginThread(usb_work, data);
 
-  INFO("Schedule work for port %d!", data->usb_sn);
+  INFO("Schedule work for port 0x%x (%d)!", data->usb_sn, data->usb_sn_port);
 
   if (data->work != NULL) {
     data->work->m_bAutoDelete = TRUE;
-    SetTimer(data->usb_sn, work_timeout * 1000, NULL);
+    SetTimer((UINT_PTR)data, work_timeout * 1000, NULL);
   } else {
-    CRITICAL("Can not begin thread!(0x%x)", data->usb_sn);
+    CRITICAL("Can not begin thread!(0x%x (%d))", data->usb_sn, data->usb_sn_port);
     usb_set_work(usb, FALSE);
     CleanUsbWorkData(data);
   }
@@ -287,7 +288,7 @@ BOOL CmdmfastbootDlg::SwitchUsbWorkData(UsbWorkData *data) {
   data->work = NULL;
   data->stat = USB_STAT_SWITCH;
   /*Set switch timeout*/
-  SetTimer(data->usb_sn, switch_timeout * 1000, NULL);
+  SetTimer((UINT_PTR)data, switch_timeout * 1000, NULL);
   return TRUE;
 }
 
@@ -297,13 +298,15 @@ BOOL CmdmfastbootDlg::SwitchUsbWorkData(UsbWorkData *data) {
 * this feature will be useful when multiport port download, it help operator
 * to make sure whether the device in a specific is flashed.
 */
-UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn, BOOL fix_map) {
+UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn, long usb_sn_port, BOOL fix_map) {
   int i= 0;
 
   // first search the before, for switch device.
   for (; i < m_nPort; i++) {
     //if (m_workdata[i].usb_sn == usb_sn && m_workdata[i].usb == NULL)
-    if ((m_workdata +i)->stat == USB_STAT_SWITCH && (m_workdata + i)->usb_sn == usb_sn)
+    if ((m_workdata +i)->stat == USB_STAT_SWITCH &&
+        (m_workdata + i)->usb_sn == usb_sn &&
+        (m_workdata + i)->usb_sn_port == usb_sn_port)
       return m_workdata + i;
   }
 
@@ -311,7 +314,7 @@ UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn, BOOL fix_map) {
     //if (m_workdata[i].usb_sn == ~1L && m_workdata[i].usb == NULL)
     if ((m_workdata + i)->stat == USB_STAT_IDLE)
       if (fix_map == FALSE ||
-        (m_workdata + i)->usb_sn == usb_sn ||
+        ((m_workdata + i)->usb_sn == usb_sn && (m_workdata + i)->usb_sn_port == usb_sn_port) ||
         (m_workdata + i)->usb_sn == ~1L)
       return m_workdata + i;
   }
@@ -323,12 +326,13 @@ UsbWorkData * CmdmfastbootDlg::GetUsbWorkData(long usb_sn, BOOL fix_map) {
 * get usbworkdata by usb_sn, the device is in switch or in working
 * or done, but not idle.
 */
-UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(long usb_sn) {
+UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(long usb_sn, long usb_sn_port) {
   int i= 0;
 
   // first search the before, for switch device.
   for (; i < m_nPort; i++) {
     if ((m_workdata+i)->usb_sn == usb_sn &&
+       (m_workdata+i)->usb_sn_port == usb_sn_port &&
       ((m_workdata+i)->stat != USB_STAT_IDLE))
       return m_workdata + i;
   }
@@ -422,10 +426,10 @@ BOOL CmdmfastbootDlg::ResetUsbWorkData(void) {
       if (workdata->work != NULL) //Delete, or ExitInstance
         workdata->work->PostThreadMessage( WM_QUIT, NULL, NULL );
       usb_close(workdata->usb);
-      KillTimer(workdata->usb_sn);
+      KillTimer((UINT_PTR)workdata);
     } else if (workdata->stat == USB_STAT_SWITCH) {
       remove_switch_device(workdata->usb_sn);
-      KillTimer(workdata->usb_sn);
+      KillTimer((UINT_PTR)workdata);
     } else if (workdata->stat == USB_STAT_FINISH) {
       ;
     } else if (workdata->stat == USB_STAT_ERROR) {
@@ -601,7 +605,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
   m_imglist = ((CListCtrl*)GetDlgItem(IDC_IMAGE_LIST));
   m_imglist->InsertColumn(0, _T("Partition/QCN"),LVCFMT_LEFT, 90);
-  m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 280);  
+  m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 280);
   m_imglist->SetExtendedStyle(LVS_EX_CHECKBOXES);//设置控件有勾选功能
 
   if (m_pack_img) {
@@ -734,8 +738,11 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
       ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
 
       long sn = usb_host_sn(pDevInf->dbcc_name);
-      sn = get_adb_composite_device_sn(sn);
-      UsbWorkData * data = FindUsbWorkData(sn);
+      long cd_sn, cd_sn_port;
+      get_adb_composite_device_sn(sn, &cd_sn, &cd_sn_port);
+      if (sn == cd_sn && cd_sn_port == 0)
+        cd_sn_port = usb_host_sn_port(pDevInf->dbcc_name);
+      UsbWorkData * data = FindUsbWorkData(cd_sn, cd_sn_port);
       UINT stat;
 
       if (data == NULL) {
@@ -751,7 +758,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         if (data->work != NULL)
             data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
 
-        KillTimer(data->usb_sn);
+        KillTimer((UINT_PTR)data);
         usb_close(data->usb);
       } else if (stat == USB_STAT_FINISH) {
          if (!m_fix_port_map) {
@@ -845,13 +852,15 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 
 /*nIDEvent is the usb sn*/
 void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
-  UsbWorkData * data = FindUsbWorkData(nIDEvent);
-  WARN("PORT %d switch device timeout", nIDEvent);
+  //UsbWorkData * data = FindUsbWorkData(nIDEvent);
+  UsbWorkData * data = (UsbWorkData *)nIDEvent;
 
   if (data == NULL) {
-    ERROR("PORT %d switch device timeout", nIDEvent);
+    ERROR("USB %p switch device timeout", nIDEvent);
     return ;
   }
+
+  WARN("PORT %d switch device timeout", data->usb_sn, data->usb_sn_port);
 
   if (data->stat = USB_STAT_SWITCH) {
     remove_switch_device(nIDEvent);
@@ -862,7 +871,7 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
   }
 
   CleanUsbWorkData(data);
-  KillTimer(data->usb_sn);
+  KillTimer((UINT_PTR)data);
 }
 
 
@@ -1023,7 +1032,7 @@ UINT CmdmfastbootDlg::adb_sw_version_cmp(adbhost& adb, UsbWorkData* data){
 
 UINT CmdmfastbootDlg::sw_version_parse(UsbWorkData* data,PCCH key, PCCH value) {
    PWCHAR a5_partition[] = {L"boot", L"system", L"userdata", L"aboot", L"recovery", L"recoveryfs"};
-   PWCHAR q6_partition[] = {L"dsp1", L"dsp2", L"dsp3", L"mibib", L"sbl2", L"rpm", 
+   PWCHAR q6_partition[] = {L"dsp1", L"dsp2", L"dsp3", L"mibib", L"sbl2", L"rpm",
 							L"adsp", L"qdsp", L"mba", L"tz", L"sdi", L"sbl"};
    PWCHAR *partition;
    int count,i;
@@ -1096,9 +1105,10 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
   status = usb_status( handle);
 
   if (usb_port_dummy_sn(handle) == data->usb_sn)
-    snprintf(title, 32, "Port %X", data->usb_sn);
+    snprintf(title, 32, "Port %X (%d)", data->usb_sn, data->usb_sn_port);
   else
-    snprintf(title, 32, "Port %X<=>%X", data->usb_sn, usb_port_dummy_sn(handle));
+    snprintf(title, 32, "Port %X (%d)<=>%X", data->usb_sn, data->usb_sn_port,
+                    usb_port_dummy_sn(handle));
 
   ui_text_msg(data, TITLE, title);
 
@@ -1218,7 +1228,9 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
        handle != NULL ;
        handle = usb_handle_next(handle)) {
     if (!usb_is_work(handle)) {
-      data = GetUsbWorkData(usb_port_address(handle), m_fix_port_map);
+      data = GetUsbWorkData(usb_port_address(handle),
+        usb_port_subaddress(handle),
+        m_fix_port_map);
 
       if (data == NULL)
         return FALSE;
@@ -1231,11 +1243,10 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
       //AfxBeginThread(usb_work, data);
       //CDownload* pDl = new CDownload(usb_work, data, m_image);
       //m_dlWorkerPool.QueueRequest( (CDlWorker::RequestType) pDl );
-      return TRUE;
     }
   }
 
-  return FALSE;
+  return TRUE;
 }
 
 
@@ -1313,7 +1324,7 @@ void CmdmfastbootDlg::SetUpAdbDevice(
     }
   }
 
-  dump_adb_device();
+  //dump_adb_device();
 
   if ( pspDevInfoData ) {
     HeapFree(GetProcessHeap(), 0, pspDevInfoData);
@@ -1694,26 +1705,26 @@ void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 	CString strPartitionName;
 	bool bSelected = false;
 	bool bSelectStatChange = false;
-	if((pNMLV->uOldState & INDEXTOSTATEIMAGEMASK(1)) /* old state : unchecked */ 
-		&& (pNMLV->uNewState & INDEXTOSTATEIMAGEMASK(2)) /* new state : checked */ 
-		) 
-	{ 
+	if((pNMLV->uOldState & INDEXTOSTATEIMAGEMASK(1)) /* old state : unchecked */
+		&& (pNMLV->uNewState & INDEXTOSTATEIMAGEMASK(2)) /* new state : checked */
+		)
+	{
 		bSelectStatChange = true;
 		bSelected = true;
-		TRACE("Item %d is checked\n", pNMLV->iItem); 
-	} 
-	else if((pNMLV->uOldState & INDEXTOSTATEIMAGEMASK(2)) /* old state : checked */ 
-		&& (pNMLV->uNewState & INDEXTOSTATEIMAGEMASK(1)) /* new state : unchecked */ 
-		) 
-	{ 
+		TRACE("Item %d is checked\n", pNMLV->iItem);
+	}
+	else if((pNMLV->uOldState & INDEXTOSTATEIMAGEMASK(2)) /* old state : checked */
+		&& (pNMLV->uNewState & INDEXTOSTATEIMAGEMASK(1)) /* new state : unchecked */
+		)
+	{
 		bSelectStatChange = true;
 		bSelected = false;
-		TRACE("Item %d is unchecked\n", pNMLV->iItem); 
-	} 
-	else 
-	{ 
-		TRACE("Item %d does't change the check-status\n", pNMLV->iItem); 
-	} 
+		TRACE("Item %d is unchecked\n", pNMLV->iItem);
+	}
+	else
+	{
+		TRACE("Item %d does't change the check-status\n", pNMLV->iItem);
+	}
 
 	if (bSelectStatChange)
 	{

@@ -856,16 +856,18 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
 		if (bIsBreak) {
 			break;
 		}
-		
+
     }
 
 	if (bIsBreak)
 	{
-		port_text_msg(hWnd, data, "download breaked. total time: %.3fs\n", (now() - start));
+		port_text_msg(hWnd, data, "download breaked. total time: %.3fs\n",
+          (now() - start) / MILLS_SECONDS);
 	}
 	else
 	{
-		port_text_msg(hWnd, data, "finished. total time: %.3fs\n", (now() - start));
+		port_text_msg(hWnd, data, "finished. total time: %.3fs\n",
+          (now() - start) / MILLS_SECONDS);
 	}
 }
 

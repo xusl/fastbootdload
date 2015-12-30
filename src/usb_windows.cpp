@@ -57,6 +57,7 @@ struct usb_handle {
   usb_dev_t status;
   BOOL work;
   long usb_sn;
+  long usb_sn_port;
   long dummy_sn;
 
   /// Mask for determining when to use zero length packets
@@ -68,6 +69,7 @@ typedef struct adb_device_t {
    adb_device_t *next;
    long adb_sn;  // adb device serial number that allocate by Windows.
    long cd_sn;    // serial number of composite device which adb device in.
+   long cd_sn_port;
 }adb_device;
 
 typedef struct dev_switch_t {
@@ -144,10 +146,10 @@ void adb_usb_init( void )
 }
 
 
-adb_device_t* is_adb_device_exist(long cd_sn, long adb_sn) {
+adb_device_t* is_adb_device_exist(long cd_sn, long cd_sn_port, long adb_sn) {
   adb_device_t* adb;
   for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-    if (adb->cd_sn == cd_sn && adb->adb_sn == adb_sn) {
+    if (adb->cd_sn == cd_sn && adb->adb_sn == adb_sn && adb->cd_sn_port == cd_sn_port) {
       return adb;
     }
   }
@@ -167,7 +169,7 @@ void build_port_map(CListCtrl *  port_list) {
     port_list->DeleteAllItems();
 
   for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-    _snwprintf(compsite,63, _T("0x%X"), adb->cd_sn);
+    _snwprintf(compsite,63, _T("0x%X (%d)"), adb->cd_sn, adb->cd_sn_port);
     _snwprintf(adb_sn, 63,_T("0x%X"), adb->adb_sn);
     port_list->InsertItem(item,compsite);
 port_list->SetItemText(item++,1,adb_sn);
@@ -185,11 +187,15 @@ void dump_adb_device(void) {
   INFO("End dump host installed adb device driver\n=================");
 }
 
-long get_adb_composite_device_sn(long adb_sn) {
+long get_adb_composite_device_sn(long adb_sn, long *cd_sn, long *cd_sn_port) {
   adb_device_t* adb;
+  *cd_sn = adb_sn;
+  *cd_sn_port = 0;
   for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
     if (adb->adb_sn == adb_sn) {
-        INFO("adb_sn 0x%x convert composite sn 0x%x", adb_sn, adb->cd_sn);
+      INFO("adb_sn 0x%x convert composite sn 0x%x(%d) ", adb_sn, adb->cd_sn, adb->cd_sn_port);
+      *cd_sn = adb->cd_sn;
+      *cd_sn_port = adb->cd_sn_port;
       return adb->cd_sn;
     }
   }
@@ -234,7 +240,7 @@ long extract_serial_number(wchar_t * sn, wchar_t **ppstart =NULL, wchar_t **ppen
 // with 6&29f04a5a&0. And adb interface's host number prefix with 6&29f04a5a&0. Then,
 // fastboot host number contain 10CD67F3.
 int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
-  long cd_sn, adb_sn;
+  long cd_sn, adb_sn, cd_sn_port=0;
 
   if (ccgp == NULL || parentId == NULL) {
     ERROR("null parameter");
@@ -244,6 +250,12 @@ int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
   size_t len = wcslen (ccgp);
   if(wcslen (ccgp) < 22)
     return -1;
+
+  wchar_t* ccgp_last_begin = ccgp + wcslen (ccgp) - 1;
+  wchar_t* ccgp_last_end = ccgp_last_begin + 1;
+  if (*(ccgp_last_begin - 1) == L'&' && *(ccgp_last_begin - 3) == L'&')
+    cd_sn_port = wcstol(ccgp_last_begin , &ccgp_last_end, 16);
+
   cd_sn = extract_serial_number(ccgp + 22);
   adb_sn = extract_serial_number(parentId);
 
@@ -252,7 +264,7 @@ int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
     return -1;
   }
 
-  if (is_adb_device_exist(cd_sn, adb_sn) == NULL) {
+  if (is_adb_device_exist(cd_sn, cd_sn_port, adb_sn) == NULL) {
     adb_device_t* adb = (adb_device_t*)malloc(sizeof(adb_device_t));
 
     if (adb == NULL) {
@@ -261,14 +273,16 @@ int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
     }
     adb->adb_sn = adb_sn;
     adb->cd_sn = cd_sn;
+    adb->cd_sn_port = cd_sn_port;
 
     adb->next = &adbdev_list;
     adb->prev = adbdev_list.prev;
     adb->prev->next = adb;
     adb->next->prev = adb;
+    INFO("Adb device 0x%x 0x%x(%d)", adb_sn, cd_sn, cd_sn_port);
   } else {
-  DEBUG("ADB_DEVICE has already exist.");
-    }
+    DEBUG("ADB_DEVICE has already exist.");
+  }
   return 0;
 }
 
@@ -312,6 +326,23 @@ long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
   return wcstol(snb, &sne, 16);
 }
 
+long usb_host_sn_port(const wchar_t* dev_name) {
+     wchar_t* begin , *end;
+    if (dev_name == NULL)
+        return 0;
+
+      begin = ( wchar_t*)wcsrchr(dev_name , L'&');
+
+        if (begin == NULL )
+            return 0;
+
+        begin ++;
+          end = begin + 1;
+  if (*(begin + 1) == L'#' && *(begin - 3) == L'&')
+    return wcstol(begin , &end, 16);
+
+  return 0;
+}
 
 int usb_switch_device(usb_handle* handle) {
   dev_switch_t* dev = (dev_switch_t*)malloc(sizeof(dev_switch_t));
@@ -777,6 +808,16 @@ long usb_port_address(usb_handle* handle) {
   return handle->usb_sn;
 }
 
+long usb_port_subaddress(usb_handle* handle) {
+  if (NULL == handle) {
+    SetLastError(ERROR_INVALID_HANDLE);
+    errno = ERROR_INVALID_HANDLE;
+    return ~1L;
+  }
+
+  return handle->usb_sn_port;
+}
+
 
 long usb_port_dummy_sn(usb_handle* handle) {
   return handle->dummy_sn;
@@ -799,8 +840,13 @@ int recognized_device(usb_handle* handle) {
   long sn = usb_host_sn(handle->interface_name, NULL);
   if (sn != 0) {
     handle->dummy_sn = sn;
-    handle->usb_sn = get_adb_composite_device_sn(sn);
-    DEBUG("%S serial number %x", handle->interface_name, sn);
+    get_adb_composite_device_sn(sn, &handle->usb_sn, &handle->usb_sn_port);
+    INFO("recognized_device %S serial number 0x%x => 0x%x (%d)",
+        handle->interface_name, sn, handle->usb_sn, handle->usb_sn_port);
+    //it should be fastboot
+    if (sn == handle->usb_sn) {
+        handle->usb_sn_port = usb_host_sn_port(handle->interface_name);
+    }
   }  else {
     //if we do not support multiple, sn is not from host allocation.
     // todo:: add a judge?
@@ -922,7 +968,7 @@ usb_handle* usb_handle_enum_init(void) {
 }
 
 usb_handle* usb_handle_next(usb_handle* usb) {
-    if (usb == NULL || usb == &handle_list)
+    if (usb == NULL || usb->next == &handle_list || usb == &handle_list)
         return NULL;
     return usb->next;
 }
