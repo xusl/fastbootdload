@@ -597,7 +597,6 @@ UINT fastboot::port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
     _vsnprintf(buffer, sizeof(buffer), fmt, ap);
     va_end(ap);
 
-
     UIInfo* info = new UIInfo();
 
     info->infoType = PROMPT_TEXT;
@@ -605,6 +604,9 @@ UINT fastboot::port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
     hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
                   (WPARAM)info,
                   (LPARAM)data);
+	UsbWorkData* wd = (UsbWorkData*) data;
+	INFO("Device 0x%x(%d): %s", wd->usb_sn, wd->usb_sn_port, buffer);
+
     return 0;
 }
 
