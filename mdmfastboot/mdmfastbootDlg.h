@@ -77,6 +77,7 @@ public:
 protected:
 	HICON m_hIcon;
   BOOL m_bInit;
+  BOOL m_UpdateDownloadFlag;
   volatile BOOL m_bWork;
   unsigned int m_updated_number;
 
@@ -125,7 +126,7 @@ public:
   BOOL AdbUsbHandler(BOOL update_device);
   BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);
-  BOOL UpdatePackageInfo(void);
+  BOOL UpdatePackageInfo(BOOL update = TRUE);
 	void SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
   afx_msg void OnTimer(UINT_PTR nIDEvent);

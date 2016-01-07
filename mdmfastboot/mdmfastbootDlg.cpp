@@ -340,15 +340,18 @@ UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(long usb_sn, long usb_sn_port) {
   return NULL;
 }
 
-BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
+BOOL CmdmfastbootDlg::UpdatePackageInfo(BOOL update) {
   const wchar_t * qcn = m_image->get_package_qcn_path();
   const FlashImageInfo* img = m_image->image_enum_init();
   int item = 0;
+
+  m_UpdateDownloadFlag = update;
+
   m_imglist->DeleteAllItems();
   for(;img != NULL; ) {
     m_imglist->InsertItem(item,img->partition);
     m_imglist->SetItemText(item,1,GetFileNameFromFullPath(img->lpath));
-	m_imglist->SetCheck(item, img->need_download);
+
     item ++;
     img = m_image->image_enum_next(img);
   }
@@ -363,6 +366,18 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
       m_imglist->SetItemText(item,1,qcn);
       CloseHandle(file);
     }
+  }
+  img = m_image->image_enum_init();
+
+  for(;img != NULL; )
+  {
+      for(item = 0; m_imglist->GetItemCount()> item; item++) {
+      CString strPartitionName = m_imglist->GetItemText(item, 0);
+        if ( strPartitionName == img->partition) {
+	        m_imglist->SetCheck(item, img->need_download);
+        }
+      }
+	  img = m_image->image_enum_next(img);
   }
 
   m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
@@ -384,6 +399,7 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(void) {
 	  GetMenu()->GetSubMenu(0)->CheckMenuItem(0,MF_BYPOSITION|MF_UNCHECKED);
   }
   UpdateData(FALSE);
+  m_UpdateDownloadFlag = TRUE;
   return TRUE;
 }
 
@@ -591,6 +607,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   SetUpAdbDevice(NULL, 0);
 
   m_bInit = TRUE;
+  m_UpdateDownloadFlag = TRUE;
   ShowWindow(SW_MAXIMIZE);
 
 #if 0
@@ -606,7 +623,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   m_imglist = ((CListCtrl*)GetDlgItem(IDC_IMAGE_LIST));
   m_imglist->InsertColumn(0, _T("Partition/QCN"),LVCFMT_LEFT, 90);
   m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 280);
-  m_imglist->SetExtendedStyle(LVS_EX_CHECKBOXES);//设置控件有勾选功能
+  m_imglist->SetExtendedStyle(m_imglist->GetExtendedStyle() |LVS_EX_CHECKBOXES);//设置控件有勾选功能
 
   if (m_pack_img) {
     GetDlgItem(IDC_BTN_BROWSE)->ShowWindow(SW_HIDE);
@@ -614,7 +631,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
     GetDlgItem(IDC_STATIC_PKG)->ShowWindow(SW_HIDE);
   }
   m_PackagePath = m_image->get_package_dir();
-  UpdatePackageInfo();
+  UpdatePackageInfo(FALSE);
 
   //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回87,因为构造函数中m_hWnd还没被初始化为有效值.
   RegisterAdbDeviceNotification();
@@ -1705,13 +1722,17 @@ void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 	CString strPartitionName;
 	bool bSelected = false;
 	bool bSelectStatChange = false;
+
+    if (!m_UpdateDownloadFlag)
+        return;
+
 	if((pNMLV->uOldState & INDEXTOSTATEIMAGEMASK(1)) /* old state : unchecked */
 		&& (pNMLV->uNewState & INDEXTOSTATEIMAGEMASK(2)) /* new state : checked */
 		)
 	{
 		bSelectStatChange = true;
 		bSelected = true;
-		TRACE("Item %d is checked\n", pNMLV->iItem);
+		ERROR("Item %d is checked\n", pNMLV->iItem);
 	}
 	else if((pNMLV->uOldState & INDEXTOSTATEIMAGEMASK(2)) /* old state : checked */
 		&& (pNMLV->uNewState & INDEXTOSTATEIMAGEMASK(1)) /* new state : unchecked */
@@ -1719,11 +1740,11 @@ void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 	{
 		bSelectStatChange = true;
 		bSelected = false;
-		TRACE("Item %d is unchecked\n", pNMLV->iItem);
+		ERROR("Item %d is unchecked\n", pNMLV->iItem);
 	}
 	else
 	{
-		TRACE("Item %d does't change the check-status\n", pNMLV->iItem);
+		ERROR("Item %d does't change the check-status\n", pNMLV->iItem);
 	}
 
 	if (bSelectStatChange)
