@@ -609,7 +609,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   m_bInit = TRUE;
   m_UpdateDownloadFlag = TRUE;
   ShowWindow(SW_MAXIMIZE);
-
+::SetWindowLong(m_hWnd,GWL_STYLE,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);
 #if 0
   HRESULT hr = m_dlWorkerPool.Initialize(NULL, THREADPOOL_SIZE);
   m_dlWorkerPool.SetTimeout(30 * 1000);
@@ -1398,13 +1398,16 @@ void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet) {
 void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
   int dx, dy, dw, dh;
-
+  //Remove for overland window issue by zhanghao 20160112
+  /*
   if (m_nPort > 1 && (800 > cx || 800 > cy))
   {
     return;
   } else if (m_nPort == 1 && ( 500 > cx || 400 > cy)) {
+	  INFO("x=%s  ", "112299");
     return;
-  }
+  }*/
+  //end to remove.
   CDialog::OnSize(nType, cx, cy);
 
   if (m_bInit) {
@@ -1446,9 +1449,9 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
     } else {
       dx = rect.right + 8;
       dy = cy - 90;
-      SetDlgItemPos(IDC_BTN_STOP, (cx + 800) /2, dy);
-      SetDlgItemPos(IDCANCEL, (cx + 1000 ) /2, dy);
-      SetDlgItemPos(IDC_BTN_START, (cx + 500) /2, dy);
+      SetDlgItemPos(IDC_BTN_STOP, (cx + 800) /2-200, dy);
+      SetDlgItemPos(IDCANCEL, (cx + 1000 ) /2-200, dy);
+      SetDlgItemPos(IDC_BTN_START, (cx + 500) /2-200, dy);
       //SetDlgItemPos(IDC_SETTING, (cx +300) /2, cy - 60);
       SetDlgItemPos(IDC_BTN_BROWSE, (cx -120) /2, dy);
       SetDlgItemPos(IDC_EDIT_PACKAGE_PATH, 100,dy);
@@ -1459,6 +1462,7 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
       if (m_pack_img == FALSE) {
         m_SetDlg.SetWindowPos(NULL, rect.left, dy, 280, 220, 0);
       }
+	  m_SetDlg.ShowWindow(SW_HIDE);   //hide set dialog by zhanghao 20160112
 
       dy = 5;
       dw = cx - dx - 10;
@@ -1469,8 +1473,8 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
   }
   //Invalidate(TRUE);
 }
-
-void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
+//Remove by zhang hao 20160112
+/*void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {
   if (m_nPort > 1) {
     lpMMI->ptMinTrackSize.x   = 800 ;
@@ -1494,7 +1498,7 @@ void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
   }
   CDialog::OnGetMinMaxInfo(lpMMI);
 }
-
+*/
 void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 {
 #if 0

@@ -120,7 +120,7 @@ public:
 	CString m_LinuxVer;
 	CString m_PackagePath;
 	afx_msg void OnSize(UINT nType, int cx, int cy);
-	afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
+	//afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 
 	BOOL RegisterAdbDeviceNotification(void);
   BOOL AdbUsbHandler(BOOL update_device);
