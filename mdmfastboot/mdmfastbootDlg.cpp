@@ -1048,9 +1048,8 @@ UINT CmdmfastbootDlg::adb_sw_version_cmp(adbhost& adb, UsbWorkData* data){
 }
 
 UINT CmdmfastbootDlg::sw_version_parse(UsbWorkData* data,PCCH key, PCCH value) {
-   PWCHAR a5_partition[] = {L"boot", L"system", L"userdata", L"aboot", L"recovery", L"recoveryfs"};
-   PWCHAR q6_partition[] = {L"dsp1", L"dsp2", L"dsp3", L"mibib", L"sbl2", L"rpm",
-							L"adsp", L"qdsp", L"mba", L"tz", L"sdi", L"sbl"};
+   PWCHAR a5_partition[] = {L"boot", L"system", L"modem", L"aboot", L"jrdresource", L"rpm",L"efs2",L"cdrom",L"tz",L"sbl"};
+   PWCHAR q6_partition[] = {L"dsp1", L"dsp2", L"dsp3", L"mibib", L"sbl2", L"adsp", L"qdsp", L"mba",  L"sdi"};
    PWCHAR *partition;
    int count,i;
   // int index;
