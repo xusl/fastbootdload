@@ -132,6 +132,13 @@ extern CLog* g_pLogInstance;
 #define ERROR(fmt, ...)			g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_ERROR, "ERR", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
 #define CRITICAL(fmt, ...)		g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_CRITICAL, "CRT", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
 #define MEMDUMP(fmt, ...)  g_pLogInstance->WriteLog(TRACE_TAG,LOG_MASK_MEMDUMP, "MDMP", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
+
+#define LOGD DEBUG
+#define LOGE ERROR
+#define LOGW WARN
+#define LOGI INFO
+#define ERR  ERROR
+#define DBGD DEBUG
 #else // !FEATURE_LOG_SYS
 #define DEBUG(fmt, ...)
 #define INFO(fmt, ...)

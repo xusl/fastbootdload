@@ -250,6 +250,14 @@
   <ItemGroup>
     <ClCompile Include="..\src\adb_auth_host.cpp" />
     <ClCompile Include="..\src\adbhost.cpp" />
+    <ClCompile Include="..\src\custdata.cpp" />
+    <ClCompile Include="..\src\diagcmd.cpp" />
+    <ClCompile Include="..\src\dlprg.cpp" />
+    <ClCompile Include="..\src\hostdl.cpp" />
+    <ClCompile Include="..\src\jrddiagcmd.cpp" />
+    <ClCompile Include="..\src\pkt.cpp" />
+    <ClCompile Include="..\src\saharacmd.cpp" />
+    <ClCompile Include="..\src\serialport.cpp" />
     <ClCompile Include="fastbootflash.cpp" />
     <ClCompile Include="..\src\list.cpp" />
     <ClCompile Include="..\src\log.cpp" />
@@ -270,6 +278,7 @@
     <ClCompile Include="..\src\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\src\serialport\serialport.h" />
     <ClInclude Include="DlWorker.h" />
     <ClInclude Include="fastbootflash.h" />
     <ClInclude Include="mdmfastboot.h" />

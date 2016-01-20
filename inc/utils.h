@@ -39,6 +39,10 @@ typedef int socklen_t;
 #define snprintf _snprintf
 #endif
 
+#define SLEEP(a)  {                         \
+                    Sleep(a);               \
+                  }
+
 #define OS_PATH_SEPARATOR '\\'
 #define OS_PATH_SEPARATOR_STR "\\"
 
