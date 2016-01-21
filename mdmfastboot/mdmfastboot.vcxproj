@@ -250,13 +250,16 @@
   <ItemGroup>
     <ClCompile Include="..\src\adb_auth_host.cpp" />
     <ClCompile Include="..\src\adbhost.cpp" />
+    <ClCompile Include="..\src\adb_dev_register.cpp" />
     <ClCompile Include="..\src\custdata.cpp" />
+    <ClCompile Include="..\src\device.cpp" />
     <ClCompile Include="..\src\diagcmd.cpp" />
     <ClCompile Include="..\src\dlprg.cpp" />
     <ClCompile Include="..\src\hostdl.cpp" />
     <ClCompile Include="..\src\jrddiagcmd.cpp" />
     <ClCompile Include="..\src\pkt.cpp" />
     <ClCompile Include="..\src\saharacmd.cpp" />
+    <ClCompile Include="..\src\scsicmd.cpp" />
     <ClCompile Include="..\src\serialport.cpp" />
     <ClCompile Include="fastbootflash.cpp" />
     <ClCompile Include="..\src\list.cpp" />

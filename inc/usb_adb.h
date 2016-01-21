@@ -1,6 +1,8 @@
 #ifndef _USB_ADB_H
 #define _USB_ADB_H
 
+#include "device.h"
+
 #define MAX_PAYLOAD 4096
 
 #define A_SYNC 0x434e5953
@@ -23,7 +25,8 @@
 
 #define ADB_CLASS              0xff
 #define ADB_SUBCLASS           0x42
-#define ADB_PROTOCOL           0x1
+
+#define ADB_PROTOCOL           0x01
 #define FB_PROTOCOL            0x03
 
 //fastboot operate
@@ -33,17 +36,6 @@
 #define OP_NOTICE     4
 
 typedef struct usb_handle usb_handle;
-
-typedef enum {
-    DEVICE_UNKNOW = 0,
-    //DEVICE_PLUGIN,
-    DEVICE_CHECK,//ADB,
-    //DEVICE_SWITCH,
-    DEVICE_FLASH,//FASTBOOT,
-    DEVICE_CONFIGURE,
-    DEVICE_REMOVE,
-    DEVICE_MAX
-}usb_dev_t;
 
 void adb_usb_init(void);
 
@@ -67,8 +59,7 @@ void usb_set_work(usb_handle* usb, BOOL bwork);
 long usb_port_address(usb_handle* handle);
 long usb_port_subaddress(usb_handle* handle);
 long usb_port_dummy_sn(usb_handle* handle);
-long usb_host_sn(const wchar_t* dev_name, wchar_t** psn = NULL);
-long usb_host_sn_port(const wchar_t* dev_name) ;
+
 long get_adb_composite_device_sn(long adb_sn, long *cd_sn, long *cd_sn_port);
 int add_adb_device(wchar_t *ccgp, wchar_t *parentId);
 void dump_adb_device(void);

@@ -2,12 +2,97 @@
 
 #include "adb_dev_register.h"
 #include "comdef.h"
-#include "Psapi.h"
 #include "log.h"
 
 #pragma	 comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")
-#pragma comment(lib, "Psapi.lib")
+
+//\\?\usbstor#disk&ven_onetouch&prod_link4&rev_2.31#6&21c8898b&1&0123456789abcdef&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
+//For id , it is "6&21c8898b&1&0123456789abcdef&0".
+//"6&21c8898b&1 is assigned by system, it is call parentIdPrefix, it is assigned by Windows.
+// "0123456789abcdef" is the usb serial number in usb description, report by device,
+//the last "0" is the port, assign by windows.
+CDevLabel::CDevLabel(const wchar_t * devPath, const wchar_t* usbBus, bool useBusPath) {
+    CopyDeviceDescPath(devPath, usbBus);
+    mUseBusPath = useBusPath;
+    GenEffectiveSnPort();
+}
+CDevLabel::~CDevLabel() {
+    //FREE_IF(mDevPath);
+    //FREE_IF(mBusControllerPath);
+    mEffectiveSn = ~1;
+    mEffectivePort = ~1;
+}
+
+bool CDevLabel::SetUseControllerPathFlag(bool useBus)
+{
+    mUseBusPath = useBus;
+    GenEffectiveSnPort();
+    return true;
+}
+
+void CDevLabel::CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* usbBus) {
+    if (devPath != NULL) {
+        mDevPath = _wcsdup(devPath);
+
+    if(mDevPath == NULL)
+            LOGE("strdup failed");
+    } else {
+        mDevPath = NULL;
+    }
+    if (usbBus != NULL) {
+        mBusControllerPath = wcsdup(usbBus);
+        if(mBusControllerPath == NULL)
+            LOGE("strdup failed");
+    } else {
+        mBusControllerPath = NULL;
+    }
+}
+
+const wchar_t * CDevLabel::GetEffectivePath()
+{
+    if (mUseBusPath)
+        return mBusControllerPath;
+    else
+        return mDevPath;
+}
+
+bool CDevLabel::SetEffectiveSnPort(long sn, long port)
+{
+    mEffectiveSn = sn;
+    mEffectivePort = port;
+    return true;
+}
+bool CDevLabel::GenEffectiveSnPort(void){
+    const wchar_t *effectivePath = GetEffectivePath();
+    if (effectivePath == NULL ) {
+        LOGE("Can not get effective path");
+        return false;
+    }
+    mEffectiveSn = usb_host_sn(effectivePath);
+    mEffectivePort = usb_host_sn_port(effectivePath);
+    return true;
+}
+
+bool CDevLabel::operator ==(CDevLabel & dev) {
+    const wchar_t *effectivePath = GetEffectivePath();
+    const wchar_t *effectivePath2 = dev.GetEffectivePath();
+    if (effectivePath == NULL || effectivePath2 == NULL)
+        return false;
+    return (0 == wcscmp(effectivePath, effectivePath2) );//stricmp
+}
+
+CDevLabel & CDevLabel::operator =(const CDevLabel & dev) {
+    FREE_IF(mDevPath);
+    FREE_IF(mBusControllerPath);
+    CopyDeviceDescPath(dev.mDevPath, dev.mBusControllerPath);
+    mUseBusPath = dev.mUseBusPath;
+    mEffectiveSn = dev.mEffectiveSn;
+    mEffectivePort = dev.mEffectivePort;
+    return *this;
+}
+
+
 //https://msdn.microsoft.com/en-us/library/windows/desktop/aa363432%28v=vs.85%29.aspx
 BOOL RegisterAdbDeviceNotification(IN HWND hWnd, OUT HDEVNOTIFY *phDeviceNotify) {
    //×¢²á²å°ÎÊÂ¼þ
@@ -109,8 +194,8 @@ void SetUpAdbDevice(
 //\\?\ide#diskhitachi_hds721050cla362_________________jp2oa3gh#4&32dd3bc3&0&0.0.0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
 //\\?\usbstor#disk&ven_onetouch&prod_mobilebroadband&rev_2.31#7&15b65f8e&0&0bdffe1f22df&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
 /* if ClassGuid is NULL, will enumerate also devices. */
-BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid) {
-  HDEVINFO hDevInfo = SetupDiGetClassDevs(ClassGuid,
+BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *pClsGuid) {
+  HDEVINFO hDevInfo = SetupDiGetClassDevs(pClsGuid,
                                           NULL,
                                           NULL,
                                           DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
@@ -124,7 +209,7 @@ BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid) {
   SP_DEVICE_INTERFACE_DATA ifcData;
   ifcData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
 
-  for (int i = 0; SetupDiEnumDeviceInterfaces(hDevInfo, NULL, ClassGuid, i, &ifcData); ++ i) {
+  for (int i = 0; SetupDiEnumDeviceInterfaces(hDevInfo, NULL, pClsGuid, i, &ifcData); ++ i) {
     DWORD dwDetDataSize = 0;
     SP_DEVINFO_DATA devdata = {sizeof(SP_DEVINFO_DATA)};
 
@@ -188,47 +273,93 @@ BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid) {
   return TRUE;
 }
 
-DWORD FindProcess(wchar_t *strProcessName, CString &AppPath)
+//SERVICE : L"disk", L"usbccgp"
+BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service, std::vector<CDevLabel>& labels)
 {
-	DWORD aProcesses[1024], cbNeeded, cbMNeeded;
-	HMODULE hMods[1024];
-	HANDLE hProcess;
-	wchar_t szProcessName[MAX_PATH];
+    // if we are adding device, we only need present devices
+    // otherwise, we need all devices
+    HDEVINFO hDevInfo = INVALID_HANDLE_VALUE;
+    long lResult;
+    if(pClsGuid == NULL || service == NULL)
+        return FALSE;
 
-	if ( !EnumProcesses( aProcesses, sizeof(aProcesses), &cbNeeded ) )  return 0;
-	for(int i=0; i< (int) (cbNeeded / sizeof(DWORD)); i++)
-	{
-		hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, aProcesses[i]);
-		EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbMNeeded);
-		GetModuleFileNameEx( hProcess, hMods[0], szProcessName,sizeof(szProcessName));
+    hDevInfo = SetupDiGetClassDevs(pClsGuid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
 
-		if(wcsstr(szProcessName, strProcessName))
-		{
-			AppPath = szProcessName;
-			return(aProcesses[i]);
-		}
-	}
-	return 0;
-}
+    if( INVALID_HANDLE_VALUE == hDevInfo )  {
+        LOGE("SetupDiGetClassDevs: %S", _com_error(GetLastError()).ErrorMessage());
+        return FALSE;
+    }
 
-BOOL StopAdbServer(){
-	int iTemp = 0;
-	DWORD adbProcID;
-	CString adbPath;
-	adbProcID = FindProcess(L"adb.exe", adbPath);
-	if (0 != adbProcID)
-	{
-		//stop adb;
-		//If the function succeeds, the return value is greater than 31.
-		iTemp = WinExec(adbPath + " kill-server", SW_HIDE);
-		if (31 < iTemp)
-		{
-			return TRUE;
-		}
-		else
-		{
-			return FALSE;
-		}
-	}
-	return TRUE;
+    SP_DEVICE_INTERFACE_DATA ifcData;
+    ifcData.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+    for (int i = 0; SetupDiEnumDeviceInterfaces(hDevInfo, NULL, pClsGuid, i, &ifcData); ++ i) {
+        DWORD nSize=0;
+        SP_DEVINFO_DATA devdata = {sizeof(SP_DEVINFO_DATA)};
+
+        // Get buffer size first
+        SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, NULL, 0, &nSize, NULL);
+        if (nSize == 0) {
+            LOGE("SetupDiGetDeviceInterfaceDetail Get empty data.");
+            continue;
+        }
+
+        SP_DEVICE_INTERFACE_DETAIL_DATA *pDetData = NULL;
+        pDetData = reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA*>(new BYTE[nSize]);
+        if(NULL == pDetData) {
+            LOGE("new arrary failed. No memory.");
+            continue;
+        }
+        memset(pDetData, 0, nSize*sizeof(BYTE));
+        pDetData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+        if(!SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, pDetData,
+                                            nSize, NULL, &devdata)) {
+            LOGE("Get empty data.");
+            continue;
+        }
+
+        TCHAR buffer[_MAX_PATH] = {0};
+        TCHAR key[MAX_PATH] = {0};
+        if (!SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata, SPDRP_SERVICE,
+                                              NULL, (PBYTE)buffer, sizeof(buffer), &nSize)) {
+            LOGE("get SPDRP_SERVICE failed");
+            continue;
+        }
+        if (wcsnicmp((const wchar_t *)buffer, service, nSize/sizeof(wchar_t))) {
+            LOGE("SPDRP_SERVICE return is not '%S'.", service);
+            continue;
+        }
+
+        if (!SetupDiGetDeviceInstanceId(hDevInfo, &devdata, buffer, sizeof(buffer), &nSize)) {
+            LOGE("SetupDiGetDeviceInstanceId(): %S", _com_error(GetLastError()).ErrorMessage());
+            continue;
+        }
+        _snwprintf_s(key, MAX_PATH,L"SYSTEM\\CurrentControlSet\\Enum\\%s", buffer);
+
+        HKEY regHandle = NULL;
+        lResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE,key,0, KEY_READ, &regHandle);
+        if (lResult != ERROR_SUCCESS) {
+            LOGE("RegOpenKeyExW error code:%d",lResult);
+            continue ;
+        }
+        nSize = MAX_PATH;
+        lResult = RegQueryValueExW(regHandle, L"ParentIdPrefix", NULL, NULL,
+                                   (LPBYTE)&buffer, &nSize);
+
+        if (lResult != ERROR_SUCCESS) {
+            LOGE("RegOpenKeyExW error code:%d",lResult);
+            continue ;
+        }
+
+        //lResult = RegQueryValueExW(regHandle, L"PortName", NULL, NULL,
+        //                           (LPBYTE)&szValue, &nSize);
+
+
+        LOGW("DEV PATH %S, parentID %S", pDetData->DevicePath, buffer);
+
+        RegCloseKey(regHandle);
+        FREE_IF(pDetData);
+    }
+
+    SetupDiDestroyDeviceInfoList(hDevInfo);
+    return TRUE;
 }

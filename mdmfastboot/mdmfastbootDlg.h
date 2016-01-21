@@ -18,7 +18,8 @@
 
 #include "SettingsDlg.h"
 #include "qcnlib/QcnParser.h"
-
+#include "adb_dev_register.h"
+#include "scsicmd.h"
 enum
 {
 	// UI Messages
@@ -45,6 +46,7 @@ typedef struct UsbWorkData{
     CWinThread       *work;
     //flash_image  *img;
     usb_handle       *usb;
+    //this is the serial number for logical ui.
     int              usb_sn;
     int              usb_sn_port;
     int              stat;
@@ -55,6 +57,12 @@ typedef struct UsbWorkData{
 
 #define THREADPOOL_SIZE	4
 static const int PORT_NUM_MAX = 9;
+
+enum
+{
+  TIMER_EVT_ADBKILLED = 0,
+  TIMER_EVT_REJECTCDROM,
+};
 
 
 // CmdmfastbootDlg ¶Ô»°¿ò
@@ -122,12 +130,13 @@ public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	//afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 
-	BOOL RegisterAdbDeviceNotification(void);
+  BOOL RejectCDROM(VOID);
   BOOL AdbUsbHandler(BOOL update_device);
   BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);
   BOOL UpdatePackageInfo(BOOL update = TRUE);
-	void SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+  BOOL RemoveDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+  static void CALLBACK GeneralTimerProc(HWND hWnd,  UINT nMsg,  UINT_PTR nIDEvent,  DWORD dwTime);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
   afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnBnClickedBtnBrowse();
@@ -164,8 +173,7 @@ private:
     UINT UsbWorkStat(UsbWorkData *data);
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
     BOOL InitSettingConfig(void);
-	DWORD FindProcess(wchar_t *strProcessName, CString &AppPath);
-	BOOL UnableAdb();
+
 	void UpdatePackage();
 public:
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);

@@ -9,8 +9,6 @@
 #include "fastbootflash.h"
 #include "adbhost.h"
 #include "usb_vendors.h"
-#include "devguid.h"
-#include "Psapi.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -18,13 +16,6 @@
 
 #pragma	 comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")
-
-static const GUID usb_class_id[] = {
-	//ANDROID_USB_CLASS_ID, adb and fastboot
-	{0xf72fe0d4, 0xcbcb, 0x407d, {0x88, 0x14, 0x9e, 0xd6, 0x73, 0xd0, 0xdd, 0x6b}},
-	//usb A5DCBF10-6530-11D2-901F-00C04FB951ED  GUID_DEVINTERFACE_USB_DEVICE
-	//{0xA5DCBF10, 0x6530, 0x11D2, {0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED}},
-};
 
 static UINT usb_work(LPVOID wParam);
 MODULE_NAME CmdmfastbootDlg::m_module_name;
@@ -573,7 +564,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   CDialog::OnInitDialog();
   ::SetProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP, (HANDLE)1);//for single instance
 
-  if (!UnableAdb())
+  if (!StopAdbServer())
   {
 	  EndDialog(0);
 	  return TRUE;
@@ -604,6 +595,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
   InitSettingDlg();
   InitUsbWorkData();
+  //SetUpDevice(NULL, 0, &GUID_DEVCLASS_USB,  _T("USB"));
   SetUpAdbDevice(NULL, 0);
 
   m_bInit = TRUE;
@@ -634,11 +626,17 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   UpdatePackageInfo(FALSE);
 
   //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回87,因为构造函数中m_hWnd还没被初始化为有效值.
-  RegisterAdbDeviceNotification();
+  RegisterAdbDeviceNotification(m_hWnd);
   SetWorkStatus(m_bWork, TRUE);
   adb_usb_init();
   //SetUpAdbDevice(NULL, 0);
-  AdbUsbHandler(true);
+
+  if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
+    SetTimer(TIMER_EVT_ADBKILLED, 1000, &GeneralTimerProc);
+  } else {
+      AdbUsbHandler(true);
+      RejectCDROM();
+  }
 
   return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -692,83 +690,87 @@ HCURSOR CmdmfastbootDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-
-
-BOOL CmdmfastbootDlg::RegisterAdbDeviceNotification(void) {
-   //注册插拔事件
-   HDEVNOTIFY hDevNotify;
-
-   DEV_BROADCAST_DEVICEINTERFACE NotificationFilter;
-   ZeroMemory( &NotificationFilter, sizeof(NotificationFilter) );
-   NotificationFilter.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
-   NotificationFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
-   for(int i=0; i<sizeof(usb_class_id)/sizeof(GUID); i++)
-   {
-      NotificationFilter.dbcc_classguid = usb_class_id[i];
-      hDevNotify = RegisterDeviceNotification(this->m_hWnd,//this->GetSafeHwnd(),
-		  &NotificationFilter,
-		  DEVICE_NOTIFY_WINDOW_HANDLE);
-      if( !hDevNotify )
-      {
-    		  DEBUG("RegisterDeviceNotification failed: %d\n", GetLastError());
-         return FALSE;
-      }
-   }
-   return TRUE;
-}
-
 BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 {
-  if (dwData == 0)
-  {
-    WARN("OnDeviceChange, dwData == 0 .EventType: 0x%x", nEventType);
-    return FALSE;
-  }
-
-  DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
-  PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
-
-  DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
-        nEventType, phdr->dbch_devicetype);
-
-  if (nEventType == DBT_DEVICEARRIVAL) {
-    switch( phdr->dbch_devicetype ) {
-    case DBT_DEVTYP_DEVNODE:
-      WARN("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
-      break;
-    case DBT_DEVTYP_VOLUME:
-      {
-        /* enumerate devices and shiftdevice
-        */
-        break;
-      }
-    case DBT_DEVTYP_DEVICEINTERFACE:
-      {
-        SetUpAdbDevice(pDevInf, dwData);
-        AdbUsbHandler(true);
-        break;
-      }
+    if (dwData == 0)
+    {
+        WARN("OnDeviceChange, dwData == 0 .EventType: 0x%x", nEventType);
+        return FALSE;
     }
-  } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
-    if (phdr->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE) {
 
-      ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+    DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
+    PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
 
-      long sn = usb_host_sn(pDevInf->dbcc_name);
-      long cd_sn, cd_sn_port;
-      get_adb_composite_device_sn(sn, &cd_sn, &cd_sn_port);
-      if (sn == cd_sn && cd_sn_port == 0)
+    DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
+          nEventType, phdr->dbch_devicetype);
+
+    if (nEventType == DBT_DEVICEARRIVAL) {
+        switch( phdr->dbch_devicetype ) {
+        case DBT_DEVTYP_DEVNODE:
+            WARN("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
+            break;
+        case DBT_DEVTYP_VOLUME:
+            {
+                /* enumerate devices and shiftdevice
+                */
+                LOGI("OnDeviceChange, get DBT_DEVTYP_VOLUME");
+                SetTimer(TIMER_EVT_REJECTCDROM, 2000, &CmdmfastbootDlg::GeneralTimerProc);
+                break;
+            }
+        case DBT_DEVTYP_PORT:
+            {
+                LOGI("device arrive, DBT_DEVTYP_PORT");
+                break;
+            }
+        case DBT_DEVTYP_DEVICEINTERFACE:
+                SetUpAdbDevice(pDevInf, dwData);
+                AdbUsbHandler(true);
+                break;
+        }
+    } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
+        switch (phdr->dbch_devicetype) {
+        case DBT_DEVTYP_DEVICEINTERFACE:
+            {
+                RemoveDevice(pDevInf, dwData);
+                break;
+            }
+        case DBT_DEVTYP_VOLUME:
+            {
+                /* enumerate devices and shiftdevice
+                */
+                LOGI("OnDeviceChange, get DBT_DEVTYP_VOLUME");
+                break;
+            }
+        case DBT_DEVTYP_PORT:
+            {
+                LOGI("device arrive, DBT_DEVTYP_PORT");
+                break;
+            }
+        }
+    }
+
+    return TRUE;
+}
+
+BOOL CmdmfastbootDlg::RemoveDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam) {
+
+    ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+
+    long sn = usb_host_sn(pDevInf->dbcc_name);
+    long cd_sn, cd_sn_port;
+    get_adb_composite_device_sn(sn, &cd_sn, &cd_sn_port);
+    if (sn == cd_sn && cd_sn_port == 0)
         cd_sn_port = usb_host_sn_port(pDevInf->dbcc_name);
-      UsbWorkData * data = FindUsbWorkData(cd_sn, cd_sn_port);
-      UINT stat;
+    UsbWorkData * data = FindUsbWorkData(cd_sn, cd_sn_port);
+    UINT stat;
 
-      if (data == NULL) {
+    if (data == NULL) {
         WARN("Can not find usbworkdata for %d, schedule remove is %d", sn, m_fix_port_map);
         return FALSE;
-      }
+    }
 
-      stat = UsbWorkStat(data);
-      if (stat == USB_STAT_WORKING) {
+    stat = UsbWorkStat(data);
+    if (stat == USB_STAT_WORKING) {
         // the device is plugin off when in working, that is because some accident.
         //the accident power-off in switch is handle by the timer.
         //thread pool notify , exit
@@ -777,25 +779,22 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 
         KillTimer((UINT_PTR)data);
         usb_close(data->usb);
-      } else if (stat == USB_STAT_FINISH) {
-         if (!m_fix_port_map) {
+    } else if (stat == USB_STAT_FINISH) {
+        if (!m_fix_port_map) {
             ERROR("We do not set m_fix_port_map, "
-                "but in device remove event we can found usb work data");
+                  "but in device remove event we can found usb work data");
             return TRUE;
         }
-      } else if (stat == USB_STAT_ERROR) {
+    } else if (stat == USB_STAT_ERROR) {
         usb_close(data->usb);
-      } else {
+    } else {
         return TRUE;
-      }
-
-      CleanUsbWorkData(data);
     }
-  }
 
-  return TRUE;
+    CleanUsbWorkData(data);
+
+    return TRUE;
 }
-
 
 LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 {
@@ -891,6 +890,56 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
   KillTimer((UINT_PTR)data);
 }
 
+  BOOL CmdmfastbootDlg::RejectCDROM(VOID){
+    std::vector<CDevLabel> devicePath;
+            GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath);
+            int cdromSize = devicePath.size();
+
+            for(int i = 0; i < cdromSize; i++)
+            {
+                CDevLabel dev = devicePath[i];
+                dev.SetUseControllerPathFlag(true);
+                CString path = dev.GetEffectivePath();
+                if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
+                    LOG("Fix DISK %S:", path);
+                    continue;
+                }
+                path.MakeUpper();
+                if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1)
+                    LOG("USB Stor %S is not alcatel",path);
+                else {
+                    CSCSICmd scsi = CSCSICmd();
+                    LOG("do switch device %S", path);
+                    scsi.SwitchToDebugDevice(path);
+                    //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
+                    break;
+                }
+            }
+            devicePath.clear();
+            return TRUE;
+  }
+ void CALLBACK CmdmfastbootDlg::GeneralTimerProc(
+   HWND hWnd,      // handle of CWnd that called SetTimer
+   UINT nMsg,      // WM_TIMER
+   UINT_PTR nIDEvent,   // timer identification
+   DWORD dwTime    // system time
+)
+{
+    CmdmfastbootDlg  *dlg = (CmdmfastbootDlg*)hWnd ;
+    switch(nIDEvent) {
+    case TIMER_EVT_ADBKILLED:
+        dlg->AdbUsbHandler(true);
+        dlg->RejectCDROM();
+        break;
+    case TIMER_EVT_REJECTCDROM:
+        dlg->RejectCDROM();
+        break;
+
+    default:
+        break;
+    }
+    // MessageBeep(0x00000030L);   // Windows question sound.
+}
 
 UINT CmdmfastbootDlg::ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg) {
   UIInfo* info = new UIInfo();
@@ -963,19 +1012,19 @@ UINT CmdmfastbootDlg::adb_update_NV(adbhost& adb, UsbWorkData* data,  flash_imag
 }
 
 UINT CmdmfastbootDlg::adb_write_IMEI(adbhost& adb, UsbWorkData* data) {
-  PCHAR resp = NULL;
-  int  resp_len;
-  int ret;
-  ret = adb.shell("nv write 15002 1", (void **)&resp, &resp_len);
+    PCHAR resp = NULL;
+    int  resp_len;
+    int ret;
+    ret = adb.shell("nv write 15002 1", (void **)&resp, &resp_len);
 
- FREE_IF(resp);
+    FREE_IF(resp);
 
-  //imei 15 letters.
-  adb.shell("imeiop write 860440020101686", (void **)&resp, &resp_len);
-FREE_IF(resp);
-  ret = adb.shell("nv write 15002 0", (void **)&resp, &resp_len);
-FREE_IF(resp);
-  return 0;
+    //imei 15 letters.
+    adb.shell("imeiop write 860440020101686", (void **)&resp, &resp_len);
+    FREE_IF(resp);
+    ret = adb.shell("nv write 15002 0", (void **)&resp, &resp_len);
+    FREE_IF(resp);
+    return 0;
 }
 
 //#define VERSION_CMP_TEST
@@ -1266,88 +1315,6 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
 }
 
 
-void CmdmfastbootDlg::SetUpAdbDevice(
-    PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
-{
-#if 0
-  // dbcc_name:
-  // \\?\USB#Vid_04e8&Pid_503b#0002F9A9828E0F06#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
-  // convert to  USB\Vid_04e8&Pid_503b\0002F9A9828E0F06
-  ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
-  CString szDevId = pDevInf->dbcc_name+4;
-  int idx = szDevId.ReverseFind(_T('#'));
-  ASSERT( -1 != idx );
-  szDevId.Truncate(idx);
-  szDevId.Replace(_T('#'), _T('\\'));
-  szDevId.MakeUpper();
-
-  CString szClass;
-  idx = szDevId.Find(_T('\\'));
-  ASSERT(-1 != idx );
-  szClass = szDevId.Left(idx);
-  DEBUG(L"szClass %S", szClass.GetString());
-#endif
-  // if we are adding device, we only need present devices
-  // otherwise, we need all devices
-  DWORD dwFlag = (DBT_DEVICEARRIVAL != wParam
-                  ? DIGCF_ALLCLASSES : (DIGCF_ALLCLASSES | DIGCF_PRESENT));
-  //HDEVINFO hDevInfo = SetupDiGetClassDevs(NULL, szClass, NULL, dwFlag);
-  HDEVINFO hDevInfo = SetupDiGetClassDevs(&GUID_DEVCLASS_USB,  L"USB",NULL, dwFlag);
-  long lResult;
-  CRegKey reg;
-  WCHAR key[MAX_PATH];
-  TCHAR value[MAX_PATH];
-
-  if( INVALID_HANDLE_VALUE == hDevInfo )  {
-    AfxMessageBox(CString("SetupDiGetClassDevs(): ")
-                  + _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);
-    return;
-  }
-
-  SP_DEVINFO_DATA* pspDevInfoData =
-    (SP_DEVINFO_DATA*)HeapAlloc(GetProcessHeap(), 0, sizeof(SP_DEVINFO_DATA));
-  pspDevInfoData->cbSize = sizeof(SP_DEVINFO_DATA);
-  for(int i=0; SetupDiEnumDeviceInfo(hDevInfo,i,pspDevInfoData); i++)  {
-    DWORD DataT ;
-    DWORD nSize=0;
-    BYTE srv[MAX_PATH];
-    TCHAR buf[MAX_PATH];
-
-    if ( !SetupDiGetDeviceInstanceId(hDevInfo, pspDevInfoData, buf, sizeof(buf), &nSize) )  {
-      AfxMessageBox(CString("SetupDiGetDeviceInstanceId(): ")
-                    + _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);
-      break;
-    }
-
-    if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData, SPDRP_SERVICE,
-                                          &DataT, (PBYTE)srv, sizeof(srv), &nSize) ) {
-      //DEBUG(" %S, size %d", srv, nSize);
-      if (wcsnicmp((const wchar_t *)srv, L"usbccgp",nSize/sizeof(wchar_t))) {
-        continue;
-      }
-    }
-
-    _snwprintf_s(key, MAX_PATH,L"SYSTEM\\CurrentControlSet\\Enum\\%s", buf);
-    lResult = reg.Open(HKEY_LOCAL_MACHINE,key, KEY_READ);
-    if (lResult == ERROR_SUCCESS) {
-      nSize = MAX_PATH;
-      lResult = reg.QueryStringValue(L"ParentIdPrefix", static_cast<LPTSTR>(value), &nSize);
-
-      if (lResult == ERROR_SUCCESS ) {
-        add_adb_device(buf, value);
-      }
-      reg.Close();
-    }
-  }
-
-  //dump_adb_device();
-
-  if ( pspDevInfoData ) {
-    HeapFree(GetProcessHeap(), 0, pspDevInfoData);
-  }
-
-  SetupDiDestroyDeviceInfoList(hDevInfo);
-}
 #if 0
 void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet) {
   BOOL bResult;
@@ -1671,52 +1638,6 @@ void CmdmfastbootDlg::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureIte
 
 	CDialog::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
 	}
-
-DWORD CmdmfastbootDlg::FindProcess(wchar_t *strProcessName, CString &AppPath)
-{
-	DWORD aProcesses[1024], cbNeeded, cbMNeeded;
-	HMODULE hMods[1024];
-	HANDLE hProcess;
-	wchar_t szProcessName[MAX_PATH];
-
-	if ( !EnumProcesses( aProcesses, sizeof(aProcesses), &cbNeeded ) )  return 0;
-	for(int i=0; i< (int) (cbNeeded / sizeof(DWORD)); i++)
-	{
-		hProcess = OpenProcess(  PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, aProcesses[i]);
-		EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbMNeeded);
-		GetModuleFileNameEx( hProcess, hMods[0], szProcessName,sizeof(szProcessName));
-
-		if(wcsstr(szProcessName, strProcessName))
-		{
-			AppPath = szProcessName;
-			return(aProcesses[i]);
-		}
-	}
-	return 0;
-}
-
-BOOL CmdmfastbootDlg::UnableAdb()
-{
-	int iTemp = 0;
-	DWORD adbProcID;
-	CString adbPath;
-	adbProcID = FindProcess(L"adb.exe", adbPath);
-	if (0 != adbProcID)
-	{
-		//stop adb;
-		//If the function succeeds, the return value is greater than 31.
-		iTemp = WinExec(adbPath + " kill-server", SW_HIDE);
-		if (31 < iTemp)
-		{
-			return TRUE;
-		}
-		else
-		{
-			return FALSE;
-		}
-	}
-	return TRUE;
-}
 
 void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 {

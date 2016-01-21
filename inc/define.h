@@ -207,6 +207,7 @@ typedef enum _PORT_STATE
         PS_MAX = 0xFFFF
 }PORT_STATE;
 
+#if 0
 //version type define
 typedef enum _VERSION_TYPE
 {
@@ -217,6 +218,7 @@ typedef enum _VERSION_TYPE
     QCN_VER,
     PTS_VER
 } VERSION_TYPE;
+#endif
 
 typedef enum
 {
@@ -667,6 +669,17 @@ typedef struct _NV_ITEM_PACKET_INFO
         uint16		nvItemIndex;            //NV Index
 	uint8		itemData[128];		//NV data
 }NV_ITEM_PACKET_INFO;
+
+#if 0
+//NV item packet struct
+typedef struct _NV_ITEM_PACKET_INFO{
+	USHORT packetLen;			//Packet length, size of NV_ITEM_PACKET_INFO structure
+	USHORT packetReserve;		//reserve
+	USHORT nvItemID;			//NV ID
+	USHORT nvItemIndex;			//NV Index
+	BYTE   itemData[128];		//NV data
+}NV_ITEM_PACKET_INFO;
+#endif
 
 typedef struct
 {

@@ -52,7 +52,7 @@ struct adb_private_key {
 };
 #endif
 
-#define TRACE_TAG TRACE_AUTH
+//#define TRACE_TAG TRACE_AUTH
 
 #define ANDROID_PATH   ".android"
 #define ADB_KEY_FILE   "adbkey"

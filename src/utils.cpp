@@ -20,93 +20,116 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "Psapi.h"
+
+#pragma comment(lib, "Psapi.lib")
 #pragma comment(lib, "ws2_32.lib")
 
-char*
-buff_addc (char*  buff, char*  buffEnd, int  c)
-{
-    int  avail = buffEnd - buff;
+/*
+  // dbcc_name:
+  // \\?\USB#Vid_04e8&Pid_503b#0002F9A9828E0F06#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+  // convert to  USB\Vid_04e8&Pid_503b\0002F9A9828E0F06
+  ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+  CString szDevId = pDevInf->dbcc_name+4;
+  int idx = szDevId.ReverseFind(_T('#'));
+  ASSERT( -1 != idx );
+  szDevId.Truncate(idx);
+  szDevId.Replace(_T('#'), _T('\\'));
+  szDevId.MakeUpper();
 
-    if (avail <= 0)  /* already in overflow mode */
-        return buff;
+  CString szClass;
+  idx = szDevId.Find(_T('\\'));
+  ASSERT(-1 != idx );
+  szClass = szDevId.Left(idx);
+  DEBUG(L"szClass %S", szClass.GetString());
+*/
 
-    if (avail == 1) {  /* overflowing, the last byte is reserved for zero */
-        buff[0] = 0;
-        return buff + 1;
+//5&10cd67f3&0&4 5&10cd67f3&0
+long extract_serial_number(wchar_t * sn, wchar_t **ppstart , wchar_t **ppend) {
+  unsigned int len;
+  wchar_t *pstart, *pend;
+  if (sn == NULL) {
+    ERROR("Bad Parameter");
+    return -1;
+  }
+
+  len = wcslen (sn);
+
+  pstart = (wchar_t*)wcschr(sn, L'&');
+  if (pstart == NULL || pstart - sn >= len) {
+    //ERROR("Can not find first '&'.");
+    return -1;
+  }
+
+  pstart++;
+  pend = wcschr(pstart , L'&');
+  if (pend == NULL || pend - sn >= len) {
+    //ERROR("Can not find first '&'.");
+    return -1;
+  }
+
+  if (ppstart != NULL)
+    *ppstart = pstart;
+  if (ppend != NULL)
+    *ppend = pend;
+  return wcstol(pstart , &pend, 16);
+}
+
+// \\?\usb#vid_18d1&pid_d00d#5&10cd67f3&0&4#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b}
+// convert to
+// 10cd67f3
+long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
+  wchar_t * snb, *sne, * sn;
+
+  size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
+  if(_wcsnicmp(L"\\\\?\\usb#",dev_name,8) || len < 26 + 40) {
+    ERROR("Not invalid dev name.");
+    return 0;
+  }
+
+  snb = (wchar_t*)wcschr(dev_name + 26, L'&');
+  if (snb == NULL || snb - dev_name >= len)
+    return 0;
+
+  snb++;
+  sne = wcschr(snb , L'&');
+  if (sne == NULL || sne - dev_name >= len)
+    return 0;
+
+  len = sne - snb;
+  if (len <= 0)
+    return 0;
+
+  if (psn) {
+    sn = (wchar_t*) malloc((len + 1) * sizeof(wchar_t));
+    if (sn == NULL) {
+      ERROR("NO memory");
+    } else {
+      wcsncpy(sn, snb , len);
+      *(sn + len) = L'\0';
     }
+    *psn = sn;
+  }
 
-    buff[0] = (char) c;  /* add char and terminating zero */
-    buff[1] = 0;
-    return buff + 1;
+  return wcstol(snb, &sne, 16);
 }
 
-char*
-buff_adds (char*  buff, char*  buffEnd, const char*  s)
-{
-    int  slen = strlen(s);
+long usb_host_sn_port(const wchar_t* dev_name) {
+     wchar_t* begin , *end;
+    if (dev_name == NULL)
+        return 0;
 
-    return buff_addb(buff, buffEnd, s, slen);
-}
+      begin = ( wchar_t*)wcsrchr(dev_name , L'&');
 
-char*
-buff_addb (char*  buff, char*  buffEnd, const void*  data, int  len)
-{
-    int  avail = (buffEnd - buff);
+        if (begin == NULL )
+            return 0;
 
-    if (avail <= 0 || len <= 0)  /* already overflowing */
-        return buff;
+        begin ++;
+          end = begin + 1;
+  if (*(begin + 1) == L'#' && *(begin - 3) == L'&')
+    return wcstol(begin , &end, 16);
 
-    if (len > avail)
-        len = avail;
-
-    memcpy(buff, data, len);
-
-    buff += len;
-
-    /* ensure there is a terminating zero */
-    if (buff >= buffEnd) {  /* overflow */
-        buff[-1] = 0;
-    } else
-        buff[0] = 0;
-
-    return buff;
-}
-
-char*
-buff_add  (char*  buff, char*  buffEnd, const char*  format, ... )
-{
-    int      avail;
-
-    avail = (buffEnd - buff);
-
-    if (avail > 0) {
-        va_list  args;
-        int      nn;
-
-        va_start(args, format);
-        nn = vsnprintf( buff, avail, format, args);
-        va_end(args);
-
-        if (nn < 0) {
-            /* some C libraries return -1 in case of overflow,
-             * but they will also do that if the format spec is
-             * invalid. We assume ADB is not buggy enough to
-             * trigger that last case. */
-            nn = avail;
-        }
-        else if (nn > avail) {
-            nn = avail;
-        }
-
-        buff += nn;
-
-        /* ensure that there is a terminating zero */
-        if (buff >= buffEnd)
-            buff[-1] = 0;
-        else
-            buff[0] = 0;
-    }
-    return buff;
+  return 0;
 }
 
 
@@ -433,4 +456,137 @@ int kill_adb_server(int port )
   closesocket( s );
   _cleanup_winsock();
   return  0;
+}
+
+DWORD FindProcess(wchar_t *strProcessName, CString &AppPath)
+{
+	DWORD aProcesses[1024], cbNeeded, cbMNeeded;
+	HMODULE hMods[1024];
+	HANDLE hProcess;
+	wchar_t szProcessName[MAX_PATH];
+
+	if ( !EnumProcesses( aProcesses, sizeof(aProcesses), &cbNeeded ) )  return 0;
+	for(int i=0; i< (int) (cbNeeded / sizeof(DWORD)); i++)
+	{
+		hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, aProcesses[i]);
+		EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbMNeeded);
+		GetModuleFileNameEx( hProcess, hMods[0], szProcessName,sizeof(szProcessName));
+
+		if(wcsstr(szProcessName, strProcessName))
+		{
+			AppPath = szProcessName;
+			return(aProcesses[i]);
+		}
+	}
+	return 0;
+}
+
+BOOL StopAdbServer(){
+	int iTemp = 0;
+	DWORD adbProcID;
+	CString adbPath;
+	adbProcID = FindProcess(L"adb.exe", adbPath);
+	if (0 != adbProcID)
+	{
+		//stop adb;
+		//If the function succeeds, the return value is greater than 31.
+		iTemp = WinExec(adbPath + " kill-server", SW_HIDE);
+		if (31 < iTemp)
+		{
+			return TRUE;
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+
+char*
+buff_addc (char*  buff, char*  buffEnd, int  c)
+{
+    int  avail = buffEnd - buff;
+
+    if (avail <= 0)  /* already in overflow mode */
+        return buff;
+
+    if (avail == 1) {  /* overflowing, the last byte is reserved for zero */
+        buff[0] = 0;
+        return buff + 1;
+    }
+
+    buff[0] = (char) c;  /* add char and terminating zero */
+    buff[1] = 0;
+    return buff + 1;
+}
+
+char*
+buff_adds (char*  buff, char*  buffEnd, const char*  s)
+{
+    int  slen = strlen(s);
+
+    return buff_addb(buff, buffEnd, s, slen);
+}
+
+char*
+buff_addb (char*  buff, char*  buffEnd, const void*  data, int  len)
+{
+    int  avail = (buffEnd - buff);
+
+    if (avail <= 0 || len <= 0)  /* already overflowing */
+        return buff;
+
+    if (len > avail)
+        len = avail;
+
+    memcpy(buff, data, len);
+
+    buff += len;
+
+    /* ensure there is a terminating zero */
+    if (buff >= buffEnd) {  /* overflow */
+        buff[-1] = 0;
+    } else
+        buff[0] = 0;
+
+    return buff;
+}
+
+char*
+buff_add  (char*  buff, char*  buffEnd, const char*  format, ... )
+{
+    int      avail;
+
+    avail = (buffEnd - buff);
+
+    if (avail > 0) {
+        va_list  args;
+        int      nn;
+
+        va_start(args, format);
+        nn = vsnprintf( buff, avail, format, args);
+        va_end(args);
+
+        if (nn < 0) {
+            /* some C libraries return -1 in case of overflow,
+             * but they will also do that if the format spec is
+             * invalid. We assume ADB is not buggy enough to
+             * trigger that last case. */
+            nn = avail;
+        }
+        else if (nn > avail) {
+            nn = avail;
+        }
+
+        buff += nn;
+
+        /* ensure that there is a terminating zero */
+        if (buff >= buffEnd)
+            buff[-1] = 0;
+        else
+            buff[0] = 0;
+    }
+    return buff;
 }

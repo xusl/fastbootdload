@@ -9,11 +9,55 @@
 #include <atlutil.h>
 #include <setupapi.h>
 #include <vector>
+#include <device.h>
+
+//GUID_DEVINTERFACE_DISK
+#define SRV_DISK   _T("disk")
+//L"usbccgp"
+
+
+/*
+a usb device path in various mode:
+              interface                        composite device
+fastboot      5&10cd67f3&0&3                       N/A
+
+debug mode
+(adb device)  6&1e805b40&0&4                    5&10cd67f3&0&3
+(mass storage)    N/A                           6&1e805b40&1&0005
+(diagnostic port) 6&1e805b40&0&4                    N/A
+
+cd-rom        6&21c8898b&0123456789abcdef&1      5&10cd67f3&0&3
+*/
+class CDevLabel {
+  public:
+    CDevLabel(const wchar_t * devPath, const wchar_t* usbBus, bool useBus=true);
+    ~CDevLabel();
+
+    bool operator ==(CDevLabel & );
+    CDevLabel & operator =(const CDevLabel & );
+    const wchar_t * GetEffectivePath();
+    bool SetEffectiveSnPort(long sn, long port);
+    bool SetUseControllerPathFlag(bool useBus);
+
+  private:
+    void CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* usbBus);
+    bool GenEffectiveSnPort(void);
+
+  public:
+    wchar_t *   mDevPath;
+    wchar_t *   mBusControllerPath;
+    bool         mUseBusPath;
+    long         mEffectiveSn;
+    long         mEffectivePort;
+};
+
+
 
 BOOL RegisterAdbDeviceNotification(IN HWND hWnd, OUT HDEVNOTIFY *phDeviceNotify = NULL);
 BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid);
+BOOL GetDevLabelByGUID(CONST GUID *ClassGuid, PCWSTR service, std::vector<CDevLabel>& labels);
 VOID SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
-BOOL StopAdbServer();
+
 static const GUID usb_class_id[] = {
 	//ANDROID_USB_CLASS_ID, adb and fastboot
 	{0xf72fe0d4, 0xcbcb, 0x407d, {0x88, 0x14, 0x9e, 0xd6, 0x73, 0xd0, 0xdd, 0x6b}},

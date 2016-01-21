@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <map>
+#include "define.h"
 
 using namespace std;
 typedef unsigned char      uint8;
@@ -52,16 +53,6 @@ enum {
   STAT_EFS_Data = 0x00000002,
   STAT_LEVEL_3_MASK = 0x0000ffff,
 };
-
-//NV item packet struct
-typedef struct _NV_ITEM_PACKET_INFO{
-	USHORT packetLen;			//Packet length, size of NV_ITEM_PACKET_INFO structure
-	USHORT packetReserve;		//reserve
-	USHORT nvItemID;			//NV ID
-	USHORT nvItemIndex;			//NV Index
-	BYTE   itemData[128];		//NV data
-}NV_ITEM_PACKET_INFO;
-
 
 //add by jie.li 2012-02-21 for LTE NV>20000
 #define rest_of_stream		128

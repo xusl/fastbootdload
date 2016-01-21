@@ -25,60 +25,9 @@
 #define   TRACE_TAG  TRACE_USB
 #include "adb.h"
 #include "adbhost.h"
-//#include "fastbootflash.h"
+#include "device.h"
 #include "usb_vendors.h"
 
-
-
-/** Structure usb_handle describes our connection to the usb device via
-  AdbWinApi.dll. This structure is returned from usb_open() routine and
-  is expected in each subsequent call that is accessing the device.
-*/
-struct usb_handle {
-  /// Previous entry in the list of opened usb handles
-  usb_handle *prev;
-
-  /// Next entry in the list of opened usb handles
-  usb_handle *next;
-
-  /// Handle to USB interface
-  ADBAPIHANDLE  adb_interface;
-
-  /// Handle to USB read pipe (endpoint)
-  ADBAPIHANDLE  adb_read_pipe;
-
-  /// Handle to USB write pipe (endpoint)
-  ADBAPIHANDLE  adb_write_pipe;
-
-  /// Interface name
-  wchar_t*         interface_name;
-
-  int interface_protocol;
-  usb_dev_t status;
-  BOOL work;
-  long usb_sn;
-  long usb_sn_port;
-  long dummy_sn;
-
-  /// Mask for determining when to use zero length packets
-  unsigned zero_mask;
-};
-
-typedef struct adb_device_t {
-   adb_device_t *prev;
-   adb_device_t *next;
-   long adb_sn;  // adb device serial number that allocate by Windows.
-   long cd_sn;    // serial number of composite device which adb device in.
-   long cd_sn_port;
-}adb_device;
-
-typedef struct dev_switch_t {
-  dev_switch_t *prev;
-  dev_switch_t *next;
-    long        usb_sn;
-    usb_dev_t   status;
-    long        time;
-} dev_switch_t;
 
 /// Class ID assigned to the device by androidusb.sys
 static const GUID usb_class_id = ANDROID_USB_CLASS_ID;
@@ -101,6 +50,10 @@ static adb_device_t adbdev_list= {
     &adbdev_list,
 };
 
+static mass_storage_handle mass_storage_list = {
+    &mass_storage_list,
+    &mass_storage_list,
+};
 
 /// Locker for the list of opened usb handles
 ADB_MUTEX_DEFINE( usb_lock );
@@ -202,36 +155,6 @@ long get_adb_composite_device_sn(long adb_sn, long *cd_sn, long *cd_sn_port) {
   return adb_sn;
 }
 
-//5&10cd67f3&0&4 5&10cd67f3&0
-long extract_serial_number(wchar_t * sn, wchar_t **ppstart =NULL, wchar_t **ppend= NULL) {
-  size_t len;
-  wchar_t *pstart, *pend;
-  if (sn == NULL) {
-    ERROR("Bad Parameter");
-    return -1;
-  }
-
-  len = wcslen (sn);
-
-  pstart = (wchar_t*)wcschr(sn, L'&');
-  if (pstart == NULL || pstart - sn >= len) {
-    //ERROR("Can not find first '&'.");
-    return -1;
-  }
-
-  pstart++;
-  pend = wcschr(pstart , L'&');
-  if (pend == NULL || pend - sn >= len) {
-    //ERROR("Can not find first '&'.");
-    return -1;
-  }
-
-  if (ppstart != NULL)
-    *ppstart = pstart;
-  if (ppend != NULL)
-    *ppend = pend;
-  return wcstol(pstart , &pend, 16);
-}
 
 // Usually, adb is a composite device interface, and fastboot is a single interface device.
 // So the adb interface 's host number is differ from fastboot. But it's composite's host number
@@ -287,62 +210,6 @@ int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
 }
 
 
-// \\?\usb#vid_18d1&pid_d00d#5&10cd67f3&0&4#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b}
-// convert to
-// 10cd67f3
-long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
-  wchar_t * snb, *sne, * sn;
-
-  size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
-  if(_wcsnicmp(L"\\\\?\\usb#",dev_name,8) || len < 26 + 40) {
-    ERROR("Not invalid dev name.");
-    return 0;
-  }
-
-  snb = (wchar_t*)wcschr(dev_name + 26, L'&');
-  if (snb == NULL || snb - dev_name >= len)
-    return 0;
-
-  snb++;
-  sne = wcschr(snb , L'&');
-  if (sne == NULL || sne - dev_name >= len)
-    return 0;
-
-  len = sne - snb;
-  if (len <= 0)
-    return 0;
-
-  if (psn) {
-    sn = (wchar_t*) malloc((len + 1) * sizeof(wchar_t));
-    if (sn == NULL) {
-      ERROR("NO memory");
-    } else {
-      wcsncpy(sn, snb , len);
-      *(sn + len) = L'\0';
-    }
-    *psn = sn;
-  }
-
-  return wcstol(snb, &sne, 16);
-}
-
-long usb_host_sn_port(const wchar_t* dev_name) {
-     wchar_t* begin , *end;
-    if (dev_name == NULL)
-        return 0;
-
-      begin = ( wchar_t*)wcsrchr(dev_name , L'&');
-
-        if (begin == NULL )
-            return 0;
-
-        begin ++;
-          end = begin + 1;
-  if (*(begin + 1) == L'#' && *(begin - 3) == L'&')
-    return wcstol(begin , &end, 16);
-
-  return 0;
-}
 
 int usb_switch_device(usb_handle* handle) {
   dev_switch_t* dev = (dev_switch_t*)malloc(sizeof(dev_switch_t));
