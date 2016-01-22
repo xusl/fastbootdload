@@ -83,7 +83,7 @@ long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
 
   size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
   if(_wcsnicmp(L"\\\\?\\usb#",dev_name,8) || len < 26 + 40) {
-    ERROR("Not invalid dev name.");
+    ERROR("Not invalid dev name: %S.", dev_name);
     return 0;
   }
 

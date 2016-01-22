@@ -890,34 +890,42 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
   KillTimer((UINT_PTR)data);
 }
 
-  BOOL CmdmfastbootDlg::RejectCDROM(VOID){
-    std::vector<CDevLabel> devicePath;
-            GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath);
-            int cdromSize = devicePath.size();
+BOOL CmdmfastbootDlg::RejectCDROM(VOID){
+    vector<CDevLabel> devicePath;
+    CSCSICmd scsi = CSCSICmd();
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath);
 
-            for(int i = 0; i < cdromSize; i++)
-            {
-                CDevLabel dev = devicePath[i];
-                dev.SetUseControllerPathFlag(true);
-                CString path = dev.GetEffectivePath();
-                if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
-                    LOG("Fix DISK %S:", path);
-                    continue;
-                }
-                path.MakeUpper();
-                if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1)
-                    LOG("USB Stor %S is not alcatel",path);
-                else {
-                    CSCSICmd scsi = CSCSICmd();
-                    LOG("do switch device %S", path);
-                    scsi.SwitchToDebugDevice(path);
-                    //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
-                    break;
-                }
+    for(int i = 0; i < devicePath.size(); i++)
+    {
+        CDevLabel* pDev = &devicePath[i];
+        //dev.SetUseControllerPathFlag(true);
+        CString path = pDev->GetEffectivePath();
+        if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
+            LOG("Fix DISK %S:", path);
+            continue;
+        }
+        path.MakeUpper();
+        if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1) {
+            LOG("USB Stor %S is not alcatel",path);
+            continue;
+        }
+        for(int j=0; j < m_WorkDev.size(); j++)
+        {
+            if (*pDev == m_WorkDev[j]) {
+                LOGI("Device is have handle, %S", path);
+                continue;
             }
-            devicePath.clear();
-            return TRUE;
-  }
+        }
+        LOG("do switch device %S", path);
+        scsi.SwitchToDebugDevice(path);
+        m_WorkDev.push_back(*pDev);
+        //scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
+
+    }
+    LOGI("Done, clear device list.");
+    devicePath.clear();
+    return TRUE;
+}
  void CALLBACK CmdmfastbootDlg::GeneralTimerProc(
    HWND hWnd,      // handle of CWnd that called SetTimer
    UINT nMsg,      // WM_TIMER

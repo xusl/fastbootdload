@@ -108,6 +108,7 @@ protected:
   CListCtrl  *m_imglist;
   //CListCtrl  *m_port;
   CSettingsDlg m_SetDlg;
+  vector<CDevLabel> m_WorkDev;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();

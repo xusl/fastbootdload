@@ -58,7 +58,8 @@ CLog::CLog() : mask (LOG_MASK_NONE)
 CLog::~CLog()
 {
 	std::locale::global(loc);
-	INFO("***** Stop logging *****");
+	INFO("********************** Stop logging ************************");
+    INFO("\n\n\n\n\n");
 #ifdef FEATURE_LOG_FILE
 	if (this->stream.is_open())
 	{
@@ -142,7 +143,7 @@ void CLog::StartLogging
     log_tags_init(tags);
 	log_level_init(mask);
 
-	INFO("===== Start logging =====");
+	INFO("=================== Start logging =================");
 }
 
 

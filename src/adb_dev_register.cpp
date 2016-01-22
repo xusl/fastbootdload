@@ -9,19 +9,28 @@
 
 //\\?\usbstor#disk&ven_onetouch&prod_link4&rev_2.31#6&21c8898b&1&0123456789abcdef&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
 //For id , it is "6&21c8898b&1&0123456789abcdef&0".
-//"6&21c8898b&1 is assigned by system, it is call parentIdPrefix, it is assigned by Windows.
+//"6&21c8898b&1 is assigned by system, it is call parentIdPrefix, it is assigned by Windows. we use the second parent is enough.
 // "0123456789abcdef" is the usb serial number in usb description, report by device,
 //the last "0" is the port, assign by windows.
 CDevLabel::CDevLabel(const wchar_t * devPath, const wchar_t* usbBus, bool useBusPath) {
     CopyDeviceDescPath(devPath, usbBus);
     mUseBusPath = useBusPath;
     GenEffectiveSnPort();
+    LOGI("CDevLabel:: %S : %S", devPath, usbBus);
 }
+
+CDevLabel::CDevLabel(const CDevLabel & dev) {
+    LOGI("Enter copy constructor");
+
+    CDevLabel::operator=(dev);
+}
+
 CDevLabel::~CDevLabel() {
-    //FREE_IF(mDevPath);
-    //FREE_IF(mBusControllerPath);
+    FREE_IF(mDevPath);
+    FREE_IF(mBusControllerPath);
     mEffectiveSn = ~1;
     mEffectivePort = ~1;
+    LOGI("~CDevLabel:: %S : %S", mDevPath, mBusControllerPath);
 }
 
 bool CDevLabel::SetUseControllerPathFlag(bool useBus)
@@ -40,6 +49,7 @@ void CDevLabel::CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* usbBu
     } else {
         mDevPath = NULL;
     }
+
     if (usbBus != NULL) {
         mBusControllerPath = wcsdup(usbBus);
         if(mBusControllerPath == NULL)
@@ -63,6 +73,7 @@ bool CDevLabel::SetEffectiveSnPort(long sn, long port)
     mEffectivePort = port;
     return true;
 }
+
 bool CDevLabel::GenEffectiveSnPort(void){
     const wchar_t *effectivePath = GetEffectivePath();
     if (effectivePath == NULL ) {
@@ -83,8 +94,8 @@ bool CDevLabel::operator ==(CDevLabel & dev) {
 }
 
 CDevLabel & CDevLabel::operator =(const CDevLabel & dev) {
-    FREE_IF(mDevPath);
-    FREE_IF(mBusControllerPath);
+    //FREE_IF(mDevPath);
+    //FREE_IF(mBusControllerPath);
     CopyDeviceDescPath(dev.mDevPath, dev.mBusControllerPath);
     mUseBusPath = dev.mUseBusPath;
     mEffectiveSn = dev.mEffectiveSn;
@@ -355,6 +366,8 @@ BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service, std::vector<CDevLab
 
 
         LOGW("DEV PATH %S, parentID %S", pDetData->DevicePath, buffer);
+        labels.push_back(CDevLabel(pDetData->DevicePath, NULL, false));
+        LOGW("push a dev in to vector");
 
         RegCloseKey(regHandle);
         FREE_IF(pDetData);

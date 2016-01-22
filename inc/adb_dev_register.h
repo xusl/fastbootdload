@@ -11,6 +11,8 @@
 #include <vector>
 #include <device.h>
 
+using std::vector;
+
 //GUID_DEVINTERFACE_DISK
 #define SRV_DISK   _T("disk")
 //L"usbccgp"
@@ -31,6 +33,7 @@ cd-rom        6&21c8898b&0123456789abcdef&1      5&10cd67f3&0&3
 class CDevLabel {
   public:
     CDevLabel(const wchar_t * devPath, const wchar_t* usbBus, bool useBus=true);
+    CDevLabel(const CDevLabel & dev);
     ~CDevLabel();
 
     bool operator ==(CDevLabel & );
@@ -51,11 +54,9 @@ class CDevLabel {
     long         mEffectivePort;
 };
 
-
-
 BOOL RegisterAdbDeviceNotification(IN HWND hWnd, OUT HDEVNOTIFY *phDeviceNotify = NULL);
 BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid);
-BOOL GetDevLabelByGUID(CONST GUID *ClassGuid, PCWSTR service, std::vector<CDevLabel>& labels);
+BOOL GetDevLabelByGUID(CONST GUID *ClassGuid, PCWSTR service, vector<CDevLabel>& labels);
 VOID SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 
 static const GUID usb_class_id[] = {
