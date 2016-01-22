@@ -13,11 +13,26 @@
 
 using std::vector;
 
+//HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Cdrom
+#define SRV_CDROM        _T("cdrom")
 //GUID_DEVINTERFACE_DISK
-#define SRV_DISK   _T("disk")
-//L"usbccgp"
+//HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Disk
+#define SRV_DISK        _T("disk")
+//HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\usbccgp
+#define SRV_USBCCGP     L"usbccgp"
+//HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\USBSTOR
+//HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\USB\Vid_0204&Pid_6025\1020500056180A10
 
 
+//HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\jrdusbser
+//HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\USB\Vid_1bbb&Pid_0196&MI_02\6&1e805b40&1&0002
+//Class :Ports,
+//ClassGUID: GUID_DEVCLASS_PORTS,  It is different fromGUID_CLASS_COMPORT
+//Service:jrdusbser
+//PortName: location in
+//HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Enum\USB\Vid_1bbb&Pid_0196&MI_02\6&1e805b40&1&0002\Device Parameters
+#define SRV_JRDUSBSER    L"jrdusbser"
+#define SRV_SERIAL       L"Serial"
 /*
 a usb device path in various mode:
               interface                        composite device
@@ -38,9 +53,12 @@ class CDevLabel {
 
     bool operator ==(CDevLabel & );
     CDevLabel & operator =(const CDevLabel & );
-    const wchar_t * GetEffectivePath();
+    const wchar_t * GetDevPath();
+    const wchar_t * GetParentIdPrefix();
     bool SetEffectiveSnPort(long sn, long port);
     bool SetUseControllerPathFlag(bool useBus);
+    bool SetComPort(const wchar_t *portName);
+    int GetComPortNum();
 
   private:
     void CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* usbBus);
@@ -48,15 +66,16 @@ class CDevLabel {
 
   public:
     wchar_t *   mDevPath;
-    wchar_t *   mBusControllerPath;
-    bool         mUseBusPath;
+    wchar_t *   mParentIdPrefix;
+    bool         mUseParentIdPrefix;
     long         mEffectiveSn;
     long         mEffectivePort;
+    int          mPortNum;
 };
 
 BOOL RegisterAdbDeviceNotification(IN HWND hWnd, OUT HDEVNOTIFY *phDeviceNotify = NULL);
 BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *ClassGuid);
-BOOL GetDevLabelByGUID(CONST GUID *ClassGuid, PCWSTR service, vector<CDevLabel>& labels);
+BOOL GetDevLabelByGUID(CONST GUID *ClassGuid, PCWSTR service, vector<CDevLabel>& labels, bool useParentIdPrefix);
 VOID SetUpAdbDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
 
 static const GUID usb_class_id[] = {

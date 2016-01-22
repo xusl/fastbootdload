@@ -531,7 +531,7 @@ int fastboot::cb_default(CWnd* hWnd, void* data, Action *a, int status, char *re
     if (status) {
         port_text_msg(hWnd, data, "FAILED (%s)\n", resp);
     } else {
-        double split = now();
+        uint64 split = now();
         port_text_msg(hWnd, data, "OKAY [%7.3fs]\n", (split - a->start));
         a->start = split;
     }
@@ -557,7 +557,7 @@ int fastboot::cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp
     if (invert) yes = !yes;
 
     if (yes) {
-        double split = now();
+        long long split = now();
         port_text_msg(hWnd, data,"OKAY [%7.3fs]\n", (split - a->start));
         a->start = split;
         return 0;

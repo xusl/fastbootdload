@@ -20,6 +20,10 @@
 #include "qcnlib/QcnParser.h"
 #include "adb_dev_register.h"
 #include "scsicmd.h"
+
+#include "diagcmd.h"
+#include "jrddiagcmd.h"
+
 enum
 {
 	// UI Messages
@@ -62,6 +66,7 @@ enum
 {
   TIMER_EVT_ADBKILLED = 0,
   TIMER_EVT_REJECTCDROM,
+  TIMER_EVT_COMPORT,
 };
 
 
@@ -132,6 +137,7 @@ public:
 	//afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 
   BOOL RejectCDROM(VOID);
+  BOOL HandleComDevice(VOID);
   BOOL AdbUsbHandler(BOOL update_device);
   BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);

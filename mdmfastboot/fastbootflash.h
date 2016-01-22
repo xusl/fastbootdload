@@ -123,7 +123,7 @@ typedef struct Action
     const char *msg;
     int (*func)(CWnd* hWnd, void* data, Action *a, int status, char *resp);
 
-    double start;
+    long long start;
 }Action;
 
 class fastboot {

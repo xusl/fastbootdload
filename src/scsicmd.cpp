@@ -11,7 +11,9 @@ CSCSICmd::~CSCSICmd()
 {
 }
 
-  //In debug mode, adb interface will enumerated.
+
+//scsi.SwitchToDebugDevice(_T("\\\\?\\H:"));
+//In debug mode, adb interface will enumerated.
 BOOL CSCSICmd::SwitchToDebugDevice(const WCHAR* devname) {
   UCHAR cmdBuf[CDB6GENERIC_LENGTH] = {0x16, 0xf9, 0x0, 0x0, 0x0, 0x0};
   return Send(devname, cmdBuf, sizeof(cmdBuf));
@@ -39,7 +41,7 @@ BOOL CSCSICmd::Send(LPCWSTR devname, PUCHAR cmd, size_t cmdLen)
                       NULL, OPEN_EXISTING, 0, NULL);
 
 	if (handle == INVALID_HANDLE_VALUE) {
-        ERROR("Open device %S failed.", devname);
+        LOGE("Open device %S failed.", devname);
 		return result;
 	}
 
@@ -81,9 +83,9 @@ BOOL CSCSICmd::SendCmd(HANDLE handle, PUCHAR cmd, size_t len, ULONG timeout)
                         &returned,
                         NULL);
   if (result) {
-    ERROR("##DeviceIoControl OK!");
+    LOGI("##DeviceIoControl OK!");
   } else {
-    ERROR("**DeviceIoControl fails!");
+    LOGE("**DeviceIoControl fails!");
   }
 
   return result;

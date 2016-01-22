@@ -12,35 +12,35 @@
 //"6&21c8898b&1 is assigned by system, it is call parentIdPrefix, it is assigned by Windows. we use the second parent is enough.
 // "0123456789abcdef" is the usb serial number in usb description, report by device,
 //the last "0" is the port, assign by windows.
-CDevLabel::CDevLabel(const wchar_t * devPath, const wchar_t* usbBus, bool useBusPath) {
-    CopyDeviceDescPath(devPath, usbBus);
-    mUseBusPath = useBusPath;
+CDevLabel::CDevLabel(const wchar_t * devPath, const wchar_t* parentIdPrefix, bool useParentIdPrefix):
+mPortNum(~1), mEffectiveSn(~1), mEffectivePort (~1) {
+    CopyDeviceDescPath(devPath, parentIdPrefix);
+    mUseParentIdPrefix = useParentIdPrefix;
     GenEffectiveSnPort();
-    LOGI("CDevLabel:: %S : %S", devPath, usbBus);
+    LOGI("CDevLabel:: %S : %S", devPath, parentIdPrefix);
 }
 
 CDevLabel::CDevLabel(const CDevLabel & dev) {
     LOGI("Enter copy constructor");
-
     CDevLabel::operator=(dev);
 }
 
 CDevLabel::~CDevLabel() {
     FREE_IF(mDevPath);
-    FREE_IF(mBusControllerPath);
+    FREE_IF(mParentIdPrefix);
     mEffectiveSn = ~1;
     mEffectivePort = ~1;
-    LOGI("~CDevLabel:: %S : %S", mDevPath, mBusControllerPath);
+    //LOGI("~CDevLabel:: %S : %S", mDevPath, mParentIdPrefix);
 }
 
 bool CDevLabel::SetUseControllerPathFlag(bool useBus)
 {
-    mUseBusPath = useBus;
+    mUseParentIdPrefix = useBus;
     GenEffectiveSnPort();
     return true;
 }
 
-void CDevLabel::CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* usbBus) {
+void CDevLabel::CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* parentIdPrefix) {
     if (devPath != NULL) {
         mDevPath = _wcsdup(devPath);
 
@@ -50,21 +50,23 @@ void CDevLabel::CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* usbBu
         mDevPath = NULL;
     }
 
-    if (usbBus != NULL) {
-        mBusControllerPath = wcsdup(usbBus);
-        if(mBusControllerPath == NULL)
+    if (parentIdPrefix != NULL) {
+        mParentIdPrefix = _wcsdup(parentIdPrefix);
+        if(mParentIdPrefix == NULL)
             LOGE("strdup failed");
     } else {
-        mBusControllerPath = NULL;
+        mParentIdPrefix = NULL;
     }
 }
 
-const wchar_t * CDevLabel::GetEffectivePath()
+const wchar_t * CDevLabel::GetDevPath()
 {
-    if (mUseBusPath)
-        return mBusControllerPath;
-    else
-        return mDevPath;
+    return mDevPath;
+}
+
+const wchar_t * CDevLabel::GetParentIdPrefix()
+{
+    return mParentIdPrefix;
 }
 
 bool CDevLabel::SetEffectiveSnPort(long sn, long port)
@@ -74,8 +76,21 @@ bool CDevLabel::SetEffectiveSnPort(long sn, long port)
     return true;
 }
 
+bool CDevLabel::SetComPort(const wchar_t *portName) {
+    LOGI("PortName %S", portName);
+    //swscanf
+    swscanf_s(portName, _T("COM%d"), &mPortNum);
+    LOGI("Set comport %d", mPortNum);
+    return true;
+}
+
+int CDevLabel::GetComPortNum() {
+    LOGI("return port %d", mPortNum);
+    return mPortNum;
+}
+
 bool CDevLabel::GenEffectiveSnPort(void){
-    const wchar_t *effectivePath = GetEffectivePath();
+    const wchar_t *effectivePath = GetDevPath();
     if (effectivePath == NULL ) {
         LOGE("Can not get effective path");
         return false;
@@ -86,8 +101,8 @@ bool CDevLabel::GenEffectiveSnPort(void){
 }
 
 bool CDevLabel::operator ==(CDevLabel & dev) {
-    const wchar_t *effectivePath = GetEffectivePath();
-    const wchar_t *effectivePath2 = dev.GetEffectivePath();
+    const wchar_t *effectivePath = GetDevPath();
+    const wchar_t *effectivePath2 = dev.GetDevPath();
     if (effectivePath == NULL || effectivePath2 == NULL)
         return false;
     return (0 == wcscmp(effectivePath, effectivePath2) );//stricmp
@@ -95,11 +110,12 @@ bool CDevLabel::operator ==(CDevLabel & dev) {
 
 CDevLabel & CDevLabel::operator =(const CDevLabel & dev) {
     //FREE_IF(mDevPath);
-    //FREE_IF(mBusControllerPath);
-    CopyDeviceDescPath(dev.mDevPath, dev.mBusControllerPath);
-    mUseBusPath = dev.mUseBusPath;
+    //FREE_IF(mParentIdPrefix);
+    CopyDeviceDescPath(dev.mDevPath, dev.mParentIdPrefix);
+    mUseParentIdPrefix = dev.mUseParentIdPrefix;
     mEffectiveSn = dev.mEffectiveSn;
     mEffectivePort = dev.mEffectivePort;
+    mPortNum = dev.mPortNum;
     return *this;
 }
 
@@ -173,7 +189,7 @@ void SetUpAdbDevice(
     if ( SetupDiGetDeviceRegistryProperty(hDevInfo, pspDevInfoData, SPDRP_SERVICE,
                                           &DataT, (PBYTE)srv, sizeof(srv), &nSize) ) {
       //DEBUG(" %S, size %d", srv, nSize);
-      if (wcsnicmp((const wchar_t *)srv, L"usbccgp",nSize/sizeof(wchar_t))) {
+      if (_wcsnicmp((const wchar_t *)srv, L"usbccgp",nSize/sizeof(wchar_t))) {
         continue;
       }
     }
@@ -285,7 +301,8 @@ BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *pClsGuid) {
 }
 
 //SERVICE : L"disk", L"usbccgp"
-BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service, std::vector<CDevLabel>& labels)
+BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service,
+        vector<CDevLabel>& labels,  bool useParentIdPrefix)
 {
     // if we are adding device, we only need present devices
     // otherwise, we need all devices
@@ -328,15 +345,18 @@ BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service, std::vector<CDevLab
             continue;
         }
 
+        HKEY regHandle = NULL;
         TCHAR buffer[_MAX_PATH] = {0};
+        TCHAR portName[_MAX_PATH] = {0};
+        TCHAR srvValue[_MAX_PATH] = {0};
         TCHAR key[MAX_PATH] = {0};
         if (!SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata, SPDRP_SERVICE,
-                                              NULL, (PBYTE)buffer, sizeof(buffer), &nSize)) {
+                                              NULL, (PBYTE)srvValue, sizeof(srvValue), &nSize)) {
             LOGE("get SPDRP_SERVICE failed");
             continue;
         }
-        if (wcsnicmp((const wchar_t *)buffer, service, nSize/sizeof(wchar_t))) {
-            LOGE("SPDRP_SERVICE return is not '%S'.", service);
+        if (_wcsnicmp((const wchar_t *)srvValue, service, nSize/sizeof(wchar_t))) {
+            LOGE("SPDRP_SERVICE return '%S', does not match '%S'.", srvValue, service);
             continue;
         }
 
@@ -346,28 +366,30 @@ BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service, std::vector<CDevLab
         }
         _snwprintf_s(key, MAX_PATH,L"SYSTEM\\CurrentControlSet\\Enum\\%s", buffer);
 
-        HKEY regHandle = NULL;
-        lResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE,key,0, KEY_READ, &regHandle);
+        lResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE,key, 0, KEY_READ, &regHandle);
         if (lResult != ERROR_SUCCESS) {
             LOGE("RegOpenKeyExW error code:%d",lResult);
             continue ;
         }
-        nSize = MAX_PATH;
-        lResult = RegQueryValueExW(regHandle, L"ParentIdPrefix", NULL, NULL,
-                                   (LPBYTE)&buffer, &nSize);
-
-        if (lResult != ERROR_SUCCESS) {
-            LOGE("RegOpenKeyExW error code:%d",lResult);
-            continue ;
+        RegCloseKey(regHandle);
+        regHandle = SetupDiOpenDevRegKey(hDevInfo, &devdata, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
+        if (regHandle == NULL) {
+            LOGE("SetupDiOpenDevRegKey %S return error code:%d",pDetData->DevicePath, lResult);
+            continue;
         }
+        CDevLabel devId(pDetData->DevicePath, buffer, useParentIdPrefix);
 
-        //lResult = RegQueryValueExW(regHandle, L"PortName", NULL, NULL,
-        //                           (LPBYTE)&szValue, &nSize);
-
+        nSize = _MAX_PATH;
+        lResult = RegQueryValueExW(regHandle, L"PortName", NULL, NULL,
+                                   (LPBYTE)&portName, &nSize);
+        if (lResult == ERROR_SUCCESS) {
+            devId.SetComPort(portName);
+        } else {
+            LOGE("RegOpenKeyExW get PortName failed");
+        }
 
         LOGW("DEV PATH %S, parentID %S", pDetData->DevicePath, buffer);
-        labels.push_back(CDevLabel(pDetData->DevicePath, NULL, false));
-        LOGW("push a dev in to vector");
+        labels.push_back(devId);
 
         RegCloseKey(regHandle);
         FREE_IF(pDetData);

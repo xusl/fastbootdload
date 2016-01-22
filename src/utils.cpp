@@ -79,39 +79,42 @@ long extract_serial_number(wchar_t * sn, wchar_t **ppstart , wchar_t **ppend) {
 // convert to
 // 10cd67f3
 long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
-  wchar_t * snb, *sne, * sn;
-
-  size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
-  if(_wcsnicmp(L"\\\\?\\usb#",dev_name,8) || len < 26 + 40) {
-    ERROR("Not invalid dev name: %S.", dev_name);
-    return 0;
-  }
-
-  snb = (wchar_t*)wcschr(dev_name + 26, L'&');
-  if (snb == NULL || snb - dev_name >= len)
-    return 0;
-
-  snb++;
-  sne = wcschr(snb , L'&');
-  if (sne == NULL || sne - dev_name >= len)
-    return 0;
-
-  len = sne - snb;
-  if (len <= 0)
-    return 0;
-
-  if (psn) {
-    sn = (wchar_t*) malloc((len + 1) * sizeof(wchar_t));
-    if (sn == NULL) {
-      ERROR("NO memory");
-    } else {
-      wcsncpy(sn, snb , len);
-      *(sn + len) = L'\0';
+    wchar_t * snb, *sne, * sn;
+    size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
+    if(_wcsnicmp(L"\\\\?\\",dev_name,4) ) {
+        LOGE("Not valid dev name: %S.", dev_name);
+        return 0;
     }
-    *psn = sn;
-  }
 
-  return wcstol(snb, &sne, 16);
+    //strtok is not suitable;
+    wchar_t delimits[] = {L'#', L'#', L'&', L'&'};
+    sne = (wchar_t *)dev_name;
+    for (int i = 0; i < sizeof(delimits)/sizeof(wchar_t) ; i++, sne++) {
+        wchar_t sep = delimits[i];
+        snb = sne;
+        sne = (wchar_t*)wcschr(sne, sep);
+        if (sne == NULL || sne - dev_name >= len) {
+            LOGE("In step %d , %c is not found", i, sep);
+            return 0;
+        }
+    }
+
+    len = sne - snb;
+    if (len <= 0)
+        return 0;
+
+    if (psn) {
+        sn = (wchar_t*) malloc((len + 1) * sizeof(wchar_t));
+        if (sn == NULL) {
+            ERROR("NO memory");
+        } else {
+            wcsncpy(sn, snb , len);
+            *(sn + len) = L'\0';
+        }
+        *psn = sn;
+    }
+
+    return wcstol(snb, &sne, 16);
 }
 
 long usb_host_sn_port(const wchar_t* dev_name) {
