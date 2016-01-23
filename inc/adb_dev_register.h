@@ -72,20 +72,28 @@ debug mode
 
 cd-rom        6&21c8898b&0123456789abcdef&1      5&10cd67f3&0&3
 */
+#define DEV_ID_LEN        64
+#define DEV_SERVICE_LEN   64
 class CDevLabel {
   public:
-    CDevLabel(const wchar_t * devPath, const wchar_t* usbBus, bool useBus=true);
+    CDevLabel(const wchar_t * name, const wchar_t * devPath, const wchar_t* usbBus, bool useBus=true);
     CDevLabel(const CDevLabel & dev);
     ~CDevLabel();
 
     bool operator ==(CDevLabel & );
     CDevLabel & operator =(const CDevLabel & );
-    const wchar_t * GetDevPath();
-    const wchar_t * GetParentIdPrefix();
+    const wchar_t * GetDevPath() const;
+    const wchar_t * GetParentIdPrefix() const;
+    const wchar_t * GetDevId() const;
+    bool SetDevId(const wchar_t * devId);
+    bool SetServiceName(const wchar_t * name);
+    const wchar_t * GetServiceName() const;
     bool SetEffectiveSnPort(long sn, long port);
+    bool GetEffectiveSnPort(long *sn, long *port);
     bool SetUseControllerPathFlag(bool useBus);
     bool SetComPort(const wchar_t *portName);
-    int GetComPortNum();
+    int GetComPortNum() const;
+
 
   private:
     void CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* usbBus);
@@ -94,9 +102,14 @@ class CDevLabel {
   public:
     wchar_t *   mDevPath;
     wchar_t *   mParentIdPrefix;
-    bool         mUseParentIdPrefix;
+
+    bool        mUseParentIdPrefix;
     long         mEffectiveSn;
     long         mEffectivePort;
+
+ private:
+    wchar_t     mDevId[DEV_ID_LEN];
+    wchar_t     mServiceName[DEV_SERVICE_LEN];
     int          mPortNum;
 };
 

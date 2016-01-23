@@ -18,13 +18,46 @@ static adb_device_t adbdev_list= {
 //For id , it is "6&21c8898b&1&0123456789abcdef&0".
 //"6&21c8898b&1 is assigned by system, it is call parentIdPrefix, it is assigned by Windows. we use the second parent is enough.
 // "0123456789abcdef" is the usb serial number in usb description, report by device,
+// if "SYSTEM\\CurrentControlSet\\Control\\UsbFlags" is set, the Windows will abandon this value.
+// so , device id reduces , "6&21c8898b&1&0"
 //the last "0" is the port, assign by windows.
-CDevLabel::CDevLabel(const wchar_t * devPath, const wchar_t* parentIdPrefix, bool useParentIdPrefix):
-mPortNum(~1), mEffectiveSn(~1), mEffectivePort (~1) {
+CDevLabel::CDevLabel(const wchar_t * name, const wchar_t * devPath,
+                     const wchar_t* parentIdPrefix, bool useParentIdPrefix):
+    mPortNum(~1),
+    mEffectiveSn(~1),
+    mEffectivePort (~1)
+{
+    SetServiceName(name);
     CopyDeviceDescPath(devPath, parentIdPrefix);
     mUseParentIdPrefix = useParentIdPrefix;
+    if (mUseParentIdPrefix) {
+        SetDevId(parentIdPrefix);
+    } else if (devPath != NULL){
+        wchar_t delimits[] = {L'#', L'#', L'#'};
+        wchar_t *sne = (wchar_t *)devPath;
+        wchar_t *snb;
+        int len = wcslen(devPath);
+        for (int i = 0; i < sizeof(delimits)/sizeof(wchar_t); i++, sne++) {
+            wchar_t sep = delimits[i];
+            snb = sne;
+            sne = (wchar_t*)wcschr(sne, sep);
+            if (sne == NULL || sne - devPath >= len) {
+                LOGE("In step %d , %c is not found", i, sep);
+                return;
+            }
+        }
+        len = sne - snb - 1;
+        wcsncpy_s(mDevId, DEV_ID_LEN, snb, len);
+    } else {
+        memset(mDevId, 0, sizeof mDevId);
+        LOGE("Can not get invalid device id");
+    }
     GenEffectiveSnPort();
-    LOGI("CDevLabel:: \nDevice Path:%S \nParentIDPrefix:%S", devPath, parentIdPrefix);
+    //LOGI("CDevLabel:: ID:\t%S\n\tDevice Path:%S \n\tParentIDPrefix:%S",
+    //     mDevId, devPath, parentIdPrefix);
+    LOGD("CDevLabel:: ID: %S", mDevId);
+    LOGD("\tDevice Path: %S", devPath);
+    LOGD("\tParentIDPrefix: %S", parentIdPrefix);
 }
 
 CDevLabel::CDevLabel(const CDevLabel & dev) {
@@ -66,16 +99,49 @@ void CDevLabel::CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* paren
     }
 }
 
-const wchar_t * CDevLabel::GetDevPath()
+const wchar_t * CDevLabel::GetDevPath() const
 {
     return mDevPath;
 }
 
-const wchar_t * CDevLabel::GetParentIdPrefix()
+const wchar_t * CDevLabel::GetParentIdPrefix() const
 {
     return mParentIdPrefix;
 }
+const wchar_t * CDevLabel::GetDevId() const {
+    return mDevId;
+}
+bool CDevLabel::SetDevId(const wchar_t * devId) {
+    if (devId == NULL )
+        return false;
+    int len =wcslen(devId);
+    if (len == 0 || len >= DEV_ID_LEN) {
+        LOGE("devId length exceed buffer length");
+        return false;
+    }
+    return (0 == wcsncpy_s(mDevId, DEV_ID_LEN, devId, len));
+}
 
+const wchar_t * CDevLabel::GetServiceName()  const {
+    return mServiceName;
+}
+bool CDevLabel::SetServiceName(const wchar_t * name) {
+    if (name == NULL)
+        return false;
+    int len = wcslen(name);
+    if (len == 0 || len >= DEV_SERVICE_LEN) {
+        LOGE("name length exceed buffer length");
+        return false;
+    }
+    wcsncpy_s(mServiceName, DEV_SERVICE_LEN, name, len);
+    return true;
+}
+
+bool CDevLabel::GetEffectiveSnPort(long *sn, long *port) {
+    *sn = mEffectiveSn;
+    *port = mEffectivePort;
+    return true;
+}
 bool CDevLabel::SetEffectiveSnPort(long sn, long port)
 {
     mEffectiveSn = sn;
@@ -91,7 +157,7 @@ bool CDevLabel::SetComPort(const wchar_t *portName) {
     return true;
 }
 
-int CDevLabel::GetComPortNum() {
+int CDevLabel::GetComPortNum() const {
     //LOGI("return port %d", mPortNum);
     return mPortNum;
 }
@@ -108,8 +174,18 @@ bool CDevLabel::GenEffectiveSnPort(void){
 }
 
 bool CDevLabel::operator ==(CDevLabel & dev) {
-    const wchar_t *effectivePath = NULL;
-    const wchar_t *effectivePath2 = NULL;
+    const wchar_t *effectivePath = GetDevId();
+    const wchar_t *effectivePath2 = dev.GetDevId();
+//TPST Upgrading device path:
+//\\?\usb#vid_1bbb&pid_007a#5&10cd67f3&0&3#{86e0d1e0-8089-11d0-9ce4-08003e301f73}
+//Adb
+//\\?\usb#vid_1bbb&pid_0196#5&10cd67f3&0&3#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+//fastboot
+//\\?\usb#vid_18d1&pid_d00d#5&10cd67f3&0&3#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+
+    if (effectivePath != NULL && effectivePath2 != NULL)
+        return (0 == wcscmp(effectivePath, effectivePath2) );//stricmp
+
     if (mUseParentIdPrefix) {
         effectivePath = GetParentIdPrefix();
         effectivePath2 =dev.GetParentIdPrefix();
@@ -127,11 +203,12 @@ bool CDevLabel::operator ==(CDevLabel & dev) {
 CDevLabel & CDevLabel::operator =(const CDevLabel & dev) {
     //FREE_IF(mDevPath);
     //FREE_IF(mParentIdPrefix);
-    CopyDeviceDescPath(dev.mDevPath, dev.mParentIdPrefix);
+    CopyDeviceDescPath(dev.GetDevPath(), dev.GetParentIdPrefix());
     mUseParentIdPrefix = dev.mUseParentIdPrefix;
     mEffectiveSn = dev.mEffectiveSn;
     mEffectivePort = dev.mEffectivePort;
-    mPortNum = dev.mPortNum;
+    mPortNum = dev.GetComPortNum();
+    wcscpy_s(mDevId, dev.GetDevId());
     return *this;
 }
 
@@ -166,6 +243,52 @@ BOOL RegisterAdbDeviceNotification(IN HWND hWnd, OUT HDEVNOTIFY *phDeviceNotify)
         *phDeviceNotify = hDevNotify;
    return TRUE;
 }
+
+#if 0
+void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet) {
+  BOOL bResult;
+  PSP_DEVICE_INTERFACE_DETAIL_DATA   pDetail   =NULL;
+  SP_DEVICE_INTERFACE_DATA   ifdata;
+  char ch[MAX_PATH];
+  int i;
+  ULONG predictedLength = 0;
+  ULONG requiredLength = 0;
+
+  ifdata.cbSize = sizeof(ifdata);
+
+  //   取得该设备接口的细节(设备路径)
+  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
+                                            &ifdata,   /*设备接口信息*/
+                                            NULL,   /*设备接口细节(设备路径)*/
+                                            0,   /*输出缓冲区大小*/
+                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
+                                            NULL);   /*不需额外的设备描述*/
+  /*   取得该设备接口的细节(设备路径)*/
+  predictedLength=requiredLength;
+
+  pDetail = (PSP_INTERFACE_DEVICE_DETAIL_DATA)GlobalAlloc(LMEM_ZEROINIT, predictedLength);
+  pDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
+                                            &ifdata,   /*设备接口信息*/
+                                            pDetail,   /*设备接口细节(设备路径)*/
+                                            predictedLength,   /*输出缓冲区大小*/
+                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
+                                            NULL);   /*不需额外的设备描述*/
+
+  if(bResult)
+  {
+    memset(ch, 0, MAX_PATH);
+    /*复制设备路径到输出缓冲区*/
+    for(i=0; i<requiredLength; i++)
+    {
+      ch[i]=*(pDetail->DevicePath+8+i);
+    }
+    printf("%s\r\n", ch);
+  }
+//  GlobalFree
+}
+#endif
+
 
 void SetUpAdbDevice(
     PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam)
@@ -401,7 +524,7 @@ long extract_serial_number(wchar_t * sn, wchar_t **ppstart , wchar_t **ppend) {
 // 10cd67f3
 long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
     wchar_t * snb, *sne, * sn;
-    size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
+    int len = wcslen (dev_name); //lstrlen, lstrcmp()
     if(_wcsnicmp(L"\\\\?\\",dev_name,4) ) {
         LOGE("Not valid dev name: %S.", dev_name);
         return 0;
@@ -623,7 +746,7 @@ BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service,
             pParentIdPrefix = buffer;
         }
 
-        CDevLabel devId(pDetData->DevicePath, pParentIdPrefix, useParentIdPrefix);
+        CDevLabel devId(service, pDetData->DevicePath, pParentIdPrefix, useParentIdPrefix);
         RegCloseKey(hKey);
 
         hKey = SetupDiOpenDevRegKey(hDevInfo, &devdata, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);

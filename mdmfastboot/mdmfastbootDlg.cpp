@@ -932,7 +932,7 @@ BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID)
 
 BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
     vector<CDevLabel> devicePath;
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, true);
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
     //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
     //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
     LOGI("Do HandleComDevice");
@@ -948,8 +948,12 @@ BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
         {
             JRDdiagCmd  DIAGCmd (*m_packetDll);
             DIAGCmd.EnableDiagServer();
-            char pPartitionVersion[VERSION_LEN] ={0};
-            DIAGCmd.RequestVersion(0, (char *)(&pPartitionVersion));
+            char version[VERSION_LEN] ={0};
+            for (int i = 0; i < 12; i++) {
+                memset(version, 0, sizeof version);
+                DIAGCmd.RequestVersion(0, (char *)(&version));
+                LOGE("index %d version %s", i, version);
+            }
             char pFlash_Type[20];
             memset(&pFlash_Type,0,20);
             TResult result = DIAGCmd.RequestFlashType_9X25((char *)(&pFlash_Type));
@@ -1000,6 +1004,7 @@ BOOL CmdmfastbootDlg::RejectCDROM(VOID){
         }
         LOG("do switch device %S", path);
         scsi.SwitchToDebugDevice(path);
+        //scsi.SwitchToTPSTDeivce(path);
         m_WorkDev.push_back(*iter);
 
     }
@@ -1413,53 +1418,6 @@ BOOL CmdmfastbootDlg::AdbUsbHandler(BOOL update_device) {
   return TRUE;
 }
 
-
-#if 0
-void GetInterfaceDeviceDetail(HDEVINFO hDevInfoSet) {
-  BOOL bResult;
-  PSP_DEVICE_INTERFACE_DETAIL_DATA   pDetail   =NULL;
-  SP_DEVICE_INTERFACE_DATA   ifdata;
-  char ch[MAX_PATH];
-  int i;
-  ULONG predictedLength = 0;
-  ULONG requiredLength = 0;
-
-  ifdata.cbSize = sizeof(ifdata);
-
-  //   取得该设备接口的细节(设备路径)
-  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
-                                            &ifdata,   /*设备接口信息*/
-                                            NULL,   /*设备接口细节(设备路径)*/
-                                            0,   /*输出缓冲区大小*/
-                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
-                                            NULL);   /*不需额外的设备描述*/
-  /*   取得该设备接口的细节(设备路径)*/
-  predictedLength=requiredLength;
-
-  pDetail = (PSP_INTERFACE_DEVICE_DETAIL_DATA)GlobalAlloc(LMEM_ZEROINIT, predictedLength);
-  pDetail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
-  bResult = SetupDiGetInterfaceDeviceDetail(hDevInfoSet,   /*设备信息集句柄*/
-                                            &ifdata,   /*设备接口信息*/
-                                            pDetail,   /*设备接口细节(设备路径)*/
-                                            predictedLength,   /*输出缓冲区大小*/
-                                            &requiredLength,   /*不需计算输出缓冲区大小(直接用设定值)*/
-                                            NULL);   /*不需额外的设备描述*/
-
-  if(bResult)
-  {
-    memset(ch, 0, MAX_PATH);
-    /*复制设备路径到输出缓冲区*/
-    for(i=0; i<requiredLength; i++)
-    {
-      ch[i]=*(pDetail->DevicePath+8+i);
-    }
-    printf("%s\r\n", ch);
-  }
-//  GlobalFree
-}
-#endif
-
-
 void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
   int dx, dy, dw, dh;
@@ -1697,14 +1655,13 @@ void CmdmfastbootDlg::OnDestroy()
 
 void CmdmfastbootDlg::OnBnClickedSetting()
 {
-
 	//m_pMainWnd = &dlg;
 	m_SetDlg.Create(IDD_SETTINGS, NULL);
 	    m_SetDlg.ModifyStyle(
               WS_CHILD | WS_VISIBLE | DS_CENTER,
               WS_POPUP | DS_MODALFRAME | WS_CAPTION | WS_SYSMENU,
               SWP_SHOWWINDOW);
-      # if 0
+# if 0
 	INT_PTR nResponse = m_SetDlg.DoModal();
 	if (nResponse == IDOK)
 	{
