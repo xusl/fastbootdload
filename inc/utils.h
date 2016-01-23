@@ -204,10 +204,6 @@ long long now(void);
  PWCH MultiStrToWideStr(PCCH pc);
 PCHAR WideStrToMultiStr(PCWCH WideStr);
 
-long extract_serial_number(wchar_t * sn, wchar_t **ppstart =NULL, wchar_t **ppend= NULL);
-long usb_host_sn(const wchar_t* dev_name, wchar_t** psn = NULL);
-long usb_host_sn_port(const wchar_t* dev_name) ;
-
 /* normally provided by <cutils/misc.h> */
 extern void* load_file(LPCWSTR pathname, unsigned*  psize);
 int kill_adb_server(int port );

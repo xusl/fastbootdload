@@ -138,6 +138,7 @@ public:
 
   BOOL RejectCDROM(VOID);
   BOOL HandleComDevice(VOID);
+  BOOL EnumerateAdbDevice(VOID);
   BOOL AdbUsbHandler(BOOL update_device);
   BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);

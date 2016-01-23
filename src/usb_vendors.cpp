@@ -18,6 +18,7 @@
 #define TRACE_TAG               TRACE_USB
 #include "atlbase.h"
 #include "usb_vendors.h"
+#include "adb_dev_register.h"
 
 #include <stdio.h>
 
@@ -53,7 +54,6 @@ usbid_t gUSBIds[ID_COUNT_MAX];
 unsigned gUSBIdCount = 0;
 
 int get_adb_usb_ini(char* buff, size_t len);
-void check_regedit_usbflags(usbid_t USBIds[], unsigned count);
 
 void usb_vendors_init(void) {
   char temp[PATH_MAX];
@@ -130,56 +130,3 @@ int get_adb_usb_ini(char* buff, size_t len) {
   return 0;
 }
 
-/*
-* same pid, vid, and serial number, will case Windows blue screen.
-*/
-void check_regedit_usbflags(usbid_t USBIds[], unsigned count){
-  CRegKey reg;
-  WCHAR szName[256];
-  BYTE szValue;
-  DWORD dwCount = sizeof(szValue);
-
-  long lResult = reg.Open(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\UsbFlags");
-  if (lResult != ERROR_SUCCESS) {
-    ERROR("error code:%d",lResult);
-    return ;
-  }
-
-  for (unsigned i = 0; i <= count; i++) {
-    if (i == count ) {
-      //wcsdup
-      _snwprintf_s(szName, sizeof(szName)/sizeof(szName[0]), L"GlobalDisableSerNumGen");
-    } else {
-      _snwprintf_s(szName, sizeof(szName)/sizeof(szName[0]), L"IgnoreHWSerNum%04X%04X",
-                   USBIds[i].vid, USBIds[i].pid);
-    }
-    //ZeroMemory(szValue, sizeof(szValue));
-    szValue = 0;
-
-    lResult = reg.QueryBinaryValue(szName, &szValue, &dwCount);
-    //DEBUG("dwCount is %d, lResult %d" , dwCount, lResult);
-#if 0
-    if (lResult == ERROR_FILE_NOT_FOUND) {
-      // _snwprintf_s(szName,
-      //    sizeof(szName),
-      //    L"SYSTEM\\ControlSet001\\Control\\UsbFlags\\IgnoreHWSerNum%X%X",
-      //    0X1BBB,
-      //    0X0192);
-      //lResult = reg.Create(HKEY_LOCAL_MACHINE, szName );
-      WCHAR szValue[1]={1};
-      lResult = reg.SetKeyValue(szName, szValue, szName);
-      DEBUG("Create lResult %d" , lResult);
-    }
-#endif
-    if (lResult != ERROR_SUCCESS || szValue != 1) {
-      szValue = 1;
-      dwCount = sizeof(szValue);
-      lResult = reg.SetBinaryValue(szName, &szValue, dwCount);
-      //TODO:: Notify USER to remove usb device. for assign id.
-      //DEBUG("SetBinaryValue lResult %d" , lResult);
-    }
-  }
-
-  reg.Flush();
-  reg.Close();
-}

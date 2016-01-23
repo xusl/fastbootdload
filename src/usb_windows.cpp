@@ -27,10 +27,8 @@
 #include "adbhost.h"
 #include "device.h"
 #include "usb_vendors.h"
+#include "adb_dev_register.h"
 
-
-/// Class ID assigned to the device by androidusb.sys
-static const GUID usb_class_id = ANDROID_USB_CLASS_ID;
 //static volatile bool exist = false;
 /// List of opened usb handles
 static usb_handle handle_list = {
@@ -45,10 +43,6 @@ static dev_switch_t switch_list = {
   &switch_list,
 };
 
-static adb_device_t adbdev_list= {
-    &adbdev_list,
-    &adbdev_list,
-};
 
 static mass_storage_handle mass_storage_list = {
     &mass_storage_list,
@@ -97,118 +91,6 @@ void adb_usb_init( void )
     ADB_MUTEX(usb_lock);
 	usb_vendors_init();
 }
-
-
-adb_device_t* is_adb_device_exist(long cd_sn, long cd_sn_port, long adb_sn) {
-  adb_device_t* adb;
-  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-    if (adb->cd_sn == cd_sn && adb->adb_sn == adb_sn && adb->cd_sn_port == cd_sn_port) {
-      return adb;
-    }
-  }
-
-  return NULL;
-}
-
-void build_port_map(CListCtrl *  port_list) {
-    int item = 0;
-    adb_device_t* adb;
-    wchar_t  compsite[64];
-    wchar_t  adb_sn[64];
-
-    if (port_list == NULL)
-        return;
-
-    port_list->DeleteAllItems();
-
-  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-    _snwprintf(compsite,63, _T("0x%X (%d)"), adb->cd_sn, adb->cd_sn_port);
-    _snwprintf(adb_sn, 63,_T("0x%X"), adb->adb_sn);
-    port_list->InsertItem(item,compsite);
-port_list->SetItemText(item++,1,adb_sn);
-
-//        INFO("0x%x (composite)<==> 0x%x(adb)", adb->cd_sn, adb->adb_sn);
-  }
-}
-
-void dump_adb_device(void) {
-  adb_device_t* adb;
-  INFO("Begin dump host installed adb device driver\n================");
-  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-        INFO("0x%x (composite)<==> 0x%x(adb)", adb->cd_sn, adb->adb_sn);
-  }
-  INFO("End dump host installed adb device driver\n=================");
-}
-
-long get_adb_composite_device_sn(long adb_sn, long *cd_sn, long *cd_sn_port) {
-  adb_device_t* adb;
-  *cd_sn = adb_sn;
-  *cd_sn_port = 0;
-  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-    if (adb->adb_sn == adb_sn) {
-      INFO("adb_sn 0x%x convert composite sn 0x%x(%d) ", adb_sn, adb->cd_sn, adb->cd_sn_port);
-      *cd_sn = adb->cd_sn;
-      *cd_sn_port = adb->cd_sn_port;
-      return adb->cd_sn;
-    }
-  }
-  return adb_sn;
-}
-
-
-// Usually, adb is a composite device interface, and fastboot is a single interface device.
-// So the adb interface 's host number is differ from fastboot. But it's composite's host number
-// is equal fastboot's host number.
-// adb composite device USB\VID_1BBB&PID_0192\5&10CD67F3&0&4 have key ParentIdPrefix
-// with 6&29f04a5a&0. And adb interface's host number prefix with 6&29f04a5a&0. Then,
-// fastboot host number contain 10CD67F3.
-int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
-  long cd_sn, adb_sn, cd_sn_port=0;
-
-  if (ccgp == NULL || parentId == NULL) {
-    ERROR("null parameter");
-    return -1;
-  }
-
-  size_t len = wcslen (ccgp);
-  if(wcslen (ccgp) < 22)
-    return -1;
-
-  wchar_t* ccgp_last_begin = ccgp + wcslen (ccgp) - 1;
-  wchar_t* ccgp_last_end = ccgp_last_begin + 1;
-  if (*(ccgp_last_begin - 1) == L'&' && *(ccgp_last_begin - 3) == L'&')
-    cd_sn_port = wcstol(ccgp_last_begin , &ccgp_last_end, 16);
-
-  cd_sn = extract_serial_number(ccgp + 22);
-  adb_sn = extract_serial_number(parentId);
-
-  if (cd_sn <= 0 || adb_sn <= 0 ) {
-    ERROR("ERROR %S<=>%S", ccgp, parentId);
-    return -1;
-  }
-
-  if (is_adb_device_exist(cd_sn, cd_sn_port, adb_sn) == NULL) {
-    adb_device_t* adb = (adb_device_t*)malloc(sizeof(adb_device_t));
-
-    if (adb == NULL) {
-      ERROR("Out of Memory");
-      return -1;
-    }
-    adb->adb_sn = adb_sn;
-    adb->cd_sn = cd_sn;
-    adb->cd_sn_port = cd_sn_port;
-
-    adb->next = &adbdev_list;
-    adb->prev = adbdev_list.prev;
-    adb->prev->next = adb;
-    adb->next->prev = adb;
-    INFO("Adb device 0x%x 0x%x(%d)", adb_sn, cd_sn, cd_sn_port);
-  } else {
-    DEBUG("ADB_DEVICE has already exist.");
-  }
-  return 0;
-}
-
 
 
 int usb_switch_device(usb_handle* handle) {
@@ -770,10 +652,11 @@ void find_devices(BOOL flashdirect) {
   char entry_buffer[2048];
   AdbInterfaceInfo* next_interface = (AdbInterfaceInfo*)(&entry_buffer[0]);
   unsigned long entry_buffer_size = sizeof(entry_buffer);
+  //const GUID usb_class_id = ANDROID_USB_CLASS_ID;
 
   // Enumerate all present and active interfaces.
   ADBAPIHANDLE enum_handle =
-    AdbEnumInterfaces(usb_class_id, true, true, true);
+    AdbEnumInterfaces(GUID_DEVINTERFACE_ADB, true, true, true);
 
   if (NULL == enum_handle) {
     WARN("find_devices: Enumeration initialize failed");

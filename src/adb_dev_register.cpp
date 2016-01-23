@@ -7,6 +7,13 @@
 #pragma	 comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")
 
+
+static adb_device_t adbdev_list= {
+    &adbdev_list,
+    &adbdev_list,
+};
+
+
 //\\?\usbstor#disk&ven_onetouch&prod_link4&rev_2.31#6&21c8898b&1&0123456789abcdef&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
 //For id , it is "6&21c8898b&1&0123456789abcdef&0".
 //"6&21c8898b&1 is assigned by system, it is call parentIdPrefix, it is assigned by Windows. we use the second parent is enough.
@@ -17,11 +24,11 @@ mPortNum(~1), mEffectiveSn(~1), mEffectivePort (~1) {
     CopyDeviceDescPath(devPath, parentIdPrefix);
     mUseParentIdPrefix = useParentIdPrefix;
     GenEffectiveSnPort();
-    LOGI("CDevLabel:: %S : %S", devPath, parentIdPrefix);
+    LOGI("CDevLabel:: \nDevice Path:%S \nParentIDPrefix:%S", devPath, parentIdPrefix);
 }
 
 CDevLabel::CDevLabel(const CDevLabel & dev) {
-    LOGI("Enter copy constructor");
+    //LOGI("Enter copy constructor");
     CDevLabel::operator=(dev);
 }
 
@@ -77,15 +84,15 @@ bool CDevLabel::SetEffectiveSnPort(long sn, long port)
 }
 
 bool CDevLabel::SetComPort(const wchar_t *portName) {
-    LOGI("PortName %S", portName);
+    //LOGI("PortName %S", portName);
     //swscanf
     swscanf_s(portName, _T("COM%d"), &mPortNum);
-    LOGI("Set comport %d", mPortNum);
+    //LOGI("Set comport %d", mPortNum);
     return true;
 }
 
 int CDevLabel::GetComPortNum() {
-    LOGI("return port %d", mPortNum);
+    //LOGI("return port %d", mPortNum);
     return mPortNum;
 }
 
@@ -101,8 +108,17 @@ bool CDevLabel::GenEffectiveSnPort(void){
 }
 
 bool CDevLabel::operator ==(CDevLabel & dev) {
-    const wchar_t *effectivePath = GetDevPath();
-    const wchar_t *effectivePath2 = dev.GetDevPath();
+    const wchar_t *effectivePath = NULL;
+    const wchar_t *effectivePath2 = NULL;
+    if (mUseParentIdPrefix) {
+        effectivePath = GetParentIdPrefix();
+        effectivePath2 =dev.GetParentIdPrefix();
+    }
+    else
+    {
+    effectivePath = GetDevPath();
+    effectivePath2 = dev.GetDevPath();
+    }
     if (effectivePath == NULL || effectivePath2 == NULL)
         return false;
     return (0 == wcscmp(effectivePath, effectivePath2) );//stricmp
@@ -207,13 +223,237 @@ void SetUpAdbDevice(
     }
   }
 
-  dump_adb_device();
+  //dump_adb_device();
 
   if ( pspDevInfoData ) {
     HeapFree(GetProcessHeap(), 0, pspDevInfoData);
   }
 
   SetupDiDestroyDeviceInfoList(hDevInfo);
+}
+
+
+
+
+adb_device_t* is_adb_device_exist(long cd_sn, long cd_sn_port, long adb_sn) {
+  adb_device_t* adb;
+  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
+    if (adb->cd_sn == cd_sn && adb->adb_sn == adb_sn && adb->cd_sn_port == cd_sn_port) {
+      return adb;
+    }
+  }
+
+  return NULL;
+}
+
+void build_port_map(CListCtrl *  port_list) {
+    int item = 0;
+    adb_device_t* adb;
+    wchar_t  compsite[64];
+    wchar_t  adb_sn[64];
+
+    if (port_list == NULL)
+        return;
+
+    port_list->DeleteAllItems();
+
+  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
+    _snwprintf_s(compsite,63, _T("0x%X (%d)"), adb->cd_sn, adb->cd_sn_port);
+    _snwprintf_s(adb_sn, 63,_T("0x%X"), adb->adb_sn);
+    port_list->InsertItem(item,compsite);
+port_list->SetItemText(item++,1,adb_sn);
+
+//        INFO("0x%x (composite)<==> 0x%x(adb)", adb->cd_sn, adb->adb_sn);
+  }
+}
+
+void dump_adb_device(void) {
+  adb_device_t* adb;
+  INFO("Begin dump host installed adb device driver\n================");
+  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
+        INFO("0x%x (composite)<==> 0x%x(adb)", adb->cd_sn, adb->adb_sn);
+  }
+  INFO("End dump host installed adb device driver\n=================");
+}
+
+long get_adb_composite_device_sn(long adb_sn, long *cd_sn, long *cd_sn_port) {
+  adb_device_t* adb;
+  *cd_sn = adb_sn;
+  *cd_sn_port = 0;
+  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
+    if (adb->adb_sn == adb_sn) {
+      INFO("adb_sn 0x%x convert composite sn 0x%x(%d) ", adb_sn, adb->cd_sn, adb->cd_sn_port);
+      *cd_sn = adb->cd_sn;
+      *cd_sn_port = adb->cd_sn_port;
+      return adb->cd_sn;
+    }
+  }
+  return adb_sn;
+}
+
+
+// Usually, adb is a composite device interface, and fastboot is a single interface device.
+// So the adb interface 's host number is differ from fastboot. But it's composite's host number
+// is equal fastboot's host number.
+// adb composite device USB\VID_1BBB&PID_0192\5&10CD67F3&0&4 have key ParentIdPrefix
+// with 6&29f04a5a&0. And adb interface's host number prefix with 6&29f04a5a&0. Then,
+// fastboot host number contain 10CD67F3.
+int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
+  long cd_sn, adb_sn, cd_sn_port=0;
+
+  if (ccgp == NULL || parentId == NULL) {
+    ERROR("null parameter");
+    return -1;
+  }
+
+  size_t len = wcslen (ccgp);
+  if(wcslen (ccgp) < 22)
+    return -1;
+
+  wchar_t* ccgp_last_begin = ccgp + wcslen (ccgp) - 1;
+  wchar_t* ccgp_last_end = ccgp_last_begin + 1;
+  if (*(ccgp_last_begin - 1) == L'&' && *(ccgp_last_begin - 3) == L'&')
+    cd_sn_port = wcstol(ccgp_last_begin , &ccgp_last_end, 16);
+
+  cd_sn = extract_serial_number(ccgp + 22);
+  adb_sn = extract_serial_number(parentId);
+
+  if (cd_sn <= 0 || adb_sn <= 0 ) {
+    ERROR("ERROR %S<=>%S", ccgp, parentId);
+    return -1;
+  }
+
+  if (is_adb_device_exist(cd_sn, cd_sn_port, adb_sn) == NULL) {
+    adb_device_t* adb = (adb_device_t*)malloc(sizeof(adb_device_t));
+
+    if (adb == NULL) {
+      ERROR("Out of Memory");
+      return -1;
+    }
+    adb->adb_sn = adb_sn;
+    adb->cd_sn = cd_sn;
+    adb->cd_sn_port = cd_sn_port;
+
+    adb->next = &adbdev_list;
+    adb->prev = adbdev_list.prev;
+    adb->prev->next = adb;
+    adb->next->prev = adb;
+    INFO("Adb device 0x%x 0x%x(%d)", adb_sn, cd_sn, cd_sn_port);
+  } else {
+    DEBUG("ADB_DEVICE has already exist.");
+  }
+  return 0;
+}
+
+
+/*
+  // dbcc_name:
+  // \\?\USB#Vid_04e8&Pid_503b#0002F9A9828E0F06#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+  // convert to  USB\Vid_04e8&Pid_503b\0002F9A9828E0F06
+  ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+  CString szDevId = pDevInf->dbcc_name+4;
+  int idx = szDevId.ReverseFind(_T('#'));
+  ASSERT( -1 != idx );
+  szDevId.Truncate(idx);
+  szDevId.Replace(_T('#'), _T('\\'));
+  szDevId.MakeUpper();
+
+  CString szClass;
+  idx = szDevId.Find(_T('\\'));
+  ASSERT(-1 != idx );
+  szClass = szDevId.Left(idx);
+  DEBUG(L"szClass %S", szClass.GetString());
+*/
+
+//5&10cd67f3&0&4 5&10cd67f3&0
+long extract_serial_number(wchar_t * sn, wchar_t **ppstart , wchar_t **ppend) {
+  unsigned int len;
+  wchar_t *pstart, *pend;
+  if (sn == NULL) {
+    ERROR("Bad Parameter");
+    return -1;
+  }
+
+  len = wcslen (sn);
+
+  pstart = (wchar_t*)wcschr(sn, L'&');
+  if (pstart == NULL || pstart - sn >= len) {
+    //ERROR("Can not find first '&'.");
+    return -1;
+  }
+
+  pstart++;
+  pend = wcschr(pstart , L'&');
+  if (pend == NULL || pend - sn >= len) {
+    //ERROR("Can not find first '&'.");
+    return -1;
+  }
+
+  if (ppstart != NULL)
+    *ppstart = pstart;
+  if (ppend != NULL)
+    *ppend = pend;
+  return wcstol(pstart , &pend, 16);
+}
+
+// \\?\usb#vid_18d1&pid_d00d#5&10cd67f3&0&4#{f72fe0d4-cbcb-407d-8814-9ed673d0dd6b}
+// convert to
+// 10cd67f3
+long usb_host_sn(const wchar_t* dev_name, wchar_t** psn) {
+    wchar_t * snb, *sne, * sn;
+    size_t len = wcslen (dev_name); //lstrlen, lstrcmp()
+    if(_wcsnicmp(L"\\\\?\\",dev_name,4) ) {
+        LOGE("Not valid dev name: %S.", dev_name);
+        return 0;
+    }
+
+    //strtok is not suitable;
+    wchar_t delimits[] = {L'#', L'#', L'&', L'&'};
+    sne = (wchar_t *)dev_name;
+    for (int i = 0; i < sizeof(delimits)/sizeof(wchar_t) ; i++, sne++) {
+        wchar_t sep = delimits[i];
+        snb = sne;
+        sne = (wchar_t*)wcschr(sne, sep);
+        if (sne == NULL || sne - dev_name >= len) {
+            LOGE("In step %d , %c is not found", i, sep);
+            return 0;
+        }
+    }
+
+    len = sne - snb;
+    if (len <= 0)
+        return 0;
+
+    if (psn) {
+        sn = (wchar_t*) malloc((len + 1) * sizeof(wchar_t));
+        if (sn == NULL) {
+            ERROR("NO memory");
+        } else {
+            wcsncpy(sn, snb , len);
+            *(sn + len) = L'\0';
+        }
+        *psn = sn;
+    }
+
+    return wcstol(snb, &sne, 16);
+}
+
+long usb_host_sn_port(const wchar_t* dev_name) {
+     wchar_t* begin , *end;
+    if (dev_name == NULL)
+        return 0;
+
+      begin = ( wchar_t*)wcsrchr(dev_name , L'&');
+
+        if (begin == NULL )
+            return 0;
+
+        begin ++;
+          end = begin + 1;
+  if (*(begin + 1) == L'#' && *(begin - 3) == L'&')
+    return wcstol(begin , &end, 16);
+
+  return 0;
 }
 
 
@@ -300,14 +540,10 @@ BOOL GetDeviceByGUID(std::vector<CString>& devicePaths, const GUID *pClsGuid) {
   return TRUE;
 }
 
-//SERVICE : L"disk", L"usbccgp"
 BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service,
         vector<CDevLabel>& labels,  bool useParentIdPrefix)
 {
-    // if we are adding device, we only need present devices
-    // otherwise, we need all devices
     HDEVINFO hDevInfo = INVALID_HANDLE_VALUE;
-    long lResult;
     if(pClsGuid == NULL || service == NULL)
         return FALSE;
 
@@ -342,59 +578,128 @@ BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service,
         if(!SetupDiGetDeviceInterfaceDetail(hDevInfo, &ifcData, pDetData,
                                             nSize, NULL, &devdata)) {
             LOGE("Get empty data.");
+            FREE_IF(pDetData);
             continue;
         }
 
-        HKEY regHandle = NULL;
+        HKEY hKey = NULL;
         TCHAR buffer[_MAX_PATH] = {0};
         TCHAR portName[_MAX_PATH] = {0};
-        TCHAR srvValue[_MAX_PATH] = {0};
         TCHAR key[MAX_PATH] = {0};
+        PCWCH pParentIdPrefix = NULL;
         if (!SetupDiGetDeviceRegistryProperty(hDevInfo, &devdata, SPDRP_SERVICE,
-                                              NULL, (PBYTE)srvValue, sizeof(srvValue), &nSize)) {
+                                              NULL, (PBYTE)buffer, sizeof(buffer), &nSize)) {
             LOGE("get SPDRP_SERVICE failed");
+            FREE_IF(pDetData);
             continue;
         }
-        if (_wcsnicmp((const wchar_t *)srvValue, service, nSize/sizeof(wchar_t))) {
-            LOGE("SPDRP_SERVICE return '%S', does not match '%S'.", srvValue, service);
+        if (_wcsnicmp((const wchar_t *)buffer, service, nSize/sizeof(wchar_t))) {
+            LOGE("SPDRP_SERVICE return '%S', does not match '%S'.", buffer, service);
+            FREE_IF(pDetData);
             continue;
         }
 
-        if (!SetupDiGetDeviceInstanceId(hDevInfo, &devdata, buffer, sizeof(buffer), &nSize)) {
-            LOGE("SetupDiGetDeviceInstanceId(): %S", _com_error(GetLastError()).ErrorMessage());
+        if(useParentIdPrefix) {
+            if (!SetupDiGetDeviceInstanceId(hDevInfo, &devdata, buffer, sizeof(buffer), &nSize)) {
+                LOGE("SetupDiGetDeviceInstanceId(): %S", _com_error(GetLastError()).ErrorMessage());
+                FREE_IF(pDetData);
+                continue;
+            }
+            _snwprintf_s(key, MAX_PATH,L"SYSTEM\\CurrentControlSet\\Enum\\%s", buffer);
+            if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
+                LOGE("RegOpenKeyExW error");
+                FREE_IF(pDetData);
+                continue ;
+            }
+
+            nSize = sizeof buffer;
+            if (RegQueryValueExW(hKey, L"ParentIdPrefix", NULL, NULL,
+                                (LPBYTE)&buffer, &nSize) != ERROR_SUCCESS) {
+                LOGE("RegQueryValueExW error %S", buffer);
+                RegCloseKey(hKey);
+                FREE_IF(pDetData);
+                continue ;
+            }
+            pParentIdPrefix = buffer;
+        }
+
+        CDevLabel devId(pDetData->DevicePath, pParentIdPrefix, useParentIdPrefix);
+        RegCloseKey(hKey);
+
+        hKey = SetupDiOpenDevRegKey(hDevInfo, &devdata, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
+        if (hKey == NULL) {
+            LOGE("SetupDiOpenDevRegKey %S failed",pDetData->DevicePath);
             continue;
         }
-        _snwprintf_s(key, MAX_PATH,L"SYSTEM\\CurrentControlSet\\Enum\\%s", buffer);
 
-        lResult = RegOpenKeyExW(HKEY_LOCAL_MACHINE,key, 0, KEY_READ, &regHandle);
-        if (lResult != ERROR_SUCCESS) {
-            LOGE("RegOpenKeyExW error code:%d",lResult);
-            continue ;
-        }
-        RegCloseKey(regHandle);
-        regHandle = SetupDiOpenDevRegKey(hDevInfo, &devdata, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
-        if (regHandle == NULL) {
-            LOGE("SetupDiOpenDevRegKey %S return error code:%d",pDetData->DevicePath, lResult);
-            continue;
-        }
-        CDevLabel devId(pDetData->DevicePath, buffer, useParentIdPrefix);
-
-        nSize = _MAX_PATH;
-        lResult = RegQueryValueExW(regHandle, L"PortName", NULL, NULL,
-                                   (LPBYTE)&portName, &nSize);
-        if (lResult == ERROR_SUCCESS) {
+        nSize = sizeof(portName);
+        if (RegQueryValueExW(hKey, L"PortName", NULL, NULL,(LPBYTE)&portName,
+                &nSize) == ERROR_SUCCESS) {
             devId.SetComPort(portName);
-        } else {
-            LOGE("RegOpenKeyExW get PortName failed");
         }
 
-        LOGW("DEV PATH %S, parentID %S", pDetData->DevicePath, buffer);
+        //LOGW("DEV PATH %S, parentID %S", pDetData->DevicePath, buffer);
         labels.push_back(devId);
-
-        RegCloseKey(regHandle);
+        RegCloseKey(hKey);
         FREE_IF(pDetData);
     }
 
     SetupDiDestroyDeviceInfoList(hDevInfo);
     return TRUE;
 }
+
+
+/*
+* same pid, vid, and serial number, will case Windows blue screen.
+*/
+void check_regedit_usbflags(usbid_t USBIds[], unsigned count){
+  CRegKey reg;
+  WCHAR szName[256];
+  BYTE szValue;
+  DWORD dwCount = sizeof(szValue);
+
+  long lResult = reg.Open(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\UsbFlags");
+  if (lResult != ERROR_SUCCESS) {
+    ERROR("error code:%d",lResult);
+    return ;
+  }
+
+  for (unsigned i = 0; i <= count; i++) {
+    if (i == count ) {
+      //wcsdup
+      _snwprintf_s(szName, sizeof(szName)/sizeof(szName[0]), L"GlobalDisableSerNumGen");
+    } else {
+      _snwprintf_s(szName, sizeof(szName)/sizeof(szName[0]), L"IgnoreHWSerNum%04X%04X",
+                   USBIds[i].vid, USBIds[i].pid);
+    }
+    //ZeroMemory(szValue, sizeof(szValue));
+    szValue = 0;
+
+    lResult = reg.QueryBinaryValue(szName, &szValue, &dwCount);
+    //DEBUG("dwCount is %d, lResult %d" , dwCount, lResult);
+#if 0
+    if (lResult == ERROR_FILE_NOT_FOUND) {
+      // _snwprintf_s(szName,
+      //    sizeof(szName),
+      //    L"SYSTEM\\ControlSet001\\Control\\UsbFlags\\IgnoreHWSerNum%X%X",
+      //    0X1BBB,
+      //    0X0192);
+      //lResult = reg.Create(HKEY_LOCAL_MACHINE, szName );
+      WCHAR szValue[1]={1};
+      lResult = reg.SetKeyValue(szName, szValue, szName);
+      DEBUG("Create lResult %d" , lResult);
+    }
+#endif
+    if (lResult != ERROR_SUCCESS || szValue != 1) {
+      szValue = 1;
+      dwCount = sizeof(szValue);
+      lResult = reg.SetBinaryValue(szName, &szValue, dwCount);
+      //TODO:: Notify USER to remove usb device. for assign id.
+      //DEBUG("SetBinaryValue lResult %d" , lResult);
+    }
+  }
+
+  reg.Flush();
+  reg.Close();
+}
+

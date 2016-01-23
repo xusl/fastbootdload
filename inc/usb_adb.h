@@ -60,11 +60,6 @@ long usb_port_address(usb_handle* handle);
 long usb_port_subaddress(usb_handle* handle);
 long usb_port_dummy_sn(usb_handle* handle);
 
-long get_adb_composite_device_sn(long adb_sn, long *cd_sn, long *cd_sn_port);
-int add_adb_device(wchar_t *ccgp, wchar_t *parentId);
-void dump_adb_device(void);
-void build_port_map(CListCtrl *  port_list) ;
-
 const wchar_t *usb_name(usb_handle* handle);
 usb_dev_t usb_status(usb_handle* handle);
 BOOL usb_is_work(usb_handle* usb);
