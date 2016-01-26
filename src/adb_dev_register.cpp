@@ -7,11 +7,122 @@
 #pragma	 comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")
 
-
 static adb_device_t adbdev_list= {
     &adbdev_list,
     &adbdev_list,
 };
+
+DeviceInterfaces::DeviceInterfaces() :
+    mActiveIntf(NULL), mAdb(), mDiag(), mFastboot()
+{
+    ;
+}
+
+DeviceInterfaces::DeviceInterfaces(const DeviceInterfaces & devIntf) {
+    DeviceInterfaces::operator =(devIntf);
+}
+
+CDevLabel* DeviceInterfaces::GetActiveIntf() const{
+    return mActiveIntf;
+}
+
+const CDevLabel& DeviceInterfaces::GetAdbIntf() const {
+    return mAdb;
+}
+
+const CDevLabel& DeviceInterfaces::GetDiagIntf() const {
+    return mDiag;
+}
+
+const CDevLabel& DeviceInterfaces::GetFastbootIntf() const {
+    return mFastboot;
+}
+
+VOID DeviceInterfaces::SetActiveIntf( CDevLabel* intf) {
+    mActiveIntf = intf;
+}
+
+VOID DeviceInterfaces::SetAdbIntf(CDevLabel& intf) {
+    mAdb.FreeBuffer();
+    mAdb = intf;
+}
+
+VOID DeviceInterfaces::SetDiagIntf(CDevLabel& intf) {
+    mDiag.FreeBuffer();
+    mDiag = intf;
+}
+
+VOID DeviceInterfaces::SetFastbootIntf(CDevLabel& intf) {
+    mFastboot.FreeBuffer();
+    mFastboot = intf;
+}
+
+bool DeviceInterfaces::operator ==(const DeviceInterfaces & devIntf) const{
+    if ( mAdb == devIntf.GetAdbIntf() || mDiag ==devIntf.GetDiagIntf() ||
+        mFastboot == devIntf.GetFastbootIntf())
+        return true;
+    return false;
+}
+
+DeviceInterfaces & DeviceInterfaces::operator =(const DeviceInterfaces & devIntfs) {
+    mActiveIntf = devIntfs.GetActiveIntf();
+    mAdb = devIntfs.GetAdbIntf();
+    mDiag = devIntfs.GetDiagIntf();
+    mFastboot = devIntfs.GetFastbootIntf();
+    return *this;
+}
+
+DeviceInterfaces::~DeviceInterfaces()
+{
+}
+
+
+DeviceCoordinator::DeviceCoordinator() :
+    mDevintfList()
+{
+    ;
+}
+
+DeviceCoordinator::~DeviceCoordinator() {
+    mDevintfList.clear();
+}
+
+BOOL DeviceCoordinator::GetDevice(const wchar_t * devPath, DeviceInterfaces& outDevIntf) {
+    return GetDevice(CDevLabel(devPath), outDevIntf);
+}
+
+BOOL DeviceCoordinator::GetDevice(const CDevLabel& dev, DeviceInterfaces& outDevIntf) {
+    DeviceInterfaces temp;
+    for (list<DeviceInterfaces>::iterator it=mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+        if (temp == *it)
+            break;
+    }
+
+#if 1
+ list<DeviceInterfaces>::iterator it = find(mDevintfList.begin(), mDevintfList.end(), temp);
+    if (it != mDevintfList.end()) {
+//found
+outDevIntf = *it;
+    }
+    else
+    {
+        // create new
+    }
+
+#endif
+    return TRUE;
+    //return FALSE;
+}
+
+BOOL DeviceCoordinator::AddDevice(const DeviceInterfaces& devIntf)  {
+    mDevintfList.push_back(devIntf);
+    return TRUE;
+}
+
+BOOL DeviceCoordinator::RemoveDevice(const DeviceInterfaces& devIntf)  {
+    mDevintfList.remove(devIntf);
+    return TRUE;
+}
 
 
 //\\?\usbstor#disk&ven_onetouch&prod_link4&rev_2.31#6&21c8898b&1&0123456789abcdef&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
@@ -30,9 +141,9 @@ CDevLabel::CDevLabel(const wchar_t * name, const wchar_t * devPath,
     SetServiceName(name);
     CopyDeviceDescPath(devPath, parentIdPrefix);
     mUseParentIdPrefix = useParentIdPrefix;
-    if (mUseParentIdPrefix) {
-        SetDevId(parentIdPrefix);
-    } else if (devPath != NULL){
+
+    memset(mDevId, 0, sizeof mDevId);
+    if (devPath != NULL){
         wchar_t delimits[] = {L'#', L'#', L'#'};
         wchar_t *sne = (wchar_t *)devPath;
         wchar_t *snb;
@@ -48,23 +159,44 @@ CDevLabel::CDevLabel(const wchar_t * name, const wchar_t * devPath,
         }
         len = sne - snb - 1;
         wcsncpy_s(mDevId, DEV_ID_LEN, snb, len);
+
+    mEffectiveSn = usb_host_sn(devPath);
+    mEffectivePort = usb_host_sn_port(devPath);
     } else {
-        memset(mDevId, 0, sizeof mDevId);
         LOGE("Can not get invalid device id");
     }
-    GenEffectiveSnPort();
+
+    memset(mMatchId, 0, sizeof mMatchId);
+    if (mUseParentIdPrefix && parentIdPrefix != NULL) {
+        SetMatchId(parentIdPrefix);
+    } else if (wcslen(mDevId) > 0) {
+      wchar_t *sne = ( wchar_t*)wcsrchr(mDevId , L'&');
+      if (sne != NULL)
+          wcsncpy_s(mMatchId, DEV_ID_LEN, mDevId, sne - mDevId);
+      else
+        LOGE("Can not find '&' in dev path.");
+    }else {
+        LOGE("Can not get invalid device id");
+    }
+
     //LOGI("CDevLabel:: ID:\t%S\n\tDevice Path:%S \n\tParentIDPrefix:%S",
     //     mDevId, devPath, parentIdPrefix);
     LOGD("CDevLabel:: ID: %S", mDevId);
     LOGD("\tDevice Path: %S", devPath);
     LOGD("\tParentIDPrefix: %S", parentIdPrefix);
+    LOGD("\tmMatchId: %S", mMatchId);
 }
 
 CDevLabel::CDevLabel(const CDevLabel & dev) {
     //LOGI("Enter copy constructor");
     CDevLabel::operator=(dev);
 }
-
+CDevLabel::CDevLabel() {
+    CDevLabel(NULL, NULL, NULL, true);
+}
+CDevLabel::CDevLabel(const wchar_t * devPath) {
+    CDevLabel(NULL, devPath, NULL, false);
+}
 CDevLabel::~CDevLabel() {
     FREE_IF(mDevPath);
     FREE_IF(mParentIdPrefix);
@@ -73,18 +205,11 @@ CDevLabel::~CDevLabel() {
     //LOGI("~CDevLabel:: %S : %S", mDevPath, mParentIdPrefix);
 }
 
-bool CDevLabel::SetUseControllerPathFlag(bool useBus)
-{
-    mUseParentIdPrefix = useBus;
-    GenEffectiveSnPort();
-    return true;
-}
-
 void CDevLabel::CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* parentIdPrefix) {
     if (devPath != NULL) {
         mDevPath = _wcsdup(devPath);
 
-    if(mDevPath == NULL)
+        if(mDevPath == NULL)
             LOGE("strdup failed");
     } else {
         mDevPath = NULL;
@@ -99,6 +224,11 @@ void CDevLabel::CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* paren
     }
 }
 
+VOID CDevLabel::FreeBuffer() {
+    FREE_IF(mDevPath);
+    FREE_IF(mParentIdPrefix);
+}
+
 const wchar_t * CDevLabel::GetDevPath() const
 {
     return mDevPath;
@@ -108,9 +238,27 @@ const wchar_t * CDevLabel::GetParentIdPrefix() const
 {
     return mParentIdPrefix;
 }
+
+const wchar_t * CDevLabel::GetMatchId() const
+{
+    return mMatchId;
+}
+
+bool CDevLabel::SetMatchId(const wchar_t * matchId){
+    if (matchId == NULL )
+        return false;
+    int len =wcslen(matchId);
+    if (len == 0 || len >= DEV_MATCHID_LEN) {
+        LOGE("matchId length exceed buffer length");
+        return false;
+    }
+    return (0 == wcsncpy_s(mMatchId, DEV_MATCHID_LEN, matchId, len));
+}
+
 const wchar_t * CDevLabel::GetDevId() const {
     return mDevId;
 }
+
 bool CDevLabel::SetDevId(const wchar_t * devId) {
     if (devId == NULL )
         return false;
@@ -125,6 +273,7 @@ bool CDevLabel::SetDevId(const wchar_t * devId) {
 const wchar_t * CDevLabel::GetServiceName()  const {
     return mServiceName;
 }
+
 bool CDevLabel::SetServiceName(const wchar_t * name) {
     if (name == NULL)
         return false;
@@ -142,6 +291,7 @@ bool CDevLabel::GetEffectiveSnPort(long *sn, long *port) {
     *port = mEffectivePort;
     return true;
 }
+
 bool CDevLabel::SetEffectiveSnPort(long sn, long port)
 {
     mEffectiveSn = sn;
@@ -162,20 +312,26 @@ int CDevLabel::GetComPortNum() const {
     return mPortNum;
 }
 
-bool CDevLabel::GenEffectiveSnPort(void){
+bool CDevLabel::operator ==(const wchar_t * devPath) {
     const wchar_t *effectivePath = GetDevPath();
-    if (effectivePath == NULL ) {
-        LOGE("Can not get effective path");
-        return false;
-    }
-    mEffectiveSn = usb_host_sn(effectivePath);
-    mEffectivePort = usb_host_sn_port(effectivePath);
-    return true;
+    if (effectivePath != NULL && devPath != NULL &&
+        0 == wcscmp(effectivePath, devPath))
+        return true;
+    return false;
 }
 
-bool CDevLabel::operator ==(CDevLabel & dev) {
-    const wchar_t *effectivePath = GetDevId();
-    const wchar_t *effectivePath2 = dev.GetDevId();
+bool CDevLabel::operator ==(const CDevLabel & dev) const {
+    const wchar_t *effectivePath;
+    const wchar_t *effectivePath2;
+
+    effectivePath = GetDevPath();
+    effectivePath2 = dev.GetDevPath();
+
+    if (effectivePath != NULL && effectivePath2 != NULL &&
+        0 == wcscmp(effectivePath, effectivePath2)) //stricmp
+        return true;
+
+
 //TPST Upgrading device path:
 //\\?\usb#vid_1bbb&pid_007a#5&10cd67f3&0&3#{86e0d1e0-8089-11d0-9ce4-08003e301f73}
 //Adb
@@ -183,21 +339,29 @@ bool CDevLabel::operator ==(CDevLabel & dev) {
 //fastboot
 //\\?\usb#vid_18d1&pid_d00d#5&10cd67f3&0&3#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
 
-    if (effectivePath != NULL && effectivePath2 != NULL)
-        return (0 == wcscmp(effectivePath, effectivePath2) );//stricmp
+//In Debug mode:
+//adb interface
+// parent: 6&1e805b40&1
+// Devpath: \\?\usb#vid_1bbb&pid_0196#5&10cd67f3&0&3#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+//com port
+//parent: (null)
+// Devpath: \\?\usb#vid_1bbb&pid_0196&mi_02#6&1e805b40&1&0002#{86e0d1e0-8089-11d0-9ce4-08003e301f73}
+    effectivePath = GetDevId();
+    effectivePath2 = dev.GetDevId();
+    if (effectivePath != NULL && effectivePath2 != NULL &&
+        (0 == wcscmp(effectivePath, effectivePath2) ))
+        return true;//stricmp
 
     if (mUseParentIdPrefix) {
-        effectivePath = GetParentIdPrefix();
-        effectivePath2 =dev.GetParentIdPrefix();
+        effectivePath = GetMatchId();
+        effectivePath2 =dev.GetMatchId();
     }
-    else
-    {
-    effectivePath = GetDevPath();
-    effectivePath2 = dev.GetDevPath();
-    }
-    if (effectivePath == NULL || effectivePath2 == NULL)
-        return false;
-    return (0 == wcscmp(effectivePath, effectivePath2) );//stricmp
+
+    if (effectivePath != NULL && effectivePath2 != NULL &&
+        (0 == wcscmp(effectivePath, effectivePath2) ))
+        return true;
+
+    return false;
 }
 
 CDevLabel & CDevLabel::operator =(const CDevLabel & dev) {
@@ -209,6 +373,8 @@ CDevLabel & CDevLabel::operator =(const CDevLabel & dev) {
     mEffectivePort = dev.mEffectivePort;
     mPortNum = dev.GetComPortNum();
     wcscpy_s(mDevId, dev.GetDevId());
+    wcscpy_s(mMatchId, dev.GetMatchId());
+    wcscpy_s(mServiceName, dev.GetServiceName());
     return *this;
 }
 
@@ -354,9 +520,6 @@ void SetUpAdbDevice(
 
   SetupDiDestroyDeviceInfoList(hDevInfo);
 }
-
-
-
 
 adb_device_t* is_adb_device_exist(long cd_sn, long cd_sn_port, long adb_sn) {
   adb_device_t* adb;
@@ -722,32 +885,30 @@ BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service,
             continue;
         }
 
-        if(useParentIdPrefix) {
-            if (!SetupDiGetDeviceInstanceId(hDevInfo, &devdata, buffer, sizeof(buffer), &nSize)) {
-                LOGE("SetupDiGetDeviceInstanceId(): %S", _com_error(GetLastError()).ErrorMessage());
-                FREE_IF(pDetData);
-                continue;
-            }
+        if (!SetupDiGetDeviceInstanceId(hDevInfo, &devdata, buffer, sizeof(buffer), &nSize)) {
+            LOGD("SetupDiGetDeviceInstanceId(): %S", _com_error(GetLastError()).ErrorMessage());
+        } else {
             _snwprintf_s(key, MAX_PATH,L"SYSTEM\\CurrentControlSet\\Enum\\%s", buffer);
             if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
-                LOGE("RegOpenKeyExW error");
-                FREE_IF(pDetData);
-                continue ;
-            }
-
-            nSize = sizeof buffer;
-            if (RegQueryValueExW(hKey, L"ParentIdPrefix", NULL, NULL,
-                                (LPBYTE)&buffer, &nSize) != ERROR_SUCCESS) {
-                LOGE("RegQueryValueExW error %S", buffer);
+                LOGD("RegOpenKeyExW error");
+            } else {
+                nSize = sizeof buffer;
+                if (RegQueryValueExW(hKey, L"ParentIdPrefix", NULL, NULL,
+                                     (LPBYTE)&buffer, &nSize) != ERROR_SUCCESS) {
+                    LOGD("RegQueryValueExW error %S", buffer);
+                } else {
+                    pParentIdPrefix = buffer;
+                }
                 RegCloseKey(hKey);
-                FREE_IF(pDetData);
-                continue ;
             }
-            pParentIdPrefix = buffer;
+        }
+
+        if(useParentIdPrefix && pParentIdPrefix == NULL) {
+            FREE_IF(pDetData);
+            continue;
         }
 
         CDevLabel devId(service, pDetData->DevicePath, pParentIdPrefix, useParentIdPrefix);
-        RegCloseKey(hKey);
 
         hKey = SetupDiOpenDevRegKey(hDevInfo, &devdata, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
         if (hKey == NULL) {
@@ -757,7 +918,7 @@ BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service,
 
         nSize = sizeof(portName);
         if (RegQueryValueExW(hKey, L"PortName", NULL, NULL,(LPBYTE)&portName,
-                &nSize) == ERROR_SUCCESS) {
+                             &nSize) == ERROR_SUCCESS) {
             devId.SetComPort(portName);
         }
 

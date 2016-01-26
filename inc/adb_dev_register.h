@@ -12,9 +12,13 @@
 #include <atlutil.h>
 #include <setupapi.h>
 #include <vector>
+#include <list>
 #include <device.h>
 #include "usb_vendors.h"
+#include <algorithm>
+
 using std::vector;
+using namespace std;
 
 //device Class GUID
 //location:
@@ -74,30 +78,34 @@ cd-rom        6&21c8898b&0123456789abcdef&1      5&10cd67f3&0&3
 */
 #define DEV_ID_LEN        64
 #define DEV_SERVICE_LEN   64
+#define DEV_MATCHID_LEN   64
 class CDevLabel {
   public:
-    CDevLabel(const wchar_t * name, const wchar_t * devPath, const wchar_t* usbBus, bool useBus=true);
+    CDevLabel();
+    CDevLabel(const wchar_t * name, const wchar_t * devPath, const wchar_t* usbBus, bool useBus);
+    CDevLabel(const wchar_t * devPath);
     CDevLabel(const CDevLabel & dev);
     ~CDevLabel();
 
-    bool operator ==(CDevLabel & );
+    bool operator ==(const CDevLabel & ) const;
+    bool operator ==(const wchar_t * devPath);
     CDevLabel & operator =(const CDevLabel & );
     const wchar_t * GetDevPath() const;
     const wchar_t * GetParentIdPrefix() const;
     const wchar_t * GetDevId() const;
+    const wchar_t * GetMatchId() const;
+    bool SetMatchId(const wchar_t * matchId);
     bool SetDevId(const wchar_t * devId);
     bool SetServiceName(const wchar_t * name);
     const wchar_t * GetServiceName() const;
     bool SetEffectiveSnPort(long sn, long port);
     bool GetEffectiveSnPort(long *sn, long *port);
-    bool SetUseControllerPathFlag(bool useBus);
     bool SetComPort(const wchar_t *portName);
     int GetComPortNum() const;
-
+    VOID FreeBuffer();
 
   private:
     void CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* usbBus);
-    bool GenEffectiveSnPort(void);
 
   public:
     wchar_t *   mDevPath;
@@ -109,10 +117,55 @@ class CDevLabel {
 
  private:
     wchar_t     mDevId[DEV_ID_LEN];
+    wchar_t     mMatchId[DEV_MATCHID_LEN];
     wchar_t     mServiceName[DEV_SERVICE_LEN];
     int          mPortNum;
 };
 
+//CD-ROM->Diag TPST -> Fastboot
+//CD-ROM->Diag Debug -> adb -> Fastboot
+//Diag 9008 -> Fastboot
+//We do not associate the CD-ROM interface.
+class DeviceInterfaces {
+  public:
+  DeviceInterfaces();
+  DeviceInterfaces(const DeviceInterfaces & devIntf);
+  ~DeviceInterfaces();
+
+  bool operator ==(const DeviceInterfaces & devIntf) const;
+  DeviceInterfaces & operator =(const DeviceInterfaces &devIntf);
+  CDevLabel* GetActiveIntf() const;
+  const CDevLabel& GetAdbIntf() const;
+  const CDevLabel& GetDiagIntf() const;
+  const CDevLabel& GetFastbootIntf() const;
+  VOID SetFastbootIntf(CDevLabel& intf);
+  VOID SetDiagIntf(CDevLabel& intf);
+  VOID SetAdbIntf(CDevLabel& intf);
+  VOID SetActiveIntf(CDevLabel* intf);
+
+  private:
+    CDevLabel  *mActiveIntf;  //interface which now we operate
+    CDevLabel   mAdb;       //Adb interface, appear in debug configuration
+    CDevLabel   mDiag;      /*Diag interface, appear in TPST configuration, which only have TPST interface
+                             * Diag interface, appear in debug configuration
+                             * Diag interface, there are none image in flash, got Qualcomm 9008.
+                            */
+
+    CDevLabel   mFastboot;  //Fastboot interface, though it uses adb driver, it alway have a different PID/VID from adb interface
+};
+
+class DeviceCoordinator {
+  public:
+    DeviceCoordinator();
+    ~DeviceCoordinator();
+    BOOL GetDevice(const wchar_t *devPath, DeviceInterfaces& outDevIntf);
+    BOOL GetDevice(const CDevLabel& dev, DeviceInterfaces& outDevIntf);
+    BOOL AddDevice(const DeviceInterfaces& devIntf) ;
+    BOOL RemoveDevice(const DeviceInterfaces& devIntf) ;
+
+  private:
+    list<DeviceInterfaces>  mDevintfList;
+};
 
 void check_regedit_usbflags(usbid_t USBIds[], unsigned count);
 BOOL RegisterAdbDeviceNotification(IN HWND hWnd, OUT HDEVNOTIFY *phDeviceNotify = NULL);

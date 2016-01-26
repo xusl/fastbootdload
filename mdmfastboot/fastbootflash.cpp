@@ -165,6 +165,17 @@ int flash_image::read_config(const wchar_t* config) {
   return 0;
 }
 
+
+BOOL flash_image::unpack_download_img(const wchar_t *lpath) {
+    uint32 size;
+    BYTE* pImgData = (BYTE*)load_file(lpath, &size);
+     char filesInfoBuf[FILEINFO_HEAD_LEN];
+        memset(filesInfoBuf, 0, FILEINFO_HEAD_LEN);
+        memcpy(filesInfoBuf, pImgData + VERSION_HEAD_LEN, FILEINFO_HEAD_LEN);
+    FilePosInfoS* fileInfo = (FilePosInfoS *)filesInfoBuf;
+    return TRUE;
+}
+
 int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write, const wchar_t* config)
 {
 
@@ -811,7 +822,7 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
     Action *a;
     char resp[FB_RESPONSE_SZ+1];
     int status;
-    double start = -1;
+    long long start = -1;
     unsigned total_size = image_size();
     unsigned flashed_size = 0;
 	bool bIsBreak = false;

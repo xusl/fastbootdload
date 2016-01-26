@@ -82,7 +82,7 @@ class flash_image{
     BOOL get_pkg_a5sw_kern_ver(CString &version);
     BOOL get_pkg_fw_ver(CString &version);
     BOOL get_pkg_qcn_ver(CString &version);
-	BOOL set_download_flag(CString strPartitionName, bool bDownload);
+	  BOOL set_download_flag(CString strPartitionName, bool bDownload);
     int read_config(const wchar_t* config);
 
   protected:
@@ -92,8 +92,8 @@ class flash_image{
   private:
     int add_image(wchar_t *partition, const wchar_t *lpath, BOOL write =FALSE, const wchar_t* config = NULL);
     void read_package_version(const wchar_t * package_conf);
-
     BOOL reset(BOOL free_only);
+    BOOL unpack_download_img(const wchar_t *lpath);
 
   private:
     FlashImageInfo *image_list;

@@ -694,8 +694,16 @@ typedef struct
 }DASHBOARD_DATA,NV_PACKET_DATA,PERSO_TXT_DATA,CONFIG_XML_DATA;
 
 // For customer backup & restore operation
-typedef struct
+typedef struct TCustDataInfoType_
 {
+
+TCustDataInfoType_ (void) {
+  memset(&dashboardData, 0, sizeof dashboardData);
+  memset(&nvPacketData, 0, sizeof nvPacketData);
+  memset(&persoTxtData, 0, sizeof persoTxtData);
+  memset(&configxmlData, 0, sizeof configxmlData);
+}
+
 	DASHBOARD_DATA    dashboardData;
 	NV_PACKET_DATA	  nvPacketData;
 	PERSO_TXT_DATA    persoTxtData;

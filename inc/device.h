@@ -152,14 +152,6 @@ typedef struct dev_switch_t {
   long        time;
 } dev_switch_t;
 
-typedef struct mass_storage_handle
-{
-  mass_storage_handle *prev;
-  mass_storage_handle *next;
-  wchar_t           *port_name;                  // port name
-  long               usb_sn;
-  long               usb_sn_port;
-} mass_storage_handle;
 
 /*=============================================================================
 	Class provides functions of enumerating devices, including cdrom,

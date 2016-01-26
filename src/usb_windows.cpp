@@ -43,12 +43,6 @@ static dev_switch_t switch_list = {
   &switch_list,
 };
 
-
-static mass_storage_handle mass_storage_list = {
-    &mass_storage_list,
-    &mass_storage_list,
-};
-
 /// Locker for the list of opened usb handles
 ADB_MUTEX_DEFINE( usb_lock );
 
@@ -83,8 +77,6 @@ void usb_kick(usb_handle* handle);
 /// Closes opened usb handle
 int usb_close(usb_handle* handle);
 
-/// Gets interface (device) name for an opened usb handle
-const wchar_t *usb_name(usb_handle* handle);
 
 void adb_usb_init( void )
 {
@@ -537,15 +529,7 @@ int usb_close(usb_handle* handle) {
   return 0;
 }
 
-const wchar_t *usb_name(usb_handle* handle) {
-  if (NULL == handle) {
-    SetLastError(ERROR_INVALID_HANDLE);
-    errno = ERROR_INVALID_HANDLE;
-    return NULL;
-  }
 
-  return handle->interface_name;
-}
 
 long usb_port_address(usb_handle* handle) {
   if (NULL == handle) {

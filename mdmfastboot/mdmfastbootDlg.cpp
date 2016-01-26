@@ -9,6 +9,7 @@
 #include "fastbootflash.h"
 #include "adbhost.h"
 #include "usb_vendors.h"
+#include "custdata.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -596,7 +597,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   InitSettingDlg();
   InitUsbWorkData();
   //SetUpDevice(NULL, 0, &GUID_DEVCLASS_USB,  _T("USB"));
-  SetUpAdbDevice(NULL, 0);
+  //SetUpAdbDevice(NULL, 0);
 
   m_bInit = TRUE;
   m_UpdateDownloadFlag = TRUE;
@@ -729,7 +730,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
                 break;
             }
         case DBT_DEVTYP_DEVICEINTERFACE:
-                SetUpAdbDevice(pDevInf, dwData);
+                //SetUpAdbDevice(pDevInf, dwData);
                 AdbUsbHandler(true);
                 EnumerateAdbDevice();
                 break;
@@ -901,11 +902,11 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
 BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID)
 {
     vector<CDevLabel> devicePath;
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_USBCCGP, devicePath, false);
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_USBCCGP, devicePath, true);
     for (vector<CDevLabel>::iterator iter = devicePath.begin();
          iter != devicePath.end();
          ++ iter){
-        LOGI("adb interface %S %S",iter->GetParentIdPrefix(), iter->GetDevPath());
+        LOGI("Enumerate adb interface:: \n parent: %S \n Devpath: %S",iter->GetParentIdPrefix(), iter->GetDevPath());
     }
 
     devicePath.clear();
@@ -914,7 +915,7 @@ BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID)
     for (vector<CDevLabel>::iterator iter = devicePath.begin();
          iter != devicePath.end();
          ++ iter){
-        LOGI("fastboot interface %S %S",iter->GetParentIdPrefix(), iter->GetDevPath());
+        LOGI("Enumerate fastboot interface:: \n parent: %S \n Devpath: %S",iter->GetParentIdPrefix(), iter->GetDevPath());
     }
 
     devicePath.clear();
@@ -935,17 +936,22 @@ BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
     GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
     //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
     //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
-    LOGI("Do HandleComDevice");
 
     for (vector<CDevLabel>::iterator iter = devicePath.begin();
          iter != devicePath.end();
          ++ iter)
     {
         CPacket  *m_packetDll = new CPacket();
-        LOGI("Port %S %S",iter->GetParentIdPrefix(), iter->GetDevPath());
+        LOGI("Enumerate Com Port: \n parent: %S \n Devpath: %S",iter->GetParentIdPrefix(), iter->GetDevPath());
+        uint16 m_dlPort = iter->GetComPortNum();
 
-        m_packetDll->Init(iter->GetComPortNum());
-        {
+        m_packetDll->Init(m_dlPort);
+        if (1){
+        TCustDataInfoType *m_pCustdataInfo = new TCustDataInfoType;
+        CCustData m_pCustdata (*m_packetDll, m_pCustdataInfo, m_dlPort);
+        delete m_pCustdataInfo;
+        }
+        if(1){
             JRDdiagCmd  DIAGCmd (*m_packetDll);
             DIAGCmd.EnableDiagServer();
             char version[VERSION_LEN] ={0};
@@ -954,17 +960,31 @@ BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
                 DIAGCmd.RequestVersion(0, (char *)(&version));
                 LOGE("index %d version %s", i, version);
             }
-            char pFlash_Type[20];
-            memset(&pFlash_Type,0,20);
+            char pFlash_Type[20] = {0};
             TResult result = DIAGCmd.RequestFlashType_9X25((char *)(&pFlash_Type));
 
             DIAGCmd.DisableDiagServer();
         }
-        if (0)
+        if (1)
         {
+            typedef struct
+{
+    byte cmd_code;
+    byte msm_hw_version_format;
+    byte reserved[2]; /* for alignment / future use */
+    uint32 msm_hw_version;
+    uint32 mobile_model_id;
+    /* The following character array contains 2 NULL terminated strings:
+    'build_id' string, followed by 'model_string' */
+    char ver_strings[32];
+}get_version_rsp_type;
             CDIAGCmd DIAGCmd(*m_packetDll);
+            get_version_rsp_type pVersion = {0};
             DIAGCmd.EnableDiagServer();
-            DIAGCmd.RestartDevice();
+            DIAGCmd.RequestFirmwareVer_N((char *)(&pVersion));
+            LOGI("COM%d pVersion.mobile_model_id = %d",m_dlPort,pVersion.mobile_model_id);
+    LOGI("COM%d pVersion.ver_strings = %s",m_dlPort,pVersion.ver_strings);
+            //DIAGCmd.RestartDevice();
             DIAGCmd.DisableDiagServer();
         }
 
@@ -1042,7 +1062,6 @@ BOOL CmdmfastbootDlg::RejectCDROM(VOID){
     default:
         break;
     }
-    // MessageBeep(0x00000030L);   // Windows question sound.
 }
 
 UINT CmdmfastbootDlg::ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg) {

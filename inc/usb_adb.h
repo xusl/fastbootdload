@@ -60,7 +60,6 @@ long usb_port_address(usb_handle* handle);
 long usb_port_subaddress(usb_handle* handle);
 long usb_port_dummy_sn(usb_handle* handle);
 
-const wchar_t *usb_name(usb_handle* handle);
 usb_dev_t usb_status(usb_handle* handle);
 BOOL usb_is_work(usb_handle* usb);
 
