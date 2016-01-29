@@ -53,7 +53,6 @@ typedef enum {
 class adbhost
 {
 	public:
-		adbhost(usb_handle *usb);
 		adbhost(usb_handle *usb, unsigned address);
 		~adbhost(void);
 

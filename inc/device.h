@@ -128,29 +128,10 @@ struct usb_handle {
   int interface_protocol;
   usb_dev_t status;
   BOOL work;
-  long usb_sn;
-  long usb_sn_port;
-  long dummy_sn;
 
   /// Mask for determining when to use zero length packets
   unsigned zero_mask;
 };
-
-typedef struct adb_device_t {
-   adb_device_t *prev;
-   adb_device_t *next;
-   long adb_sn;  // adb device serial number that allocate by Windows.
-   long cd_sn;    // serial number of composite device which adb device in.
-   long cd_sn_port;
-}adb_device;
-
-typedef struct dev_switch_t {
-  dev_switch_t *prev;
-  dev_switch_t *next;
-  long        usb_sn;
-  usb_dev_t   status;
-  long        time;
-} dev_switch_t;
 
 
 /*=============================================================================

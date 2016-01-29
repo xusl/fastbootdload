@@ -49,16 +49,9 @@ int usb_read(usb_handle *h, void *data, int len, bool fulfill);
 int usb_close(usb_handle *h);
 void usb_kick(usb_handle *h);
 
-int usb_switch_device(usb_handle* handle);
-int remove_switch_device(long sn);
-
 usb_handle* usb_handle_enum_init(void);
 usb_handle* usb_handle_next(usb_handle* usb);
 void usb_set_work(usb_handle* usb, BOOL bwork);
-/*get host sn from us_handle*/
-long usb_port_address(usb_handle* handle);
-long usb_port_subaddress(usb_handle* handle);
-long usb_port_dummy_sn(usb_handle* handle);
 
 usb_dev_t usb_status(usb_handle* handle);
 BOOL usb_is_work(usb_handle* usb);

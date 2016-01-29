@@ -616,7 +616,7 @@ UINT fastboot::port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
                   (WPARAM)info,
                   (LPARAM)data);
 	UsbWorkData* wd = (UsbWorkData*) data;
-	INFO("Device 0x%x(%d): %s", wd->usb_sn, wd->usb_sn_port, buffer);
+	INFO("%s: %s", wd->devIntf->GetDevTag(), buffer);
 
     return 0;
 }

@@ -113,12 +113,6 @@ static void dump_packet( const char*  tag, apacket* const p)
 }
 #endif
 
-adbhost::adbhost(usb_handle *usb)
-{
-   adbhost(usb, usb_port_address(usb));
-}
-
-
 adbhost::adbhost(usb_handle *usb, unsigned address):
    id(address)
 {

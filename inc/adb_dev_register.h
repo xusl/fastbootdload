@@ -61,6 +61,17 @@ using namespace std;
 //HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Enum\USB\Vid_1bbb&Pid_0196&MI_02\6&1e805b40&1&0002\Device Parameters
 #define SRV_JRDUSBSER    L"jrdusbser"
 #define SRV_SERIAL       L"Serial"
+
+typedef enum {
+	//DEVTYPE_NONE  = 0,
+	//DEVTYPE_CDROM,
+	//DEVTYPE_DISK
+	DEVTYPE_DIAGPORT,
+	DEVTYPE_FASTBOOT,
+	DEVTYPE_ADB,
+	//DEVTYPE_MAX = 0xFF,
+} TDevType;
+
 /*
 a usb device path in various mode:
               interface                        composite device
@@ -74,6 +85,7 @@ debug mode
 cd-rom        6&21c8898b&0123456789abcdef&1      5&10cd67f3&0&3
 */
 #define DEV_ID_LEN        64
+#define DEV_TAG_LEN       64
 #define DEV_SERVICE_LEN   64
 #define DEV_MATCHID_LEN   64
 class CDevLabel {
@@ -86,7 +98,7 @@ class CDevLabel {
 
     bool operator ==(const CDevLabel & ) const;
     bool Match(const CDevLabel * const &) const;
-    bool operator ==(const wchar_t * devPath);
+    bool MatchDevPath(const wchar_t * devPath);
     CDevLabel & operator =(const CDevLabel & );
     const wchar_t * GetDevPath() const;
     const wchar_t * GetParentIdPrefix() const;
@@ -131,22 +143,31 @@ class DeviceInterfaces {
   ~DeviceInterfaces();
 
   bool operator ==(const DeviceInterfaces * const & devIntf) const;
-  bool operator ==(const wchar_t * devPath) const;
+  bool MatchDevPath(const wchar_t * devPath) const;
   DeviceInterfaces & operator =(const DeviceInterfaces &devIntf);
   CDevLabel* GetActiveIntf() const;
   CDevLabel* GetAdbIntf() const;
   CDevLabel* GetDiagIntf() const;
   CDevLabel* GetFastbootIntf() const;
-  VOID SetFastbootIntf(CDevLabel& intf);
-  VOID SetDiagIntf(CDevLabel& intf);
-  VOID SetAdbIntf(CDevLabel& intf);
+  BOOL GetDeviceStatus() const;
+  VOID SetDeviceStatus(BOOL status);
+  CDevLabel* SetFastbootIntf(CDevLabel& intf);
+  CDevLabel* SetDiagIntf(CDevLabel& intf);
+  CDevLabel* SetAdbIntf(CDevLabel& intf);
   VOID SetActiveIntf(CDevLabel* intf);
-  VOID DeleteInterfaces(VOID);
+  BOOL SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf=TRUE);
+  VOID DeleteMemory(VOID);
+  int GetDevId();
+  VOID UpdateDevTag();
+  const char *GetDevTag() const;
 
   private:
+    char       mTag[DEV_TAG_LEN];
+    BOOL       mDeviceActive;  //Device is exactly exist. For when enable fix logic port,
+                               //we do not remove DeviceInterfaces object.
     CDevLabel  *mActiveIntf;  //interface which now we operate
-    CDevLabel   *mAdb;       //Adb interface, appear in debug configuration
-    CDevLabel   *mDiag;      /*Diag interface, appear in TPST configuration, which only have TPST interface
+    CDevLabel  *mAdb;       //Adb interface, appear in debug configuration
+    CDevLabel  *mDiag;      /*Diag interface, appear in TPST configuration, which only have TPST interface
                              * Diag interface, appear in debug configuration
                              * Diag interface, there are none image in flash, got Qualcomm 9008.
                             */
@@ -154,15 +175,6 @@ class DeviceInterfaces {
     CDevLabel   *mFastboot;  //Fastboot interface, though it uses adb driver, it alway have a different PID/VID from adb interface
 };
 
-typedef enum {
-	//DEVTYPE_NONE  = 0,
-	//DEVTYPE_CDROM,
-	//DEVTYPE_DISK
-	DEVTYPE_DIAGPORT,
-	DEVTYPE_FASTBOOT,
-	DEVTYPE_ADB,
-	//DEVTYPE_MAX = 0xFF,
-} TDevType;
 
 class DeviceCoordinator {
   public:
@@ -197,10 +209,6 @@ DEFINE_GUID(GUID_DEVINTERFACE_ADB, 0xf72fe0d4, 0xcbcb, 0x407d, 0x88, 0x14, 0x9e,
 DEFINE_GUID(GUID_DEVINTERFACE_MODEM, 0x2c7089aa, 0x2e0e, 0x11d1, 0xb1, 0x14, 0x00, 0xc0, 0x4f, 0xc2, 0xaa, 0xe4);
 //DEFINE_GUID(GUID_DEVINTERFACE_DISK, 0x53f56307, 0xb6bf, 0x11d0, 0x94, 0xf2, 0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b);
 
-long get_adb_composite_device_sn(long adb_sn, long *cd_sn, long *cd_sn_port);
-int add_adb_device(wchar_t *ccgp, wchar_t *parentId);
-void dump_adb_device(void);
-void build_port_map(CListCtrl *  port_list) ;
 
 long extract_serial_number(wchar_t * sn, wchar_t **ppstart =NULL, wchar_t **ppend= NULL);
 long usb_host_sn(const wchar_t* dev_name, wchar_t** psn = NULL);

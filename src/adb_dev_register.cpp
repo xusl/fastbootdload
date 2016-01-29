@@ -7,17 +7,16 @@
 #pragma	 comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")
 
-static adb_device_t adbdev_list= {
-    &adbdev_list,
-    &adbdev_list,
-};
-
 DeviceInterfaces::DeviceInterfaces() :
     mActiveIntf(NULL),
     mAdb(NULL),
     mDiag(NULL),
-    mFastboot(NULL)
-{;}
+    mFastboot(NULL),
+    mDeviceActive(TRUE)
+{
+    const char *default_tag = "N/A Device";
+    strncpy_s(mTag, DEV_TAG_LEN, default_tag, strlen(default_tag));
+}
 
 DeviceInterfaces::DeviceInterfaces(const DeviceInterfaces & devIntf) {
     DeviceInterfaces::operator =(devIntf);
@@ -39,23 +38,94 @@ CDevLabel* DeviceInterfaces::GetFastbootIntf() const {
     return mFastboot;
 }
 
+BOOL DeviceInterfaces::GetDeviceStatus() const {
+    return mDeviceActive;
+}
+
+VOID DeviceInterfaces::SetDeviceStatus(BOOL status) {
+    mDeviceActive = status;
+}
+
 VOID DeviceInterfaces::SetActiveIntf( CDevLabel* intf) {
     mActiveIntf = intf;
 }
 
-VOID DeviceInterfaces::SetAdbIntf(CDevLabel& intf) {
+CDevLabel* DeviceInterfaces::SetAdbIntf(CDevLabel& intf) {
     DELETE_IF(mAdb);
     mAdb = new CDevLabel(intf);
+    return mAdb;
 }
 
-VOID DeviceInterfaces::SetDiagIntf(CDevLabel& intf) {
+CDevLabel* DeviceInterfaces::SetDiagIntf(CDevLabel& intf) {
     DELETE_IF(mDiag);
     mDiag = new CDevLabel(intf);
+    return mDiag;
 }
 
-VOID DeviceInterfaces::SetFastbootIntf(CDevLabel& intf) {
+CDevLabel* DeviceInterfaces::SetFastbootIntf(CDevLabel& intf) {
     DELETE_IF(mFastboot);
     mFastboot = new CDevLabel(intf);
+    return mFastboot;
+}
+
+VOID DeviceInterfaces::UpdateDevTag() {
+    long sn;
+    long port;
+    if(mAdb != NULL) {
+        mAdb->GetEffectiveSnPort(&sn, &port);
+    } else if(mFastboot != NULL) {
+        mFastboot->GetEffectiveSnPort(&sn, &port);
+    }
+
+    if(mDiag != NULL) {
+        //wsprintf
+    snprintf(mTag, DEV_TAG_LEN, "COM%d (0X%X.%d)", mDiag->GetComPortNum(), sn, port);
+    } else {
+     snprintf(mTag, DEV_TAG_LEN, "Device: 0X%X (%d)", sn, port);
+    }
+}
+
+const char *DeviceInterfaces::GetDevTag() const {
+    return mTag;
+}
+
+int DeviceInterfaces::GetDevId() {
+    long sn;
+    long port;
+
+    if(mDiag != NULL)
+        return mDiag->GetComPortNum();
+
+    if(mActiveIntf != NULL) {
+        mActiveIntf->GetEffectiveSnPort(&sn, &port);
+        return sn+port;
+    }
+
+    if(mAdb != NULL) {
+        mAdb->GetEffectiveSnPort(&sn, &port);
+        return sn+port;
+    }
+
+    if(mFastboot != NULL) {
+        mFastboot->GetEffectiveSnPort(&sn, &port);
+        return sn+port;
+    }
+    return 0xdeadbeef;
+}
+
+BOOL DeviceInterfaces::SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf) {
+    CDevLabel* pDev = NULL;
+    if (type == DEVTYPE_DIAGPORT) {
+        pDev = SetDiagIntf(dev);
+    } else if(type == DEVTYPE_ADB) {
+        pDev = SetAdbIntf(dev);
+    } else if(type == DEVTYPE_FASTBOOT) {
+        pDev = SetFastbootIntf(dev);
+    }
+    if(pDev != NULL && updateActiveIntf)
+        SetActiveIntf(pDev);
+    UpdateDevTag();
+    return TRUE;
 }
 
 bool DeviceInterfaces::operator ==(const DeviceInterfaces * const & devIntf) const{
@@ -79,7 +149,7 @@ bool DeviceInterfaces::operator ==(const DeviceInterfaces * const & devIntf) con
     return false;
 }
 
-bool DeviceInterfaces::operator ==(const wchar_t * devPath) const {
+bool DeviceInterfaces::MatchDevPath(const wchar_t * devPath) const {
     LOGE("DO DeviceInterfaces::operator == 2");
     if ( *mAdb == devPath || *mDiag == devPath ||
         *mFastboot == devPath)
@@ -92,10 +162,12 @@ DeviceInterfaces & DeviceInterfaces::operator =(const DeviceInterfaces & devIntf
     mAdb = devIntfs.GetAdbIntf();
     mDiag = devIntfs.GetDiagIntf();
     mFastboot = devIntfs.GetFastbootIntf();
+    mDeviceActive = devIntfs.GetDeviceStatus();
+    strcpy(mTag, devIntfs.GetDevTag());
     return *this;
 }
 
-VOID DeviceInterfaces::DeleteInterfaces(VOID) {
+VOID DeviceInterfaces::DeleteMemory(VOID) {
     DELETE_IF(mAdb);
     DELETE_IF(mDiag);
     DELETE_IF(mFastboot);
@@ -117,7 +189,7 @@ DeviceCoordinator::~DeviceCoordinator() {
     list<DeviceInterfaces*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
         DeviceInterfaces* item = *it;
-        item->DeleteInterfaces();
+        item->DeleteMemory();
         delete item;
         //*it = NULL;
     }
@@ -136,7 +208,7 @@ BOOL DeviceCoordinator::GetDevice(const wchar_t * const devPath, DeviceInterface
     ASSERT(devPath != NULL);
     list<DeviceInterfaces*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
-        if(**it == devPath) {
+        if((*it)->MatchDevPath(devPath) && (*it)->GetDeviceStatus()) {
             *outDevIntf = *it;
             return TRUE;
         }
@@ -146,13 +218,7 @@ BOOL DeviceCoordinator::GetDevice(const wchar_t * const devPath, DeviceInterface
 
 BOOL DeviceCoordinator::CreateDevice(CDevLabel& dev, TDevType type, DeviceInterfaces** outDevIntf) {
     DeviceInterfaces temp;
-    if (type == DEVTYPE_DIAGPORT) {
-        temp.SetDiagIntf(dev);
-    } else if(type == DEVTYPE_ADB) {
-        temp.SetAdbIntf(dev);
-    } else if(type == DEVTYPE_FASTBOOT) {
-        temp.SetFastbootIntf(dev);
-    }
+    temp.SetIntf(dev, type);
 
     list<DeviceInterfaces*>::iterator it;
     //it = find(mDevintfList.begin(), mDevintfList.end(), temp);
@@ -162,18 +228,14 @@ BOOL DeviceCoordinator::CreateDevice(CDevLabel& dev, TDevType type, DeviceInterf
     }
     if (it != mDevintfList.end()) {
         LOGI("Update exist device");
-        if (type == DEVTYPE_DIAGPORT) {
-            (*it)->SetDiagIntf(dev);
-        } else if(type == DEVTYPE_ADB) {
-            (*it)->SetAdbIntf(dev);
-        } else if(type == DEVTYPE_FASTBOOT) {
-            (*it)->SetFastbootIntf(dev);
-        }
+        (*it)->SetDeviceStatus(TRUE);
+        (*it)->SetIntf(dev, type);
         if (outDevIntf != NULL)
             *outDevIntf = *it;
     } else {
         LOGI("Create new device");
         DeviceInterfaces* newDevIntf = new DeviceInterfaces(temp);
+        newDevIntf->SetDeviceStatus(TRUE);
         AddDevice(newDevIntf);
         if (outDevIntf != NULL)
             *outDevIntf = newDevIntf;
@@ -189,7 +251,7 @@ BOOL DeviceCoordinator::AddDevice(DeviceInterfaces* const &devIntf)  {
 
 BOOL DeviceCoordinator::RemoveDevice(DeviceInterfaces* const & devIntf)  {
     mDevintfList.remove(devIntf);
-    devIntf->DeleteInterfaces();
+    devIntf->DeleteMemory();
     delete devIntf;
     return TRUE;
 }
@@ -381,7 +443,7 @@ int CDevLabel::GetComPortNum() const {
     return mPortNum;
 }
 
-bool CDevLabel::operator ==(const wchar_t * devPath) {
+bool CDevLabel::MatchDevPath(const wchar_t * devPath) {
     LOGE("DO CDevLabel::operator ==");
     const wchar_t *effectivePath = GetDevPath();
     if (effectivePath != NULL && devPath != NULL &&
@@ -588,7 +650,7 @@ void SetUpAdbDevice(
       lResult = reg.QueryStringValue(L"ParentIdPrefix", static_cast<LPTSTR>(value), &nSize);
 
       if (lResult == ERROR_SUCCESS ) {
-        add_adb_device(buf, value);
+        //add_adb_device(buf, value);
       }
       reg.Close();
     }
@@ -602,117 +664,6 @@ void SetUpAdbDevice(
 
   SetupDiDestroyDeviceInfoList(hDevInfo);
 }
-
-adb_device_t* is_adb_device_exist(long cd_sn, long cd_sn_port, long adb_sn) {
-  adb_device_t* adb;
-  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-    if (adb->cd_sn == cd_sn && adb->adb_sn == adb_sn && adb->cd_sn_port == cd_sn_port) {
-      return adb;
-    }
-  }
-
-  return NULL;
-}
-
-void build_port_map(CListCtrl *  port_list) {
-    int item = 0;
-    adb_device_t* adb;
-    wchar_t  compsite[64];
-    wchar_t  adb_sn[64];
-
-    if (port_list == NULL)
-        return;
-
-    port_list->DeleteAllItems();
-
-  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-    _snwprintf_s(compsite,63, _T("0x%X (%d)"), adb->cd_sn, adb->cd_sn_port);
-    _snwprintf_s(adb_sn, 63,_T("0x%X"), adb->adb_sn);
-    port_list->InsertItem(item,compsite);
-port_list->SetItemText(item++,1,adb_sn);
-
-//        INFO("0x%x (composite)<==> 0x%x(adb)", adb->cd_sn, adb->adb_sn);
-  }
-}
-
-void dump_adb_device(void) {
-  adb_device_t* adb;
-  INFO("Begin dump host installed adb device driver\n================");
-  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-        INFO("0x%x (composite)<==> 0x%x(adb)", adb->cd_sn, adb->adb_sn);
-  }
-  INFO("End dump host installed adb device driver\n=================");
-}
-
-long get_adb_composite_device_sn(long adb_sn, long *cd_sn, long *cd_sn_port) {
-  adb_device_t* adb;
-  *cd_sn = adb_sn;
-  *cd_sn_port = 0;
-  for(adb = adbdev_list.next; adb != &adbdev_list; adb = adb->next) {
-    if (adb->adb_sn == adb_sn) {
-      INFO("adb_sn 0x%x convert composite sn 0x%x(%d) ", adb_sn, adb->cd_sn, adb->cd_sn_port);
-      *cd_sn = adb->cd_sn;
-      *cd_sn_port = adb->cd_sn_port;
-      return adb->cd_sn;
-    }
-  }
-  return adb_sn;
-}
-
-
-// Usually, adb is a composite device interface, and fastboot is a single interface device.
-// So the adb interface 's host number is differ from fastboot. But it's composite's host number
-// is equal fastboot's host number.
-// adb composite device USB\VID_1BBB&PID_0192\5&10CD67F3&0&4 have key ParentIdPrefix
-// with 6&29f04a5a&0. And adb interface's host number prefix with 6&29f04a5a&0. Then,
-// fastboot host number contain 10CD67F3.
-int add_adb_device(wchar_t *ccgp, wchar_t *parentId) {
-  long cd_sn, adb_sn, cd_sn_port=0;
-
-  if (ccgp == NULL || parentId == NULL) {
-    ERROR("null parameter");
-    return -1;
-  }
-
-  size_t len = wcslen (ccgp);
-  if(wcslen (ccgp) < 22)
-    return -1;
-
-  wchar_t* ccgp_last_begin = ccgp + wcslen (ccgp) - 1;
-  wchar_t* ccgp_last_end = ccgp_last_begin + 1;
-  if (*(ccgp_last_begin - 1) == L'&' && *(ccgp_last_begin - 3) == L'&')
-    cd_sn_port = wcstol(ccgp_last_begin , &ccgp_last_end, 16);
-
-  cd_sn = extract_serial_number(ccgp + 22);
-  adb_sn = extract_serial_number(parentId);
-
-  if (cd_sn <= 0 || adb_sn <= 0 ) {
-    ERROR("ERROR %S<=>%S", ccgp, parentId);
-    return -1;
-  }
-
-  if (is_adb_device_exist(cd_sn, cd_sn_port, adb_sn) == NULL) {
-    adb_device_t* adb = (adb_device_t*)malloc(sizeof(adb_device_t));
-
-    if (adb == NULL) {
-      ERROR("Out of Memory");
-      return -1;
-    }
-    adb->adb_sn = adb_sn;
-    adb->cd_sn = cd_sn;
-    adb->cd_sn_port = cd_sn_port;
-
-    adb->next = &adbdev_list;
-    adb->prev = adbdev_list.prev;
-    adb->prev->next = adb;
-    adb->next->prev = adb;
-    INFO("Adb device 0x%x 0x%x(%d)", adb_sn, cd_sn, cd_sn_port);
-  } else {
-    DEBUG("ADB_DEVICE has already exist.");
-  }
-  return 0;
-}
-
 
 /*
   // dbcc_name:

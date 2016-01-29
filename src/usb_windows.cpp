@@ -38,10 +38,6 @@ static usb_handle handle_list = {
   &handle_list,
 };
 
-static dev_switch_t switch_list = {
-  &switch_list,
-  &switch_list,
-};
 
 /// Locker for the list of opened usb handles
 ADB_MUTEX_DEFINE( usb_lock );
@@ -84,97 +80,6 @@ void adb_usb_init( void )
 	usb_vendors_init();
 }
 
-
-int usb_switch_device(usb_handle* handle) {
-  dev_switch_t* dev = (dev_switch_t*)malloc(sizeof(dev_switch_t));
-
-  if (dev == NULL) {
-	  ERROR("Out of Memory");
-	  return -1;
-  }
-
-  adb_mutex_lock(&usb_lock);
-  dev->usb_sn = handle->usb_sn;
-  dev->status = handle->status;
-  dev->time = now();
-
-    // Not in the list. Add this handle to the list.
-  dev->next = &switch_list;
-  dev->prev = switch_list.prev;
-  dev->prev->next = dev;
-  dev->next->prev = dev;
-  adb_mutex_unlock(&usb_lock);
-
-  return 0;
-}
-
-static int switch_device_close(dev_switch_t* dev) {
-    if (dev == NULL)
-        return -1;
-
-  adb_mutex_lock(&usb_lock);
-      if ((dev->next != dev) && (dev->prev != dev)) {
-      //link the next node and previous node
-      dev->next->prev = dev->prev;
-      dev->prev->next = dev->next;
-      //unlink self from the list
-      dev->prev = dev;
-      dev->next = dev;
-    }
-
-    free(dev);
-
-  adb_mutex_unlock(&usb_lock);
-  return 0;
-}
-
-
-int remove_switch_device(long sn)  {
-    dev_switch_t* dev;
-
-  // Iterate through the list looking for the name match.
-  for(dev = switch_list.next; dev != &switch_list; dev = dev->next) {
-    if (sn != dev->usb_sn)
-      continue;
-
-    switch_device_close(dev);
-    return 0;
-  }
-  return -1;
-}
-
-/*
-* return 0: success, 1 failed.
-*/
-int known_switch_device(usb_handle* handle) {
-  dev_switch_t* dev;
-
-  // Iterate through the list looking for the name match.
-  for(dev = switch_list.next; dev != &switch_list; dev = dev->next) {
-    if (handle->usb_sn != dev->usb_sn)
-      continue;
-
-    handle->status = dev->status;
-    switch_device_close(dev);
-
-#if 0
-     adb_mutex_lock(&usb_lock);
-    if ((dev->next != dev) && (dev->prev != dev)) {
-      //link the next node and previous node
-      dev->next->prev = dev->prev;
-      dev->prev->next = dev->next;
-      //unlink self from the list
-      dev->prev = dev;
-      dev->next = dev;
-    }
-    free(dev);
-    adb_mutex_unlock(&usb_lock);
-#endif
-    return 0;
-  }
-
-  return -1;
-}
 
 int known_device_locked(const wchar_t* dev_name) {
   usb_handle* usb;
@@ -222,18 +127,7 @@ int register_new_device(usb_handle* handle, BOOL flashdirect) {
     goto register_new_device_out;
   }
 
-  if (known_switch_device(handle) == 0) {
-    if(handle->status == DEVICE_CHECK && protocol == FB_PROTOCOL) {
-        handle->status = DEVICE_FLASH;
-    } else if (handle->status == DEVICE_FLASH && protocol == ADB_PROTOCOL) {
-        handle->status = DEVICE_CONFIGURE;
-    } else {
-        ERROR("Device status switch error, \n\
-        Do not know how to switch from status %d with new protocol %d",
-        handle->status, protocol);
-        goto register_new_device_out;
-    }
-  } else if (protocol == ADB_PROTOCOL) {
+  if (protocol == ADB_PROTOCOL) {
     handle->status = DEVICE_CHECK;
   } else if (protocol == FB_PROTOCOL) {
    if (flashdirect) {
@@ -529,33 +423,6 @@ int usb_close(usb_handle* handle) {
   return 0;
 }
 
-
-
-long usb_port_address(usb_handle* handle) {
-  if (NULL == handle) {
-    SetLastError(ERROR_INVALID_HANDLE);
-    errno = ERROR_INVALID_HANDLE;
-    return ~1L;
-  }
-
-  return handle->usb_sn;
-}
-
-long usb_port_subaddress(usb_handle* handle) {
-  if (NULL == handle) {
-    SetLastError(ERROR_INVALID_HANDLE);
-    errno = ERROR_INVALID_HANDLE;
-    return ~1L;
-  }
-
-  return handle->usb_sn_port;
-}
-
-
-long usb_port_dummy_sn(usb_handle* handle) {
-  return handle->dummy_sn;
-}
-
 usb_dev_t usb_status(usb_handle* handle) {
      if (NULL == handle) {
         return DEVICE_UNKNOW;
@@ -569,23 +436,6 @@ int recognized_device(usb_handle* handle) {
 
   if (NULL == handle)
     return 0;
-
-  long sn = usb_host_sn(handle->interface_name, NULL);
-  if (sn != 0) {
-    handle->dummy_sn = sn;
-    get_adb_composite_device_sn(sn, &handle->usb_sn, &handle->usb_sn_port);
-    INFO("recognized_device %S serial number 0x%x => 0x%x (%d)",
-        handle->interface_name, sn, handle->usb_sn, handle->usb_sn_port);
-    //it should be fastboot
-    if (sn == handle->usb_sn) {
-        handle->usb_sn_port = usb_host_sn_port(handle->interface_name);
-    }
-  }  else {
-    //if we do not support multiple, sn is not from host allocation.
-    // todo:: add a judge?
-    ERROR("%S serial number %x", handle->interface_name, sn);
-    return 0;
-  }
 
   // Check vendor and product id first
 
