@@ -13,10 +13,11 @@ static adb_device_t adbdev_list= {
 };
 
 DeviceInterfaces::DeviceInterfaces() :
-    mActiveIntf(NULL), mAdb(), mDiag(), mFastboot()
-{
-    ;
-}
+    mActiveIntf(NULL),
+    mAdb(NULL),
+    mDiag(NULL),
+    mFastboot(NULL)
+{;}
 
 DeviceInterfaces::DeviceInterfaces(const DeviceInterfaces & devIntf) {
     DeviceInterfaces::operator =(devIntf);
@@ -26,15 +27,15 @@ CDevLabel* DeviceInterfaces::GetActiveIntf() const{
     return mActiveIntf;
 }
 
-const CDevLabel& DeviceInterfaces::GetAdbIntf() const {
+CDevLabel* DeviceInterfaces::GetAdbIntf() const {
     return mAdb;
 }
 
-const CDevLabel& DeviceInterfaces::GetDiagIntf() const {
+CDevLabel* DeviceInterfaces::GetDiagIntf() const {
     return mDiag;
 }
 
-const CDevLabel& DeviceInterfaces::GetFastbootIntf() const {
+CDevLabel* DeviceInterfaces::GetFastbootIntf() const {
     return mFastboot;
 }
 
@@ -43,23 +44,45 @@ VOID DeviceInterfaces::SetActiveIntf( CDevLabel* intf) {
 }
 
 VOID DeviceInterfaces::SetAdbIntf(CDevLabel& intf) {
-    mAdb.FreeBuffer();
-    mAdb = intf;
+    DELETE_IF(mAdb);
+    mAdb = new CDevLabel(intf);
 }
 
 VOID DeviceInterfaces::SetDiagIntf(CDevLabel& intf) {
-    mDiag.FreeBuffer();
-    mDiag = intf;
+    DELETE_IF(mDiag);
+    mDiag = new CDevLabel(intf);
 }
 
 VOID DeviceInterfaces::SetFastbootIntf(CDevLabel& intf) {
-    mFastboot.FreeBuffer();
-    mFastboot = intf;
+    DELETE_IF(mFastboot);
+    mFastboot = new CDevLabel(intf);
 }
 
-bool DeviceInterfaces::operator ==(const DeviceInterfaces & devIntf) const{
-    if ( mAdb == devIntf.GetAdbIntf() || mDiag ==devIntf.GetDiagIntf() ||
-        mFastboot == devIntf.GetFastbootIntf())
+bool DeviceInterfaces::operator ==(const DeviceInterfaces * const & devIntf) const{
+    LOGE("DO DeviceInterfaces::operator ==");
+    if (this == devIntf)
+        return true;
+
+    CDevLabel* adb = devIntf->GetAdbIntf();
+    CDevLabel* diag = devIntf->GetDiagIntf();
+    CDevLabel* fb = devIntf->GetFastbootIntf();
+
+    if (mAdb != NULL && (mAdb->Match(adb) || mAdb->Match(diag) ||mAdb->Match(fb)))
+        return true;
+
+    if (mDiag != NULL && (mDiag->Match(diag) || mDiag->Match(adb) ||mDiag->Match(fb)))
+        return true;
+
+    if (mFastboot != NULL && (mFastboot->Match(fb) ||mFastboot->Match(adb) || mFastboot->Match(diag)))
+        return true;
+
+    return false;
+}
+
+bool DeviceInterfaces::operator ==(const wchar_t * devPath) const {
+    LOGE("DO DeviceInterfaces::operator == 2");
+    if ( *mAdb == devPath || *mDiag == devPath ||
+        *mFastboot == devPath)
         return true;
     return false;
 }
@@ -72,8 +95,15 @@ DeviceInterfaces & DeviceInterfaces::operator =(const DeviceInterfaces & devIntf
     return *this;
 }
 
+VOID DeviceInterfaces::DeleteInterfaces(VOID) {
+    DELETE_IF(mAdb);
+    DELETE_IF(mDiag);
+    DELETE_IF(mFastboot);
+}
+
 DeviceInterfaces::~DeviceInterfaces()
 {
+    mActiveIntf = NULL;
 }
 
 
@@ -84,43 +114,83 @@ DeviceCoordinator::DeviceCoordinator() :
 }
 
 DeviceCoordinator::~DeviceCoordinator() {
+    list<DeviceInterfaces*>::iterator it;
+    for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+        DeviceInterfaces* item = *it;
+        item->DeleteInterfaces();
+        delete item;
+        //*it = NULL;
+    }
     mDevintfList.clear();
 }
 
-BOOL DeviceCoordinator::GetDevice(const wchar_t * devPath, DeviceInterfaces& outDevIntf) {
-    return GetDevice(CDevLabel(devPath), outDevIntf);
-}
-
-BOOL DeviceCoordinator::GetDevice(const CDevLabel& dev, DeviceInterfaces& outDevIntf) {
-    DeviceInterfaces temp;
-    for (list<DeviceInterfaces>::iterator it=mDevintfList.begin(); it != mDevintfList.end(); ++it) {
-        if (temp == *it)
-            break;
-    }
-
-#if 1
- list<DeviceInterfaces>::iterator it = find(mDevintfList.begin(), mDevintfList.end(), temp);
+BOOL DeviceCoordinator::GetDevice(const wchar_t * const devPath, DeviceInterfaces** outDevIntf) {
+#if 0
+    list<DeviceInterfaces>::iterator it = find(mDevintfList.begin(), mDevintfList.end(), devPath);
     if (it != mDevintfList.end()) {
-//found
-outDevIntf = *it;
+        *outDevIntf = *it;
+        return TRUE;
     }
-    else
-    {
-        // create new
-    }
-
+    return FALSE;
 #endif
-    return TRUE;
-    //return FALSE;
+    ASSERT(devPath != NULL);
+    list<DeviceInterfaces*>::iterator it;
+    for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+        if(**it == devPath) {
+            *outDevIntf = *it;
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
-BOOL DeviceCoordinator::AddDevice(const DeviceInterfaces& devIntf)  {
+BOOL DeviceCoordinator::CreateDevice(CDevLabel& dev, TDevType type, DeviceInterfaces** outDevIntf) {
+    DeviceInterfaces temp;
+    if (type == DEVTYPE_DIAGPORT) {
+        temp.SetDiagIntf(dev);
+    } else if(type == DEVTYPE_ADB) {
+        temp.SetAdbIntf(dev);
+    } else if(type == DEVTYPE_FASTBOOT) {
+        temp.SetFastbootIntf(dev);
+    }
+
+    list<DeviceInterfaces*>::iterator it;
+    //it = find(mDevintfList.begin(), mDevintfList.end(), temp);
+    for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+        DeviceInterfaces* item = *it;
+        if(temp == item) break;
+    }
+    if (it != mDevintfList.end()) {
+        LOGI("Update exist device");
+        if (type == DEVTYPE_DIAGPORT) {
+            (*it)->SetDiagIntf(dev);
+        } else if(type == DEVTYPE_ADB) {
+            (*it)->SetAdbIntf(dev);
+        } else if(type == DEVTYPE_FASTBOOT) {
+            (*it)->SetFastbootIntf(dev);
+        }
+        if (outDevIntf != NULL)
+            *outDevIntf = *it;
+    } else {
+        LOGI("Create new device");
+        DeviceInterfaces* newDevIntf = new DeviceInterfaces(temp);
+        AddDevice(newDevIntf);
+        if (outDevIntf != NULL)
+            *outDevIntf = newDevIntf;
+    }
+
+    return TRUE;
+}
+
+BOOL DeviceCoordinator::AddDevice(DeviceInterfaces* const &devIntf)  {
     mDevintfList.push_back(devIntf);
     return TRUE;
 }
 
-BOOL DeviceCoordinator::RemoveDevice(const DeviceInterfaces& devIntf)  {
+BOOL DeviceCoordinator::RemoveDevice(DeviceInterfaces* const & devIntf)  {
     mDevintfList.remove(devIntf);
+    devIntf->DeleteInterfaces();
+    delete devIntf;
     return TRUE;
 }
 
@@ -132,8 +202,8 @@ BOOL DeviceCoordinator::RemoveDevice(const DeviceInterfaces& devIntf)  {
 // if "SYSTEM\\CurrentControlSet\\Control\\UsbFlags" is set, the Windows will abandon this value.
 // so , device id reduces , "6&21c8898b&1&0"
 //the last "0" is the port, assign by windows.
-CDevLabel::CDevLabel(const wchar_t * name, const wchar_t * devPath,
-                     const wchar_t* parentIdPrefix, bool useParentIdPrefix):
+CDevLabel::CDevLabel(const wchar_t * devPath,
+                     const wchar_t* parentIdPrefix, bool useParentIdPrefix, const wchar_t * name):
     mPortNum(~1),
     mEffectiveSn(~1),
     mEffectivePort (~1)
@@ -181,22 +251,19 @@ CDevLabel::CDevLabel(const wchar_t * name, const wchar_t * devPath,
 
     //LOGI("CDevLabel:: ID:\t%S\n\tDevice Path:%S \n\tParentIDPrefix:%S",
     //     mDevId, devPath, parentIdPrefix);
+#if 0
     LOGD("CDevLabel:: ID: %S", mDevId);
     LOGD("\tDevice Path: %S", devPath);
     LOGD("\tParentIDPrefix: %S", parentIdPrefix);
     LOGD("\tmMatchId: %S", mMatchId);
+#endif
 }
 
 CDevLabel::CDevLabel(const CDevLabel & dev) {
     //LOGI("Enter copy constructor");
     CDevLabel::operator=(dev);
 }
-CDevLabel::CDevLabel() {
-    CDevLabel(NULL, NULL, NULL, true);
-}
-CDevLabel::CDevLabel(const wchar_t * devPath) {
-    CDevLabel(NULL, devPath, NULL, false);
-}
+
 CDevLabel::~CDevLabel() {
     FREE_IF(mDevPath);
     FREE_IF(mParentIdPrefix);
@@ -275,8 +342,10 @@ const wchar_t * CDevLabel::GetServiceName()  const {
 }
 
 bool CDevLabel::SetServiceName(const wchar_t * name) {
-    if (name == NULL)
+    if (name == NULL) {
+        memset(mServiceName, 0, sizeof mServiceName);
         return false;
+    }
     int len = wcslen(name);
     if (len == 0 || len >= DEV_SERVICE_LEN) {
         LOGE("name length exceed buffer length");
@@ -313,6 +382,7 @@ int CDevLabel::GetComPortNum() const {
 }
 
 bool CDevLabel::operator ==(const wchar_t * devPath) {
+    LOGE("DO CDevLabel::operator ==");
     const wchar_t *effectivePath = GetDevPath();
     if (effectivePath != NULL && devPath != NULL &&
         0 == wcscmp(effectivePath, devPath))
@@ -320,12 +390,18 @@ bool CDevLabel::operator ==(const wchar_t * devPath) {
     return false;
 }
 
-bool CDevLabel::operator ==(const CDevLabel & dev) const {
-    const wchar_t *effectivePath;
-    const wchar_t *effectivePath2;
+
+bool CDevLabel::Match(const CDevLabel * const & dev) const {
+    const wchar_t *effectivePath = NULL;
+    const wchar_t *effectivePath2 = NULL;
+    LOGE("DO CDevLabel::operator == 2");
+    if (dev == NULL)
+        return false;
+    if (this == dev)
+        return true;
 
     effectivePath = GetDevPath();
-    effectivePath2 = dev.GetDevPath();
+    effectivePath2 = dev->GetDevPath();
 
     if (effectivePath != NULL && effectivePath2 != NULL &&
         0 == wcscmp(effectivePath, effectivePath2)) //stricmp
@@ -347,14 +423,14 @@ bool CDevLabel::operator ==(const CDevLabel & dev) const {
 //parent: (null)
 // Devpath: \\?\usb#vid_1bbb&pid_0196&mi_02#6&1e805b40&1&0002#{86e0d1e0-8089-11d0-9ce4-08003e301f73}
     effectivePath = GetDevId();
-    effectivePath2 = dev.GetDevId();
+    effectivePath2 = dev->GetDevId();
     if (effectivePath != NULL && effectivePath2 != NULL &&
         (0 == wcscmp(effectivePath, effectivePath2) ))
         return true;//stricmp
 
-    if (mUseParentIdPrefix) {
+    if (mUseParentIdPrefix || dev->GetParentIdPrefix()) {
         effectivePath = GetMatchId();
-        effectivePath2 =dev.GetMatchId();
+        effectivePath2 =dev->GetMatchId();
     }
 
     if (effectivePath != NULL && effectivePath2 != NULL &&
@@ -362,6 +438,12 @@ bool CDevLabel::operator ==(const CDevLabel & dev) const {
         return true;
 
     return false;
+}
+
+
+bool CDevLabel::operator ==(const CDevLabel & dev) const {
+    LOGE("DO CDevLabel::operator == 3");
+    return Match(&dev);
 }
 
 CDevLabel & CDevLabel::operator =(const CDevLabel & dev) {
@@ -908,7 +990,7 @@ BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service,
             continue;
         }
 
-        CDevLabel devId(service, pDetData->DevicePath, pParentIdPrefix, useParentIdPrefix);
+        CDevLabel devId(pDetData->DevicePath, pParentIdPrefix, useParentIdPrefix, service);
 
         hKey = SetupDiOpenDevRegKey(hDevInfo, &devdata, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
         if (hKey == NULL) {

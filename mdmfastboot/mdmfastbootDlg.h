@@ -53,6 +53,7 @@ typedef struct UsbWorkData{
     //this is the serial number for logical ui.
     int              usb_sn;
     int              usb_sn_port;
+    DeviceInterfaces*  devIntf;
     int              stat;
     FlashImageInfo const * flash_partition[PARTITION_NUM_MAX];
     short           partition_nr;
@@ -114,6 +115,7 @@ protected:
   //CListCtrl  *m_port;
   CSettingsDlg m_SetDlg;
   vector<CDevLabel> m_WorkDev;
+  DeviceCoordinator mDevCoordinator;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();

@@ -55,7 +55,9 @@ END_MESSAGE_MAP()
 
 // CmdmfastbootDlg ¶Ô»°¿ò
 CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
-	: CDialog(CmdmfastbootDlg::IDD, pParent), m_WorkDev()
+	: CDialog(CmdmfastbootDlg::IDD, pParent),
+	m_WorkDev(),
+	mDevCoordinator()
 {
   m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
   m_bInit = FALSE;
@@ -225,8 +227,10 @@ BOOL CmdmfastbootDlg::CleanUsbWorkData(UsbWorkData *data, BOOL schedule) {
   }
 
   data->usb = NULL;
-  if (schedule == FALSE)
+  if (schedule == FALSE) {
     data->usb_sn = ~1L;
+    data->devIntf = NULL;
+  }
   data->stat = USB_STAT_IDLE;
   data->work = NULL;
   data->update_qcn = FALSE;
@@ -255,6 +259,9 @@ BOOL CmdmfastbootDlg::SetUsbWorkData(UsbWorkData *data, usb_handle * usb) {
   data->usb = usb;
   data->usb_sn = usb_port_address(usb);
   data->usb_sn_port = usb_port_subaddress(usb);
+
+  mDevCoordinator.GetDevice(usb->interface_name, &data->devIntf);
+
   data->stat = USB_STAT_WORKING;
   data->work = AfxBeginThread(usb_work, data);
 
@@ -764,6 +771,12 @@ BOOL CmdmfastbootDlg::RemoveDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARA
 
     ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
 
+    DeviceInterfaces* devIntf;
+    if(mDevCoordinator.GetDevice(pDevInf->dbcc_name, &devIntf)) {
+        mDevCoordinator.RemoveDevice( devIntf);
+        LOGI("Remove device %S", pDevInf->dbcc_name);
+    }
+
     long sn = usb_host_sn(pDevInf->dbcc_name);
     long cd_sn, cd_sn_port;
     get_adb_composite_device_sn(sn, &cd_sn, &cd_sn_port);
@@ -907,6 +920,7 @@ BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID)
          iter != devicePath.end();
          ++ iter){
         LOGI("Enumerate adb interface:: \n parent: %S \n Devpath: %S",iter->GetParentIdPrefix(), iter->GetDevPath());
+        mDevCoordinator.CreateDevice(*iter, DEVTYPE_ADB, NULL);
     }
 
     devicePath.clear();
@@ -916,6 +930,7 @@ BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID)
          iter != devicePath.end();
          ++ iter){
         LOGI("Enumerate fastboot interface:: \n parent: %S \n Devpath: %S",iter->GetParentIdPrefix(), iter->GetDevPath());
+        mDevCoordinator.CreateDevice(*iter, DEVTYPE_FASTBOOT, NULL);
     }
 
     devicePath.clear();
@@ -944,6 +959,7 @@ BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
         CPacket  *m_packetDll = new CPacket();
         LOGI("Enumerate Com Port: \n parent: %S \n Devpath: %S",iter->GetParentIdPrefix(), iter->GetDevPath());
         uint16 m_dlPort = iter->GetComPortNum();
+        mDevCoordinator.CreateDevice(*iter, DEVTYPE_DIAGPORT, NULL);
 
         m_packetDll->Init(m_dlPort);
         if (1){

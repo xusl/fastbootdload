@@ -54,6 +54,13 @@ typedef int socklen_t;
                     }while(0)
 
 
+#define DELETE_IF(x)  do {\
+                      if ((x) != NULL) {\
+                        delete (x);\
+                        (x) = NULL;\
+                      } \
+                    }while(0)
+
 
 /* Get array element count
  */

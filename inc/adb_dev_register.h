@@ -33,9 +33,6 @@ using namespace std;
 #define CLS_ADB         _T("AndroidUsbDeviceClass")
 #define SRV_WINUSB      _T("WinUSB")
 
-
-
-
 //HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Cdrom
 #define SRV_CDROM        _T("cdrom")
 
@@ -81,13 +78,14 @@ cd-rom        6&21c8898b&0123456789abcdef&1      5&10cd67f3&0&3
 #define DEV_MATCHID_LEN   64
 class CDevLabel {
   public:
-    CDevLabel();
-    CDevLabel(const wchar_t * name, const wchar_t * devPath, const wchar_t* usbBus, bool useBus);
-    CDevLabel(const wchar_t * devPath);
+
+    CDevLabel(const wchar_t * devPath, const wchar_t* usbBus = NULL,
+              bool useBus = true, const wchar_t * name = NULL);
     CDevLabel(const CDevLabel & dev);
     ~CDevLabel();
 
     bool operator ==(const CDevLabel & ) const;
+    bool Match(const CDevLabel * const &) const;
     bool operator ==(const wchar_t * devPath);
     CDevLabel & operator =(const CDevLabel & );
     const wchar_t * GetDevPath() const;
@@ -132,39 +130,51 @@ class DeviceInterfaces {
   DeviceInterfaces(const DeviceInterfaces & devIntf);
   ~DeviceInterfaces();
 
-  bool operator ==(const DeviceInterfaces & devIntf) const;
+  bool operator ==(const DeviceInterfaces * const & devIntf) const;
+  bool operator ==(const wchar_t * devPath) const;
   DeviceInterfaces & operator =(const DeviceInterfaces &devIntf);
   CDevLabel* GetActiveIntf() const;
-  const CDevLabel& GetAdbIntf() const;
-  const CDevLabel& GetDiagIntf() const;
-  const CDevLabel& GetFastbootIntf() const;
+  CDevLabel* GetAdbIntf() const;
+  CDevLabel* GetDiagIntf() const;
+  CDevLabel* GetFastbootIntf() const;
   VOID SetFastbootIntf(CDevLabel& intf);
   VOID SetDiagIntf(CDevLabel& intf);
   VOID SetAdbIntf(CDevLabel& intf);
   VOID SetActiveIntf(CDevLabel* intf);
+  VOID DeleteInterfaces(VOID);
 
   private:
     CDevLabel  *mActiveIntf;  //interface which now we operate
-    CDevLabel   mAdb;       //Adb interface, appear in debug configuration
-    CDevLabel   mDiag;      /*Diag interface, appear in TPST configuration, which only have TPST interface
+    CDevLabel   *mAdb;       //Adb interface, appear in debug configuration
+    CDevLabel   *mDiag;      /*Diag interface, appear in TPST configuration, which only have TPST interface
                              * Diag interface, appear in debug configuration
                              * Diag interface, there are none image in flash, got Qualcomm 9008.
                             */
 
-    CDevLabel   mFastboot;  //Fastboot interface, though it uses adb driver, it alway have a different PID/VID from adb interface
+    CDevLabel   *mFastboot;  //Fastboot interface, though it uses adb driver, it alway have a different PID/VID from adb interface
 };
+
+typedef enum {
+	//DEVTYPE_NONE  = 0,
+	//DEVTYPE_CDROM,
+	//DEVTYPE_DISK
+	DEVTYPE_DIAGPORT,
+	DEVTYPE_FASTBOOT,
+	DEVTYPE_ADB,
+	//DEVTYPE_MAX = 0xFF,
+} TDevType;
 
 class DeviceCoordinator {
   public:
     DeviceCoordinator();
     ~DeviceCoordinator();
-    BOOL GetDevice(const wchar_t *devPath, DeviceInterfaces& outDevIntf);
-    BOOL GetDevice(const CDevLabel& dev, DeviceInterfaces& outDevIntf);
-    BOOL AddDevice(const DeviceInterfaces& devIntf) ;
-    BOOL RemoveDevice(const DeviceInterfaces& devIntf) ;
+    BOOL GetDevice(const wchar_t *const devPath, DeviceInterfaces** outDevIntf);
+    BOOL CreateDevice(CDevLabel& dev, TDevType type, DeviceInterfaces** outDevIntf);
+    BOOL AddDevice( DeviceInterfaces* const &devIntf) ;
+    BOOL RemoveDevice( DeviceInterfaces*const & devIntf) ;
 
   private:
-    list<DeviceInterfaces>  mDevintfList;
+    list<DeviceInterfaces *>  mDevintfList;
 };
 
 void check_regedit_usbflags(usbid_t USBIds[], unsigned count);
