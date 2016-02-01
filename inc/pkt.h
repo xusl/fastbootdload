@@ -153,6 +153,7 @@ public:
 	uint16  GetComPort(void);
 	void    SetPacketType(TPktTypeEnumType type);
 	char*   GetDevice();
+  unsigned short GetPort() { return m_Port; };
     //add by minghui.zhang 2013-11-06
     TResult SendData(uint8 buf[], uint32 len);
     TResult SaharaDLReceive(rsp_buffer_s_type* rsp_ptr, uint32 rlen);
@@ -181,6 +182,7 @@ private:
         CSerialPort         m_SerialPort;
         pkt_buffer_s_type   m_Packet;
         TPktTypeEnumType    m_PktType;
+        unsigned short      m_Port;
 };
 
 //-----------------------------------------------------------------------------

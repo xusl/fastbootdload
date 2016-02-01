@@ -2,6 +2,7 @@
 #define __CUSTDATA_H__
 
 #include "stdafx.h"
+#include "log.h"
 #include "pkt.h"
 #include "utils.h"
 //#include "../xml/DomParser.h"

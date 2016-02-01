@@ -17,11 +17,12 @@ when        who        what
 #include <usb100.h>
 #include <adb_api.h>
 #include "define.h"
+
+#include "custdata.h"
+
 using namespace std;
 
 //using std::vector;
-//using namespace std;
-
 
 /* Currently we support 16 devices maxinumly */
 const uint16 MAX_DEVICES = /*9*/12;//v3.9.0
@@ -36,9 +37,6 @@ typedef enum {
 	DEVTYPE_CDROM,
 	DEVTYPE_PORT,
 	DEVTYPE_DISK,
-	// ...
-	DEVTYPE_ALL,
-	DEVTYPE_UNKNOWN,
 	DEVTYPE_MAX = 0xFF,
 } TDeviceEnumType;
 
@@ -62,6 +60,7 @@ typedef enum {
     DEVICE_MAX
 }usb_dev_t;
 
+class DeviceInterfaces;
 /** Structure usb_handle describes our connection to the usb device via
   AdbWinApi.dll. This structure is returned from usb_open() routine and
   is expected in each subsequent call that is accessing the device.
@@ -88,6 +87,7 @@ struct usb_handle {
   int interface_protocol;
   usb_dev_t status;
   BOOL work;
+  DeviceInterfaces* dev_intfs;
 
   /// Mask for determining when to use zero length packets
   unsigned zero_mask;
@@ -174,10 +174,10 @@ class CDevLabel {
     bool Match(const CDevLabel * const &) const;
     bool MatchDevPath(const wchar_t * devPath);
     CDevLabel & operator =(const CDevLabel & );
-    const wchar_t * GetDevPath() const;
-    const wchar_t * GetParentIdPrefix() const;
-    const wchar_t * GetDevId() const;
-    const wchar_t * GetMatchId() const;
+    const wchar_t * GetDevPath() const {   return mDevPath;};
+    const wchar_t * GetParentIdPrefix() const{ return mParentIdPrefix;};
+    const wchar_t * GetDevId() const{ return mDevId;};
+    const wchar_t * GetMatchId() const { return mMatchId;};
     bool SetMatchId(const wchar_t * matchId);
     bool SetDevId(const wchar_t * devId);
     bool SetServiceName(const wchar_t * name);
@@ -185,8 +185,9 @@ class CDevLabel {
     bool SetEffectiveSnPort(long sn, long port);
     bool GetEffectiveSnPort(long *sn, long *port);
     bool SetComPort(const wchar_t *portName);
-    int GetComPortNum() const;
+    int GetComPortNum() const{ return mPortNum;};
     VOID FreeBuffer();
+    VOID Dump(const char *tag);
 
   private:
     void CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* usbBus);
@@ -219,24 +220,34 @@ class DeviceInterfaces {
   bool operator ==(const DeviceInterfaces * const & devIntf) const;
   bool MatchDevPath(const wchar_t * devPath) const;
   DeviceInterfaces & operator =(const DeviceInterfaces &devIntf);
-  CDevLabel* GetActiveIntf() const;
-  CDevLabel* GetAdbIntf() const;
-  CDevLabel* GetDiagIntf() const;
-  CDevLabel* GetFastbootIntf() const;
-  BOOL GetDeviceStatus() const;
+  CDevLabel* GetActiveIntf() const {  return mActiveIntf; };
+  CDevLabel* GetAdbIntf() const {  return mAdb; };
+  CDevLabel* GetDiagIntf() const {  return mDiag; };
+  CDevLabel* GetFastbootIntf() const {  return mFastboot; };
+  BOOL GetDeviceStatus() const{ return mDeviceActive;};
+  usb_handle* GetAdbHandle() const { return mAdbHandle;};
+  usb_handle* GetFastbootHandle() const { return mFbHandle;};
   VOID SetDeviceStatus(BOOL status);
   CDevLabel* SetFastbootIntf(CDevLabel& intf);
   CDevLabel* SetDiagIntf(CDevLabel& intf);
   CDevLabel* SetAdbIntf(CDevLabel& intf);
-  VOID SetActiveIntf(CDevLabel* intf);
+  VOID SetActiveIntf(CDevLabel* intf) {  mActiveIntf = intf; };
+  VOID SetAdbHandle(usb_handle* handle) const { mAdbHandle = handle;};
+  VOID SetFastbootHandle(usb_handle* handle) const { mFbHandle = handle;};
   BOOL SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf=TRUE);
   VOID DeleteMemory(VOID);
   int GetDevId();
   VOID UpdateDevTag();
-  const char *GetDevTag() const;
+  const char *GetDevTag() const{  return mTag;};
+  long long GetTimeElapse() { return mEndTimeStamp - mBeginTimeStamp;};
 
   private:
+    long long     mBeginTimeStamp;
+    long long     mEndTimeStamp;
     char       mTag[DEV_TAG_LEN];
+    CPacket    *m_packetDll;
+    usb_handle*  mAdbHandle;
+    usb_handle*  mFbHandle;
     BOOL       mDeviceActive;  //Device is exactly exist. For when enable fix logic port,
                                //we do not remove DeviceInterfaces object.
     CDevLabel  *mActiveIntf;  //interface which now we operate
@@ -255,9 +266,9 @@ class DeviceCoordinator {
     DeviceCoordinator();
     ~DeviceCoordinator();
     BOOL GetDevice(const wchar_t *const devPath, DeviceInterfaces** outDevIntf);
-    BOOL CreateDevice(CDevLabel& dev, TDevType type, DeviceInterfaces** outDevIntf);
-    BOOL AddDevice( DeviceInterfaces* const &devIntf) ;
-    BOOL RemoveDevice( DeviceInterfaces*const & devIntf) ;
+    DeviceInterfaces* AddDevice(CDevLabel& dev, TDevType type);
+    BOOL RemoveDevice( DeviceInterfaces*const & devIntf);
+    VOID Dump(VOID);
 
   private:
     list<DeviceInterfaces *>  mDevintfList;

@@ -487,6 +487,7 @@ CPacket::CPacket(TPktTypeEnumType type)
 	{
 		this->m_PktType = PKT_TYPE_HDLC;
 	}
+    m_Port = 0;
 }
 
 CPacket::~CPacket(void)
@@ -496,7 +497,7 @@ CPacket::~CPacket(void)
 
 CPacket::CPacket(const char* devpath)
 {
-
+    m_Port = 0;
 }
 
 /*===========================================================================
@@ -547,10 +548,8 @@ TResult CPacket::Init(uint16 port)
         to.WriteTotalTimeoutConstant = PORT_TIMEOUT;
         break;
     }
-
+    m_Port = port;
 	return this->m_SerialPort.SetTimeOut(to);
-
-	return EOK;
 }
 
 /*===========================================================================

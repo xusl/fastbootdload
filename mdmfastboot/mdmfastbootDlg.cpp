@@ -9,7 +9,6 @@
 #include "fastbootflash.h"
 #include "adbhost.h"
 #include "usb_vendors.h"
-#include "custdata.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -148,8 +147,6 @@ BOOL CmdmfastbootDlg::SetPortDialogs(int x, int y,  int w, int h)
 
   return true;
 }
-
-
 
 BOOL CmdmfastbootDlg::SetDlgItemPos(UINT nID, int x, int y) {
   RECT rect;
@@ -877,41 +874,48 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
 }
 
 
-BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID)
-{
-    vector<CDevLabel> devicePath;
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_USBCCGP, devicePath, true);
-    for (vector<CDevLabel>::iterator iter = devicePath.begin();
-         iter != devicePath.end();
-         ++ iter){
-        LOGI("Enumerate adb interface:: \n parent: %S \n Devpath: %S",iter->GetParentIdPrefix(), iter->GetDevPath());
-        mDevCoordinator.CreateDevice(*iter, DEVTYPE_ADB, NULL);
+BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID) {
+    usb_handle* handle;
+    vector<CDevLabel> AdbDev;
+    vector<CDevLabel> FbDev;
+    vector<CDevLabel>::iterator iter;
+    bool match = false;
+
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_USBCCGP, AdbDev, true);
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_WINUSB, FbDev, false);
+    find_devices(m_flashdirect);
+    handle = usb_handle_enum_init();
+    for (; handle != NULL; handle = usb_handle_next(handle)) {
+        match = false;
+        for (iter = AdbDev.begin(); iter != AdbDev.end();  ++ iter){
+            if (iter->MatchDevPath(handle->interface_name)) {
+                iter->Dump("adb interface");
+                handle->dev_intfs = mDevCoordinator.AddDevice(*iter, DEVTYPE_ADB);
+                match = true;
+                break;
+            }
+        }
+        if(match)
+            continue;
+        //fastboot
+        for (iter = FbDev.begin(); iter != FbDev.end(); ++ iter){
+            if (iter->MatchDevPath(handle->interface_name)) {
+                iter->Dump("fastboot interface");
+                handle->dev_intfs = mDevCoordinator.AddDevice(*iter, DEVTYPE_FASTBOOT);
+                break;
+            }
+        }
     }
 
-
-
-    devicePath.clear();
-    //fastboot
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_WINUSB, devicePath, false);
-    for (vector<CDevLabel>::iterator iter = devicePath.begin();
-         iter != devicePath.end();
-         ++ iter){
-        LOGI("Enumerate fastboot interface:: \n parent: %S \n Devpath: %S",iter->GetParentIdPrefix(), iter->GetDevPath());
-        mDevCoordinator.CreateDevice(*iter, DEVTYPE_FASTBOOT, NULL);
-    }
-
-    devicePath.clear();
+    AdbDev.clear();
+    FbDev.clear();
 
 #if 0
     GetDevLabelByGUID(&GUID_DEVINTERFACE_ADB, SRV_WINUSB, devicePath, false);
-    for (vector<CDevLabel>::iterator iter = devicePath.begin();
-         iter != devicePath.end();
-         ++ iter){
+    for (iter = devicePath.begin();iter != devicePath.end(); ++ iter){
         LOGI("class %S %S",iter->GetParentIdPrefix(), iter->GetDevPath());
     }
 #endif
-
-    AdbUsbHandler(true);
     return TRUE;
 }
 
@@ -920,15 +924,12 @@ BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
     GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
     //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
     //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
-
-    for (vector<CDevLabel>::iterator iter = devicePath.begin();
-         iter != devicePath.end();
-         ++ iter)
-    {
+    vector<CDevLabel>::iterator iter;
+    for (iter = devicePath.begin(); iter != devicePath.end();++iter) {
         CPacket  *m_packetDll = new CPacket();
-        LOGI("Enumerate Com Port: \n parent: %S \n Devpath: %S",iter->GetParentIdPrefix(), iter->GetDevPath());
+        iter->Dump("Com Port");
         uint16 m_dlPort = iter->GetComPortNum();
-        mDevCoordinator.CreateDevice(*iter, DEVTYPE_DIAGPORT, NULL);
+        mDevCoordinator.AddDevice(*iter, DEVTYPE_DIAGPORT);
 
         m_packetDll->Init(m_dlPort);
 
@@ -948,24 +949,11 @@ BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
         }
         if (1)
         {
-            typedef struct
-            {
-                byte cmd_code;
-                byte msm_hw_version_format;
-                byte reserved[2]; /* for alignment / future use */
-                uint32 msm_hw_version;
-                uint32 mobile_model_id;
-                /* The following character array contains 2 NULL terminated strings:
-                   'build_id' string, followed by 'model_string' */
-                char ver_strings[32];
-            }get_version_rsp_type;
             CDIAGCmd DIAGCmd(*m_packetDll);
-            get_version_rsp_type pVersion = {0};
             DIAGCmd.EnableDiagServer();
-            DIAGCmd.RequestFirmwareVer_N((char *)(&pVersion));
-            LOGI("COM%d pVersion.mobile_model_id = %d",m_dlPort,pVersion.mobile_model_id);
-            LOGI("COM%d pVersion.ver_strings = %s",m_dlPort,pVersion.ver_strings);
             //DIAGCmd.RestartDevice();
+            DIAGCmd.SwitchToOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
+            DIAGCmd.DLoadMode();
             DIAGCmd.DisableDiagServer();
         }
 
@@ -976,23 +964,21 @@ BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
             delete m_pCustdataInfo;
         }
         m_packetDll->Uninit();
+        delete m_packetDll;
     }
     return TRUE;
 }
 
 BOOL CmdmfastbootDlg::RejectCDROM(VOID){
     vector<CDevLabel> devicePath;
+    vector<CDevLabel>::iterator iter;
     CSCSICmd scsi = CSCSICmd();
-//    GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath, false);
     GetDevLabelByGUID(&GUID_DEVINTERFACE_CDROM, SRV_CDROM, devicePath, false);
-    int  devSize = m_WorkDev.size();
+    //GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath, false);
 
-    for(vector<CDevLabel>::iterator iter = devicePath.begin();
-         iter != devicePath.end();
-         ++ iter)
-    {
+    for(iter = devicePath.begin();iter != devicePath.end(); ++ iter) {
         CString path = iter->GetDevPath();
-        LOGI("interface %S %S",iter->GetParentIdPrefix(), iter->GetDevPath());
+        iter->Dump( __FUNCTION__ " : " __FILE__);
         if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
             LOGI("Fix DISK %S:", path);
             continue;
@@ -1002,26 +988,29 @@ BOOL CmdmfastbootDlg::RejectCDROM(VOID){
             LOGI("USB Stor %S is not alcatel",path);
             continue;
         }
-        for(int j=0; j < devSize; j++)
-        {
+
+#if 0
+        int  devSize = m_WorkDev.size();
+        for(int j=0; j < devSize; j++) {
             if (*iter == m_WorkDev[j]) {
                 LOGI("Device is have handle, %S", path);
                 continue;
             }
         }
-        LOG("do switch device %S", path);
+#endif
+
         scsi.SwitchToDebugDevice(path);
         //scsi.SwitchToTPSTDeivce(path);
-        m_WorkDev.push_back(*iter);
+
+        //m_WorkDev.push_back(*iter);
 
     }
     LOGI("Done, clear device list.");
     devicePath.clear();
-
-    //GetDevLabelByGUID(&GUID_DEVCLASS_USB, SRV_USBCCGP, devicePath, false);
-    //GUID_DEVINTERFACE_DISK
     return TRUE;
 }
+
+
  void CALLBACK CmdmfastbootDlg::GeneralTimerProc(
    HWND hWnd,      // handle of CWnd that called SetTimer
    UINT nMsg,      // WM_TIMER

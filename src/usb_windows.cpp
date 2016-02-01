@@ -482,65 +482,72 @@ int recognized_device(usb_handle* handle) {
 }
 
 void find_devices(BOOL flashdirect) {
-  usb_handle* handle = NULL;
-  char entry_buffer[2048];
-  AdbInterfaceInfo* next_interface = (AdbInterfaceInfo*)(&entry_buffer[0]);
-  unsigned long entry_buffer_size = sizeof(entry_buffer);
-  //const GUID usb_class_id = ANDROID_USB_CLASS_ID;
+    usb_handle* handle = NULL;
+    char entry_buffer[2048];
+    AdbInterfaceInfo* next_interface = (AdbInterfaceInfo*)(&entry_buffer[0]);
+    unsigned long entry_buffer_size = sizeof(entry_buffer);
+    //const GUID usb_class_id = ANDROID_USB_CLASS_ID;
 
-  // Enumerate all present and active interfaces.
-  ADBAPIHANDLE enum_handle =
-    AdbEnumInterfaces(GUID_DEVINTERFACE_ADB, true, true, true);
+    // Enumerate all present and active interfaces.
+    ADBAPIHANDLE enum_handle =
+        AdbEnumInterfaces(GUID_DEVINTERFACE_ADB, true, true, true);
 
-  if (NULL == enum_handle) {
-    WARN("find_devices: Enumeration initialize failed");
-    return;
-  }
+    if (NULL == enum_handle) {
+        WARN("find_devices: Enumeration initialize failed");
+        return;
+    }
 
-  while (AdbNextInterface(enum_handle, next_interface, &entry_buffer_size)) {
-    // Lets see if we already have this device in the list
-    if (!known_device(next_interface->device_name)) {
-      // This seems to be a new device. Open it!
+    while (AdbNextInterface(enum_handle, next_interface, &entry_buffer_size)) {
+        // Lets see if we already have this device in the list
+        if (known_device(next_interface->device_name)) {
+            INFO("%S is not ours adb interface.", next_interface->device_name);
+            entry_buffer_size = sizeof(entry_buffer);
+            continue;
+        }
+
+        // This seems to be a new device. Open it!
         handle = do_usb_open(next_interface->device_name);
         if (NULL == handle) {
             WARN("Open %S failed", next_interface->device_name);
+            entry_buffer_size = sizeof(entry_buffer);
             continue;
         }
         // Lets see if this interface (device) belongs to us
-        if (recognized_device(handle)) {
-          char serial_number[512];
-          unsigned long serial_number_len = sizeof(serial_number);
-          INFO("adding a new device %S", next_interface->device_name);
-          if (AdbGetSerialNumber(handle->adb_interface,
+        if (0 == recognized_device(handle)) {
+            ERROR("DO NOT recognized_device: %S.", handle->interface_name);
+            usb_cleanup_handle(handle);
+            free(handle);
+            entry_buffer_size = sizeof(entry_buffer);
+            continue;
+        }
+
+        char serial_number[512];
+        unsigned long serial_number_len = sizeof(serial_number);
+        INFO("adding a new device %S", next_interface->device_name);
+        if (!AdbGetSerialNumber(handle->adb_interface,
                                 serial_number,
                                 &serial_number_len,
                                 true)) {
-            // Lets make sure that we don't duplicate this device
-            if (register_new_device(handle, flashdirect)) {
-         //    AfxBeginThread(run, (void*)handle);
-            } else {
-              WARN("register_new_device failed for %s\n", next_interface->device_name);
-              usb_cleanup_handle(handle);
-              free(handle);
-            }
-          } else {
             WARN("cannot get serial number\n");
             usb_cleanup_handle(handle);
             free(handle);
-          }
-        }else {
-        ERROR("DO NOT recognized_device: %S.", handle->interface_name);
-          usb_cleanup_handle(handle);
-          free(handle);
+            entry_buffer_size = sizeof(entry_buffer);
+            continue;
         }
-    }else {
-        INFO("%S is not ours adb interface.", next_interface->device_name);
+
+        // Lets make sure that we don't duplicate this device
+        if (register_new_device(handle, flashdirect)) {
+            //    AfxBeginThread(run, (void*)handle);
+        } else {
+            WARN("register_new_device failed for %s\n", next_interface->device_name);
+            usb_cleanup_handle(handle);
+            free(handle);
+        }
+
+        entry_buffer_size = sizeof(entry_buffer);
     }
 
-    entry_buffer_size = sizeof(entry_buffer);
-  }
-
-  AdbCloseHandle(enum_handle);
+    AdbCloseHandle(enum_handle);
 }
 
 usb_handle* usb_handle_enum_init(void) {

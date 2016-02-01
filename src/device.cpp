@@ -4,7 +4,7 @@ DESC:
 CHANGE HISTORY:
 when        who        what
 ----------  ---------  --------------------------------------------------------
-2009-02-06  dawang.xu  init first version
+2016-01-28  shenlong.xu  init
 
 =============================================================================*/
 #include "StdAfx.h"
@@ -25,7 +25,10 @@ DeviceInterfaces::DeviceInterfaces() :
     mAdb(NULL),
     mDiag(NULL),
     mFastboot(NULL),
-    mDeviceActive(TRUE)
+    mDeviceActive(FALSE),
+    m_packetDll(NULL),
+    mAdbHandle(NULL),
+    mFbHandle(NULL)
 {
     const char *default_tag = "N/A Device";
     strncpy_s(mTag, DEV_TAG_LEN, default_tag, strlen(default_tag));
@@ -33,34 +36,6 @@ DeviceInterfaces::DeviceInterfaces() :
 
 DeviceInterfaces::DeviceInterfaces(const DeviceInterfaces & devIntf) {
     DeviceInterfaces::operator =(devIntf);
-}
-
-CDevLabel* DeviceInterfaces::GetActiveIntf() const{
-    return mActiveIntf;
-}
-
-CDevLabel* DeviceInterfaces::GetAdbIntf() const {
-    return mAdb;
-}
-
-CDevLabel* DeviceInterfaces::GetDiagIntf() const {
-    return mDiag;
-}
-
-CDevLabel* DeviceInterfaces::GetFastbootIntf() const {
-    return mFastboot;
-}
-
-BOOL DeviceInterfaces::GetDeviceStatus() const {
-    return mDeviceActive;
-}
-
-VOID DeviceInterfaces::SetDeviceStatus(BOOL status) {
-    mDeviceActive = status;
-}
-
-VOID DeviceInterfaces::SetActiveIntf( CDevLabel* intf) {
-    mActiveIntf = intf;
 }
 
 CDevLabel* DeviceInterfaces::SetAdbIntf(CDevLabel& intf) {
@@ -71,7 +46,17 @@ CDevLabel* DeviceInterfaces::SetAdbIntf(CDevLabel& intf) {
 
 CDevLabel* DeviceInterfaces::SetDiagIntf(CDevLabel& intf) {
     DELETE_IF(mDiag);
+    if (m_packetDll != NULL) {
+        m_packetDll->Uninit();
+        delete m_packetDll;
+    }
     mDiag = new CDevLabel(intf);
+    m_packetDll = new CPacket();
+    ASSERT(m_packetDll != NULL);
+
+    uint16 m_dlPort = mDiag->GetComPortNum();
+    m_packetDll->Init(m_dlPort);
+
     return mDiag;
 }
 
@@ -96,10 +81,6 @@ VOID DeviceInterfaces::UpdateDevTag() {
     } else {
      snprintf(mTag, DEV_TAG_LEN, "Device: 0X%X (%d)", sn, port);
     }
-}
-
-const char *DeviceInterfaces::GetDevTag() const {
-    return mTag;
 }
 
 int DeviceInterfaces::GetDevId() {
@@ -180,10 +161,32 @@ DeviceInterfaces & DeviceInterfaces::operator =(const DeviceInterfaces & devIntf
     return *this;
 }
 
+VOID DeviceInterfaces::SetDeviceStatus(BOOL status) {
+    mDeviceActive = status;
+
+    if (status) {
+        if (mDiag != NULL) {
+            if (m_packetDll == NULL)
+                m_packetDll = new CPacket();
+            ASSERT(m_packetDll != NULL);
+
+            uint16 m_dlPort = mDiag->GetComPortNum();
+            m_packetDll->Init(m_dlPort);
+        }
+    } else {
+        if (m_packetDll != NULL) {
+            m_packetDll->Uninit();
+            delete m_packetDll;
+        }
+    }
+}
+
 VOID DeviceInterfaces::DeleteMemory(VOID) {
     DELETE_IF(mAdb);
     DELETE_IF(mDiag);
     DELETE_IF(mFastboot);
+    mActiveIntf = NULL;
+    SetDeviceStatus(FALSE);
 }
 
 DeviceInterfaces::~DeviceInterfaces()
@@ -229,37 +232,29 @@ BOOL DeviceCoordinator::GetDevice(const wchar_t * const devPath, DeviceInterface
     return FALSE;
 }
 
-BOOL DeviceCoordinator::CreateDevice(CDevLabel& dev, TDevType type, DeviceInterfaces** outDevIntf) {
+DeviceInterfaces* DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type) {
+    DeviceInterfaces* newDevIntf = NULL;
     DeviceInterfaces temp;
     temp.SetIntf(dev, type);
 
     list<DeviceInterfaces*>::iterator it;
-    //it = find(mDevintfList.begin(), mDevintfList.end(), temp);
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
         DeviceInterfaces* item = *it;
         if(temp == item) break;
     }
+
     if (it != mDevintfList.end()) {
         LOGI("Update exist device");
+        newDevIntf = *it;
         (*it)->SetDeviceStatus(TRUE);
         (*it)->SetIntf(dev, type);
-        if (outDevIntf != NULL)
-            *outDevIntf = *it;
     } else {
         LOGI("Create new device");
-        DeviceInterfaces* newDevIntf = new DeviceInterfaces(temp);
+        newDevIntf = new DeviceInterfaces(temp);
         newDevIntf->SetDeviceStatus(TRUE);
-        AddDevice(newDevIntf);
-        if (outDevIntf != NULL)
-            *outDevIntf = newDevIntf;
+        mDevintfList.push_back(newDevIntf);
     }
-
-    return TRUE;
-}
-
-BOOL DeviceCoordinator::AddDevice(DeviceInterfaces* const &devIntf)  {
-    mDevintfList.push_back(devIntf);
-    return TRUE;
+    return newDevIntf;
 }
 
 BOOL DeviceCoordinator::RemoveDevice(DeviceInterfaces* const & devIntf)  {
@@ -269,6 +264,13 @@ BOOL DeviceCoordinator::RemoveDevice(DeviceInterfaces* const & devIntf)  {
     return TRUE;
 }
 
+VOID DeviceCoordinator::Dump(VOID) {
+    list<DeviceInterfaces*>::iterator it;
+    DeviceInterfaces* item ;
+        for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+item = *it;
+    }
+}
 
 //\\?\usbstor#disk&ven_onetouch&prod_link4&rev_2.31#6&21c8898b&1&0123456789abcdef&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
 //For id , it is "6&21c8898b&1&0123456789abcdef&0".
@@ -323,15 +325,6 @@ CDevLabel::CDevLabel(const wchar_t * devPath,
     }else {
         LOGE("Can not get invalid device id");
     }
-
-    //LOGI("CDevLabel:: ID:\t%S\n\tDevice Path:%S \n\tParentIDPrefix:%S",
-    //     mDevId, devPath, parentIdPrefix);
-#if 0
-    LOGD("CDevLabel:: ID: %S", mDevId);
-    LOGD("\tDevice Path: %S", devPath);
-    LOGD("\tParentIDPrefix: %S", parentIdPrefix);
-    LOGD("\tmMatchId: %S", mMatchId);
-#endif
 }
 
 CDevLabel::CDevLabel(const CDevLabel & dev) {
@@ -344,9 +337,17 @@ CDevLabel::~CDevLabel() {
     FREE_IF(mParentIdPrefix);
     mEffectiveSn = ~1;
     mEffectivePort = ~1;
-    //LOGI("~CDevLabel:: %S : %S", mDevPath, mParentIdPrefix);
 }
 
+VOID CDevLabel::Dump(const char *tag) {
+    //LOGI("CDevLabel:: ID:\t%S\n\tDevice Path:%S \n\tParentIDPrefix:%S",
+    //     mDevId, devPath, parentIdPrefix);
+    LOG("CDevLabel (%s) :: ", tag);
+    LOGD("\tID: %S", mDevId);
+    LOGD("\tDevice Path: %S", mDevPath);
+    LOGD("\tParentIDPrefix: %S", mParentIdPrefix);
+    LOGD("\tmMatchId: %S", mMatchId);
+}
 void CDevLabel::CopyDeviceDescPath(const wchar_t * devPath, const wchar_t* parentIdPrefix) {
     if (devPath != NULL) {
         mDevPath = _wcsdup(devPath);
@@ -371,20 +372,6 @@ VOID CDevLabel::FreeBuffer() {
     FREE_IF(mParentIdPrefix);
 }
 
-const wchar_t * CDevLabel::GetDevPath() const
-{
-    return mDevPath;
-}
-
-const wchar_t * CDevLabel::GetParentIdPrefix() const
-{
-    return mParentIdPrefix;
-}
-
-const wchar_t * CDevLabel::GetMatchId() const
-{
-    return mMatchId;
-}
 
 bool CDevLabel::SetMatchId(const wchar_t * matchId){
     if (matchId == NULL )
@@ -395,10 +382,6 @@ bool CDevLabel::SetMatchId(const wchar_t * matchId){
         return false;
     }
     return (0 == wcsncpy_s(mMatchId, DEV_MATCHID_LEN, matchId, len));
-}
-
-const wchar_t * CDevLabel::GetDevId() const {
-    return mDevId;
 }
 
 bool CDevLabel::SetDevId(const wchar_t * devId) {
@@ -449,11 +432,6 @@ bool CDevLabel::SetComPort(const wchar_t *portName) {
     swscanf_s(portName, _T("COM%d"), &mPortNum);
     //LOGI("Set comport %d", mPortNum);
     return true;
-}
-
-int CDevLabel::GetComPortNum() const {
-    //LOGI("return port %d", mPortNum);
-    return mPortNum;
 }
 
 bool CDevLabel::MatchDevPath(const wchar_t * devPath) {
