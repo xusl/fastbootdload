@@ -51,12 +51,12 @@ typedef enum {
 
 typedef enum {
     DEVICE_UNKNOW = 0,
-    //DEVICE_PLUGIN,
+    DEVICE_PLUGIN,
     DEVICE_CHECK,//ADB,
     //DEVICE_SWITCH,
     DEVICE_FLASH,//FASTBOOT,
     DEVICE_CONFIGURE,
-    DEVICE_REMOVE,
+    DEVICE_REMOVED,
     DEVICE_MAX
 }usb_dev_t;
 
@@ -219,27 +219,30 @@ class DeviceInterfaces {
 
   bool operator ==(const DeviceInterfaces * const & devIntf) const;
   bool MatchDevPath(const wchar_t * devPath) const;
+  bool Match(const DeviceInterfaces * const & devIntf) const;
   DeviceInterfaces & operator =(const DeviceInterfaces &devIntf);
   CDevLabel* GetActiveIntf() const {  return mActiveIntf; };
   CDevLabel* GetAdbIntf() const {  return mAdb; };
   CDevLabel* GetDiagIntf() const {  return mDiag; };
   CDevLabel* GetFastbootIntf() const {  return mFastboot; };
-  BOOL GetDeviceStatus() const{ return mDeviceActive;};
+  usb_dev_t GetDeviceStatus() const{ return mDeviceActive;};
   usb_handle* GetAdbHandle() const { return mAdbHandle;};
   usb_handle* GetFastbootHandle() const { return mFbHandle;};
-  VOID SetDeviceStatus(BOOL status);
+  CPacket* GetPacket() const {return m_packetDll;};
+  VOID SetDeviceStatus(usb_dev_t status);
   CDevLabel* SetFastbootIntf(CDevLabel& intf);
   CDevLabel* SetDiagIntf(CDevLabel& intf);
   CDevLabel* SetAdbIntf(CDevLabel& intf);
   VOID SetActiveIntf(CDevLabel* intf) {  mActiveIntf = intf; };
-  VOID SetAdbHandle(usb_handle* handle) const { mAdbHandle = handle;};
-  VOID SetFastbootHandle(usb_handle* handle) const { mFbHandle = handle;};
+  VOID SetAdbHandle(usb_handle* handle)  { mAdbHandle = handle;};
+  VOID SetFastbootHandle(usb_handle* handle)  { mFbHandle = handle;};
   BOOL SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf=TRUE);
   VOID DeleteMemory(VOID);
   int GetDevId();
   VOID UpdateDevTag();
   const char *GetDevTag() const{  return mTag;};
   long long GetTimeElapse() { return mEndTimeStamp - mBeginTimeStamp;};
+  VOID Dump(const char *tag);
 
   private:
     long long     mBeginTimeStamp;
@@ -248,7 +251,7 @@ class DeviceInterfaces {
     CPacket    *m_packetDll;
     usb_handle*  mAdbHandle;
     usb_handle*  mFbHandle;
-    BOOL       mDeviceActive;  //Device is exactly exist. For when enable fix logic port,
+    usb_dev_t       mDeviceActive;  //Device is exactly exist. For when enable fix logic port,
                                //we do not remove DeviceInterfaces object.
     CDevLabel  *mActiveIntf;  //interface which now we operate
     CDevLabel  *mAdb;       //Adb interface, appear in debug configuration
@@ -265,9 +268,11 @@ class DeviceCoordinator {
   public:
     DeviceCoordinator();
     ~DeviceCoordinator();
+    DeviceInterfaces *GetIdleDevice();
     BOOL GetDevice(const wchar_t *const devPath, DeviceInterfaces** outDevIntf);
     DeviceInterfaces* AddDevice(CDevLabel& dev, TDevType type);
-    BOOL RemoveDevice( DeviceInterfaces*const & devIntf);
+    BOOL RemoveDevice(DeviceInterfaces*const & devIntf);
+    BOOL IsEmpty();
     VOID Dump(VOID);
 
   private:

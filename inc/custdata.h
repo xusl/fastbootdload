@@ -15,7 +15,7 @@
 
 //modify by yanbin.wan 20130708 from 60 to 128
 #define DIAG_FS_MAX_FILENAME_LEN       128
-#define DIAG_FS_BUFFER_SIZE            1024           
+#define DIAG_FS_BUFFER_SIZE            1024
 
 #define MAX_PC_PATH_LENGTH             1024
 
@@ -314,7 +314,7 @@ typedef enum cm_mode_pref_e
   CM_MODE_PREF_GWL = 39,
 	/**<
     ** Service is limited to GSM, WCDMA or LTE
-    */    
+    */
     /**< @internal */
   CM_MODE_PREF_WCDMA_LTE_ONLY3G = 40,
     /**<
@@ -411,87 +411,87 @@ typedef enum cm_mode_pref_e
   #define  NV_MODE_PCS_CDMA_ONLY                         ((nv_mode_enum_type)7)
   /* Restrict to cellular home only */
   #define  NV_MODE_CELL_CDMA_ONLY                        ((nv_mode_enum_type)8)
-  
+
   #define  NV_MODE_CDMA_ONLY                             ((nv_mode_enum_type)9)
-  
+
   #define  NV_MODE_HDR_ONLY                              ((nv_mode_enum_type)10)
-  
+
   #define  NV_MODE_CDMA_AMPS_ONLY                        ((nv_mode_enum_type)11)
-  
+
   #define  NV_MODE_GPS_ONLY                              ((nv_mode_enum_type)12)
   /* Service is limited to GSM only */
   #define  NV_MODE_GSM_ONLY                              ((nv_mode_enum_type)13)
   /* Service is limited to WCDMA only */
   #define  NV_MODE_WCDMA_ONLY                            ((nv_mode_enum_type)14)
-  
+
   #define  NV_MODE_WLAN_ONLY                             ((nv_mode_enum_type)15)
-  
+
   #define  NV_MODE_ANY_BUT_HDR                           ((nv_mode_enum_type)16)
-  
+
   #define  NV_MODE_GSM_WCDMA_ONLY                        ((nv_mode_enum_type)17)
-  
+
   #define  NV_MODE_DIGITAL_LESS_HDR_ONLY                 ((nv_mode_enum_type)18)
-  
+
   #define  NV_MODE_CDMA_HDR_ONLY                         ((nv_mode_enum_type)19)
-  
+
   #define  NV_MODE_CDMA_AMPS_HDR_ONLY                    ((nv_mode_enum_type)20)
-  
+
   #define  NV_MODE_CDMA_WLAN_ONLY                        ((nv_mode_enum_type)21)
-  
+
   #define  NV_MODE_HDR_WLAN_ONLY                         ((nv_mode_enum_type)22)
-  
+
   #define  NV_MODE_CDMA_HDR_WLAN_ONLY                    ((nv_mode_enum_type)23)
-  
+
   #define  NV_MODE_GSM_WLAN_ONLY                         ((nv_mode_enum_type)24)
-  
+
   #define  NV_MODE_WCDMA_WLAN_ONLY                       ((nv_mode_enum_type)25)
-  
+
   #define  NV_MODE_GW_WLAN_ONLY                          ((nv_mode_enum_type)26)
-  
+
   #define  NV_MODE_CDMA_AMPS_HDR_WLAN_ONLY               ((nv_mode_enum_type)27)
-  
+
   #define  NV_MODE_CDMA_AMPS_WLAN_ONLY                   ((nv_mode_enum_type)28)
-  
+
   #define  NV_MODE_ANY_BUT_HDR_WLAN                      ((nv_mode_enum_type)29)
-  
+
   #define  NV_MODE_LTE_ONLY                              ((nv_mode_enum_type)30)
-  
+
   #define  NV_MODE_GWL                                   ((nv_mode_enum_type)31)
-  
+
   #define  NV_MODE_CDMA_LTE_ONLY                         ((nv_mode_enum_type)32)
-  
+
   #define  NV_MODE_HDR_LTE_ONLY                          ((nv_mode_enum_type)33)
-  
+
   #define  NV_MODE_GSM_LTE_ONLY                          ((nv_mode_enum_type)34)
-  
+
   #define  NV_MODE_WCDMA_LTE_ONLY                        ((nv_mode_enum_type)35)
-  
+
   #define  NV_MODE_CDMA_HDR_LTE_ONLY                     ((nv_mode_enum_type)36)
-  
+
   #define  NV_MODE_CDMA_GSM_LTE_ONLY                     ((nv_mode_enum_type)37)
-  
+
   #define  NV_MODE_CDMA_WCDMA_LTE_ONLY                   ((nv_mode_enum_type)38)
-  
+
   #define  NV_MODE_HDR_GSM_LTE_ONLY                      ((nv_mode_enum_type)39)
-  
+
   #define  NV_MODE_HDR_WCDMA_LTE_ONLY                    ((nv_mode_enum_type)40)
-  
+
   #define  NV_MODE_CDMA_LTE_WLAN_ONLY                    ((nv_mode_enum_type)41)
-  
+
   #define  NV_MODE_HDR_LTE_WLAN_ONLY                     ((nv_mode_enum_type)42)
-  
+
   #define  NV_MODE_GSM_LTE_WLAN_ONLY                     ((nv_mode_enum_type)43)
-  
+
   #define  NV_MODE_WCDMA_LTE_WLAN_ONLY                   ((nv_mode_enum_type)44)
-  
+
   #define  NV_MODE_CDMA_HDR_LTE_WLAN_ONLY                ((nv_mode_enum_type)45)
-  
+
   #define  NV_MODE_CDMA_GSM_LTE_WLAN_ONLY                ((nv_mode_enum_type)46)
-  
+
   #define  NV_MODE_CDMA_WCDMA_LTE_WLAN_ONLY              ((nv_mode_enum_type)47)
-  
+
   #define  NV_MODE_HDR_GSM_LTE_WLAN_ONLY                 ((nv_mode_enum_type)48)
-  
+
   #define  NV_MODE_HDR_WCDMA_LTE_WLAN_ONLY               ((nv_mode_enum_type)49)
 
 class CDIAGCmd;
@@ -500,7 +500,7 @@ typedef void (*ProgressCallback)(int port,uint16 percent);
 class CCustData
 {
 public:
-        CCustData(CPacket& packetDll, TCustDataInfoType* pCustDataInfo,int dlPort);
+        CCustData(CPacket& packetDll, TCustDataInfoType* pCustDataInfo);
 	~CCustData();
 
 public:
@@ -527,11 +527,11 @@ public:
     TResult DeleteEFSFiles(bool bWriteArm, const char* fileName);
     TResult DeleteFile(bool bWriteArmEfs, const char* fileName);
 
-private:	
+private:
 	TNviItemType* 	   	m_pItems;
 	uint32             	m_uCount;
 	TCustDataInfoType* 	m_pCustDataInfo;
-	
+
 	//char			   	m_sProjectDir[MAX_PC_PATH_LENGTH];
 	//char			   	m_sProjectDir[MAX_PATH];
 	bool              	m_isMoreOp;

@@ -25,10 +25,10 @@ DeviceInterfaces::DeviceInterfaces() :
     mAdb(NULL),
     mDiag(NULL),
     mFastboot(NULL),
-    mDeviceActive(FALSE),
     m_packetDll(NULL),
     mAdbHandle(NULL),
-    mFbHandle(NULL)
+    mFbHandle(NULL),
+    mDeviceActive(DEVICE_UNKNOW)
 {
     const char *default_tag = "N/A Device";
     strncpy_s(mTag, DEV_TAG_LEN, default_tag, strlen(default_tag));
@@ -53,9 +53,7 @@ CDevLabel* DeviceInterfaces::SetDiagIntf(CDevLabel& intf) {
     mDiag = new CDevLabel(intf);
     m_packetDll = new CPacket();
     ASSERT(m_packetDll != NULL);
-
-    uint16 m_dlPort = mDiag->GetComPortNum();
-    m_packetDll->Init(m_dlPort);
+    m_packetDll->Init(mDiag->GetComPortNum());
 
     return mDiag;
 }
@@ -75,9 +73,12 @@ VOID DeviceInterfaces::UpdateDevTag() {
         mFastboot->GetEffectiveSnPort(&sn, &port);
     }
 
-    if(mDiag != NULL) {
+    if(mDiag != NULL ) {
         //wsprintf
+        if (mAdb != NULL || mFastboot != NULL )
     snprintf(mTag, DEV_TAG_LEN, "COM%d (0X%X.%d)", mDiag->GetComPortNum(), sn, port);
+    else
+    snprintf(mTag, DEV_TAG_LEN, "COM%d", mDiag->GetComPortNum());
     } else {
      snprintf(mTag, DEV_TAG_LEN, "Device: 0X%X (%d)", sn, port);
     }
@@ -124,7 +125,11 @@ BOOL DeviceInterfaces::SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveI
 
 bool DeviceInterfaces::operator ==(const DeviceInterfaces * const & devIntf) const{
     LOGE("DO DeviceInterfaces::operator ==");
-    if (this == devIntf)
+    return Match(devIntf);
+}
+
+bool DeviceInterfaces::Match(const DeviceInterfaces * const & devIntf) const {
+        if (this == devIntf)
         return true;
 
     CDevLabel* adb = devIntf->GetAdbIntf();
@@ -157,11 +162,14 @@ DeviceInterfaces & DeviceInterfaces::operator =(const DeviceInterfaces & devIntf
     mDiag = devIntfs.GetDiagIntf();
     mFastboot = devIntfs.GetFastbootIntf();
     mDeviceActive = devIntfs.GetDeviceStatus();
+    m_packetDll = devIntfs.GetPacket();
+    mAdbHandle = devIntfs.GetAdbHandle() ;
+    mFbHandle = devIntfs.GetFastbootHandle();
     strcpy(mTag, devIntfs.GetDevTag());
     return *this;
 }
 
-VOID DeviceInterfaces::SetDeviceStatus(BOOL status) {
+VOID DeviceInterfaces::SetDeviceStatus(usb_dev_t status) {
     mDeviceActive = status;
 
     if (status) {
@@ -173,11 +181,9 @@ VOID DeviceInterfaces::SetDeviceStatus(BOOL status) {
             uint16 m_dlPort = mDiag->GetComPortNum();
             m_packetDll->Init(m_dlPort);
         }
-    } else {
-        if (m_packetDll != NULL) {
+    } else if (m_packetDll != NULL) {
             m_packetDll->Uninit();
             delete m_packetDll;
-        }
     }
 }
 
@@ -186,12 +192,23 @@ VOID DeviceInterfaces::DeleteMemory(VOID) {
     DELETE_IF(mDiag);
     DELETE_IF(mFastboot);
     mActiveIntf = NULL;
-    SetDeviceStatus(FALSE);
+    SetDeviceStatus(DEVICE_UNKNOW);
 }
 
 DeviceInterfaces::~DeviceInterfaces()
 {
     mActiveIntf = NULL;
+}
+
+
+VOID DeviceInterfaces::Dump(const char *tag) {
+    if(mFastboot != NULL)
+        mFastboot->Dump("fastboot");
+    if(mAdb)
+        mAdb->Dump("adb");
+    if(mDiag)
+        mDiag->Dump("diag");
+    LOGD("DeviceInterfaces::Dump END ");
 }
 
 
@@ -212,6 +229,17 @@ DeviceCoordinator::~DeviceCoordinator() {
     mDevintfList.clear();
 }
 
+DeviceInterfaces *DeviceCoordinator::GetIdleDevice() {
+    list<DeviceInterfaces*>::iterator it;
+    for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+        DeviceInterfaces *item = *it;
+        if(item->GetDeviceStatus() == DEVICE_PLUGIN) {
+            return item;
+        }
+    }
+    return NULL;
+}
+
 BOOL DeviceCoordinator::GetDevice(const wchar_t * const devPath, DeviceInterfaces** outDevIntf) {
 #if 0
     list<DeviceInterfaces>::iterator it = find(mDevintfList.begin(), mDevintfList.end(), devPath);
@@ -229,6 +257,7 @@ BOOL DeviceCoordinator::GetDevice(const wchar_t * const devPath, DeviceInterface
             return TRUE;
         }
     }
+    LOGE("Can not get device interface for  %S", devPath);
     return FALSE;
 }
 
@@ -246,29 +275,36 @@ DeviceInterfaces* DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type) {
     if (it != mDevintfList.end()) {
         LOGI("Update exist device");
         newDevIntf = *it;
-        (*it)->SetDeviceStatus(TRUE);
+        (*it)->SetDeviceStatus(DEVICE_PLUGIN);
         (*it)->SetIntf(dev, type);
     } else {
         LOGI("Create new device");
         newDevIntf = new DeviceInterfaces(temp);
-        newDevIntf->SetDeviceStatus(TRUE);
+        newDevIntf->SetDeviceStatus(DEVICE_PLUGIN);
         mDevintfList.push_back(newDevIntf);
     }
     return newDevIntf;
 }
 
 BOOL DeviceCoordinator::RemoveDevice(DeviceInterfaces* const & devIntf)  {
+    ASSERT(devIntf != NULL);
     mDevintfList.remove(devIntf);
     devIntf->DeleteMemory();
     delete devIntf;
     return TRUE;
 }
 
+BOOL DeviceCoordinator::IsEmpty() {
+    return mDevintfList.empty();
+}
+
 VOID DeviceCoordinator::Dump(VOID) {
     list<DeviceInterfaces*>::iterator it;
+    LOGI("===================================");
     DeviceInterfaces* item ;
         for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
 item = *it;
+item->Dump("dump device");
     }
 }
 

@@ -45,7 +45,7 @@ bool check_backup_data_ok(cust_data_info_s_type* custdata_info)
 }
 
 CCustData::CCustData( CPacket& packetDll,
-                      TCustDataInfoType* pCustDataInfo,int adlPort)
+                      TCustDataInfoType* pCustDataInfo)
 {
     m_uTotalRatio = 0;
     m_uRatio = 0;
@@ -55,7 +55,7 @@ CCustData::CCustData( CPacket& packetDll,
     this->m_pItems = NULL;
     this->m_uCount = 0;
     this->m_pDIAGCmd = new CDIAGCmd(packetDll);
-    this->dlPort = adlPort;
+    this->dlPort = packetDll.GetComPort();
     memset(&this->m_simlockData, 0, sizeof(TImgBufType));
     memset(&this->m_traceData, 0, sizeof(TImgBufType));
 }

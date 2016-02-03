@@ -44,7 +44,22 @@ enum
 
 class CmdmfastbootDlg;
 
-typedef struct UsbWorkData{
+class UsbWorkData{
+  public:
+    UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator);
+    ~UsbWorkData();
+    BOOL Clean(BOOL noCleanUI=TRUE);
+    BOOL IsIdle();
+    BOOL Reset(VOID);
+    BOOL Abort(VOID);
+    BOOL Start(DeviceInterfaces* devIntf, UINT nElapse);
+    BOOL Finish(VOID);
+    BOOL SwitchDev(UINT nElapse);
+
+  private:
+    DeviceCoordinator *pCoordinator;
+
+  public:
     CmdmfastbootDlg  *hWnd;
     CPortStateUI      ctl;
     CWinThread       *work;
@@ -56,7 +71,7 @@ typedef struct UsbWorkData{
     FlashImageInfo const * flash_partition[PARTITION_NUM_MAX];
     short           partition_nr;
     BOOL            update_qcn;
-} UsbWorkData;
+} ;
 
 #define THREADPOOL_SIZE	4
 static const int PORT_NUM_MAX = 9;
@@ -67,6 +82,7 @@ enum
   TIMER_EVT_REJECTCDROM,
   TIMER_EVT_COMPORT,
   TIMER_EVT_USBADB,
+  TIMER_EVT_ALL
 };
 
 
@@ -76,6 +92,7 @@ class CmdmfastbootDlg : public CDialog
 // 构造
 public:
 	CmdmfastbootDlg(CWnd* pParent = NULL);	// 标准构造函数
+	~CmdmfastbootDlg();
 
 // 对话框数据
 	enum { IDD = IDD_MDMFASTBOOT_DIALOG };
@@ -109,7 +126,7 @@ protected:
 	//CThreadPool<CDlWorker> m_dlWorkerPool;
   CString m_ConfigPath;
   flash_image *m_image;
-  UsbWorkData m_workdata[PORT_NUM_MAX];
+  UsbWorkData* m_workdata[PORT_NUM_MAX];
   CListCtrl  *m_imglist;
   //CListCtrl  *m_port;
   CSettingsDlg m_SetDlg;
@@ -140,12 +157,13 @@ public:
   BOOL RejectCDROM(VOID);
   BOOL HandleComDevice(VOID);
   BOOL EnumerateAdbDevice(VOID);
-  BOOL AdbUsbHandler(BOOL update_device);
+  BOOL ScheduleDeviceWork(BOOL update_device);
   BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);
   BOOL UpdatePackageInfo(BOOL update = TRUE);
   BOOL RemoveDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
-  static void CALLBACK GeneralTimerProc(HWND hWnd,  UINT nMsg,  UINT_PTR nIDEvent,  DWORD dwTime);
+  BOOL SetupDevice(int evt);
+  static void CALLBACK DeviceEventTimerProc(HWND hWnd,  UINT nMsg,  UINT_PTR nIDEvent,  DWORD dwTime);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
   afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnBnClickedBtnBrowse();
@@ -156,7 +174,7 @@ public:
 	afx_msg void OnClose();
 	afx_msg void OnDestroy();
 
-private:
+public:
     static UINT usb_work(LPVOID wParam);
     static UINT adb_hw_check(adbhost& adb, UsbWorkData* data);
     static UINT adb_sw_version_cmp(adbhost& adb, UsbWorkData* data);
@@ -169,21 +187,12 @@ private:
 
 private:
     BOOL InitSettingDlg(void);
-    BOOL InitUsbWorkData(void);
-    UsbWorkData * GetUsbWorkData(usb_handle* handle, BOOL fix_map);
     UsbWorkData * FindUsbWorkData(wchar_t *devPath);
-    BOOL SetUsbWorkData(UsbWorkData *data, usb_handle * usb);
-    BOOL CleanUsbWorkData(UsbWorkData *data, BOOL schedule = TRUE);
-    BOOL SwitchUsbWorkData(UsbWorkData *data);
-    BOOL FinishUsbWorkData(UsbWorkData *data);
-    BOOL AbortUsbWorkData(UsbWorkData *data);
-    BOOL ResetUsbWorkData(void);
     BOOL IsHaveUsbWork(void);
-    UINT UsbWorkStat(UsbWorkData *data);
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
     BOOL InitSettingConfig(void);
+	  void UpdatePackage();
 
-	void UpdatePackage();
 public:
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);
 	virtual void HtmlHelp(DWORD_PTR dwData, UINT nCmd = 0x000F);

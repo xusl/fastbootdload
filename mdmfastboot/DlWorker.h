@@ -1,8 +1,8 @@
 #pragma once
 
 //#include "mdmfastbootDlg.h"
-
-typedef UINT (*WORKFN)(struct UsbWorkData * usbdata, flash_image  *image);
+class UsbWorkData;
+typedef UINT (*WORKFN)(UsbWorkData * usbdata, flash_image  *image);
 
 class CDownload
 {
