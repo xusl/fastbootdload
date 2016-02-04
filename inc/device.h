@@ -229,7 +229,6 @@ class DeviceInterfaces {
   usb_handle* GetAdbHandle() const { return mAdbHandle;};
   usb_handle* GetFastbootHandle() const { return mFbHandle;};
   usb_handle* GetUsbHandle(BOOL flashdirect) const;
-  CPacket* GetPacket() const {return m_packetDll;};
   bool GetAttachStatus() const { return mAttachUiPort;};
   VOID SetAttachStatus(bool attached)  { mAttachUiPort = attached;};
   VOID SetDeviceStatus(usb_dev_t status);
@@ -242,6 +241,7 @@ class DeviceInterfaces {
   BOOL SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf=TRUE);
   VOID DeleteMemory(VOID);
   int GetDevId();
+  CPacket* GetPacket();
   VOID UpdateDevTag();
   const char *GetDevTag() const{  return mTag;};
   long long GetTimeElapse() { return mEndTimeStamp - mBeginTimeStamp;};
@@ -252,7 +252,7 @@ class DeviceInterfaces {
     long long     mEndTimeStamp;
     bool       mAttachUiPort;
     char       mTag[DEV_TAG_LEN];
-    CPacket    *m_packetDll;
+
     usb_handle*  mAdbHandle;
     usb_handle*  mFbHandle;
     usb_dev_t       mDeviceActive;  //Device is exactly exist. For when enable fix logic port,

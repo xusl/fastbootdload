@@ -697,21 +697,24 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         case DBT_DEVTYP_PORT:
             {
                 LOGI("device arrive, DBT_DEVTYP_PORT");
-                SetTimer(TIMER_EVT_COMPORT, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
-                break;
+                //SetTimer(TIMER_EVT_COMPORT, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
+               HandleComDevice();
+            ScheduleDeviceWork(m_flashdirect);
+            break;
             }
         case DBT_DEVTYP_DEVICEINTERFACE:
             LOGI("device arrive, DBT_DEVTYP_DEVICEINTERFACE");
-                //SetUpAdbDevice(pDevInf, dwData);
-                SetTimer(TIMER_EVT_USBADB, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
-                //EnumerateAdbDevice();
+                //SetTimer(TIMER_EVT_USBADB, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
+            EnumerateAdbDevice();
+            ScheduleDeviceWork(m_flashdirect);
+
                 break;
         }
     } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
         switch (phdr->dbch_devicetype) {
         case DBT_DEVTYP_DEVICEINTERFACE:
             {
-                RemoveDevice(pDevInf, dwData);
+               // RemoveDevice(pDevInf, dwData);
                 break;
             }
         case DBT_DEVTYP_VOLUME:
@@ -806,7 +809,7 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
   case FLASH_DONE:
     usb_close(data->usb);
 
-        mDevCoordinator.RemoveDevice(data->devIntf);
+    mDevCoordinator.RemoveDevice(data->devIntf);
 
       m_updated_number ++;
   if (NULL == mDevCoordinator.IsEmpty()) {
@@ -990,24 +993,27 @@ BOOL CmdmfastbootDlg::RejectCDROM(VOID){
 BOOL CmdmfastbootDlg::SetupDevice(int evt) {
     switch(evt) {
         case TIMER_EVT_ADBKILLED:
-            EnumerateAdbDevice();
             RejectCDROM();
+            EnumerateAdbDevice();
             HandleComDevice();
+            ScheduleDeviceWork(m_flashdirect);
             break;
         case TIMER_EVT_REJECTCDROM:
             RejectCDROM();
             break;
         case TIMER_EVT_COMPORT:
             HandleComDevice();
+            ScheduleDeviceWork(m_flashdirect);
             break;
         case TIMER_EVT_USBADB:
             EnumerateAdbDevice();
+            ScheduleDeviceWork(m_flashdirect);
             break;
         default:
             break;
         }
-    if (evt != TIMER_EVT_REJECTCDROM)
-        ScheduleDeviceWork(m_flashdirect);
+   // if (evt != TIMER_EVT_REJECTCDROM)
+   //     ScheduleDeviceWork(m_flashdirect);
 
     mDevCoordinator.Dump();
     return TRUE;
@@ -1244,6 +1250,11 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     if (status == DEVICE_PLUGIN) {
         CPacket *m_packetDll = data->devIntf->GetPacket();
 
+if (m_packetDll == NULL) {
+dev->SetDeviceStatus(DEVICE_CHECK);
+return 0;
+}
+
         if(1){
             JRDdiagCmd  DIAGCmd (*m_packetDll);
             DIAGCmd.EnableDiagServer();
@@ -1275,6 +1286,10 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
             m_pCustdata.ChangeOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
             delete m_pCustdataInfo;
         }
+                    if (m_packetDll != NULL) {
+        m_packetDll->Uninit();
+        delete m_packetDll;
+    }
         dev->SetDeviceStatus(DEVICE_CHECK);
     } else if (status == DEVICE_CHECK) {
         adbhost adb(handle , dev->GetDevId());

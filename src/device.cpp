@@ -25,7 +25,6 @@ DeviceInterfaces::DeviceInterfaces() :
     mAdb(NULL),
     mDiag(NULL),
     mFastboot(NULL),
-    m_packetDll(NULL),
     mAdbHandle(NULL),
     mFbHandle(NULL),
     mDeviceActive(DEVICE_UNKNOW),
@@ -47,17 +46,26 @@ CDevLabel* DeviceInterfaces::SetAdbIntf(CDevLabel& intf) {
 
 CDevLabel* DeviceInterfaces::SetDiagIntf(CDevLabel& intf) {
     DELETE_IF(mDiag);
-    if (m_packetDll != NULL) {
-        m_packetDll->Uninit();
-        delete m_packetDll;
-    }
+
+
+
     mDiag = new CDevLabel(intf);
-    m_packetDll = new CPacket();
-    ASSERT(m_packetDll != NULL);
-    m_packetDll->Init(mDiag->GetComPortNum());
+
+
 
     return mDiag;
 }
+
+
+  CPacket* DeviceInterfaces::GetPacket() {
+    if (mDiag == NULL)
+        return NULL;
+
+     CPacket* m_packetDll = new CPacket();
+    m_packetDll->Init(mDiag->GetComPortNum());
+    return m_packetDll;
+
+  }
 
 CDevLabel* DeviceInterfaces::SetFastbootIntf(CDevLabel& intf) {
     DELETE_IF(mFastboot);
@@ -172,7 +180,7 @@ DeviceInterfaces & DeviceInterfaces::operator =(const DeviceInterfaces & devIntf
     mDiag = devIntfs.GetDiagIntf();
     mFastboot = devIntfs.GetFastbootIntf();
     mDeviceActive = devIntfs.GetDeviceStatus();
-    m_packetDll = devIntfs.GetPacket();
+    //m_packetDll = devIntfs.GetPacket();
     mAdbHandle = devIntfs.GetAdbHandle() ;
     mFbHandle = devIntfs.GetFastbootHandle();
     strcpy(mTag, devIntfs.GetDevTag());
@@ -183,19 +191,6 @@ DeviceInterfaces & DeviceInterfaces::operator =(const DeviceInterfaces & devIntf
 VOID DeviceInterfaces::SetDeviceStatus(usb_dev_t status) {
     mDeviceActive = status;
 
-    if (status == DEVICE_PLUGIN) {
-        if (mDiag != NULL && m_packetDll == NULL) {
-            m_packetDll = new CPacket();
-            //ASSERT(m_packetDll != NULL);
-            m_packetDll->Init(mDiag->GetComPortNum());
-        }
-    } else if (status == DEVICE_UNKNOW || status == DEVICE_REMOVED) {
-    if (m_packetDll != NULL) {
-            m_packetDll->Uninit();
-            delete m_packetDll;
-            m_packetDll = NULL;
-    }
-    }
 }
 
 VOID DeviceInterfaces::DeleteMemory(VOID) {
@@ -224,9 +219,9 @@ VOID DeviceInterfaces::Dump(const char *tag) {
 
 
 DeviceCoordinator::DeviceCoordinator() :
-    mDevintfList(0)
+    mDevintfList()
 {
-    ;
+    mDevintfList.clear();
 }
 
 DeviceCoordinator::~DeviceCoordinator() {
@@ -302,9 +297,12 @@ DeviceInterfaces* DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type) {
 
 BOOL DeviceCoordinator::RemoveDevice(DeviceInterfaces* const & devIntf)  {
     ASSERT(devIntf != NULL);
+    LOGE("RemoveDevice , NOW DO NOTHING!");
+#if 0
     mDevintfList.remove(devIntf);
     devIntf->DeleteMemory();
     delete devIntf;
+#endif
     return TRUE;
 }
 
