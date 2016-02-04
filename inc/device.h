@@ -52,10 +52,10 @@ typedef enum {
 typedef enum {
     DEVICE_UNKNOW = 0,
     DEVICE_PLUGIN,
-    DEVICE_CHECK,//ADB,
-    //DEVICE_SWITCH,
-    DEVICE_FLASH,//FASTBOOT,
-    DEVICE_CONFIGURE,
+    DEVICE_CHECK,  //VERSION CHECK BY ADB OR DIAG
+    DEVICE_PST,    //DOWNLOAD IMAGE THROUGH DIAG (PRG, SERIAL)
+    DEVICE_FLASH,//DOWNLOAD IMAGE THROUGH FASTBOOT
+    DEVICE_REBOOT,
     DEVICE_REMOVED,
     DEVICE_MAX
 }usb_dev_t;
@@ -65,7 +65,7 @@ class DeviceInterfaces;
   AdbWinApi.dll. This structure is returned from usb_open() routine and
   is expected in each subsequent call that is accessing the device.
 */
-struct usb_handle {
+typedef struct usb_handle {
   /// Previous entry in the list of opened usb handles
   usb_handle *prev;
 
@@ -85,13 +85,13 @@ struct usb_handle {
   wchar_t*         interface_name;
 
   int interface_protocol;
-  usb_dev_t status;
+  //usb_dev_t status;
   BOOL work;
   DeviceInterfaces* dev_intfs;
 
   /// Mask for determining when to use zero length packets
   unsigned zero_mask;
-};
+}usb_handle;
 
 
 //device Class GUID
@@ -228,7 +228,10 @@ class DeviceInterfaces {
   usb_dev_t GetDeviceStatus() const{ return mDeviceActive;};
   usb_handle* GetAdbHandle() const { return mAdbHandle;};
   usb_handle* GetFastbootHandle() const { return mFbHandle;};
+  usb_handle* GetUsbHandle(BOOL flashdirect) const;
   CPacket* GetPacket() const {return m_packetDll;};
+  bool GetAttachStatus() const { return mAttachUiPort;};
+  VOID SetAttachStatus(bool attached)  { mAttachUiPort = attached;};
   VOID SetDeviceStatus(usb_dev_t status);
   CDevLabel* SetFastbootIntf(CDevLabel& intf);
   CDevLabel* SetDiagIntf(CDevLabel& intf);
@@ -247,6 +250,7 @@ class DeviceInterfaces {
   private:
     long long     mBeginTimeStamp;
     long long     mEndTimeStamp;
+    bool       mAttachUiPort;
     char       mTag[DEV_TAG_LEN];
     CPacket    *m_packetDll;
     usb_handle*  mAdbHandle;
@@ -268,7 +272,7 @@ class DeviceCoordinator {
   public:
     DeviceCoordinator();
     ~DeviceCoordinator();
-    DeviceInterfaces *GetIdleDevice();
+    DeviceInterfaces *GetValidDevice();
     BOOL GetDevice(const wchar_t *const devPath, DeviceInterfaces** outDevIntf);
     DeviceInterfaces* AddDevice(CDevLabel& dev, TDevType type);
     BOOL RemoveDevice(DeviceInterfaces*const & devIntf);

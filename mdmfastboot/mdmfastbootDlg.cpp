@@ -117,17 +117,14 @@ BOOL UsbWorkData::Abort(VOID) {
     return TRUE;
 }
 
-BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, UINT nElapse) {
+BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, UINT nElapse, BOOL flashdirect) {
     ASSERT(pDevIntf != NULL);
     devIntf = pDevIntf;
 
   //TODO::
-  usb = devIntf->GetAdbHandle();
-
+  usb = devIntf->GetUsbHandle(flashdirect);
   usb_set_work(usb, TRUE);
-
-  devIntf->SetDeviceStatus(DEVICE_CHECK);
-
+    devIntf->SetAttachStatus(true);
   stat = USB_STAT_WORKING;
   work = AfxBeginThread(CmdmfastbootDlg::usb_work, this);
 
@@ -160,6 +157,32 @@ BOOL UsbWorkData::SwitchDev(UINT nElapse) {
   /*Set switch timeout*/
   hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);
     return TRUE;
+}
+
+
+UINT UsbWorkData::ui_text_msg(UI_INFO_TYPE info_type, PCCH msg) {
+  UIInfo* info = new UIInfo();
+
+  //if (FLASH_DONE && data->hWnd->m_fix_port_map)
+  //  sleep(1);
+
+  info->infoType = info_type;
+  info->sVal = msg;
+  hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                          (WPARAM)info,
+                          (LPARAM)this);
+  return 0;
+}
+
+UINT UsbWorkData::SetProgress(int progress) {
+        UIInfo* info = new UIInfo();
+
+    info->infoType = PROGRESS_VAL;
+    info->iVal = progress;
+    hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                  (WPARAM)info,
+                  (LPARAM)this);
+    return 0;
 }
 
 // CmdmfastbootDlg ¶Ô»°¿ò
@@ -297,8 +320,7 @@ BOOL CmdmfastbootDlg::IsHaveUsbWork(void) {
   int i= 0;
   for (; i < m_nPort; i++) {
     workdata = m_workdata[i];
-    if (workdata->stat == USB_STAT_SWITCH ||
-        workdata->stat == USB_STAT_WORKING)
+    if (!workdata->IsIdle())
         return TRUE ;
   }
   return FALSE;
@@ -654,8 +676,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
     DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
     PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
 
-    DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x",
-          nEventType, phdr->dbch_devicetype);
+    //DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x", nEventType, phdr->dbch_devicetype);
 
     if (nEventType == DBT_DEVICEARRIVAL) {
         switch( phdr->dbch_devicetype ) {
@@ -680,6 +701,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
                 break;
             }
         case DBT_DEVTYP_DEVICEINTERFACE:
+            LOGI("device arrive, DBT_DEVTYP_DEVICEINTERFACE");
                 //SetUpAdbDevice(pDevInf, dwData);
                 SetTimer(TIMER_EVT_USBADB, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
                 //EnumerateAdbDevice();
@@ -742,7 +764,7 @@ BOOL CmdmfastbootDlg::RemoveDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARA
     }
 
     data->Clean(mDevCoordinator.IsEmpty());
-    ScheduleDeviceWork(true);
+    ScheduleDeviceWork(m_flashdirect);
 
     return TRUE;
 }
@@ -805,7 +827,7 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
         sleep(1);
 
     data->Clean(mDevCoordinator.IsEmpty());
-    ScheduleDeviceWork(true);
+    ScheduleDeviceWork(m_flashdirect);
     }
     break;
 
@@ -845,7 +867,7 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
   }
 
   data->Clean(mDevCoordinator.IsEmpty());
-  ScheduleDeviceWork(true);
+  ScheduleDeviceWork(m_flashdirect);
   KillTimer((UINT_PTR)data);
 }
 
@@ -888,6 +910,12 @@ BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID) {
                 iter->Dump("fastboot interface");
                 handle->dev_intfs = mDevCoordinator.AddDevice(*iter, DEVTYPE_FASTBOOT);
                 handle->dev_intfs->SetFastbootHandle(handle);
+                usb_dev_t status = handle->dev_intfs->GetDeviceStatus();
+                if ((m_flashdirect && status == DEVICE_PLUGIN) ||
+                    status == DEVICE_PST ||
+                    status == DEVICE_CHECK) {
+                    handle->dev_intfs->SetDeviceStatus(DEVICE_FLASH);
+                }
                 break;
             }
         }
@@ -932,12 +960,12 @@ BOOL CmdmfastbootDlg::RejectCDROM(VOID){
         CString path = iter->GetDevPath();
         iter->Dump( __FUNCTION__ " : " __FILE__);
         if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
-            LOGI("Fix DISK %S:", path);
+            //LOGI("Fix DISK %S:", path);
             continue;
         }
         path.MakeUpper();
         if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1) {
-            LOGI("USB Stor %S is not alcatel",path);
+            //LOGI("USB Stor %S is not alcatel",path);
             continue;
         }
 
@@ -953,37 +981,36 @@ BOOL CmdmfastbootDlg::RejectCDROM(VOID){
 
         scsi.SwitchToDebugDevice(path);
         //scsi.SwitchToTPSTDeivce(path);
-
         //m_WorkDev.push_back(*iter);
-
     }
-    LOGI("Done, clear device list.");
     devicePath.clear();
     return TRUE;
 }
 
 BOOL CmdmfastbootDlg::SetupDevice(int evt) {
-switch(evt) {
-    case TIMER_EVT_ADBKILLED:
-        EnumerateAdbDevice();
-        RejectCDROM();
-        HandleComDevice();
-        break;
-    case TIMER_EVT_REJECTCDROM:
-        RejectCDROM();
-        break;
-    case TIMER_EVT_COMPORT:
-        HandleComDevice();
-        break;
-    case TIMER_EVT_USBADB:
-        EnumerateAdbDevice();
-        break;
-    default:
-        break;
-    }
+    switch(evt) {
+        case TIMER_EVT_ADBKILLED:
+            EnumerateAdbDevice();
+            RejectCDROM();
+            HandleComDevice();
+            break;
+        case TIMER_EVT_REJECTCDROM:
+            RejectCDROM();
+            break;
+        case TIMER_EVT_COMPORT:
+            HandleComDevice();
+            break;
+        case TIMER_EVT_USBADB:
+            EnumerateAdbDevice();
+            break;
+        default:
+            break;
+        }
+    if (evt != TIMER_EVT_REJECTCDROM)
+        ScheduleDeviceWork(m_flashdirect);
 
-  mDevCoordinator.Dump();
-  return TRUE;
+    mDevCoordinator.Dump();
+    return TRUE;
 }
  void CALLBACK CmdmfastbootDlg::DeviceEventTimerProc(
    HWND hWnd,      // handle of CWnd that called SetTimer
@@ -997,19 +1024,6 @@ switch(evt) {
     dlg->SetupDevice(nIDEvent) ;
 }
 
-UINT CmdmfastbootDlg::ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg) {
-  UIInfo* info = new UIInfo();
-
-  //if (FLASH_DONE && data->hWnd->m_fix_port_map)
-  //  sleep(1);
-
-  info->infoType = info_type;
-  info->sVal = msg;
-  data->hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
-                          (WPARAM)info,
-                          (LPARAM)data);
-  return 0;
-}
 
 UINT CmdmfastbootDlg::adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH command,
                                               UI_INFO_TYPE info_type)
@@ -1020,10 +1034,10 @@ UINT CmdmfastbootDlg::adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH co
   ret = adb.shell(command, (void **)&resp, &resp_len);
   if (ret ==0 && resp != NULL) {
     if (UI_DEFAULT == info_type) {
-      ui_text_msg(data, PROMPT_TITLE, command);
-      ui_text_msg(data, PROMPT_TEXT, resp);
+      data->ui_text_msg(PROMPT_TITLE, command);
+      data->ui_text_msg(PROMPT_TEXT, resp);
     } else {
-      ui_text_msg(data, info_type, resp);
+      data->ui_text_msg(info_type, resp);
     }
     free(resp);
     return 0;
@@ -1092,10 +1106,10 @@ UINT CmdmfastbootDlg::adb_hw_check(adbhost& adb, UsbWorkData* data) {
   if (ret ==0 && resp != NULL) {
     ret = strcmp(resp, "match");
     if (ret == 0) {
-      ui_text_msg(data, PROMPT_TEXT, "hardware is match!");
+      data->ui_text_msg( PROMPT_TEXT, "hardware is match!");
     } else {
-      ui_text_msg(data, PROMPT_TITLE, "hwinfo_check return ");
-      ui_text_msg(data, PROMPT_TEXT, resp);
+      data->ui_text_msg(PROMPT_TITLE, "hwinfo_check return ");
+      data->ui_text_msg(PROMPT_TEXT, resp);
       WARN("hwinfo_check return \"%s\"", resp);
     }
 
@@ -1167,13 +1181,13 @@ UINT CmdmfastbootDlg::sw_version_parse(UsbWorkData* data,PCCH key, PCCH value) {
   if (stricmp(key , "a5") == 0) {
     partition = a5_partition;
     count = sizeof(a5_partition)/ sizeof(a5_partition[0]);
-    ui_text_msg(data, PROMPT_TEXT, "A5 firmware can update");
+    data->ui_text_msg(PROMPT_TEXT, "A5 firmware can update");
   } else if (stricmp(key , "q6") == 0) {
     partition = q6_partition;
     count = sizeof(q6_partition)/ sizeof(q6_partition[0]);
-    ui_text_msg(data, PROMPT_TEXT, "Q6 firmware can update.");
+    data->ui_text_msg(PROMPT_TEXT, "Q6 firmware can update.");
   } else if (stricmp(key , "qcn") == 0) {
-    ui_text_msg(data, PROMPT_TEXT, "QCN can update.");
+    data->ui_text_msg(PROMPT_TEXT, "QCN can update.");
     data->update_qcn = TRUE;
     return 1;
   } else {
@@ -1211,44 +1225,12 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     BOOL force_update;
     usb_dev_t status ;
 
-    CPacket *m_packetDll = data->devIntf->GetPacket();
-
-    if(1){
-        JRDdiagCmd  DIAGCmd (*m_packetDll);
-        DIAGCmd.EnableDiagServer();
-        char version[VERSION_LEN] ={0};
-        for (int i = 0; i < 12; i++) {
-            memset(version, 0, sizeof version);
-            DIAGCmd.RequestVersion(i, (char *)(&version));
-            LOGE("index %d version %s", i, version);
-        }
-        char pFlash_Type[20] = {0};
-        TResult result = DIAGCmd.RequestFlashType_9X25((char *)(&pFlash_Type));
-
-        DIAGCmd.DisableDiagServer();
-    }
-    if (0)
-    {
-        CDIAGCmd DIAGCmd(*m_packetDll);
-        DIAGCmd.EnableDiagServer();
-        //DIAGCmd.RestartDevice();
-        DIAGCmd.SwitchToOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
-        DIAGCmd.DLoadMode();
-        DIAGCmd.DisableDiagServer();
-    }
-
-    if (0){
-        TCustDataInfoType *m_pCustdataInfo = new TCustDataInfoType;
-        CCustData m_pCustdata (*m_packetDll, m_pCustdataInfo);
-        m_pCustdata.ChangeOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
-        delete m_pCustdataInfo;
-    }
-
     if (data == NULL || data->usb == NULL ||  data->hWnd == NULL ||
         data->hWnd->m_image == NULL) {
         ERROR("Bad parameter");
         return -1;
     }
+
     dev = data->devIntf;
     handle = data->usb;
     img = data->hWnd->m_image;
@@ -1256,11 +1238,45 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     //when m_flashdirect set , force_update must set.
     ignore_version = data->hWnd->m_flashdirect;
     force_update = data->hWnd->m_forceupdate;
-    status = usb_status( handle);
+    status = dev->GetDeviceStatus();
 
-    ui_text_msg(data, TITLE, dev->GetDevTag());
+    data->ui_text_msg(TITLE, dev->GetDevTag());
+    if (status == DEVICE_PLUGIN) {
+        CPacket *m_packetDll = data->devIntf->GetPacket();
 
-    if (status == DEVICE_CHECK) {
+        if(1){
+            JRDdiagCmd  DIAGCmd (*m_packetDll);
+            DIAGCmd.EnableDiagServer();
+            char version[VERSION_LEN] ={0};
+            for (int i = 0; i < 12; i++) {
+                memset(version, 0, sizeof version);
+                DIAGCmd.RequestVersion(i, (char *)(&version));
+                data->ui_text_msg(FIRMWARE_VER, version);
+                LOGE("index %d version %s", i, version);
+            }
+            char pFlash_Type[20] = {0};
+            TResult result = DIAGCmd.RequestFlashType_9X25((char *)(&pFlash_Type));
+
+            DIAGCmd.DisableDiagServer();
+        }
+        if (0)
+        {
+            CDIAGCmd DIAGCmd(*m_packetDll);
+            DIAGCmd.EnableDiagServer();
+            //DIAGCmd.RestartDevice();
+            DIAGCmd.SwitchToOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
+            DIAGCmd.DLoadMode();
+            DIAGCmd.DisableDiagServer();
+        }
+
+        if (0){
+            TCustDataInfoType *m_pCustdataInfo = new TCustDataInfoType;
+            CCustData m_pCustdata (*m_packetDll, m_pCustdataInfo);
+            m_pCustdata.ChangeOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
+            delete m_pCustdataInfo;
+        }
+        dev->SetDeviceStatus(DEVICE_CHECK);
+    } else if (status == DEVICE_CHECK) {
         adbhost adb(handle , dev->GetDevId());
         const wchar_t *conf_file = img->get_package_config();
         char *conf_file_char ;
@@ -1275,35 +1291,32 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
             sw_version_parse(data, "qcn", "mismatch");
         } else {
             if (INVALID_FILE_ATTRIBUTES == GetFileAttributes(conf_file)) {
-                ui_text_msg(data, ADB_CHK_ABORT, "no config.xml in the package,  abort!");
+                data->ui_text_msg(ADB_CHK_ABORT, "no config.xml in the package, abort!");
                 return -1;
             }
 
             conf_file_char = WideStrToMultiStr(conf_file);
             if (conf_file_char == NULL) {
-                ui_text_msg(data, ADB_CHK_ABORT, "out of memory, abort!");
+                data->ui_text_msg(ADB_CHK_ABORT, "out of memory, abort!");
                 return -1;
             }
 
             adb.sync_push(conf_file_char, "/tmp/config.xml");
-            ui_text_msg(data, PROMPT_TEXT, "Copy config.xml to /tmp/config.xml.");
+            data->ui_text_msg(PROMPT_TEXT, "Copy config.xml to /tmp/config.xml.");
             delete conf_file_char;
 
             result = adb_hw_check(adb,data);
             if (result != 0) {
-                WARN("hardware check failed.");
-                ui_text_msg(data, ADB_CHK_ABORT, "hardware check failed, abort!");
+                data->ui_text_msg(ADB_CHK_ABORT, "hardware check failed, abort!");
                 return -1;
             }
 
             result = adb_sw_version_cmp(adb,data);
             if (result < 0) {
-                WARN("firmware version check failed.");
-                ui_text_msg(data, ADB_CHK_ABORT, "firmware version check failed, abort!");
+                data->ui_text_msg(ADB_CHK_ABORT, "firmware version check failed, abort!");
                 return -1;
             } else if (result ==0) {
-                WARN("firmware is the newest.");
-                ui_text_msg(data, FLASH_DONE, "firmware is the NEWEST. DO NOT UPDATE.");
+                data->ui_text_msg(FLASH_DONE, "firmware is the NEWEST. DO NOT UPDATE.");
                 return 0;
             }
         }
@@ -1315,10 +1328,10 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
         //adb_shell_command(adb,data, "backup");
         if (data->partition_nr > 0) {
             adb.reboot_bootloader(m_module_name);
-            ui_text_msg(data, REBOOT_DEVICE, "reboot bootloader");
+            data->ui_text_msg(REBOOT_DEVICE, "reboot bootloader");
         } else {
             // that is mean just update qcn
-            ui_text_msg(data, FLASH_DONE, "Finish. QCN updated.");
+            data->ui_text_msg(FLASH_DONE, "Finish. QCN updated.");
         }
     } else if (status == DEVICE_FLASH) {
         fastboot fb(handle);
@@ -1348,48 +1361,52 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
         }
 
         //  fb.fb_queue_reboot();
-        fb.fb_execute_queue(handle,data->hWnd, data);
+        fb.fb_execute_queue(handle, data);
 
-        ui_text_msg(data, FLASH_DONE, NULL);
+        data->ui_text_msg(FLASH_DONE, NULL);
+        dev->SetDeviceStatus(DEVICE_REMOVED);
     }
     return 0;
 }
 
-/*
-*
-*/
-BOOL CmdmfastbootDlg::ScheduleDeviceWork(BOOL update_device) {
-  usb_handle* handle;
-  UsbWorkData* data;
 
-  if (!m_bWork) {
-   // INFO("do not work now.");
-   // return FALSE;
-  }
+BOOL CmdmfastbootDlg::ScheduleDeviceWork(BOOL flashdirect) {
+    usb_handle* handle;
+    UsbWorkData* data;
 
-/*
-* Get usbworkdata that in free or in switch.
-* fix_map means whether logical port (portstatui) fix map physical port.
-* this feature will be useful when multiport port download, it help operator
-* to make sure whether the device in a specific is flashed.
-*/
-DeviceInterfaces* idleDev;
-UsbWorkData* workdata;
-  while(NULL != (idleDev = mDevCoordinator.GetIdleDevice())) {
-    workdata = NULL;
-      for (int i=0; i < m_nPort; i++) {
-      DeviceInterfaces* item = m_workdata[i]->devIntf;
-      if (m_fix_port_map == FALSE || item == NULL || item->Match(idleDev)) {
-        workdata = m_workdata[i];
-      workdata->Start(idleDev, work_timeout);
-        break;
-      }
-  }
-      if (workdata == NULL)
-        break;
-  }
+    if (!m_bWork) {
+        // INFO("do not work now.");
+        return FALSE;
+    }
 
-  return TRUE;
+    /*
+     * Get usbworkdata that in free or in switch.
+     * fix_map means whether logical port (portstatui) fix map physical port.
+     * this feature will be useful when multiport port download, it help operator
+     * to make sure whether the device in a specific is flashed.
+     */
+    DeviceInterfaces* idleDev;
+    UsbWorkData* workdata;
+    BOOL NonePort;
+    while(NULL != (idleDev = mDevCoordinator.GetValidDevice())) {
+        NonePort= TRUE;
+        for (int i=0; i < m_nPort; i++) {
+            workdata = m_workdata[i];
+            if (!workdata->IsIdle())
+                continue;
+
+            DeviceInterfaces* item = m_workdata[i]->devIntf;
+            if (m_fix_port_map == FALSE || item == NULL || item->Match(idleDev)) {
+                workdata->Start(idleDev, work_timeout, flashdirect);
+                NonePort = FALSE;
+                break;
+            }
+        }
+        if (NonePort)
+            break;
+    }
+
+    return TRUE;
 }
 
 
@@ -1568,7 +1585,7 @@ void CmdmfastbootDlg::OnBnClickedStart()
 	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_DISABLED|MF_GRAYED);
 	if (SetWorkStatus(TRUE, FALSE)) {
 	//AdbUsbHandler(true);
-    ScheduleDeviceWork(true);
+    ScheduleDeviceWork(m_flashdirect);
 	}
 
   //::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
@@ -1688,7 +1705,7 @@ void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 	{
 		bSelectStatChange = true;
 		bSelected = true;
-		ERROR("Item %d is checked\n", pNMLV->iItem);
+		ERROR("Item %d is checked", pNMLV->iItem);
 	}
 	else if((pNMLV->uOldState & INDEXTOSTATEIMAGEMASK(2)) /* old state : checked */
 		&& (pNMLV->uNewState & INDEXTOSTATEIMAGEMASK(1)) /* new state : unchecked */
@@ -1696,11 +1713,11 @@ void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 	{
 		bSelectStatChange = true;
 		bSelected = false;
-		ERROR("Item %d is unchecked\n", pNMLV->iItem);
+		ERROR("Item %d is unchecked", pNMLV->iItem);
 	}
 	else
 	{
-		ERROR("Item %d does't change the check-status\n", pNMLV->iItem);
+		ERROR("Item %d does't change the check-status", pNMLV->iItem);
 	}
 
 	if (bSelectStatChange)

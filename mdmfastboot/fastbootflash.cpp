@@ -34,7 +34,7 @@
 #include <log.h>
 
 #include "resource.h"
-#include "PortStateUI.h"
+//#include "PortStateUI.h"
 #include "mdmfastbootDlg.h"
 #include "fastbootflash.h"
 
@@ -537,19 +537,19 @@ int fastboot::match(char *str, const char **value, unsigned count)
     return 0;
 }
 
-int fastboot::cb_default(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_default(void* data, Action *a, int status, char *resp)
 {
     if (status) {
-        port_text_msg(hWnd, data, "FAILED (%s)\n", resp);
+        port_text_msg(data, "FAILED (%s)\n", resp);
     } else {
         uint64 split = now();
-        port_text_msg(hWnd, data, "OKAY [%7.3fs]\n", (split - a->start));
+        port_text_msg(data, "OKAY [%7.3fs]\n", (split - a->start));
         a->start = split;
     }
     return status;
 }
 
-int fastboot::cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int invert)
+int fastboot::cb_check(void* data, Action *a, int status, char *resp, int invert)
 {
     const char **value = (const char **)a->data;
     unsigned count = a->size;
@@ -560,7 +560,7 @@ int fastboot::cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp
     int write_len;
 
     if (status) {
-        port_text_msg(hWnd, data, "FAILED (%s)\n", resp);
+        port_text_msg(data, "FAILED (%s)\n", resp);
         return status;
     }
 
@@ -569,7 +569,7 @@ int fastboot::cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp
 
     if (yes) {
         long long split = now();
-        port_text_msg(hWnd, data,"OKAY [%7.3fs]\n", (split - a->start));
+        port_text_msg(data,"OKAY [%7.3fs]\n", (split - a->start));
         a->start = split;
         return 0;
     }
@@ -594,12 +594,11 @@ int fastboot::cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp
     //fprintf(stderr,".\n\n");
     if (msg_len < sizeof(msg))
         _snprintf(msg + msg_len, sizeof(msg) - msg_len, ".\n\n");
-    port_text_msg(hWnd, data, msg);
+    port_text_msg(data, msg);
     return -1;
 }
 
-UINT fastboot::port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
-
+UINT fastboot::port_text_msg(void* data, const char *fmt,  ... ) {
     va_list ap;
     va_start(ap, fmt);
     char buffer[256]={0};
@@ -608,55 +607,37 @@ UINT fastboot::port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... ) {
     _vsnprintf(buffer, sizeof(buffer), fmt, ap);
     va_end(ap);
 
-    UIInfo* info = new UIInfo();
-
-    info->infoType = PROMPT_TEXT;
-    info->sVal = buffer;
-    hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
-                  (WPARAM)info,
-                  (LPARAM)data);
 	UsbWorkData* wd = (UsbWorkData*) data;
+    wd->ui_text_msg(PROMPT_TEXT, buffer);
 	INFO("%s: %s", wd->devIntf->GetDevTag(), buffer);
 
     return 0;
 }
 
-
-UINT fastboot::port_progress(CWnd* hWnd,void* data, int process ) {
-    UIInfo* info = new UIInfo();
-
-    info->infoType = PROGRESS_VAL;
-    info->iVal = process;
-    hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
-                  (WPARAM)info,
-                  (LPARAM)data);
-    return 0;
-}
-
-int fastboot::cb_require(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_require(void* data, Action *a, int status, char *resp)
 {
-    return cb_check(hWnd, data, a, status, resp, 0);
+    return cb_check(data, a, status, resp, 0);
 }
 
-int fastboot::cb_reject(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_reject(void* data, Action *a, int status, char *resp)
 {
-    return cb_check(hWnd, data, a, status, resp, 1);
+    return cb_check(data, a, status, resp, 1);
 }
 
-int fastboot::cb_do_nothing(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_do_nothing(void* data, Action *a, int status, char *resp)
 {
     fprintf(stderr,"\n");
     return 0;
 }
 
-int fastboot::cb_display(CWnd* hWnd, void* data, Action *a, int status, char *resp)
+int fastboot::cb_display(void* data, Action *a, int status, char *resp)
 {
     if (status) {
-        port_text_msg(hWnd, data, "%s FAILED (%s)\n", a->cmd, resp);
+        port_text_msg(data, "%s FAILED (%s)\n", a->cmd, resp);
         return status;
     }
     //fprintf(stderr, "%s: %s\n", (char*) a->data, resp);
-    port_text_msg(hWnd, data, "%s: %s", (char*) a->data, resp);
+    port_text_msg(data, "%s: %s", (char*) a->data, resp);
     return 0;
 }
 
@@ -817,7 +798,7 @@ unsigned fastboot::image_size(void) {
     return total_size;
 }
 
-void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
+void fastboot::fb_execute_queue(usb_handle *usb, void* data)
 {
     Action *a;
     char resp[FB_RESPONSE_SZ+1];
@@ -835,17 +816,17 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
         if (start < 0) start = a->start;
         if (a->msg) {
             //fprintf(stderr,"%s...\n",a->msg);
-            port_text_msg(hWnd, data, "%s...",a->msg);
+            port_text_msg(data, "%s...",a->msg);
         }
         if (a->op == OP_DOWNLOAD) {
             status = fb_download_data(usb, a->data, a->size);
-            status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
+            status = a->func(data, a, status, status ? fb_get_error() : "");
             if (status)
 				bIsBreak = true;
             flashed_size += a->size;
         } else if (a->op == OP_COMMAND) {
             status = fb_command(usb, a->cmd);
-			status = a->func(hWnd, data, a, status, status ? fb_get_error() : "");
+			status = a->func(data, a, status, status ? fb_get_error() : "");
 			if (status)
 				bIsBreak = true;
 
@@ -854,15 +835,15 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
               return;
             }
 
-            port_progress(hWnd, data, (int) (100.0 * (double) flashed_size / total_size ));
+            ((UsbWorkData*)data)->SetProgress((int) (100.0 * (double) flashed_size / total_size ));
         } else if (a->op == OP_QUERY) {
             status = fb_command_response(usb, a->cmd, resp);
-			status = a->func(hWnd, data, a, status, status ? fb_get_error() : resp);
+			status = a->func(data, a, status, status ? fb_get_error() : resp);
 			if (status)
 				bIsBreak = true;
         } else if (a->op == OP_NOTICE) {
             //fprintf(stderr,"%s\n",(char*)a->data);
-            port_text_msg(hWnd, data, "%s\n",(char*)a->data);
+            port_text_msg(data, "%s\n",(char*)a->data);
         } else {
             ERROR("bogus action");
         }
@@ -874,12 +855,12 @@ void fastboot::fb_execute_queue(usb_handle *usb,CWnd* hWnd, void* data)
 
 	if (bIsBreak)
 	{
-		port_text_msg(hWnd, data, "download breaked. total time: %.3fs\n",
+		port_text_msg(data, "download breaked. total time: %.3fs\n",
           (now() - start) / MILLS_SECONDS);
 	}
 	else
 	{
-		port_text_msg(hWnd, data, "finished. total time: %.3fs\n",
+		port_text_msg(data, "finished. total time: %.3fs\n",
           (now() - start) / MILLS_SECONDS);
 	}
 }

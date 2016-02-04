@@ -35,7 +35,7 @@
 #define OP_QUERY      3
 #define OP_NOTICE     4
 
-typedef struct usb_handle usb_handle;
+//typedef struct usb_handle usb_handle;
 
 void adb_usb_init(void);
 
@@ -53,7 +53,6 @@ usb_handle* usb_handle_enum_init(void);
 usb_handle* usb_handle_next(usb_handle* usb);
 void usb_set_work(usb_handle* usb, BOOL bwork);
 
-usb_dev_t usb_status(usb_handle* handle);
 BOOL usb_is_work(usb_handle* usb);
 
 #endif /* _USB_ADB_H */

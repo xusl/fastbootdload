@@ -28,7 +28,8 @@ DeviceInterfaces::DeviceInterfaces() :
     m_packetDll(NULL),
     mAdbHandle(NULL),
     mFbHandle(NULL),
-    mDeviceActive(DEVICE_UNKNOW)
+    mDeviceActive(DEVICE_UNKNOW),
+    mAttachUiPort(false)
 {
     const char *default_tag = "N/A Device";
     strncpy_s(mTag, DEV_TAG_LEN, default_tag, strlen(default_tag));
@@ -108,6 +109,15 @@ int DeviceInterfaces::GetDevId() {
     return 0xdeadbeef;
 }
 
+usb_handle* DeviceInterfaces::GetUsbHandle(BOOL flashdirect) const {
+    usb_dev_t status = GetDeviceStatus();
+    if (GetFastbootHandle() != NULL && (DEVICE_PLUGIN == status || DEVICE_FLASH == status))
+        return GetFastbootHandle();
+    if (GetAdbHandle() != NULL && (DEVICE_PLUGIN == status || DEVICE_CHECK == status))
+        return GetAdbHandle();
+    return NULL;
+}
+
 BOOL DeviceInterfaces::SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf) {
     CDevLabel* pDev = NULL;
     if (type == DEVTYPE_DIAGPORT) {
@@ -166,24 +176,25 @@ DeviceInterfaces & DeviceInterfaces::operator =(const DeviceInterfaces & devIntf
     mAdbHandle = devIntfs.GetAdbHandle() ;
     mFbHandle = devIntfs.GetFastbootHandle();
     strcpy(mTag, devIntfs.GetDevTag());
+    mAttachUiPort = devIntfs.GetAttachStatus();
     return *this;
 }
 
 VOID DeviceInterfaces::SetDeviceStatus(usb_dev_t status) {
     mDeviceActive = status;
 
-    if (status) {
-        if (mDiag != NULL) {
-            if (m_packetDll == NULL)
-                m_packetDll = new CPacket();
-            ASSERT(m_packetDll != NULL);
-
-            uint16 m_dlPort = mDiag->GetComPortNum();
-            m_packetDll->Init(m_dlPort);
+    if (status == DEVICE_PLUGIN) {
+        if (mDiag != NULL && m_packetDll == NULL) {
+            m_packetDll = new CPacket();
+            //ASSERT(m_packetDll != NULL);
+            m_packetDll->Init(mDiag->GetComPortNum());
         }
-    } else if (m_packetDll != NULL) {
+    } else if (status == DEVICE_UNKNOW || status == DEVICE_REMOVED) {
+    if (m_packetDll != NULL) {
             m_packetDll->Uninit();
             delete m_packetDll;
+            m_packetDll = NULL;
+    }
     }
 }
 
@@ -213,7 +224,7 @@ VOID DeviceInterfaces::Dump(const char *tag) {
 
 
 DeviceCoordinator::DeviceCoordinator() :
-    mDevintfList()
+    mDevintfList(0)
 {
     ;
 }
@@ -229,11 +240,14 @@ DeviceCoordinator::~DeviceCoordinator() {
     mDevintfList.clear();
 }
 
-DeviceInterfaces *DeviceCoordinator::GetIdleDevice() {
+DeviceInterfaces *DeviceCoordinator::GetValidDevice() {
     list<DeviceInterfaces*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
         DeviceInterfaces *item = *it;
-        if(item->GetDeviceStatus() == DEVICE_PLUGIN) {
+        usb_dev_t status = item->GetDeviceStatus();
+        if (item->GetAttachStatus())
+            continue;
+        if(status >= DEVICE_PLUGIN && status < DEVICE_REMOVED ) {
             return item;
         }
     }
@@ -275,7 +289,7 @@ DeviceInterfaces* DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type) {
     if (it != mDevintfList.end()) {
         LOGI("Update exist device");
         newDevIntf = *it;
-        (*it)->SetDeviceStatus(DEVICE_PLUGIN);
+        //(*it)->SetDeviceStatus(DEVICE_PLUGIN);
         (*it)->SetIntf(dev, type);
     } else {
         LOGI("Create new device");
@@ -300,12 +314,13 @@ BOOL DeviceCoordinator::IsEmpty() {
 
 VOID DeviceCoordinator::Dump(VOID) {
     list<DeviceInterfaces*>::iterator it;
-    LOGI("===================================");
+    LOGI("DeviceCoordinator::===================================BEGIN");
     DeviceInterfaces* item ;
         for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
 item = *it;
 item->Dump("dump device");
     }
+        LOGI("DeviceCoordinator::===================================END");
 }
 
 //\\?\usbstor#disk&ven_onetouch&prod_link4&rev_2.31#6&21c8898b&1&0123456789abcdef&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
@@ -483,7 +498,6 @@ bool CDevLabel::MatchDevPath(const wchar_t * devPath) {
 bool CDevLabel::Match(const CDevLabel * const & dev) const {
     const wchar_t *effectivePath = NULL;
     const wchar_t *effectivePath2 = NULL;
-    LOGE("DO CDevLabel::operator == 2");
     if (dev == NULL)
         return false;
     if (this == dev)
@@ -531,7 +545,6 @@ bool CDevLabel::Match(const CDevLabel * const & dev) const {
 
 
 bool CDevLabel::operator ==(const CDevLabel & dev) const {
-    LOGE("DO CDevLabel::operator == 3");
     return Match(&dev);
 }
 

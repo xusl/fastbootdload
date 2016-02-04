@@ -127,6 +127,7 @@ int register_new_device(usb_handle* handle, BOOL flashdirect) {
     goto register_new_device_out;
   }
 
+  #if 0
   if (protocol == ADB_PROTOCOL) {
     handle->status = DEVICE_CHECK;
   } else if (protocol == FB_PROTOCOL) {
@@ -137,6 +138,7 @@ int register_new_device(usb_handle* handle, BOOL flashdirect) {
     goto register_new_device_out;
     }
   }
+#endif
 
   // Not in the list. Add this handle to the list.
   handle->next = &handle_list;
@@ -421,13 +423,6 @@ int usb_close(usb_handle* handle) {
   }
 
   return 0;
-}
-
-usb_dev_t usb_status(usb_handle* handle) {
-     if (NULL == handle) {
-        return DEVICE_UNKNOW;
-     }
-    return handle->status;
 }
 
 int recognized_device(usb_handle* handle) {

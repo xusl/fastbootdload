@@ -121,7 +121,7 @@ typedef struct Action
     unsigned size;
 
     const char *msg;
-    int (*func)(CWnd* hWnd, void* data, Action *a, int status, char *resp);
+    int (*func)(void* data, Action *a, int status, char *resp);
 
     long long start;
 }Action;
@@ -147,7 +147,7 @@ public:
    void fb_queue_command(const char *cmd, const char *msg);
    void fb_queue_download(const char *name, void *data, unsigned size);
    void fb_queue_notice(const char *notice);
-   void fb_execute_queue(usb_handle *usb,CWnd* hWnd,void* data);
+   void fb_execute_queue(usb_handle *usb,void* data);
 
 private:
    Action *action_list;
@@ -163,14 +163,14 @@ private:
    int _command_send(usb_handle *usb, const char *cmd,
                      const void *data, unsigned size,
                      char *response);
-   static int cb_display(CWnd* hWnd, void* data, Action *a, int status, char *resp);
-   static int cb_do_nothing(CWnd* hWnd, void* data, Action *a, int status, char *resp);
-   static int cb_reject(CWnd* hWnd, void* data, Action *a, int status, char *resp);
-   static int cb_require(CWnd* hWnd, void* data, Action *a, int status, char *resp);
-   static UINT port_progress(CWnd* hWnd,void* data, int process );
-   static UINT port_text_msg(CWnd* hWnd,void* data, const char *fmt,  ... );
-   static int cb_check(CWnd* hWnd, void* data, Action *a, int status, char *resp, int invert);
-   static int cb_default(CWnd* hWnd, void* data, Action *a, int status, char *resp);
+   static int cb_display(void* data, Action *a, int status, char *resp);
+   static int cb_do_nothing(void* data, Action *a, int status, char *resp);
+   static int cb_reject(void* data, Action *a, int status, char *resp);
+   static int cb_require(void* data, Action *a, int status, char *resp);
+
+   static UINT port_text_msg(void* data, const char *fmt,  ... );
+   static int cb_check(void* data, Action *a, int status, char *resp, int invert);
+   static int cb_default(void* data, Action *a, int status, char *resp);
    static int match(char *str, const char **value, unsigned count);
 };
 //#ifdef __cplusplus

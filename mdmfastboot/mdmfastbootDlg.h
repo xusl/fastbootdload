@@ -52,9 +52,12 @@ class UsbWorkData{
     BOOL IsIdle();
     BOOL Reset(VOID);
     BOOL Abort(VOID);
-    BOOL Start(DeviceInterfaces* devIntf, UINT nElapse);
+    BOOL Start(DeviceInterfaces* devIntf, UINT nElapse, BOOL flashdirect);
     BOOL Finish(VOID);
     BOOL SwitchDev(UINT nElapse);
+    UINT ui_text_msg(UI_INFO_TYPE info_type, PCCH msg);
+    UINT SetProgress(int progress);
+
 
   private:
     DeviceCoordinator *pCoordinator;
@@ -63,7 +66,6 @@ class UsbWorkData{
     CmdmfastbootDlg  *hWnd;
     CPortStateUI      ctl;
     CWinThread       *work;
-    //flash_image  *img;
     usb_handle       *usb;
     //this is the serial number for logical ui.
     DeviceInterfaces*  devIntf;
@@ -157,7 +159,7 @@ public:
   BOOL RejectCDROM(VOID);
   BOOL HandleComDevice(VOID);
   BOOL EnumerateAdbDevice(VOID);
-  BOOL ScheduleDeviceWork(BOOL update_device);
+  BOOL ScheduleDeviceWork(BOOL flashdirect);
   BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);
   BOOL UpdatePackageInfo(BOOL update = TRUE);
@@ -183,7 +185,6 @@ public:
                                 UI_INFO_TYPE info = UI_DEFAULT);
     static UINT adb_write_IMEI(adbhost& adb, UsbWorkData* data);
     static UINT adb_update_NV(adbhost& adb, UsbWorkData* data,  flash_image  *const image);
-    static UINT ui_text_msg(UsbWorkData* data, UI_INFO_TYPE info_type, PCCH msg);
 
 private:
     BOOL InitSettingDlg(void);
