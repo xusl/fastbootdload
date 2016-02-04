@@ -71,6 +71,68 @@ TResult SAHARACmd::SwitchToDLoadMode(void)
 
     return (result ? EOK : EFAILED);
 }
+TResult SAHARACmd::DownloadPrg_9X07(uint8* prgbuf, size_t len,int myPort, bool blDownLoadMode)
+{
+    TResult result = EOK;
+    imgBuf = prgbuf;
+
+    imgLen = len;
+
+
+#ifdef Q_OS_WIN32
+    Sleep(3000);
+#else
+    SLEEP(3000);
+#endif
+
+    for(int i = 0; i < 5;i++)
+    {
+        //wait to receive hello package
+        if(blDownLoadMode)
+        {
+            result = GetHelloAckCmdInDlMode();
+        }
+        else
+        {
+            result = GetHelloAckCmd();
+        }
+        if(SUCCESS(result))
+        {
+            break;
+        }
+        if(i == 4)
+        {
+            // return EFAILED;
+        }
+    }
+    //send hello response package
+    SaharaHelloRsp();
+//#ifdef download_9X07_PRG
+    //result = GetReadDataAckCmd_9X07_PRG();
+//#else
+
+
+        result = GetReadDataAckCmd_9X07_PRG();
+
+    SaharaDone();
+    return EOK;
+
+    for(int i = 0; i < 5;i++)
+    {
+        result = GetDoneRsp();
+
+        if(SUCCESS(result))
+        {
+            break;
+        }
+        if(i == 4)
+        {
+            return EFAILED;
+        }
+    }
+
+    return result;
+}
 
 TResult SAHARACmd::DownloadPrg(uint8* prgbuf, size_t len,int myPort, bool blDownLoadMode)
 {
@@ -377,6 +439,56 @@ TResult SAHARACmd::GetDoneRsp(void)
     }
     return result;
 }
+TResult SAHARACmd::GetReadDataAckCmd_9X07_PRG()
+{
+    TResult result = EOK;
+    uint32  rlen = 0;
+    sahara_read_data_type rsp = {0};
+
+    DECLARE_RSP_PTR(rsp_ptr);
+    START_BUILDING_RSP();
+    while(true)
+    {
+        result = m_packetDll->Receive(rsp_ptr, &rlen);
+        INFO("COM%d GetReadDataAckCmd:receive %04X",port,*(rsp_ptr->buf));
+        if (FAILURE(result))
+        {
+            ERR("COM%d GetReadDataAckCmd:fail to get data ",port);
+            return result;
+        }
+        memcpy(&rsp, rsp_ptr->buf, rlen);
+        if (rsp.command != CMD_READ_DATA)
+        {
+            ERR("COM%d GetReadDataAckCmd:not CMD_READ_DATA",port);
+            return EFAILED;
+        }
+
+
+        if(readDataOffSet != rsp.dataOffset || readDataLength != rsp.dataLength)
+        {
+            readDataOffSet = rsp.dataOffset;
+            readDataLength = rsp.dataLength;
+
+            //uint8 buf[rsp.dataLength];
+        //uint8 buf[rsp.dataLength];
+        uint8 *buf = (uint8 *)malloc(sizeof uint8 * rsp.dataLength);
+
+        if(buf == NULL){
+            LOGE("No memory, malloc failed.");
+            return EFAILED;
+        }
+
+            memcpy(buf, imgBuf + rsp.dataOffset, rsp.dataLength);
+            //send PRG
+            m_packetDll->SendData(buf,rsp.dataLength);
+            free(buf);
+        }
+        else
+            break;
+    }
+
+    return result;
+}
 
 TResult SAHARACmd::GetReadDataAckCmd()
 {
@@ -408,11 +520,10 @@ TResult SAHARACmd::GetReadDataAckCmd()
         //uint8 buf[rsp.dataLength];
         uint8 *buf = (uint8 *)malloc(sizeof uint8 * rsp.dataLength);
 
-        if(buf == NULL){
-            LOGE("No memory, malloc failed.");
-            return EFAILED;
-        }
-
+if(buf == NULL){
+    LOGE("No memory, malloc failed.");
+    return EFAILED;
+}
         memcpy(buf, imgBuf + rsp.dataOffset, rsp.dataLength);
         //send PRG
         m_packetDll->SendData(buf,rsp.dataLength);

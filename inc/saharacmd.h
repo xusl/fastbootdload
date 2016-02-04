@@ -192,6 +192,7 @@ public:
 public:
     //start download PRG
     TResult DownloadPrg(uint8* prgbuf, size_t len, int myPort,bool blDownLoadMode);
+     TResult DownloadPrg_9X07(uint8* prgbuf, size_t len, int myPort,bool blDownLoadMode);
 
     //receive hello from device
     TResult GetHelloAckCmd();
@@ -201,6 +202,7 @@ public:
 
     //receive read data from device
     TResult GetReadDataAckCmd();
+    TResult GetReadDataAckCmd_9X07_PRG();
 
     //receive end transfer from device
     TResult GetEndTransferAckCmd();

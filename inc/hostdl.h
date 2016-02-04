@@ -28,6 +28,7 @@ public:
 
         //add by minghui.zhang 2013-11-05   delete
         TResult DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  uint32 Software_size);
+        TResult DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  uint32 Software_size);
         //end add
 
 

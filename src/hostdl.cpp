@@ -1279,9 +1279,9 @@ TResult CDLData::DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
                      dlPort);
                 }
             }
+            #if 0
             if("mdm9635-boot.img"==it->first)
             {
-#if 0
                 QString AREA="0:recovery";
                 for(int i=0;i<AREA.length();i++)
                 {
@@ -1290,8 +1290,6 @@ TResult CDLData::DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
                     ch=ba.data();
                     it->second.Area[i+2]=(unsigned char)ch[i];
                 }
-#endif
-                memcpy(it->second.Area + 2, "0:recovery", strlen("0:recovery"));
                 mode=it->second.Area;
                 LOG("COM%d: mdm9635-boot.img second download...,len = %d", dlPort,len);
                 result = this->DownloadDataUsePrtn(pdata, len, mode);
@@ -1303,6 +1301,159 @@ TResult CDLData::DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
                 }
 
             }
+            #endif
+        }
+    }
+    this->m_uBaseRatio = base;
+    this->UpdateProgress(this->m_uBaseRatio + this->m_uTotalRatio);
+    return result ;
+}
+TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  uint32 Software_size)
+{
+    TResult result = EOK;
+    is9X25 = true;
+    uint8*  pdata = NULL;
+    uint8* mode=NULL;
+    uint32  len = 0;
+    int     i;
+    //QString comPort = QString("COM%1").arg(dlPort);
+    for (i = 0; i < MAX_DUMMY_PACKET_NUM; ++i)
+    {
+        DBGD("COM%d: Send DUMMY packet %d ...",dlPort, i);
+        result = this->SendDummyData();
+        if (SUCCESS(result))
+        {
+            break;
+        }
+        SLEEP(SEND_DUMMY_INTERVAL);
+    }
+    if (FAILURE(result))
+    {
+        return EHOSTDLDUMMY;
+    }
+
+    SLEEP(SEND_DUMMY_INTERVAL);
+    /* Keep send hello packet until reach max retry */
+    for (i = 0; i < MAX_HELLO_PACKET_NUM; ++i)
+    {
+        DBGD("COM%d: Send HELLO packet %d ...",
+              dlPort, i);
+        result = this->SendHelloPacket();
+        if (SUCCESS(result))
+        {
+            break;
+        }
+        SLEEP(SEND_HELLO_INTERVAL);
+    }
+    if (FAILURE(result))
+    {
+        return EHOSTDLHELLO;
+    }
+    SLEEP(1000);
+    /* send security mode*/
+    result = this->SendSecMode();
+    if (FAILURE(result))
+    {
+        DBGD("COM%d: Send SECMODE packet failed!",
+              dlPort);
+        return EHOSTDLSECMODE;
+    }
+    /* send partition table*/
+   // m_pDLImgInfo->prtn.data = m_dlFileBuffer.at(PARTITION_NAME).strFileBuf;
+   // m_pDLImgInfo->prtn.len = m_dlFileBuffer.at(PARTITION_NAME).uFileLens;
+    pdata = FileBufMap.at(PARTITION_NAME).strFileBuf;
+    len = FileBufMap.at(PARTITION_NAME).uFileLens;
+    result = this->SendPrtnTbl(pdata, len, FALSE);
+    /* If send partition table returns unmatched, check
+     * if all the images needed are present. If YES, resend
+     * partition table then send qcsbl_cfgdata->qcsbl->
+     * oemsbl->amss->efs; if NOT, report the error and return.
+    */
+    if (FAILURE(result))
+    {
+#if 0
+        if (result == EHOSTDLPRTNTBLDIFF)
+        {
+            WARN("COM%d: Partition table unmatched!",
+                 dlPort);
+#ifdef FEATURE_PRTNTBL_DIFF_DLOAD
+            /* check if all the images needed are present */
+            if (mask & IMAGE_TYPE_ALL)
+            {
+                INFO("COM%d: Re-send partition table with override TRUE.",
+                     dlPort);
+                result = this->SendPrtnTbl(pdata, len, TRUE);
+            }
+            else
+            {
+                ERR("COM%d: Not all images are available, mask = %d!",
+                      dlPort, mask);
+            }
+#endif
+        }
+#endif
+        if (FAILURE(result))
+        {
+            ERR("COM%d: Send PRTNTBL packet failed!",
+                  dlPort);
+            return EHOSTDLPRTNTBL;
+        }
+    }
+    /* calculate all images buffer length, hd files not included */
+    uint32 total = Software_size;
+
+    //end add
+    uint8 base = this->m_uBaseRatio;
+    std::map<string,FileBufStruct>::iterator it;
+    for (it = FileBufMap.begin(); it != FileBufMap.end(); it++)
+    {
+        if(it->second.isDownload)
+        {
+
+            pdata=it->second.strFileBuf;
+            len=it->second.uFileLens;
+            /* Start downloading images buffer into device*/
+            if (pdata == NULL || len == 0)
+            {
+                INFO("COM%d: DLoadImages, invalid pdata=%p or len=%d",
+                     dlPort, pdata, len);
+                // should we break to reset or return here???
+                return EINVALIDPARAM;
+            }
+            mode=it->second.Area;
+
+            //INFO(FILE_LINE, "COM%d: %s ...,len = %d", dlPort,QString::fromStdString(it->first),len);
+#ifdef FEATURE_TPST
+           // m_mainApp->SlotUpdateStatus(comPort,"Download "+QString::fromStdString(it->first)+"...");
+#endif
+            if (total < 100)
+            {
+                this->m_uRatio = (len*100)/total;
+            }
+            else
+            {
+                this->m_uRatio = (len)/(total/100);
+            }
+            result = this->DownloadDataUsePrtn(pdata, len,  mode);
+            if (FAILURE(result))
+            {
+                ERR("COM%d: DownloadData failed, return here!!!",
+                      dlPort);
+                return result;
+            }
+            this->m_uBaseRatio += (this->m_uRatio * this->m_uTotalRatio) / 100;
+                                        if ("b.vhd" == it->first)
+            {
+                INFO("COM%d: WriteDashboard Version, version = %s",
+                     dlPort,(char*)m_pDLImgInfo->dashboardVer);
+                result = this->WriteDashboardVer((char*)m_pDLImgInfo->dashboardVer);
+                if (FAILURE(result))
+                {
+                    ERR("COM%d: WriteDashboard Version failed,continue!!!",
+                     dlPort);
+                }
+            }
+
         }
     }
     this->m_uBaseRatio = base;
