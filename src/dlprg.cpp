@@ -62,9 +62,9 @@ static void start_building_dload_rsp(rsp_buffer_s_type* rsp_ptr)
 	rsp_ptr->length = MAX_RSP_BUFFER_LEN;
 }
 
-CDLPrg::CDLPrg(CPacket& packetDll)
+CDLPrg::CDLPrg(CPacket* packetDll)
 {
-	m_packetDll = &packetDll;
+	m_packetDll = packetDll;
 	m_packetDll->SetPacketType(PKT_TYPE_HDLC);
 	this->port = m_packetDll->GetComPort();
 }
@@ -835,7 +835,7 @@ TResult CDLPrg::SwitchToDLoadMode(void)
 {
 	bool result = true;
 //	uint32 rlen = 0;
-	CDIAGCmd diaginst(*m_packetDll);
+	CDIAGCmd diaginst(m_packetDll);
 
 	result = diaginst.DLoadMode();
 
@@ -846,7 +846,7 @@ bool CDLPrg::PingDevice(void)
 {
 	bool result = EOK;
 //	uint32  rlen = 0;
-	CDIAGCmd diaginst(*m_packetDll);
+	CDIAGCmd diaginst(m_packetDll);
 
 	result = diaginst.WcdmaStatus();
 	return result;

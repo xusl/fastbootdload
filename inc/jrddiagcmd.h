@@ -282,7 +282,7 @@ typedef struct{
 class JRDdiagCmd
 {
 public:
-    JRDdiagCmd(CPacket& packetDll);
+    JRDdiagCmd(CPacket* packetDll);
     ~JRDdiagCmd();
 
     TResult EnableDiagServer();

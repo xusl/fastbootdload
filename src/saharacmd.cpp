@@ -45,9 +45,9 @@ static void start_building_dload_rsp(rsp_buffer_s_type* rsp_ptr)
     rsp_ptr->length = 50;
 }
 
-SAHARACmd::SAHARACmd(CPacket& packetDll)
+SAHARACmd::SAHARACmd(CPacket* packetDll)
 {
-    m_packetDll = &packetDll;
+    m_packetDll = packetDll;
     m_packetDll->SetPacketType(PKT_TYPE_SAHARA);
     this->port = m_packetDll->GetComPort();
 
@@ -64,7 +64,7 @@ SAHARACmd::~SAHARACmd()
 TResult SAHARACmd::SwitchToDLoadMode(void)
 {
     bool result = TRUE;
-    CDIAGCmd diaginst(*m_packetDll);
+    CDIAGCmd diaginst(m_packetDll);
 
     result = diaginst.DLoadMode();
     LOGW("COM%d SwitchToDLoadMode", port);

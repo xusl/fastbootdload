@@ -44,8 +44,8 @@ typedef enum {
 
 class CDLPrg
 {
-public:	
-    CDLPrg(CPacket& packetDll);
+public:
+    CDLPrg(CPacket* packetDll);
 	~CDLPrg();
     //TResult DownloadPrg(uint8* prgbuf, long len, bool bDL8200 = false);  //modify by huangzhongping 2011-03-24
     TResult DownloadPrg(uint8* prgbuf, size_t len, int addrType/*bool bDL8200 = false*/);  //changed by jie.li for MDM9x15
@@ -63,14 +63,14 @@ public:
 	/*end*/
 
 private:
-	TResult SendVerReq(char** version);	
+	TResult SendVerReq(char** version);
 	TResult SendGoCmd(int addrType/*bool bGo8200 = false*/); //changed by jie.li for MDM9x15
 	TResult SendResetCmd(void);
 	TResult SendWrite32Cmd(uint8* prgbuf, long len, int addrType/*bool bWrite8200 = false*/); //changed by jie.li for MDM9x15
 
 private:
 	TResult GetAckCmd(TAckCode* pAckCode);
-	TResult SendCmd(cmd_buffer_s_type* cmd_ptr, uint32* rlen);	
+	TResult SendCmd(cmd_buffer_s_type* cmd_ptr, uint32* rlen);
 
 	uint16   port;
 	CPacket* m_packetDll;

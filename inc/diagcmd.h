@@ -283,7 +283,7 @@ typedef struct{
 class CDIAGCmd
 {
 public:
-	CDIAGCmd(CPacket& packetDll);
+	CDIAGCmd(CPacket* packetDll);
 	~CDIAGCmd(){}
 
 public:

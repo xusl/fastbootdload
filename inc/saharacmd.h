@@ -186,7 +186,7 @@ typedef struct{
 class SAHARACmd
 {
 public:
-    SAHARACmd(CPacket& packetDll);
+    SAHARACmd(CPacket* packetDll);
     ~SAHARACmd();
 
 public:

@@ -57,6 +57,7 @@ class UsbWorkData{
     BOOL SwitchDev(UINT nElapse);
     UINT ui_text_msg(UI_INFO_TYPE info_type, PCCH msg);
     UINT SetProgress(int progress);
+    UINT SetPromptMsg(PCCH msg) { return ui_text_msg(PROMPT_TEXT, msg);};
 
 
   private:

@@ -93,6 +93,9 @@
     <ClCompile Include="..\src\adb_dev_register.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="DiagPST.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DlWorker.h">
@@ -123,6 +126,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="..\src\serialport\serialport.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="DiagPST.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

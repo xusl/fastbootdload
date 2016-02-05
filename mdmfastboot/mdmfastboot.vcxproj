@@ -261,6 +261,7 @@
     <ClCompile Include="..\src\saharacmd.cpp" />
     <ClCompile Include="..\src\scsicmd.cpp" />
     <ClCompile Include="..\src\serialport.cpp" />
+    <ClCompile Include="DiagPST.cpp" />
     <ClCompile Include="fastbootflash.cpp" />
     <ClCompile Include="..\src\list.cpp" />
     <ClCompile Include="..\src\log.cpp" />
@@ -282,6 +283,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\serialport\serialport.h" />
+    <ClInclude Include="DiagPST.h" />
     <ClInclude Include="DlWorker.h" />
     <ClInclude Include="fastbootflash.h" />
     <ClInclude Include="mdmfastboot.h" />

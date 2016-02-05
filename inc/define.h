@@ -13,7 +13,7 @@ when        who             what
 #define DEFINE_H
 
 #include <iostream>
-
+#include <vector>
 
 using namespace std;
 typedef signed char int8;         /* 8 bit signed */
@@ -165,29 +165,13 @@ typedef struct
 } TImgBufType;
 
 /* For firmware download*/
-typedef struct {
+typedef struct _TDLImgInfoType{
         TImgBufType             prg;
         TImgBufType             prtn;
-
         TImgBufType             oemsblhd;
-
         TImgBufType             amsshd;
-        /* add by jianwen.he 2010-05-17*/
-    //add by huangzhongping 2011-03-24 for 8200A
-    /* add by jie.li 2011-07-04   MDM9200 compatible*/
-    /* End.*/
-        //add by jie.li for MDM9x15
         uint8                   dashboardVer[128];   //the version of Win+Mac+Linux
         uint32                  lenDashboardVer;
-        //end add
-
-        //add by minghui.zhang for MDM9x25
-
-
-        //end add
-
-
-        //add by zhanghao for MDM9x30 2014-09-05
 
 } TDLImgInfoType;
 

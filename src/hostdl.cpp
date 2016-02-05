@@ -219,12 +219,12 @@ ProgressCallback CDLData::func = NULL;
 
 CDLData::CDLData
         (
-                CPacket& packetDll,
+                CPacket* packetDll,
                 TDLImgInfoType* pDLImgInfo,
                 int adlPort
                 )
 {
-    m_packetDll = &packetDll;
+    m_packetDll = packetDll;
 
     m_packetDll->SetPacketType(PKT_TYPE_HDLC);
     this->m_pDLImgInfo = pDLImgInfo;
@@ -1336,8 +1336,7 @@ TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
     /* Keep send hello packet until reach max retry */
     for (i = 0; i < MAX_HELLO_PACKET_NUM; ++i)
     {
-        DBGD("COM%d: Send HELLO packet %d ...",
-              dlPort, i);
+        DBGD("COM%d: Send HELLO packet %d ...",dlPort, i);
         result = this->SendHelloPacket();
         if (SUCCESS(result))
         {
@@ -1354,8 +1353,7 @@ TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
     result = this->SendSecMode();
     if (FAILURE(result))
     {
-        DBGD("COM%d: Send SECMODE packet failed!",
-              dlPort);
+        DBGD("COM%d: Send SECMODE packet failed!",dlPort);
         return EHOSTDLSECMODE;
     }
     /* send partition table*/
@@ -1394,8 +1392,7 @@ TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
 #endif
         if (FAILURE(result))
         {
-            ERR("COM%d: Send PRTNTBL packet failed!",
-                  dlPort);
+            ERR("COM%d: Send PRTNTBL packet failed!", dlPort);
             return EHOSTDLPRTNTBL;
         }
     }
@@ -1409,14 +1406,12 @@ TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
     {
         if(it->second.isDownload)
         {
-
             pdata=it->second.strFileBuf;
             len=it->second.uFileLens;
             /* Start downloading images buffer into device*/
             if (pdata == NULL || len == 0)
             {
-                INFO("COM%d: DLoadImages, invalid pdata=%p or len=%d",
-                     dlPort, pdata, len);
+                INFO("COM%d: DLoadImages, invalid pdata=%p or len=%d", dlPort, pdata, len);
                 // should we break to reset or return here???
                 return EINVALIDPARAM;
             }
@@ -1434,15 +1429,14 @@ TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
             {
                 this->m_uRatio = (len)/(total/100);
             }
-            result = this->DownloadDataUsePrtn(pdata, len,  mode);
+            result = this->DownloadDataUsePrtn(pdata, len, mode);
             if (FAILURE(result))
             {
-                ERR("COM%d: DownloadData failed, return here!!!",
-                      dlPort);
+                ERR("COM%d: DownloadData failed, return here!!!",dlPort);
                 return result;
             }
             this->m_uBaseRatio += (this->m_uRatio * this->m_uTotalRatio) / 100;
-                                        if ("b.vhd" == it->first)
+            if ("b.vhd" == it->first)
             {
                 INFO("COM%d: WriteDashboard Version, version = %s",
                      dlPort,(char*)m_pDLImgInfo->dashboardVer);

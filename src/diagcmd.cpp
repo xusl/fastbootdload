@@ -827,9 +827,9 @@ static bool check_nv_status_ok(uint16 status)
 
 //-----------------------------------------------------------------------------
 
-CDIAGCmd::CDIAGCmd(CPacket& packetDll)
+CDIAGCmd::CDIAGCmd(CPacket* packetDll)
 {
-	m_packetDll = &packetDll;
+	m_packetDll = packetDll;
 }
 
 bool CDIAGCmd::NV_Read_Item_Array
@@ -1462,7 +1462,7 @@ TResult CDIAGCmd::EfsOpOpen
         efs2_diag_open_rsp_type 	rsp;
 	uint32 len = sizeof(req) - DIAG_FS_MAX_FILENAME_LEN
 				+ strlen(filename) + 1;
-	uint32 rlen = sizeof(rsp);        
+	uint32 rlen = sizeof(rsp);
 
         memset(&req, 0, sizeof req);
         memset(&rsp, 0, sizeof rsp);
@@ -2263,7 +2263,7 @@ TResult CDIAGCmd::EfsOpMKDir(bool bArmEfs, const char* filename)
     efs2_diag_mkdir_req_type 	req;
     efs2_diag_mkdir_rsp_type 	rsp;
     uint32 len = sizeof(req) - DIAG_FS_MAX_FILENAME_LEN + strlen(filename) + 1;
-    uint32 rlen = sizeof(rsp);    
+    uint32 rlen = sizeof(rsp);
 
     memset(&req, 0, sizeof req);
     memset(&rsp, 0, sizeof rsp);
@@ -3269,7 +3269,7 @@ TResult CDIAGCmd::StorePIC(uint8* data, uint32 len)
 {
     TResult result = EOK;
     extend_diag_store_pic_req_type req;
-    uint32 rlen = 0;    
+    uint32 rlen = 0;
 
     memset(&req, 0, sizeof req);
 
@@ -3335,7 +3335,7 @@ TResult CDIAGCmd::GenerateFTFilesNew(byte valueForce)
     extend_diag_factory_file_gen_rsp_type 	rsp;
 
     uint32 len  = sizeof(req);
-    uint32 rlen = sizeof(rsp);    
+    uint32 rlen = sizeof(rsp);
 
     memset(&req, 0, sizeof req);
     memset(&rsp, 0, sizeof rsp);
@@ -3362,7 +3362,7 @@ TResult CDIAGCmd::SetFuncFive(byte valueFuncFive)
     extend_diag_set_func_five_rsp_type 	rsp;
 
     uint32 len  = sizeof(req);
-    uint32 rlen = sizeof(rsp);    
+    uint32 rlen = sizeof(rsp);
 
     memset(&req, 0, sizeof req);
     memset(&rsp, 0, sizeof rsp);

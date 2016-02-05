@@ -105,9 +105,9 @@ static bool check_diag_rsp_ok
 
 //-----------------------------------------------------------------------------
 
-JRDdiagCmd::JRDdiagCmd(CPacket& packetDll)
+JRDdiagCmd::JRDdiagCmd(CPacket* packetDll)
 {
-    m_packetDll = &packetDll;
+    m_packetDll = packetDll;
 }
 
 

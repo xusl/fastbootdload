@@ -16,13 +16,11 @@
 #undef APSTUDIO_READONLY_SYMBOLS
 
 /////////////////////////////////////////////////////////////////////////////
-// 中文(中华人民共和国) resources
+// Chinese (Simplified, PRC) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
-#ifdef _WIN32
 LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
 #pragma code_page(936)
-#endif //_WIN32
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -112,25 +110,25 @@ BEGIN
     CONTROL         "",IDC_IMAGE_LIST,"SysListView32",LVS_LIST | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOLABELWRAP | LVS_ALIGNLEFT | LVS_NOSORTHEADER | WS_BORDER,6,78,112,160,WS_EX_LEFTSCROLLBAR
 END
 
-IDD_PORT_STATE DIALOGEX 0, 0, 229, 121
+IDD_PORT_STATE DIALOGEX 0, 0, 297, 142
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CENTER | WS_CHILD | WS_VISIBLE
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    GROUPBOX        "静态",IDC_GROUP,7,5,212,108
-    CONTROL         "",IDC_PROGRESS1,"msctls_progress32",WS_BORDER,50,64,156,8
-    LTEXT           "Progress:",IDC_STATIC,15,64,32,12
-    LTEXT           "",IDC_DL_INFO,14,94,192,12,SS_WORDELLIPSIS
-    LTEXT           "FW Ver:",IDC_STATIC_FRM_VER,15,15,34,12
-    LTEXT           "QCN Ver:",IDC_STATIC_QCN_VER,15,30,31,12
-    LTEXT           "Linux Ver:",IDC_STATIC_LINUX_VER,15,46,33,12
-    EDITTEXT        IDC_EDIT_FRM_VER,50,15,54,12,ES_AUTOHSCROLL | ES_READONLY
-    EDITTEXT        IDC_EDIT_QCN_VER,50,30,54,12,ES_AUTOHSCROLL | ES_READONLY
-    EDITTEXT        IDC_EDIT_LINUX_VER,50,46,156,12,ES_AUTOHSCROLL | ES_READONLY
-    LTEXT           "Usr Ver:",IDC_STATIC_USERDATA_VER,116,30,32,12
-    EDITTEXT        IDC_EDIT_USERDATA_VER,152,30,54,12,ES_AUTOHSCROLL | ES_READONLY
-    LTEXT           "Sys Ver:",IDC_STATIC_SYSTEM_VER,116,15,30,12
-    EDITTEXT        IDC_EDIT_SYSTEM_VER,152,15,54,12,ES_AUTOHSCROLL | ES_READONLY
-    LTEXT           "",IDC_DLINFO_TITLE,14,77,192,12
+    GROUPBOX        "静态",IDC_GROUP,5,5,289,131
+    CONTROL         "",IDC_PROGRESS1,"msctls_progress32",WS_BORDER,53,64,235,8
+    LTEXT           "Progress:",IDC_STATIC,16,64,32,12
+    LTEXT           "",IDC_DL_INFO,19,94,192,12,SS_WORDELLIPSIS
+    LTEXT           "FW Ver:",IDC_STATIC_FRM_VER,16,15,34,12
+    LTEXT           "QCN Ver:",IDC_STATIC_QCN_VER,16,30,31,12
+    LTEXT           "Linux Ver:",IDC_STATIC_LINUX_VER,16,46,33,12
+    EDITTEXT        IDC_EDIT_FRM_VER,53,15,98,12,ES_AUTOHSCROLL | ES_READONLY
+    EDITTEXT        IDC_EDIT_QCN_VER,53,30,98,12,ES_AUTOHSCROLL | ES_READONLY
+    EDITTEXT        IDC_EDIT_LINUX_VER,53,46,235,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Usr Ver:",IDC_STATIC_USERDATA_VER,156,30,32,12
+    EDITTEXT        IDC_EDIT_USERDATA_VER,185,30,103,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Sys Ver:",IDC_STATIC_SYSTEM_VER,156,15,30,12
+    EDITTEXT        IDC_EDIT_SYSTEM_VER,185,15,103,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "",IDC_DLINFO_TITLE,19,77,192,12
 END
 
 IDD_SETTINGS DIALOGEX 0, 0, 166, 113
@@ -190,7 +188,7 @@ END
 //
 
 #ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO 
+GUIDELINES DESIGNINFO
 BEGIN
     IDD_ABOUTBOX, DIALOG
     BEGIN
@@ -211,9 +209,9 @@ BEGIN
     IDD_PORT_STATE, DIALOG
     BEGIN
         LEFTMARGIN, 4
-        RIGHTMARGIN, 225
+        RIGHTMARGIN, 293
         TOPMARGIN, 7
-        BOTTOMMARGIN, 115
+        BOTTOMMARGIN, 136
     END
 
     IDD_SETTINGS, DIALOG
@@ -232,7 +230,7 @@ END
 // Menu
 //
 
-IDR_MENU_MAIN MENU 
+IDR_MENU_MAIN MENU
 BEGIN
     POPUP "&File"
     BEGIN
@@ -252,7 +250,7 @@ END
 // String Table
 //
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDS_ABOUTBOX            "关于 mdmfastboot(&A)..."
     IDS_STOPBTN             "停止"
@@ -261,7 +259,7 @@ BEGIN
     IDS_TIP_SCHE            "When device more than UI port, schedule UI port if device removed."
 END
 
-#endif    // 中文(中华人民共和国) resources
+#endif    // Chinese (Simplified, PRC) resources
 /////////////////////////////////////////////////////////////////////////////
 
 

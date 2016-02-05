@@ -500,7 +500,7 @@ typedef void (*ProgressCallback)(int port,uint16 percent);
 class CCustData
 {
 public:
-        CCustData(CPacket& packetDll, TCustDataInfoType* pCustDataInfo);
+        CCustData(CPacket* packetDll, TCustDataInfoType* pCustDataInfo);
 	~CCustData();
 
 public:

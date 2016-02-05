@@ -9,6 +9,7 @@
 #include "fastbootflash.h"
 #include "adbhost.h"
 #include "usb_vendors.h"
+#include "DiagPST.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -1248,48 +1249,34 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
 
     data->ui_text_msg(TITLE, dev->GetDevTag());
     if (status == DEVICE_PLUGIN) {
-        CPacket *m_packetDll = data->devIntf->GetPacket();
-
-if (m_packetDll == NULL) {
+        DiagPST pst(data);
+    if(!pst.DownloadCheck())    {
 dev->SetDeviceStatus(DEVICE_CHECK);
 return 0;
-}
-
-        if(1){
-            JRDdiagCmd  DIAGCmd (*m_packetDll);
-            DIAGCmd.EnableDiagServer();
-            char version[VERSION_LEN] ={0};
-            for (int i = 0; i < 12; i++) {
-                memset(version, 0, sizeof version);
-                DIAGCmd.RequestVersion(i, (char *)(&version));
-                data->ui_text_msg(FIRMWARE_VER, version);
-                LOGE("index %d version %s", i, version);
-            }
-            char pFlash_Type[20] = {0};
-            TResult result = DIAGCmd.RequestFlashType_9X25((char *)(&pFlash_Type));
-
-            DIAGCmd.DisableDiagServer();
-        }
-        if (0)
-        {
-            CDIAGCmd DIAGCmd(*m_packetDll);
-            DIAGCmd.EnableDiagServer();
-            //DIAGCmd.RestartDevice();
-            DIAGCmd.SwitchToOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
-            DIAGCmd.DLoadMode();
-            DIAGCmd.DisableDiagServer();
-        }
-
-        if (0){
-            TCustDataInfoType *m_pCustdataInfo = new TCustDataInfoType;
-            CCustData m_pCustdata (*m_packetDll, m_pCustdataInfo);
-            m_pCustdata.ChangeOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
-            delete m_pCustdataInfo;
-        }
-                    if (m_packetDll != NULL) {
-        m_packetDll->Uninit();
-        delete m_packetDll;
     }
+
+    if(!pst.RunTimeDiag())
+    {
+dev->SetDeviceStatus(DEVICE_CHECK);
+return 0;
+    }
+    if(!pst.Calculate_length())
+    {
+dev->SetDeviceStatus(DEVICE_CHECK);
+return 0;
+    }
+
+    if(!pst.DownloadPrg())
+    {
+dev->SetDeviceStatus(DEVICE_CHECK);
+return 0;
+    }
+    if(!pst.DownloadImages())
+    {
+dev->SetDeviceStatus(DEVICE_CHECK);
+return 0;
+    }
+
         dev->SetDeviceStatus(DEVICE_CHECK);
     } else if (status == DEVICE_CHECK) {
         adbhost adb(handle , dev->GetDevId());

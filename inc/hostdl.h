@@ -4,6 +4,8 @@
 #include "stdafx.h"
 #include "pkt.h"
 #include "utils.h"
+#include <map>
+using namespace std;
 //#include "WinMsgProcessApp.h"
 
 //class WinMsgProApp;
@@ -17,7 +19,7 @@ class CPacket;
 class CDLData
 {
 public:
-        CDLData(CPacket& packetDll, TDLImgInfoType* pDLImgInfo,int dlPort);
+        CDLData(CPacket* packetDll, TDLImgInfoType* pDLImgInfo,int dlPort);
 	~CDLData(void);
 
 	void    SetRatioParams(uint8 ratio, uint8 base);

@@ -1,0 +1,95 @@
+#pragma once
+
+#include "define.h"
+#include "diagcmd.h"
+#include "dlprg.h"
+#include "hostdl.h"
+#include "custdata.h"
+#include "jrddiagcmd.h"
+#include "saharacmd.h"
+#include <map>
+#include <string>
+
+using namespace std;
+
+class UsbWorkData;
+
+typedef struct
+{
+    byte cmd_code;
+    byte msm_hw_version_format;
+    byte reserved[2]; /* for alignment / future use */
+    uint32 msm_hw_version;
+    uint32 mobile_model_id;
+    /* The following character array contains 2 NULL terminated strings:
+    'build_id' string, followed by 'model_string' */
+    char ver_strings[32];
+}get_version_rsp_type;
+
+class DiagPST
+{
+public:
+    DiagPST(UsbWorkData * worker);
+    ~DiagPST(void);
+
+
+    bool EraseSimlock_9X25();
+    bool checkIfFlashTypeMatchNormalMode_9X25();
+    bool CompareVersions_9X25();
+    bool CompareAllVersion_9X25(PCCH firmware_name);
+    bool My_CompareDashboardVersion_9X25(PCCH Device_firmware,PCCH PC_firmware);
+    bool Compare_EFS_Version(PCCH PC_firmware,PCCH Device_firmware);
+    bool Compare_special_ver(PCCH firmware_name,PCCH Device_ver,PCCH PC_ver);
+
+    virtual void initDLimgInfo();
+    virtual void initCustDataInfo();
+    virtual bool DownloadCheck();
+    virtual bool RunTimeDiag();
+    virtual bool DownloadImages();
+    virtual bool DownloadCustomerInfo();
+    virtual bool DownloadPrg();
+    virtual bool Calculate_length();
+
+private:
+    virtual bool SwitchOfflineMode();
+    virtual bool RequestDeviceStatus();
+    virtual TResult EnableDiagServer();
+    virtual TResult DisableDiagServer();
+    virtual bool checkIfPackageMatchNormalMode();
+    virtual bool checkIfPackageMatchDlMode();
+    virtual bool checkCusIdNormalMode();
+    virtual bool checkIfPartitionMatchNormalMode();
+
+    virtual bool GenerateFTFiles();
+    virtual bool SetFuncFive();
+    virtual bool StorePIC();
+
+    bool RequestFirmwarVerAndMobileIdNormalMode();
+    bool RequestExternalVersion();
+    BOOL StringSplit(char * content, PCHAR lineDelim, std::vector<PCCH>& dataOut);
+
+private:
+    CPacket                         *m_DLLPacket;
+    CCustData                       *m_pCustdata;
+    CDLData                         *m_dlData;
+    CDIAGCmd                        *m_DIAGCmd;
+    CDLPrg                          *m_DLPrg;
+    JRDdiagCmd                      *m_newDIAGCmd;
+    SAHARACmd                       *m_sahara;
+    UsbWorkData                     *m_Worker;
+    map<string,FileBufStruct>        m_dlFileBuffer;
+    uint32                           Software_size;
+    TDLImgInfoType                  *m_pDLImgInfo;
+    TCustDataInfoType               *m_pCustdataInfo;
+
+    bool                            m_blDownloadMode;
+    bool                            m_bRestore;
+    bool                            m_bForceMode;
+    bool                            m_bEraseSimlock;
+    bool                            m_isbDownload;
+    bool                            m_bDownDashBrd;
+    bool                            m_bDownFir;
+    uint32                          m_iMobileId;
+    string                          m_FirmwareVersion;
+    uint16                          m_dlPort;
+};
