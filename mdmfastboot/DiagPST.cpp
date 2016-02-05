@@ -36,7 +36,7 @@ Software_size (0),
             LOGE("index %d version %s", i, version);
         }
         char pFlash_Type[20] = {0};
-        TResult result = DIAGCmd.RequestFlashType_9X25((char *)(&pFlash_Type));
+        TResult result = DIAGCmd.RequestFlashType((char *)(&pFlash_Type));
         DIAGCmd.DisableDiagServer();
     }
 }
@@ -166,7 +166,7 @@ bool DiagPST::RequestDeviceStatus()
     return true;
 }
 
-bool DiagPST::EraseSimlock_9X25()
+bool DiagPST::EraseSimlock()
 {
    if (!m_blDownloadMode && m_bEraseSimlock)
     {
@@ -184,13 +184,13 @@ bool DiagPST::EraseSimlock_9X25()
     return true;
 }
 
-bool DiagPST::checkIfFlashTypeMatchNormalMode_9X25()
+bool DiagPST::checkIfFlashTypeMatchNormalMode()
 {
     return true;
 #if 0
     char pFlash_Type[20];
     memset(&pFlash_Type,0,20);
-    TResult result = m_newDIAGCmd->RequestFlashType_9X25((char *)(&pFlash_Type));
+    TResult result = m_newDIAGCmd->RequestFlashType((char *)(&pFlash_Type));
     if (FAILURE(result) && (strlen(pFlash_Type) != 4))
     {
         m_Worker->SetPromptMsg("Request Flash Type error!");
@@ -220,7 +220,7 @@ bool DiagPST::checkIfFlashTypeMatchNormalMode_9X25()
 
     return true;
 }
-bool DiagPST::CompareVersions_9X25()
+bool DiagPST::CompareVersions()
 {
     std::map<string,FileBufStruct>::iterator it;
 
@@ -232,7 +232,7 @@ bool DiagPST::CompareVersions_9X25()
 
         for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++) {
             if(it->second.isDownload){
-                if(CompareAllVersion_9X25(it->first.c_str()))
+                if(CompareAllVersion(it->first.c_str()))
                     it->second.isDownload=false;
             }
         }
@@ -241,7 +241,7 @@ bool DiagPST::CompareVersions_9X25()
            for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++) {
                if(it->second.isDownload) {
                    if(string(it->first)=="b.vhd")
-                       CompareAllVersion_9X25(it->first.c_str());
+                       CompareAllVersion(it->first.c_str());
                }
            }
        }
@@ -583,7 +583,7 @@ bool DiagPST::SwitchOfflineMode()
     return true;
 }
 
-bool DiagPST::CompareAllVersion_9X25(PCCH firmware_name)
+bool DiagPST::CompareAllVersion(PCCH firmware_name)
 {
 #if 0
     QSettings *configIniRead = new QSettings("option.ini", QSettings::IniFormat);
@@ -616,7 +616,7 @@ bool DiagPST::CompareAllVersion_9X25(PCCH firmware_name)
 
     if(firmware_name=="b.vhd")
     {
-      return  My_CompareDashboardVersion_9X25(pFW_Device_Version.c_str(),PC_Version.c_str());
+      return  My_CompareDashboardVersion(pFW_Device_Version.c_str(),PC_Version.c_str());
     }
     return Compare_special_ver(firmware_name,pFW_Device_Version.c_str(),PC_Version.c_str());
 
@@ -627,7 +627,7 @@ bool DiagPST::Compare_special_ver(PCCH firmware_name,PCCH Device_ver,PCCH PC_VER
     return true;
 }
 
-bool DiagPST::My_CompareDashboardVersion_9X25(PCCH Device_firmware,PCCH PC_firmware)
+bool DiagPST::My_CompareDashboardVersion(PCCH Device_firmware,PCCH PC_firmware)
 {
     return true;
 #if 0
@@ -715,7 +715,7 @@ bool DiagPST::DownloadCheck()
         {
             return false;
         }
-        if(!checkIfFlashTypeMatchNormalMode_9X25())
+        if(!checkIfFlashTypeMatchNormalMode())
         {
             return false;
         }
@@ -740,7 +740,7 @@ bool DiagPST::RunTimeDiag() {
     {
         m_Worker->SetPromptMsg("DEVICE in Download mode");
     }
-    CompareVersions_9X25();
+    CompareVersions();
 
     if(!StorePIC())
     {
@@ -751,7 +751,7 @@ bool DiagPST::RunTimeDiag() {
         return false;
     }
 
-    if(!EraseSimlock_9X25())
+    if(!EraseSimlock())
     {
         return false;
     }

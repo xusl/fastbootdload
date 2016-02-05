@@ -33,11 +33,11 @@ public:
     ~DiagPST(void);
 
 
-    bool EraseSimlock_9X25();
-    bool checkIfFlashTypeMatchNormalMode_9X25();
-    bool CompareVersions_9X25();
-    bool CompareAllVersion_9X25(PCCH firmware_name);
-    bool My_CompareDashboardVersion_9X25(PCCH Device_firmware,PCCH PC_firmware);
+    bool EraseSimlock();
+    bool checkIfFlashTypeMatchNormalMode();
+    bool CompareVersions();
+    bool CompareAllVersion(PCCH firmware_name);
+    bool My_CompareDashboardVersion(PCCH Device_firmware,PCCH PC_firmware);
     bool Compare_EFS_Version(PCCH PC_firmware,PCCH Device_firmware);
     bool Compare_special_ver(PCCH firmware_name,PCCH Device_ver,PCCH PC_ver);
 
