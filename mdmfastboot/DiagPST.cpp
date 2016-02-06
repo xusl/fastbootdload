@@ -35,8 +35,8 @@ Software_size (0),
             m_Worker->ui_text_msg(FIRMWARE_VER, version);
             LOGE("index %d version %s", i, version);
         }
-        char pFlash_Type[20] = {0};
-        TResult result = DIAGCmd.RequestFlashType((char *)(&pFlash_Type));
+        //char pFlash_Type[20] = {0};
+        //TResult result = DIAGCmd.RequestFlashType((char *)(&pFlash_Type));
         DIAGCmd.DisableDiagServer();
     }
 }

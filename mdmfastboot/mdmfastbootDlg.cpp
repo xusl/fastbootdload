@@ -507,6 +507,27 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
     m_forceupdate = TRUE; /*Now fw build system can not handle config.xml, so set it to true*/
   }
 
+  CString path;
+
+  unsigned int size;
+  GetAppPath(path);
+  path += "/config1.xml";
+  void *data = load_file(path.GetString(), &size);
+  XmlParser parser1;
+  parser1.Parse("<?wsx version \"1.0\" ?><smil> \
+           <media src = \"welcome1.asf\"/>cdcddddddddd</smil>");
+
+
+  XmlParser parser;
+
+  GetAppPath(path);
+  path += "/config.xml";
+  parser.Parse(path.GetString());
+  string refs;
+  parser.getElementsByTagName(L"RECOVERYFS", refs);
+  LOGE("RECOVERYFS value %sxxxxxxxxxxxxxxxxxxxxx", refs.c_str());
+
+
   return TRUE;
 }
 
@@ -606,7 +627,6 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   RegisterAdbDeviceNotification(m_hWnd);
   SetWorkStatus(m_bWork, TRUE);
   adb_usb_init();
-  //SetUpAdbDevice(NULL, 0);
 
   if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
     SetTimer(TIMER_EVT_ADBKILLED, 1000, &DeviceEventTimerProc);

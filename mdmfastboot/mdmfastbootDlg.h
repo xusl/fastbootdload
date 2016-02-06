@@ -15,14 +15,13 @@
 #include "DlWorker.h"
 
 #include "adbhost.h"
-
 #include "SettingsDlg.h"
 #include "qcnlib/QcnParser.h"
 #include "adb_dev_register.h"
 #include "scsicmd.h"
-
 #include "diagcmd.h"
 #include "jrddiagcmd.h"
+#include "XmlParser.h"
 
 enum
 {

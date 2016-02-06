@@ -482,21 +482,21 @@ do {											\
 	} while(0)
 
 
-#define RELEASE(pptr)							\
+#define RELEASE(ptr)							\
 do {											\
-	if ((pptr) && *(pptr)) {					\
-		delete (*(pptr));						\
-		*(pptr) = NULL;							\
+	if ((ptr) ) {					\
+		delete (ptr);						\
+		(ptr) = NULL;							\
 	}											\
 } while (0)
 
 /* Release (array) memory previously allocated to "*pptr".
  */
-#define RELEASE_ARRAY(pptr)						\
+#define RELEASE_ARRAY(ptr)						\
 do {											\
-	if ((pptr) && *(pptr)) {					\
-		delete [] *(pptr);						\
-		*(pptr) = NULL;							\
+	if ((ptr) ) {					\
+		delete [] (ptr);						\
+		(ptr) = NULL;							\
 	}											\
 } while (0)
 
@@ -743,6 +743,18 @@ typedef vector<XmlStruct> XMLInfoVector;
 
 typedef vector<string> nvItemList;
 
-#define XML_BUF_LEN		   5096
+#define XML_BUF_LEN		   4096
+
+#define XML_TEMPLATE             "1.1"
+#define IMG_VERSION		  IMG_VERSION_9
+#define DYNAMIC_XML_VER          "1.2"
+#define DYNAMIC_XML_VER_NEW	 "1.3"
+
+#define DYNAMIC_XML_VER_THREE	 "1.3"
+#define CFG_XML_VER_THREE        "1.3"
+#define DYNAMIC_XML_VER_4        "1.4"   //add by jie.li 2011-11-29 for LTE Band
+#define DYNAMIC_XML_VER_5        "1.5"
+
+#define CONFIG_XML_VER_NEWRULE	"4.0"
 
 #endif          //DEFINE_H

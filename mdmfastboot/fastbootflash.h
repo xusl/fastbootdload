@@ -93,7 +93,6 @@ class flash_image{
     int add_image(wchar_t *partition, const wchar_t *lpath, BOOL write =FALSE, const wchar_t* config = NULL);
     void read_package_version(const wchar_t * package_conf);
     BOOL reset(BOOL free_only);
-    BOOL unpack_download_img(const wchar_t *lpath);
 
   private:
     FlashImageInfo *image_list;

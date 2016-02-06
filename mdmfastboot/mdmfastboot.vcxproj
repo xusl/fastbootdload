@@ -256,11 +256,13 @@
     <ClCompile Include="..\src\diagcmd.cpp" />
     <ClCompile Include="..\src\dlprg.cpp" />
     <ClCompile Include="..\src\hostdl.cpp" />
+    <ClCompile Include="..\src\ImgUnpack.cpp" />
     <ClCompile Include="..\src\jrddiagcmd.cpp" />
     <ClCompile Include="..\src\pkt.cpp" />
     <ClCompile Include="..\src\saharacmd.cpp" />
     <ClCompile Include="..\src\scsicmd.cpp" />
     <ClCompile Include="..\src\serialport.cpp" />
+    <ClCompile Include="..\src\XmlParser.cpp" />
     <ClCompile Include="DiagPST.cpp" />
     <ClCompile Include="fastbootflash.cpp" />
     <ClCompile Include="..\src\list.cpp" />

@@ -62,10 +62,10 @@ CCustData::CCustData( CPacket* packetDll,
 
 CCustData::~CCustData()
 {
-    RELEASE_ARRAY(&this->m_pItems);
-    RELEASE_ARRAY(&this->m_simlockData.data);
-    RELEASE_ARRAY(&this->m_traceData.data);
-    RELEASE(&this->m_pDIAGCmd);
+    RELEASE_ARRAY(this->m_pItems);
+    RELEASE_ARRAY(this->m_simlockData.data);
+    RELEASE_ARRAY(this->m_traceData.data);
+    RELEASE(this->m_pDIAGCmd);
 }
 
 bool CCustData::ChangeOfflineMode(uint16 wMode)
@@ -85,7 +85,7 @@ TResult CCustData::ReadConfigXml(const char* filename,uint8* pdata, long& rlen)
     }
 
     memcpy(pdata, data, rlen);
-    RELEASE_ARRAY(&data);
+    RELEASE_ARRAY(data);
 
     return EOK;
 }
@@ -284,7 +284,7 @@ TResult CCustData::ReadFile(bool bReadArmEfs, const char* filename, uint8** ppda
 	if (FAILURE(result))
 	{
         ERR("COM%d: EfsOpRead failure!", dlPort);
-		RELEASE_ARRAY(&pdata);
+		RELEASE_ARRAY(pdata);
 		return EEFSOPREAD;
 	}
 
@@ -292,7 +292,7 @@ TResult CCustData::ReadFile(bool bReadArmEfs, const char* filename, uint8** ppda
 	if (FAILURE(result))
 	{
         ERR("COM%d: EfsOpClose failure!", dlPort);
-		RELEASE_ARRAY(&pdata);
+		RELEASE_ARRAY(pdata);
 		return EEFSOPCLOSE;
 	}
 
@@ -1307,7 +1307,7 @@ TResult CCustData::ReadWebsConfigFile(WebsXMLInfo* pwebsxmlinfo)
     {
         return EFAILED;
     };
-    RELEASE_ARRAY(&pdata);
+    RELEASE_ARRAY(pdata);
     return EOK;
 }
 
@@ -1336,6 +1336,6 @@ TResult CCustData::ReadSSIDConfigFile(WebsXMLInfo* pwebsxmlinfo)
         return EFAILED;
     };
 
-    RELEASE_ARRAY(&pdata);
+    RELEASE_ARRAY(pdata);
     return EOK;
 }

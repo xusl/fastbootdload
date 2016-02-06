@@ -463,7 +463,7 @@ static void finish_building_at_packet
 
 	if (i > nlen)
 	{
-		RELEASE_ARRAY(&nbuf);
+		RELEASE_ARRAY(nbuf);
 
 		pkt->broken = true;
 		return;
@@ -472,7 +472,7 @@ static void finish_building_at_packet
 	memcpy(pbuf, nbuf, i);
 	pkt->length = i;
 
-	RELEASE_ARRAY(&nbuf);
+	RELEASE_ARRAY(nbuf);
 }
 
 

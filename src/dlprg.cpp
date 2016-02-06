@@ -187,7 +187,7 @@ TResult CDLPrg::MyDownloadPrg(uint8* prgbuf, size_t len, int addrType,int myPort
         ERR("COM%d: Send version request failure!",port);
     }
 
-    RELEASE_ARRAY(&pVersion);
+    RELEASE_ARRAY(pVersion);
 
 #endif
 
@@ -277,7 +277,7 @@ TResult CDLPrg::DownloadPrg(uint8* prgbuf, size_t len, int addrType)
         ERR("COM%d: Send version request failure!",port);
 	}
 
-	RELEASE_ARRAY(&pVersion);
+	RELEASE_ARRAY(pVersion);
 
 #endif
 
