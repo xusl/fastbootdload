@@ -29,7 +29,7 @@ typedef struct
 class DiagPST
 {
 public:
-    DiagPST(UsbWorkData * worker);
+    DiagPST(UsbWorkData * worker, map<string,FileBufStruct> &filebuffer);
     ~DiagPST(void);
 
 
@@ -67,6 +67,8 @@ private:
     bool RequestFirmwarVerAndMobileIdNormalMode();
     bool RequestExternalVersion();
     BOOL StringSplit(char * content, PCHAR lineDelim, std::vector<PCCH>& dataOut);
+
+
 
 private:
     CPacket                         *m_DLLPacket;

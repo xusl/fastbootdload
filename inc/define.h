@@ -606,17 +606,19 @@ typedef struct TCustDataInfoType_ {
 } TCustDataInfoType;
 
 typedef struct _FileBufStruct {
-    uint8*      strFileName;
-    uint8*		strFileBuf;
+    char*       strFileName;
+    uint8*		  strFileBuf;
     uint8       partition[20];
     uint8       comand;
-    uint32		uFileLens;
+    uint32		  uFileLens;
     bool        isDownload;
     _FileBufStruct() {
+        strFileName = NULL;
+        strFileBuf = NULL;
         isDownload=true;
         memset(partition, 0x00, sizeof(partition));
-        partition[0]  = OPEN_MULTI_CMD;
-        partition[1]=OPEN_MULTI_MODE_CUSTOM;
+        partition[0] = OPEN_MULTI_CMD;
+        partition[1] = OPEN_MULTI_MODE_CUSTOM;
 
     }
 }FileBufStruct;

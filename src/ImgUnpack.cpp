@@ -58,7 +58,7 @@ BOOL ImgUnpack::UnpackDownloadImg(const wchar_t *lpath, const wchar_t* config_fi
             FileBufStruct afBuf;
             m_efsFileName.push_back(fileName);
 
-            afBuf.strFileName = (uint8*)m_efsFileName.at(k).data();
+            afBuf.strFileName = (char *)m_efsFileName.at(k).data();
             afBuf.uFileLens = fileInfo->fileLen;
             afBuf.strFileBuf = pImgData + fileInfo->beginPos;
 
@@ -100,7 +100,7 @@ BOOL ImgUnpack::UnpackDownloadImg(const wchar_t *lpath, const wchar_t* config_fi
             FileBufStruct afBuf;
             m_efsFileName.push_back(fileName);
 
-            afBuf.strFileName = (uint8*)m_efsFileName.at(k).data();
+            afBuf.strFileName = (char *)m_efsFileName.at(k).data();
             afBuf.uFileLens = fileInfo->fileLen;
             afBuf.strFileBuf = pImgData + fileInfo->beginPos;
 

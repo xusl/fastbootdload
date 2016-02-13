@@ -30,6 +30,7 @@
 #define _FASTBOOT_H_
 
 #include "usb_adb.h"
+#include <map>
 
 //#ifdef __cplusplus
 //extern "C" {
@@ -43,7 +44,8 @@
 #define PKG_STATIC_QCN          L"static.qcn"
 
 #define PARTITIONTBL_SECTION    L"partition_table"
-#define PARTITIONTBL_DL		    L"partition_dl"
+#define PARTITIONTBL_DL		      L"partition_dl"
+#define DIAGPST_SECTION         L"pst_diag"
 #define PKG_SECTION             L"package"
 #define PKG_PATH                L"path"
 static const int PARTITION_NUM_MAX = 32;
@@ -83,7 +85,11 @@ class flash_image{
     BOOL get_pkg_fw_ver(CString &version);
     BOOL get_pkg_qcn_ver(CString &version);
 	  BOOL set_download_flag(CString strPartitionName, bool bDownload);
-    int read_config(const wchar_t* config);
+    int read_fastboot_config(const wchar_t* config);
+    int read_diagpst_config(const wchar_t* config);
+
+     bool AddFileBuffer(const wchar_t *partition, const wchar_t *pkgPath, const wchar_t *filName);
+     map<string,FileBufStruct> GetFileBuffer() { return m_dlFileBuffer;};
 
   protected:
     virtual int parse_pkg_sw(CString & node, CString & text);
@@ -103,6 +109,7 @@ class flash_image{
     unsigned int nv_num;
     char ** nv_buffer;
     char * nv_cmd;
+    map<string,FileBufStruct>  m_dlFileBuffer;
     CString a5sw_kern_ver;
     CString a5sw_usr_ver;
     CString a5sw_sys_ver;

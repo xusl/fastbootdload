@@ -87,7 +87,8 @@ flash_image::flash_image(const wchar_t* config):
   wcsncpy(pkg_qcn_file, pkg_dir, data_len+1);
   wcsncat(pkg_qcn_file, PKG_STATIC_QCN, sizeof(pkg_qcn_file) / sizeof(pkg_qcn_file[0]) - data_len);
 
-  read_config(config);
+  read_fastboot_config(config);
+  read_diagpst_config(config);
   read_package_version(pkg_conf_file);
 }
 
@@ -95,7 +96,59 @@ flash_image::~flash_image() {
   reset(TRUE);
 }
 
-int flash_image::read_config(const wchar_t* config) {
+
+int flash_image::read_diagpst_config(const wchar_t* config) {
+  wchar_t partition_tbl[PARTITION_TBL_LEN] = {0};
+  wchar_t filename[MAX_PATH];
+  wchar_t *partition;
+  size_t partition_len;
+  CString path;
+  int data_len;
+
+  if (config == NULL) {
+    ERROR("not specified config file name");
+    return -1;
+  }
+
+  data_len = GetPrivateProfileString(DIAGPST_SECTION,
+                                     NULL,
+                                     NULL,
+                                     partition_tbl,
+                                     PARTITION_TBL_LEN,
+                                     config);
+
+  if (data_len == 0) {
+    LOGW("no DIAG PST in%S .", config);
+    return 0;
+  }
+
+  partition = partition_tbl;
+  partition_len = wcslen(partition);
+
+  while (partition_len > 0) {
+    data_len = GetPrivateProfileString(DIAGPST_SECTION,
+                                       partition,
+                                       NULL,
+                                       filename,
+                                       MAX_PATH,
+                                       config);
+    if (data_len > 0) {
+//        path.Empty();
+        path = pkg_dir;
+        //path += L'\\';
+        path += filename;
+      AddFileBuffer(partition, path.GetBuffer(), filename);
+      path.ReleaseBuffer();
+    }
+
+    partition = partition + partition_len + 1;
+    partition_len = wcslen(partition);
+  }
+
+  return 0;
+}
+
+int flash_image::read_fastboot_config(const wchar_t* config) {
   wchar_t partition_tbl[PARTITION_TBL_LEN] = {0};
   wchar_t filename[MAX_PATH];
   wchar_t *partition;
@@ -213,6 +266,29 @@ int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write
 
   return 0;
 }
+
+bool flash_image::AddFileBuffer(const wchar_t *partition, const wchar_t *lpath, const wchar_t *filName) {
+    char * part = WideStrToMultiStr(partition);
+    char * fn = WideStrToMultiStr(filName);
+    //int bytes = sizeof (wchar_t) * (2+ wcslen(pkgPath)+ wcslen(filName));
+    //wchar_t *lpath = (wchar_t *)malloc(bytes);
+    if (part != NULL && fn != NULL && lpath != NULL){
+        //memset(lpath, 0, bytes);
+        FileBufStruct afBuf;
+        afBuf.strFileBuf = (uint8*)load_file(lpath, &afBuf.uFileLens);
+        if(afBuf.strFileBuf != NULL) {
+        afBuf.strFileName = strdup(fn);
+        afBuf.isDownload=false;
+        strcpy((char *)(afBuf.partition + 2), part);
+        m_dlFileBuffer.insert(std::pair<string,FileBufStruct>(fn,afBuf));
+        }
+    }
+    DELETE_IF(part);
+    DELETE_IF(fn);
+    //FREE_IF(lpath);
+    return true;
+}
+
 
 const wchar_t * flash_image::get_package_dir(void) {
     return pkg_dir;
@@ -498,6 +574,13 @@ BOOL flash_image::reset(BOOL free_only) {
       nv_num = 0;
       }
       FREE_IF (nv_cmd);
+    }
+
+          std::map<string,FileBufStruct>::iterator it;
+    for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++)
+    {
+        FREE_IF(it->second.strFileBuf);
+
     }
 
 	return TRUE;

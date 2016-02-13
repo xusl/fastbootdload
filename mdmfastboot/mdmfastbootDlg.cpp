@@ -1279,34 +1279,16 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
 
     data->ui_text_msg(TITLE, dev->GetDevTag());
     if (status == DEVICE_PLUGIN) {
-        DiagPST pst(data);
-        if(!pst.DownloadCheck())    {
-            dev->SetDeviceStatus(DEVICE_CHECK);
-            return 0;
-        }
-
-        if(!pst.RunTimeDiag())
-        {
-            dev->SetDeviceStatus(DEVICE_CHECK);
-            return 0;
-        }
-        if(!pst.Calculate_length())
-        {
-            dev->SetDeviceStatus(DEVICE_CHECK);
-            return 0;
-        }
-
-        if(!pst.DownloadPrg())
-        {
-            dev->SetDeviceStatus(DEVICE_CHECK);
-            return 0;
-        }
-        if(!pst.DownloadImages())
-        {
-            dev->SetDeviceStatus(DEVICE_CHECK);
-            return 0;
-        }
-
+        DiagPST pst(data, img->GetFileBuffer());
+        bool result = pst.DownloadCheck();
+        if(result)
+            result = pst.RunTimeDiag();
+        if(result)
+            result = pst.Calculate_length();
+        if(result)
+            result = pst.DownloadPrg();
+        if(result)
+            result = pst.DownloadImages();
         dev->SetDeviceStatus(DEVICE_CHECK);
     } else if (status == DEVICE_CHECK) {
         adbhost adb(handle , dev->GetDevId());

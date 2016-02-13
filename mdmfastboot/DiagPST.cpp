@@ -6,11 +6,12 @@
 #include "PortStateUI.h"
 #include <strstream>
 
-DiagPST::DiagPST(UsbWorkData * worker):
+DiagPST::DiagPST(UsbWorkData * worker, map<string,FileBufStruct> & filebuffer):
 Software_size (0),
     m_iMobileId(0),
     m_FirmwareVersion(""),
-    m_blDownloadMode(false)
+    m_blDownloadMode(false),
+    m_dlFileBuffer(filebuffer)
 {
     DeviceInterfaces *dev =worker->devIntf;
     m_Worker = worker;
@@ -20,7 +21,7 @@ Software_size (0),
     m_sahara = new SAHARACmd(m_DLLPacket);
     m_newDIAGCmd = new JRDdiagCmd(m_DLLPacket);
     m_dlPort = m_DLLPacket->GetPort() ;
-    m_dlData = new CDLData(m_packetDll,NULL,m_dlPort);
+    m_dlData = new CDLData(m_DLLPacket,NULL,m_dlPort);
     m_pDLImgInfo = new TDLImgInfoType();
     m_pCustdataInfo = new TCustDataInfoType();
     memset(m_pDLImgInfo, 0, sizeof(TDLImgInfoType));
@@ -51,8 +52,8 @@ DiagPST::~DiagPST(void){
 
     DELETE_IF(m_sahara);
     DELETE_IF(m_newDIAGCmd);
-    DELETE_IF(m_pDLImgInfo);
-    DELETE_IF(m_pCustdataInfo);
+    DELETE_IF(m_dlData);
+    //DELETE_IF(m_pCustdataInfo);
 
     if (m_DLLPacket != NULL) {
         m_DLLPacket->Uninit();
@@ -71,6 +72,7 @@ void DiagPST::initDLimgInfo() {
     memcpy(m_pDLImgInfo->dashboardVer,strTotal.c_str(), strTotal.length());
     m_dlData->setDlImgInfo(m_pDLImgInfo);
 }
+
 
 void DiagPST::initCustDataInfo()
 {
@@ -91,7 +93,6 @@ inline TResult DiagPST::DisableDiagServer()
 bool DiagPST::RequestDeviceStatus()
 {
     TResult result = EOK;
-    EnableDiagServer();
 
     m_Worker->SetPromptMsg("GETTING DEVICE STATUS");
 
@@ -115,7 +116,6 @@ bool DiagPST::RequestDeviceStatus()
             break;
         }
     }
-    EnableDiagServer();
 
     if(!requestNormalStatus && !requestDLStatus)
     {
@@ -552,8 +552,10 @@ bool DiagPST::RequestFirmwarVerAndMobileIdNormalMode()
 
 bool DiagPST::SwitchOfflineMode()
 {
-    if (!m_blDownloadMode)
+    if (m_blDownloadMode)
     {
+        return true;
+    }
         bool bOk = m_pCustdata->ChangeOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
         if (bOk)
         {
@@ -563,8 +565,9 @@ bool DiagPST::SwitchOfflineMode()
         {
             m_Worker->SetPromptMsg("Swtich offline mode fails!");
         }
-    }
+    return bOk;
 
+#if 0
      if (0) {
             CDIAGCmd DIAGCmd(m_DLLPacket);
             DIAGCmd.EnableDiagServer();
@@ -580,8 +583,7 @@ bool DiagPST::SwitchOfflineMode()
             m_pCustdata.ChangeOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
             delete m_pCustdataInfo;
         }
-
-    return true;
+#endif
 }
 
 bool DiagPST::CompareAllVersion(PCCH firmware_name)
@@ -692,43 +694,23 @@ bool DiagPST::RequestExternalVersion()
 
 bool DiagPST::DownloadCheck()
 {
+    bool result = true;
     initDLimgInfo();
-    if(!RequestDeviceStatus())
-    {
-        return false;
-    }
+     EnableDiagServer();
+    result = RequestDeviceStatus();
 
-    if(!m_blDownloadMode)
-    {
-        if(!RequestFirmwarVerAndMobileIdNormalMode())
-        {
-            return false;
-        }
-        if(!checkIfPackageMatchNormalMode())
-        {
-            return false;
-        }
-        if(!checkCusIdNormalMode())
-        {
-            return false;
-        }
-        if(!checkIfPartitionMatchNormalMode())
-        {
-            return false;
-        }
-        if(!checkIfFlashTypeMatchNormalMode())
-        {
-            return false;
-        }
+    if(!m_blDownloadMode) {
+        result = RequestFirmwarVerAndMobileIdNormalMode();
+        //result = result && checkIfPackageMatchNormalMode();
+        result = result && checkCusIdNormalMode();
+        result = result && checkIfPartitionMatchNormalMode();
+        result = result && checkIfFlashTypeMatchNormalMode();
+    } else {
+           result = checkIfPackageMatchDlMode();
     }
-    else
-    {
-        if(!checkIfPackageMatchDlMode())
-        {
-            return false;
-        }
-    }
-    return true;
+    if (!result)
+        DisableDiagServer();
+    return result;
 }
 
 bool DiagPST::RunTimeDiag() {
@@ -769,7 +751,22 @@ bool DiagPST::RunTimeDiag() {
 
 
 bool DiagPST::DownloadPrg() {
-//    m_sahara->DownloadPrg(pPrgImg->data,pPrgImg->len,m_dlPort,m_blDownloadMode);
+    /* download PRG */
+    TImgBufType* pPrgImg = &m_pDLImgInfo->prg;
+    const char * prg = "NPRG9x07.mbn";
+
+    map<string,FileBufStruct>::iterator iter=m_dlFileBuffer.find(prg);
+    if(iter!=m_dlFileBuffer.end()) {
+        pPrgImg->data = m_dlFileBuffer.at(prg).strFileBuf;
+        pPrgImg->len = m_dlFileBuffer.at(prg).uFileLens;
+    }
+
+        m_Worker->SetPromptMsg("download NPRG9x07.mbn");
+
+
+            m_sahara->SwitchToDLoadMode();
+
+    m_sahara->DownloadPrg(pPrgImg->data,pPrgImg->len,m_dlPort,m_blDownloadMode);
     return true;
  }
 
