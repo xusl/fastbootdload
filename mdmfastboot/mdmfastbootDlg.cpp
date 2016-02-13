@@ -10,6 +10,7 @@
 #include "adbhost.h"
 #include "usb_vendors.h"
 #include "DiagPST.h"
+#include <ImgUnpack.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -470,8 +471,8 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   StartLogging(log_file, log_level, log_tag);
 
   if(log_file) free(log_file);
-  if(log_tag) delete log_tag;
-  if(log_level) delete log_level;
+  if(log_tag) delete []log_tag;
+  if(log_level) delete []log_level;
 
   //construct update software package. get configuration about partition information.
   if (NULL!=m_image)
@@ -507,6 +508,7 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
     m_forceupdate = TRUE; /*Now fw build system can not handle config.xml, so set it to true*/
   }
 
+#if 0
   CString path;
 
   unsigned int size;
@@ -514,6 +516,7 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   path += "/config1.xml";
   void *data = load_file(path.GetString(), &size);
   XmlParser parser1;
+  //parser1.Parse((PCCH)data);
   parser1.Parse("<?wsx version \"1.0\" ?><smil> \
            <media src = \"welcome1.asf\"/>cdcddddddddd</smil>");
 
@@ -527,6 +530,13 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   parser.getElementsByTagName(L"RECOVERYFS", refs);
   LOGE("RECOVERYFS value %sxxxxxxxxxxxxxxxxxxxxx", refs.c_str());
 
+  ImgUnpack imgunpack;
+
+    //
+  imgunpack.UnpackDownloadImg(L"F:\\EE40VB_00_00.00_11_20160202\\DownloadImage\\Download.img"
+  , m_ConfigPath.GetString());
+
+#endif
 
   return TRUE;
 }
@@ -1270,32 +1280,32 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     data->ui_text_msg(TITLE, dev->GetDevTag());
     if (status == DEVICE_PLUGIN) {
         DiagPST pst(data);
-    if(!pst.DownloadCheck())    {
-dev->SetDeviceStatus(DEVICE_CHECK);
-return 0;
-    }
+        if(!pst.DownloadCheck())    {
+            dev->SetDeviceStatus(DEVICE_CHECK);
+            return 0;
+        }
 
-    if(!pst.RunTimeDiag())
-    {
-dev->SetDeviceStatus(DEVICE_CHECK);
-return 0;
-    }
-    if(!pst.Calculate_length())
-    {
-dev->SetDeviceStatus(DEVICE_CHECK);
-return 0;
-    }
+        if(!pst.RunTimeDiag())
+        {
+            dev->SetDeviceStatus(DEVICE_CHECK);
+            return 0;
+        }
+        if(!pst.Calculate_length())
+        {
+            dev->SetDeviceStatus(DEVICE_CHECK);
+            return 0;
+        }
 
-    if(!pst.DownloadPrg())
-    {
-dev->SetDeviceStatus(DEVICE_CHECK);
-return 0;
-    }
-    if(!pst.DownloadImages())
-    {
-dev->SetDeviceStatus(DEVICE_CHECK);
-return 0;
-    }
+        if(!pst.DownloadPrg())
+        {
+            dev->SetDeviceStatus(DEVICE_CHECK);
+            return 0;
+        }
+        if(!pst.DownloadImages())
+        {
+            dev->SetDeviceStatus(DEVICE_CHECK);
+            return 0;
+        }
 
         dev->SetDeviceStatus(DEVICE_CHECK);
     } else if (status == DEVICE_CHECK) {

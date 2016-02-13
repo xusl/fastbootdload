@@ -1246,7 +1246,7 @@ TResult CDLData::DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
                 // should we break to reset or return here???
                 return EINVALIDPARAM;
             }
-            mode=it->second.Area;
+            mode=it->second.partition;
             //INFO(FILE_LINE, "COM%d: %s ...,len = %d", dlPort,QString::fromStdString(it->first),len);
 
             //TODO
@@ -1260,7 +1260,7 @@ TResult CDLData::DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
             {
                 this->m_uRatio = (len)/(total/100);
             }
-            result = this->DownloadDataUsePrtn(pdata, len,  mode);
+            result = this->DownloadDataUsePrtn(pdata, len, mode);
             if (FAILURE(result))
             {
                 ERR("COM%d: DownloadData failed, return here!!!",
@@ -1415,7 +1415,7 @@ TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
                 // should we break to reset or return here???
                 return EINVALIDPARAM;
             }
-            mode=it->second.Area;
+            mode=it->second.partition;
 
             //INFO(FILE_LINE, "COM%d: %s ...,len = %d", dlPort,QString::fromStdString(it->first),len);
 #ifdef FEATURE_TPST

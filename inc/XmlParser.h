@@ -33,7 +33,6 @@ private:
     //QDomElement               getElementById(QDomElement& parent);
     map<string, string>     XML_Value;
     // map<wstring, wstring>     XML_Value;
-    BSTR                    m_pXmlBuf;
     vector<string>           m_mandatoryCompArray;
 };
 

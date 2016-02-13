@@ -7,12 +7,12 @@
 
 using namespace std;
 
-class ImgUnpack{
+class ConfigIni{
 public:
-    ImgUnpack();
-    ~ImgUnpack();
+    ConfigIni();
+    ~ConfigIni();
 
-    BOOL UnpackDownloadImg(const wchar_t *lpath, const wchar_t* config_file);
+    BOOL UnpackDownloadImg(const wchar_t *lpath);
 
 private:
   bool ReadVersionInfo();

@@ -199,6 +199,25 @@ PCHAR WideStrToMultiStr(PCWCH WideStr)
     return MultiStr;
 }
 
+int CharToBSTR(PCCH inParam, BSTR *outParam){
+    ULONG size;
+    int retVal = -1;
+    WCHAR *tmp = NULL;
+
+    size = MultiByteToWideChar(CP_OEMCP, 0, inParam, -1, tmp, 0);
+    tmp = (WCHAR*)GlobalAlloc(GMEM_ZEROINIT, size * sizeof(WCHAR));
+    retVal = MultiByteToWideChar(CP_OEMCP, 0, inParam, -1, tmp, size);
+
+    if ( 0 != retVal ) {
+        retVal = 1;
+        *outParam = SysAllocString(tmp);
+    }
+
+    GlobalFree(tmp);
+
+    return retVal;
+}
+
 /**************************************************************************/
 /**************************************************************************/
 /*****                                                                *****/

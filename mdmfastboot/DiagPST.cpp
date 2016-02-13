@@ -20,6 +20,7 @@ Software_size (0),
     m_sahara = new SAHARACmd(m_DLLPacket);
     m_newDIAGCmd = new JRDdiagCmd(m_DLLPacket);
     m_dlPort = m_DLLPacket->GetPort() ;
+    m_dlData = new CDLData(m_packetDll,NULL,m_dlPort);
     m_pDLImgInfo = new TDLImgInfoType();
     m_pCustdataInfo = new TCustDataInfoType();
     memset(m_pDLImgInfo, 0, sizeof(TDLImgInfoType));
@@ -61,9 +62,9 @@ DiagPST::~DiagPST(void){
 
 void DiagPST::initDLimgInfo() {
     //get the Dashboard version
-    string strWinVer = "";//m_LocalConfigXml->get_XML_Value("WKIT");
-    string strMacVer = "";//m_LocalConfigXml->get_XML_Value("MKIT");
-    string strLinuxVer ="";//m_LocalConfigXml->get_XML_Value("LKIT");
+    string strWinVer = "EE40_WKIT_00_00";//m_LocalConfigXml->get_XML_Value("WKIT");
+    string strMacVer = "EE40_MKIT_00_00";//m_LocalConfigXml->get_XML_Value("MKIT");
+    string strLinuxVer ="EE40_LKIT_00_00";//m_LocalConfigXml->get_XML_Value("LKIT");
 
     string strTotal = strWinVer + DASHBOARD_VER_SEG + strMacVer + DASHBOARD_VER_SEG + strLinuxVer;
     m_pDLImgInfo->lenDashboardVer = strTotal.length();
@@ -682,7 +683,7 @@ bool DiagPST::RequestExternalVersion()
         SLEEP(1000);
     }
 #ifdef FEATURE_TPST
-    setVerCallBack(m_dlPort,pExternal,FIRWARE_VER);
+    setVerCallBack(m_dlPort,pExternal,FIRMWARE_VER);
     setVerCallBack(m_dlPort,"NA",LINUX_VER);
     setVerCallBack(m_dlPort,"NA",PTS_VER);
 #endif

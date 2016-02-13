@@ -28,17 +28,14 @@ ImgUnpack::~ImgUnpack() {
 }
 
 
-BOOL ImgUnpack::UnpackDownloadImg(const wchar_t *lpath) {
+BOOL ImgUnpack::UnpackDownloadImg(const wchar_t *lpath, const wchar_t* config_file) {
     uint32 size;
     BYTE* pImgData = (BYTE*)load_file(lpath, &size);
-    char headVerBuf[FILEINFO_HEAD_LEN] = {0};
-    memcpy(headVerBuf, pImgData + VERSION_HEAD_LEN, FILEINFO_HEAD_LEN);
-    FilePosInfoS* fileInfo = (FilePosInfoS *)headVerBuf;
-
-
+    char headVerBuf[VERSION_HEAD_LEN] = {0};
+    memcpy(headVerBuf, pImgData, VERSION_HEAD_LEN);
     IMGVerS* pImgVer = (IMGVerS *)headVerBuf;
     imgVersion = pImgVer->imgVer;
-    if (IMG_VERSION > pImgVer->imgVer || pImgVer->imgVer > IMG_VERSION_9) //changed by minghui.zhang 2013-12-30
+    if (IMG_VERSION > imgVersion || imgVersion > IMG_VERSION_9) //changed by minghui.zhang 2013-12-30
     {
         ERR("Img version unmatched !");
         return false;
@@ -46,74 +43,71 @@ BOOL ImgUnpack::UnpackDownloadImg(const wchar_t *lpath) {
 
     m_downloadFileBuffer.clear();
     m_efsFileName.clear();
-    if (pImgVer->imgVer >= IMG_VERSION_4)
-    {
-        char filesInfoBuf[FILEINFO_HEAD_LEN_NEW];
-        memset(filesInfoBuf, 0, FILEINFO_HEAD_LEN_NEW);
+    if (pImgVer->imgVer >= IMG_VERSION_4) {
+        PCHAR pConfig = WideStrToMultiStr(config_file);
+        char filesInfoBuf[FILEINFO_HEAD_LEN_NEW]= {0};
         memcpy(filesInfoBuf, pImgData + VERSION_HEAD_LEN, FILEINFO_HEAD_LEN_NEW);
 
         FilePosInfoNewS* fileInfo = (FilePosInfoNewS *)filesInfoBuf;
-        string strFileTemp = fileInfo->fileName;
+        string fileName = fileInfo->fileName;
         int k = 0;
 
-        while(strFileTemp.size() > 1)
-        {
-            string area_key="/Area_List/";
-
-            if (!strFileTemp.compare(""))
-                break;
-
+        while(fileName.size() >= 1) {
+            char profileBuf[32] = {0};
+            char* partition = profileBuf;
             FileBufStruct afBuf;
-            m_efsFileName.push_back(strFileTemp);
+            m_efsFileName.push_back(fileName);
 
             afBuf.strFileName = (uint8*)m_efsFileName.at(k).data();
             afBuf.uFileLens = fileInfo->fileLen;
             afBuf.strFileBuf = pImgData + fileInfo->beginPos;
-            area_key+=strFileTemp;
 
-            //TODO::
-            char* AREA = "";//m_ConfigIni->value(area_key).toString();
-            if(strFileTemp=="sbl1.mbn"&&(pImgVer->imgVer==IMG_VERSION_6||pImgVer->imgVer==IMG_VERSION_9))           //for M850
-                AREA="0:SBL";
-            if(strFileTemp=="appsboot.mbn"&&(pImgVer->imgVer==IMG_VERSION_8||pImgVer->imgVer==IMG_VERSION_9))        //for 9X30
-                AREA="0:aboot";
-            if(AREA=="")
+            GetPrivateProfileStringA("Area_List",
+                                     fileInfo->fileName,
+                                     NULL,
+                                     profileBuf,
+                                     32,
+                                     pConfig);
+
+
+            if(fileName=="sbl1.mbn"&&(imgVersion==IMG_VERSION_6||imgVersion==IMG_VERSION_9))
+                partition="0:SBL";
+            if(fileName=="appsboot.mbn"&&(imgVersion==IMG_VERSION_8||imgVersion==IMG_VERSION_9))
+                partition="0:aboot";
+            if(strlen(partition) == 0)
                 afBuf.isDownload=false;
-            if(strFileTemp=="dsp2.mbn"&&pImgVer->imgVer==7)  //for M850
-            {
-                AREA="0:ADSP";
-            }
-            strcpy((char *)(afBuf.Area + 2), AREA);
-            m_downloadFileBuffer.insert(std::pair<string,FileBufStruct>(strFileTemp,afBuf));
+            strcpy((char *)(afBuf.partition + 2), partition);
+            m_downloadFileBuffer.insert(std::pair<string,FileBufStruct>(fileName,afBuf));
 
             k++;
             fileInfo++;
-            strFileTemp = fileInfo->fileName;
+            fileName = fileInfo->fileName;
         }
+        delete []pConfig;
     } else {
         char filesInfoBuf[FILEINFO_HEAD_LEN] = {0};
         memcpy(filesInfoBuf, pImgData + VERSION_HEAD_LEN, FILEINFO_HEAD_LEN);
 
         FilePosInfoS* fileInfo = (FilePosInfoS *)filesInfoBuf;
-        string strFileTemp = fileInfo->fileName;
+        string fileName = fileInfo->fileName;
 
         int k = 0;
-        while(strFileTemp.size() > 1)
+        while(fileName.size() > 1)
         {
-            if (!strFileTemp.compare(""))
+            if (!fileName.compare(""))
                 break;
 
             FileBufStruct afBuf;
-            m_efsFileName.push_back(strFileTemp);
+            m_efsFileName.push_back(fileName);
 
             afBuf.strFileName = (uint8*)m_efsFileName.at(k).data();
             afBuf.uFileLens = fileInfo->fileLen;
             afBuf.strFileBuf = pImgData + fileInfo->beginPos;
 
-            m_downloadFileBuffer.insert(std::pair<string,FileBufStruct>(strFileTemp,afBuf));
+            m_downloadFileBuffer.insert(std::pair<string,FileBufStruct>(fileName,afBuf));
             k++;
             fileInfo++;
-            strFileTemp = fileInfo->fileName;
+            fileName = fileInfo->fileName;
         }
     }
 
@@ -129,8 +123,6 @@ BOOL ImgUnpack::UnpackDownloadImg(const wchar_t *lpath) {
         !ParseQCN())
     {
         bParsePacketOk = false;
-
-        SLEEP(6000);
         return false;
     }
 
@@ -138,19 +130,16 @@ BOOL ImgUnpack::UnpackDownloadImg(const wchar_t *lpath) {
 }
 
 
-bool ImgUnpack::ReadVersionInfo()
-{
+bool ImgUnpack::ReadVersionInfo() {
     map<string,FileBufStruct>::iterator it = m_downloadFileBuffer.find(XML_NAME);
-    if(it != m_downloadFileBuffer.end())
-    {
+    if(it != m_downloadFileBuffer.end()) {
         uint8* pXmlBuf = m_downloadFileBuffer.at(XML_NAME).strFileBuf;
         XmlParser *m_LocalConfig = new XmlParser();
         m_LocalConfig->Parse((PCCH)pXmlBuf);
 
         versionMap.clear();
         string value=m_LocalConfig->get_XML_Value("External_Ver");
-        if(value!="")
-        {
+        if(value!="") {
             versionMap[XML_KEY_FIRMWARE_EX_VER]=value;
             versionMap[XML_KEY_WINDOWS_VER] =m_LocalConfig->get_XML_Value("WKIT");
             versionMap[XML_KEY_MAC_VER] =m_LocalConfig->get_XML_Value("MKIT");
@@ -158,9 +147,7 @@ bool ImgUnpack::ReadVersionInfo()
             versionMap[XML_KEY_LINUX_VER] = "NA";
             versionMap[XML_KEY_WEBUI_VER] = "NA";
             versionMap[XML_KEY_PTS_VER] = "NA";
-        }
-        else
-        {
+        } else {
             versionMap[XML_KEY_FIRMWARE_EX_VER] = m_LocalConfig->get_XML_Value("Firmware_External_Ver");
             versionMap[XML_KEY_WINDOWS_VER] = m_LocalConfig->get_XML_Value("WINDOWS");
             versionMap[XML_KEY_MAC_VER] =m_LocalConfig->get_XML_Value("MAC");
@@ -176,25 +163,20 @@ bool ImgUnpack::ReadVersionInfo()
 
 
 bool ImgUnpack::ParseQCN() {
-    if (qcnDataBuffer)
-    {
+    if (qcnDataBuffer) {
         RELEASE_ARRAY(qcnDataBuffer);
     }
 
     map<string,FileBufStruct>::iterator it = m_downloadFileBuffer.find(QCN_NAME);
 
-    if(it != m_downloadFileBuffer.end())
-    {
+    if(it != m_downloadFileBuffer.end()) {
         uint32 dwFileLens = m_downloadFileBuffer.at(QCN_NAME).uFileLens;
         uint8* pQcnBufTemp = m_downloadFileBuffer.at(QCN_NAME).strFileBuf;
 
         NEW_ARRAY(qcnDataBuffer, uint8, dwFileLens);
         memcpy(qcnDataBuffer, pQcnBufTemp, dwFileLens);
-
         qcnLens = dwFileLens;
-    }
-    else
-    {
+    } else {
         return false;
     }
 
@@ -204,14 +186,11 @@ bool ImgUnpack::ParseQCN() {
     bool bFind = false;
     uint32 uTimes = 0;
     uint32 itemSize = qcnLens/sizeof(NV_ITEM_PACKET_INFO);
-    while(itemSize)
-    {
+    while(itemSize) {
         bFind = false;
-        if (imgVersion != IMG_VERSION_5)
-        {
+        if (imgVersion != IMG_VERSION_5) {
             uint16 lens = nvItemsIgnore.size();
-            for (uint16 i = 0; i < lens; i++)
-            {
+            for (uint16 i = 0; i < lens; i++) {
                 if (itemPacket->nvItemID == atoi(nvItemsIgnore[i].c_str()))//TODO::::
                 {
                     bFind = true;
@@ -219,10 +198,9 @@ bool ImgUnpack::ParseQCN() {
                 }
             }
         }
-        if (!bFind)
-        {
+        if (!bFind) {
             memcpy( staticQcnBuf + uTimes*sizeof(NV_ITEM_PACKET_INFO),
-                    itemPacket,sizeof(NV_ITEM_PACKET_INFO));
+                   itemPacket,sizeof(NV_ITEM_PACKET_INFO));
 
             uTimes++;
         }
@@ -232,16 +210,13 @@ bool ImgUnpack::ParseQCN() {
 
     qcnLens = uTimes*sizeof(NV_ITEM_PACKET_INFO);
 
-
     it = m_downloadFileBuffer.find(QCN_NAME);
-    if(it != m_downloadFileBuffer.end())
-    {
+    if(it != m_downloadFileBuffer.end()) {
         m_downloadFileBuffer.at(QCN_NAME).uFileLens = qcnLens;
         m_downloadFileBuffer.at(QCN_NAME).strFileBuf = staticQcnBuf;
     }
 
-    if (qcnDataBuffer)
-    {
+    if (qcnDataBuffer) {
         RELEASE_ARRAY(qcnDataBuffer);
     }
 

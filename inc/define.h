@@ -16,6 +16,8 @@ when        who             what
 #include <vector>
 
 using namespace std;
+
+
 typedef signed char int8;         /* 8 bit signed */
 typedef unsigned char uint8;      /* 8 bit unsigned */
 typedef short int16;              /* 16 bit signed */
@@ -50,111 +52,110 @@ typedef unsigned int uint32;      /* 32 bit unsigned */
 #define MDM9x30_MOBILE_ID		4093
 
 
-typedef enum
-{
-        /* General error */
-        EOK = 0,               // No Error
-        EFAILED,               // General Error
-        EINVALIDPARAM,         // Invalid parameters Error
-        ENOMEMORY,             // Out of memory
-        EBUFFERBROKEN,
+typedef enum {
+    /* General error */
+    EOK = 0,               // No Error
+    EFAILED,               // General Error
+    EINVALIDPARAM,         // Invalid parameters Error
+    ENOMEMORY,             // Out of memory
+    EBUFFERBROKEN,
 
-        /* com port layer error */
-        EPORTOPEN,             // Port Open Error
-        EPORTSEND,             // Port Send Error
-        EPORTSENDTIMEOUT,      // Port Send Timeout Error
-        EPORTRECEIVE,          // Port Receive Error
-        EPORTRECEIVETIMEOUT,   // Port Receive Timeout Error
-        EPORTCLOSE,            // Port Close Error
+    /* com port layer error */
+    EPORTOPEN,             // Port Open Error
+    EPORTSEND,             // Port Send Error
+    EPORTSENDTIMEOUT,      // Port Send Timeout Error
+    EPORTRECEIVE,          // Port Receive Error
+    EPORTRECEIVETIMEOUT,   // Port Receive Timeout Error
+    EPORTCLOSE,            // Port Close Error
 
-        /* packet layer error */
-        EPACKETSEND,           // Packet Send Error
-        EPACKETRECEIVECRC,     // Packet Receive CRC Error
-        EPACKETRECEIVETOOLARGE,// Packet Receive Too Large Error
-        EPACKETRECEIVETOOSHORT,// Packet Receive Too Short Error
-        EPACKETBROKEN,         // Packet Broken (overflow)
-        EPACKETUNKNOWN,        // Packet Unknown (not support)
+    /* packet layer error */
+    EPACKETSEND,           // Packet Send Error
+    EPACKETRECEIVECRC,     // Packet Receive CRC Error
+    EPACKETRECEIVETOOLARGE,// Packet Receive Too Large Error
+    EPACKETRECEIVETOOSHORT,// Packet Receive Too Short Error
+    EPACKETBROKEN,         // Packet Broken (overflow)
+    EPACKETUNKNOWN,        // Packet Unknown (not support)
 
-        /* command layer general error */
-        ECMDSEND,
-        ERSPRECEIVE,
+    /* command layer general error */
+    ECMDSEND,
+    ERSPRECEIVE,
 
-        /* command layer EFS operation error */
-        EEFSOPHELLO,
-        EEFSOPSTAT,
-        EEFSOPOPEN,
-        EEFSOPREAD,
-        EEFSOPWRITE,
-        EEFSOPCLOSE,
+    /* command layer EFS operation error */
+    EEFSOPHELLO,
+    EEFSOPSTAT,
+    EEFSOPOPEN,
+    EEFSOPREAD,
+    EEFSOPWRITE,
+    EEFSOPCLOSE,
 
-        /* PRG download command error */
-        EACKPACKET,            // can not receive a ack packte, (ACK or NAK)
-        EACKFAILED,            // receive a NAK cmd
+    /* PRG download command error */
+    EACKPACKET,            // can not receive a ack packte, (ACK or NAK)
+    EACKFAILED,            // receive a NAK cmd
 
-        /* Data download command error */
-        EDATARSP,
-        EDATACRC,
+    /* Data download command error */
+    EDATARSP,
+    EDATACRC,
 
-        /* Image error */
-        EIMAGEFAILED,
+    /* Image error */
+    EIMAGEFAILED,
 
-        /* Get Device Info failed */
-        EGETDEVINFO,
+    /* Get Device Info failed */
+    EGETDEVINFO,
 
-        /* Version */
-        EVERSION,
+    /* Version */
+    EVERSION,
 
-        /* DLPrg error */
-        //EDLOADNOP,            // send nop cmd error
-        //EDLOADWRITE,          // send write cmd error
-        //EDLOADGO,             // send go cmd error
+    /* DLPrg error */
+    //EDLOADNOP,            // send nop cmd error
+    //EDLOADWRITE,          // send write cmd error
+    //EDLOADGO,             // send go cmd error
 
-        /* Host download error */
-        EMODEUNSUPPORT,         // unknown mode
-        EHOSTDLDUMMY,
-        EHOSTDLHELLO,         // send hello packet error
-        EHOSTDLSECMODE,       // send security mode error
-        EHOSTDLPRTNTBL,       // send partition table error
-        EHOSTDLPRTNTBLDIFF,   // partition table different (unmatch)
-        EHOSTDLOPEN,          // send open packet error
-        EHOSTDLWRITE,         // send write packet error
-        EHOSTDLCLOSE,         // send close packet error
+    /* Host download error */
+    EMODEUNSUPPORT,         // unknown mode
+    EHOSTDLDUMMY,
+    EHOSTDLHELLO,         // send hello packet error
+    EHOSTDLSECMODE,       // send security mode error
+    EHOSTDLPRTNTBL,       // send partition table error
+    EHOSTDLPRTNTBLDIFF,   // partition table different (unmatch)
+    EHOSTDLOPEN,          // send open packet error
+    EHOSTDLWRITE,         // send write packet error
+    EHOSTDLCLOSE,         // send close packet error
 
-        EBACKUPNV,
-        EBACKUPSIMLOCK,
-        EBACKUPTRACE,
-        ERESTORENV,
-        ERESTORESIMLOCK,
-        ERESTORETRACE,
-        EHOSTDLDASHBOARD,
-        EWRITETOPC,
-        EATOPERTE,
+    EBACKUPNV,
+    EBACKUPSIMLOCK,
+    EBACKUPTRACE,
+    ERESTORENV,
+    ERESTORESIMLOCK,
+    ERESTORETRACE,
+    EHOSTDLDASHBOARD,
+    EWRITETOPC,
+    EATOPERTE,
 
-        /* module layer error */
-        ECUSTBACKUP,
-        ECUSTBACKUPNV,
-        ECUSTBACKUPSIMLOCK,
-        ECUSTBACKUPTRACE,
+    /* module layer error */
+    ECUSTBACKUP,
+    ECUSTBACKUPNV,
+    ECUSTBACKUPSIMLOCK,
+    ECUSTBACKUPTRACE,
 
-        EDLOADPRG,
+    EDLOADPRG,
 
-        EDLOADBOOT,
-        EDLOADAMSS,
-        EDLOADEFS,
+    EDLOADBOOT,
+    EDLOADAMSS,
+    EDLOADEFS,
 
-        ECUSTRESTORE,
-        ECUSTRESTORENV,
-        ECUSTRESTORESIMLOCK,
-        ECUSTRESTORETRACE,
+    ECUSTRESTORE,
+    ECUSTRESTORENV,
+    ECUSTRESTORESIMLOCK,
+    ECUSTRESTORETRACE,
 
-        EDLDASHBOARD,
-        EWRITEQCN,
-        EWRITEXML,
-        EWRITESIMLOCK,
-        EERASEEFS,
-        EPARTITION,
-        EXMLINCORRECT,
-        EMAXERROR = 0xFF,
+    EDLDASHBOARD,
+    EWRITEQCN,
+    EWRITEXML,
+    EWRITESIMLOCK,
+    EERASEEFS,
+    EPARTITION,
+    EXMLINCORRECT,
+    EMAXERROR = 0xFF,
 } TResult;
 
 //Common image buffer type
@@ -294,103 +295,72 @@ typedef enum
 #define PRGCOMBINE_NAME			"nandprgcombined.mbn"
 #define PARTITION_NAME			"partition.mbn"
 #define QCSBLHDCFG_NAME			"qcsblhd_cfgdata.mbn"
-//#define QCSBL_NAME                      "qcsbl.mbn"
+//#define QCSBL_NAME            "qcsbl.mbn"
 #define OEMSBLHD_NAME			"oemsblhd.mbn"
-//#define OEMSBL_NAME                     "oemsbl.mbn"
-#define AMSSHD_NAME                     "amsshd.mbn"
+//#define OEMSBL_NAME           "oemsbl.mbn"
+#define AMSSHD_NAME             "amsshd.mbn"
 
 /* SB Architecture 2.0 */
-
-#define DSP1_NAME                       "dsp1.mbn"
-#define DSP2_NAME                       "dsp2.mbn"
+#define DSP1_NAME               "dsp1.mbn"
+#define DSP2_NAME               "dsp2.mbn"
 
 /* efs file */
 #define DASHBOARD_NAME			"b.vhd"
-#define QCN_NAME                        "static.qcn"
+#define QCN_NAME                "static.qcn"
 #define SIMLOCK_NAME			"perso.txt"
-#define XML_NAME                        "config.xml"
+#define XML_NAME                "config.xml"
 #define DYNAMIC_NAME			"dynamic_nv.xml"
 
 //add by jie.li for MDM9x15
-#define SBL1_NAME                       "sbl1.mbn"
-#define SBL2_NAME                       "sbl2.mbn"
+#define SBL1_NAME               "sbl1.mbn"
+#define SBL2_NAME               "sbl2.mbn"
 #define APPSBOOT_NAME			"appsboot.mbn"
-#define RPM_NAME                        "rpm.mbn"
-#define DSP3_NAME                       "dsp3.mbn"
-#define BOOTOE_NAME                     "boot-oe-msm9615.img"
+#define RPM_NAME                "rpm.mbn"
+#define DSP3_NAME               "dsp3.mbn"
+#define BOOTOE_NAME             "boot-oe-msm9615.img"
 #define BOOTIMG_NAME			"9615-cdp-image-9615-cdp.yaffs2"
 #define USERIMG_NAME			"9615-cdp-usr-image.usrfs.yaffs2"
-#define EFS_NAME                        "efs.mbn"
-//end add
-
-//add by minghui.zhang for MDM9x25
-#define MBA_NAME                        "mba.mbn"
+#define EFS_NAME                "efs.mbn"
+#define MBA_NAME                "mba.mbn"
 #define QDSP6SW_NAME 			"qdsp6sw.mbn"
-#define SDI_NAME                        "sdi.mbn"
-#define TZ_NAME                         "tz.mbn"
+#define SDI_NAME                "sdi.mbn"
+#define TZ_NAME                 "tz.mbn"
 #define USRESOURCE_NAME			"jrd-resource.usrfs.yaffs2"
 #define USRIMAGE_NAME			"mdm9625-usr-image.usrfs.yaffs2"
-#define BOOTIMAGE_NAME                  "mdm-image-boot-mdm9625.img"
-#define MDMIMG_NAME                     "mdm-image-mdm9625.yaffs2"
-
-#define MDM_RECV_BOOT_IMG               "mdm-recovery-image-boot-mdm9625.img"
-#define MDM_RECV_YAFFS                  "mdm-recovery-image-mdm9625.yaffs2"
-//end add
+#define BOOTIMAGE_NAME          "mdm-image-boot-mdm9625.img"
+#define MDMIMG_NAME             "mdm-image-mdm9625.yaffs2"
+#define MDM_RECV_BOOT_IMG       "mdm-recovery-image-boot-mdm9625.img"
+#define MDM_RECV_YAFFS          "mdm-recovery-image-mdm9625.yaffs2"
 
 //add for mdm9x30
-#define NON_HLOS_9X30_NAME              "NON-HLOS.yaffs2"
-#define BOOT_9X30_NAME                  "mdm9635-boot.img"
-#define SYSFS_YAFFS_9X30_NAME           "mdm9635-sysfs.yaffs2"
-#define USRFS_YAFFS_9X30_NAME           "mdm9635-usrfs.yaffs2"
-#define RECV_YAFFS_9X30_NAME            "mdm-recovery-image-mdm9635.yaffs2"
-#define NAND_PRG_9X30_NAME              "NPRG9x35.mbn"
+#define NON_HLOS_9X30_NAME      "NON-HLOS.yaffs2"
+#define BOOT_9X30_NAME          "mdm9635-boot.img"
+#define SYSFS_YAFFS_9X30_NAME   "mdm9635-sysfs.yaffs2"
+#define USRFS_YAFFS_9X30_NAME   "mdm9635-usrfs.yaffs2"
+#define RECV_YAFFS_9X30_NAME    "mdm-recovery-image-mdm9635.yaffs2"
+#define NAND_PRG_9X30_NAME      "NPRG9x35.mbn"
 
 /*******************config.xml define Begin*************************/
 
 #define XML_KEY_CUSTOMERID		"CustomerID"
 #define XML_KEY_FLASH			"Flash"
-
-#define XML_KEY_FIRMWARE_VER            "Firmware_Internal_Ver"
-#define XML_KEY_FIRMWARE_EX_VER         "Firmware_External_Ver"
+#define XML_KEY_FIRMWARE_VER    "Firmware_Internal_Ver"
+#define XML_KEY_FIRMWARE_EX_VER "Firmware_External_Ver"
 #define XML_KEY_PTS_VER			"PTS_Number"
-#define XML_KEY_QCN_VER                 "QCN"
+#define XML_KEY_QCN_VER         "QCN"
 #define XML_KEY_WINDOWS_VER		"WINDOWS"
 #define XML_KEY_MAC_VER			"MAC"
 #define XML_KEY_LINUX_VER		"LINUX"
-#define XML_KEY_WEBUI_VER               "WEBUI"         //add by jie.li 2011-11-29 for Y580
-
-
-
-//add by jie.li for MDM9x15
-#define XML_KEY_Q6_RESOURCE_VER		"Q6_Resource_Ver"
-#define XML_KEY_LINUX_KERNEL_VER	"Linux_Kernel_Ver"
-#define XML_KEY_LINUX_APP_VER		"Linux_UserData_Ver"
-#define XML_KEY_LINUX_SYS_VER		"Linux_SYS_Ver"
-//end add
-
-//add by minghui.zhang for MDM9X25
-//add end
-
-
+#define XML_KEY_WEBUI_VER       "WEBUI"         //add by jie.li 2011-11-29 for Y580
+#define XML_KEY_Q6_RESOURCE_VER	"Q6_Resource_Ver"
+#define XML_KEY_LINUX_KERNEL_VER "Linux_Kernel_Ver"
+#define XML_KEY_LINUX_APP_VER	"Linux_UserData_Ver"
+#define XML_KEY_LINUX_SYS_VER	"Linux_SYS_Ver"
 #define XML_KEY_SETUP_MOPDE		"Device_setup_mopde"
 #define XML_KEY_HSU_COMPID		"HSU_Comp_id"
 
-
-//add by jie.li 011-11-29 for LTE Band
-//end add
-
-//add by jie.li 2012-10-16
-//end add
-
-//add by yanbin.wan 2013-1-25 for LTE band
-//end add
-
-//add by jie.li 2012-04-06 for Diversity NV
-
-//end add
-
 //add by minghui.zhang 2013-11-14
-#define DASHBOARD_VER_SEG               "######"
+#define DASHBOARD_VER_SEG       "######"
 
 //add by yanbin.wan 20130826
 //example
@@ -406,26 +376,9 @@ typedef enum
 //band type
 
 
-
-//FDDLTE
-
-//TDDLTE
-
-//end add
-
-//add by minghui.zhang  2014-03-14  for xml version 5.0
-
-
 #define XML_KEY_FLASH_CODE              "Flash_Code"
 
-
-
-
 /*******************config.xml define End*************************/
-
-
-
-
 /* Data size unit */
 #define KB (1024)	   // kilobyte
 //#define MB (1024*1024)    // megabyte
@@ -449,16 +402,6 @@ typedef enum
 #define OK 0
 #define SUCCESS(result) ((result == OK) ? true : false)
 #define FAILURE(result) ((result != OK) ? true : false)
-
-
-/* metric */
-// memery operation define
-
-/****************color Define*********************/
-#define PROGRESS_ERR_COLOR      QColor("red")
-#define PROGRESS_WARN_COLOR     QColor(220,220,100)
-#define PROGRESS_OK_COLOR       QColor("green")
-#define PROGRESS_REDOWN_COLOR   QColor(100,100,100)
 
 /*******************************************************/
 // memory operation define
@@ -484,8 +427,8 @@ do {											\
 
 #define RELEASE(ptr)							\
 do {											\
-	if ((ptr) ) {					\
-		delete (ptr);						\
+	if ((ptr) ) {				                \
+		delete (ptr);						    \
 		(ptr) = NULL;							\
 	}											\
 } while (0)
@@ -494,7 +437,7 @@ do {											\
  */
 #define RELEASE_ARRAY(ptr)						\
 do {											\
-	if ((ptr) ) {					\
+	if ((ptr) ) {					            \
 		delete [] (ptr);						\
 		(ptr) = NULL;							\
 	}											\
@@ -526,35 +469,33 @@ do {											\
 //#define FILEINFO_HEAD_LEN_NEW   20000  //add by jie.li 2011-09-28 for efs config files
 #define FILEINFO_HEAD_LEN_NEW   150000   //changed by jie.li 2011-11-29
 
-#define IMG_VERSION_3           3           // 8200A
+#define IMG_VERSION_3           3       // 8200A
 #define IMG_VERSION_4           4       //add by jie.li 2011-09-28
-#define IMG_VERSION_5		5       //add by jie.li for MDM9x15
-
+#define IMG_VERSION_5		    5       //add by jie.li for MDM9x15
 #define IMG_VERSION_6           6       //add by minghui.zhang for MDM9x25
 #define IMG_VERSION_7           7       //add by minghui.zhang for M850
 #define IMG_VERSION_8           8       //add by zhanghao for 9X30 2014-09-04
 #define IMG_VERSION_9           9       //add by xiaohua.lan 2016.1.12
-    #define OPEN_MULTI_CMD                                   0x1B
+
+#define OPEN_MULTI_CMD          0x1B
 
     /* List to use for which image to open for */
-    typedef enum {
+typedef enum {
+    /*	   Config Data					*/
+    OPEN_MULTI_MODE_OEMSBL                  = 0x04,	 /* OEM 2ndary Boot Loader			  */
+    OPEN_MULTI_MODE_AMSS                    = 0x05,	 /* AMSS modem executable			  */
+    /* add by jianwen.he 2010.05.17 */
+    OPEN_MULTI_MODE_CUSTOM                  = 0x0E,    /* Image for user defined partition  */
 
-        /*	   Config Data					*/
-        OPEN_MULTI_MODE_OEMSBL                  = 0x04,	 /* OEM 2ndary Boot Loader			  */
-        OPEN_MULTI_MODE_AMSS                    = 0x05,	 /* AMSS modem executable			  */
-
-        /* add by jianwen.he 2010.05.17 */
-        OPEN_MULTI_MODE_CUSTOM                  = 0x0E,    /* Image for user defined partition  */
-
-                                      } TDLMode;
+} TDLMode;
 
 //type define
 enum APP_TYPE{
-	APP_TYPE_FIRMWARE = 0x01,        //firmware
-        APP_TYPE_DASHBOARD,             //dashboard
-        APP_TYPE_NV,                    //nv
-        APP_TYPE_SIMLOCK,               //simlock
-	APP_TYPE_MAX
+    APP_TYPE_FIRMWARE = 0x01,        //firmware
+    APP_TYPE_DASHBOARD,             //dashboard
+    APP_TYPE_NV,                    //nv
+    APP_TYPE_SIMLOCK,               //simlock
+    APP_TYPE_MAX
 };
 
 typedef struct _IMGVerS{
@@ -568,14 +509,14 @@ typedef struct _PacketHeadInfoS{
 
 //Define file store structure
 typedef struct _FilePosInfoS{
-	char      fileName[20];			//file name
-        uint32	  beginPos;                     //begin position
-        uint32	  fileLen;                      //file length
+    char      fileName[20];			//file name
+    uint32	  beginPos;                     //begin position
+    uint32	  fileLen;                      //file length
 }FilePosInfoS;
 
 //add by jie.li 2011-09-28 for efs config files
 typedef struct _FilePosInfoNewS{
-    char          fileName[70];			//file name
+    char      fileName[70];			//file name
     uint32	  beginPos;                     //begin position
     uint32	  fileLen;                      //file length
 }FilePosInfoNewS;
@@ -591,38 +532,9 @@ typedef struct _PacketTailInfoS{
 	uint16	  dwCRCCode;			 //CRC
 }PacketTailInfoS;
 
-typedef struct {
-        uint32 exeOffset;
-        uint32 exeLength;
-        uint32 imgOffset;
-        uint32 imgLength;
-        uint32 picOffset;
-        uint32 picLength;
-        uint32 txtOffset;
-        uint32 txtLength;
-        uint32 iconOffset;
-        uint32 iconLength;
-        uint32 nvFileOffset;
-        uint32 nvFileLength;
-        uint32 chmFileOffset;
-        uint32 chmFileLength;
-#ifdef FEATHER_DASHBOARD_ONLY
-        uint32 prgFileOffset;
-        uint32 prgFileLength;
-        uint32 partFileOffset;
-        uint32 partFileLength;
-#endif
-#ifdef FEATHER_PATCH
-        uint32 patchFileOffset;
-        uint32 patchFileLength;
-#endif
-} TDataPosType;
 
 /*====================================================================== */
 /**************************************************************************/
-
-
-
 
 // define download thread state
 typedef struct _DLThreadState{
@@ -647,11 +559,11 @@ typedef struct
 //NV item packet struct
 typedef struct _NV_ITEM_PACKET_INFO
 {
-        uint16		packetLen;              //Packet length
-	uint16		packetReserve;		//reserve
-        uint16		nvItemID;               //NV ID
-        uint16		nvItemIndex;            //NV Index
-	uint8		itemData[128];		//NV data
+    uint16		packetLen;              //Packet length
+    uint16		packetReserve;		//reserve
+    uint16		nvItemID;               //NV ID
+    uint16		nvItemIndex;            //NV Index
+    uint8		itemData[128];		//NV data
 }NV_ITEM_PACKET_INFO;
 
 #if 0
@@ -678,38 +590,35 @@ typedef struct
 }DASHBOARD_DATA,NV_PACKET_DATA,PERSO_TXT_DATA,CONFIG_XML_DATA;
 
 // For customer backup & restore operation
-typedef struct TCustDataInfoType_
-{
+typedef struct TCustDataInfoType_ {
 
-TCustDataInfoType_ (void) {
-  memset(&dashboardData, 0, sizeof dashboardData);
-  memset(&nvPacketData, 0, sizeof nvPacketData);
-  memset(&persoTxtData, 0, sizeof persoTxtData);
-  memset(&configxmlData, 0, sizeof configxmlData);
-}
+    TCustDataInfoType_ (void) {
+        memset(&dashboardData, 0, sizeof dashboardData);
+        memset(&nvPacketData, 0, sizeof nvPacketData);
+        memset(&persoTxtData, 0, sizeof persoTxtData);
+        memset(&configxmlData, 0, sizeof configxmlData);
+    }
 
-	DASHBOARD_DATA    dashboardData;
-	NV_PACKET_DATA	  nvPacketData;
-	PERSO_TXT_DATA    persoTxtData;
-	CONFIG_XML_DATA	  configxmlData;
+    DASHBOARD_DATA    dashboardData;
+    NV_PACKET_DATA	  nvPacketData;
+    PERSO_TXT_DATA    persoTxtData;
+    CONFIG_XML_DATA	  configxmlData;
 } TCustDataInfoType;
 
-typedef struct _FileBufStruct
-{
-        uint8*          strFileName;
-	uint32		uFileLens;
-	uint8*		strFileBuf;
-        uint8           Area[20];
-        bool            isDownload;
-        uint8             comand;
-       _FileBufStruct()
-        {
-            isDownload=true;
-            memset(Area, 0x00, sizeof(Area));
-            Area[0]  = OPEN_MULTI_CMD;
-            Area[1]=OPEN_MULTI_MODE_CUSTOM;
+typedef struct _FileBufStruct {
+    uint8*      strFileName;
+    uint8*		strFileBuf;
+    uint8       partition[20];
+    uint8       comand;
+    uint32		uFileLens;
+    bool        isDownload;
+    _FileBufStruct() {
+        isDownload=true;
+        memset(partition, 0x00, sizeof(partition));
+        partition[0]  = OPEN_MULTI_CMD;
+        partition[1]=OPEN_MULTI_MODE_CUSTOM;
 
-        }
+    }
 }FileBufStruct;
 
 typedef struct tagImgLens
@@ -732,8 +641,7 @@ typedef struct
 //end add
 
 
-typedef struct _XmlStruct
-{
+typedef struct _XmlStruct {
         string       key;
         string       value;
 

@@ -1,23 +1,22 @@
 #include "StdAfx.h"
 #include "XmlParser.h"
-#import "msxml6.dll" raw_interfaces_only
+#import "msxml6.dll" // raw_interfaces_only
 #include "log.h"
 #include "utils.h"
 
-XmlParser::XmlParser():
-    m_pXmlBuf(NULL)
+XmlParser::XmlParser()//:
+    //m_pXmlBuf(NULL)
 {
     ::CoInitialize(NULL);
     mHR = spDoc.CoCreateInstance(__uuidof(DOMDocument));    //创建文档对象
-    //CHKHR(spDoc->put_validateOnParse(VARIANT_FALSE));
-    //CHKHR(spDoc->put_resolveExternals(VARIANT_FALSE));
+
 }
 
 XmlParser::~XmlParser() {
     if (SUCCEEDED(mHR))
         spDoc.Release();
     ::CoUninitialize();
-    RELEASE_ARRAY(m_pXmlBuf);
+    //RELEASE_ARRAY(m_pXmlBuf);
 }
 /*
 HRESULT loadXML(
@@ -26,15 +25,103 @@ VARIANT_BOOL* varIsSuccessful
 );
 */
 void XmlParser::Parse(PCCH pXmlBuf) {
+#if 1
+    IStream *I=NULL;
+    LARGE_INTEGER liTemp = {0};
+    ULARGE_INTEGER uiPos = {0};
+    DWORD dwSize=0;
+    STATSTG stats={0};
+    //char buf[]="Hello,IStream!";
+    //char str[sizeof(buf)]={0};
+    char text[4096] = {0};
+
+    //创建一个保存在全局内存的流对象
+    CreateStreamOnHGlobal(NULL, true, &I);
+
+    //从流对象的开始处写入相应的内容
+    I->Seek(liTemp, STREAM_SEEK_SET, NULL);
+    //I->Write(buf, sizeof(buf), NULL);
+    I->Write(pXmlBuf, strlen(pXmlBuf) + 1, NULL);
+
+    //获取流对象里内容的大小
+    I->Seek(liTemp, STREAM_SEEK_CUR, &uiPos);
+    dwSize = (DWORD)uiPos.QuadPart;
+    printf("已写入%d字节的内容/n", dwSize);
+
+    //从流对象开始处读取其所有内容
+    I->Seek(liTemp, STREAM_SEEK_SET, NULL);
+    I->Read(text, sizeof(text), NULL);
+    printf("%s/n", text);
+
+    //获取流对象里内容的状态（提取其中的流对象里的内容的大小信息）
+    I->Stat(&stats, 0);
+    dwSize = (DWORD)stats.cbSize.QuadPart;
+    printf("已读取到%d字节的内容/n", dwSize);
+
     HRESULT hr;
     VARIANT_BOOL bFlag;
-    RELEASE_ARRAY(m_pXmlBuf);
     XML_Value.clear();
-    m_pXmlBuf = MultiStrToWideStr(pXmlBuf);
+    I->Seek(liTemp, STREAM_SEEK_SET, NULL);
+    hr = spDoc->load(CComVariant(I), &bFlag);       //load xml文件
 
-    //hr = spDoc->loadXML((BSTR)pXmlBuf, &bFlag);
-    hr = spDoc->loadXML(m_pXmlBuf, &bFlag);
+    CComPtr<IXMLDOMParseError> spParseError;
+    CComBSTR bstrReason;
+
+    spDoc->get_parseError(&spParseError);
+    spParseError->get_reason(&bstrReason);
+
+    if (bstrReason != NULL)
+        wprintf((wchar_t*)bstrReason);
     DoParse(spDoc);
+
+
+    //释放流对象
+    I->Release();
+#else
+    HRESULT hr;
+    VARIANT_BOOL bFlag;
+    //RELEASE_ARRAY(m_pXmlBuf);
+    XML_Value.clear();
+    BSTR m_pXmlBuf = NULL;
+    PCCH data;
+    //escape BOM
+    if (pXmlBuf[0] == (char)0XEF && pXmlBuf[1] == (char)0XBB && pXmlBuf[2] == (char)0XBF)
+        data = pXmlBuf + 3; //UTF-8
+    else if (pXmlBuf[0] == (char)0XFE && pXmlBuf[1] == (char)0XFF || pXmlBuf[1] == (char)0XFE && pXmlBuf[0] == (char)0XFF)
+        data = pXmlBuf + 2;//UTF-16
+    else if (pXmlBuf[0] == (char)0X00 && pXmlBuf[1] == (char)0X00 && pXmlBuf[2] == (char)0XFE && pXmlBuf[3] == (char)0XFF ||
+             pXmlBuf[3] == (char)0X00 && pXmlBuf[2] == (char)0X00 && pXmlBuf[1] == (char)0XFE && pXmlBuf[0] == (char)0XFF)
+        data = pXmlBuf + 4;//UTF-16
+    else
+        data = pXmlBuf;
+
+
+    if(CharToBSTR(data, &m_pXmlBuf) != 1)
+        return;
+    //m_pXmlBuf = (BSTR)pXmlBuf;
+
+    if (m_pXmlBuf != NULL) {
+
+        //CHKHR(spDoc->put_validateOnParse(VARIANT_FALSE));
+        //CHKHR(spDoc->put_resolveExternals(VARIANT_FALSE));
+        spDoc->put_validateOnParse(VARIANT_FALSE);
+        spDoc->put_resolveExternals(VARIANT_FALSE);
+        hr = spDoc->loadXML(m_pXmlBuf, &bFlag);
+
+        CComPtr<IXMLDOMParseError> spParseError;
+        CComBSTR bstrReason;
+
+        spDoc->get_parseError(&spParseError);
+        spParseError->get_reason(&bstrReason);
+
+        if (bstrReason != NULL)
+            wprintf((wchar_t*)bstrReason);
+
+        DoParse(spDoc);
+
+        SysFreeString(m_pXmlBuf);
+    }
+#endif
 }
 void XmlParser::Parse(const wchar_t * xmlPath) {
     HRESULT hr;

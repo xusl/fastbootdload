@@ -208,8 +208,9 @@ void get_my_path(char *s, size_t maxLen);
 CString GetAppPath(CString & sPath );
 void sleep(int seconds);
 long long now(void);
- PWCH MultiStrToWideStr(PCCH pc);
+PWCH MultiStrToWideStr(PCCH pc);
 PCHAR WideStrToMultiStr(PCWCH WideStr);
+int CharToBSTR(PCCH inParam, BSTR *outParam);
 
 /* normally provided by <cutils/misc.h> */
 extern void* load_file(LPCWSTR pathname, unsigned*  psize);
