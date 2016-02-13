@@ -496,7 +496,7 @@ typedef enum cm_mode_pref_e
 
 class CDIAGCmd;
 
-typedef void (*ProgressCallback)(int port,uint16 percent);
+typedef void (*ProgressCallback)(void *data, int port,uint16 percent);
 class CCustData
 {
 public:
@@ -513,8 +513,8 @@ public:
     bool    ChangeOfflineMode(uint16 wMode=MODE_CHANGE_OFFLINE_DIGITAL_MODE);
     TResult WriteFile(bool bWriteArmEfs, const char* fileName,uint8* data, long len, bool bDelExistFile = true);
     bool    WriteBandConfigItems(unsigned int dsat_syssel_val[4]);
-    static  ProgressCallback func;
-    void    RegisterCallback(ProgressCallback callback);
+
+    void    RegisterCallback(ProgressCallback callback, void *data);
     TResult DeleteDir(bool bWriteArm, const char* fileName);
 
     //add by jie.li 20120830 for Y580 to parse the webs_config
@@ -552,6 +552,9 @@ private:
 	uint8                m_uBaseRatio;
         int                  dlPort;
         uint8 lastdone;
+        //static
+          ProgressCallback m_Callback;
+        void *m_CallbackData;
 };
 
 #endif //__CUSTDATA_H__

@@ -1013,8 +1013,8 @@ BOOL CmdmfastbootDlg::RejectCDROM(VOID){
         }
 #endif
 
-        scsi.SwitchToDebugDevice(path);
-        //scsi.SwitchToTPSTDeivce(path);
+        //scsi.SwitchToDebugDevice(path);
+        scsi.SwitchToTPSTDeivce(path);
         //m_WorkDev.push_back(*iter);
     }
     devicePath.clear();
@@ -1262,9 +1262,8 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     BOOL force_update;
     usb_dev_t status ;
 
-    if (data == NULL || data->usb == NULL ||  data->hWnd == NULL ||
-        data->hWnd->m_image == NULL) {
-        ERROR("Bad parameter");
+    if (data == NULL ||  data->hWnd == NULL || data->hWnd->m_image == NULL) {
+        data->ui_text_msg(FLASH_DONE, "Bad parameter");
         return -1;
     }
 
@@ -1291,6 +1290,10 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
             result = pst.DownloadImages();
         dev->SetDeviceStatus(DEVICE_CHECK);
     } else if (status == DEVICE_CHECK) {
+        if (handle == NULL) {
+             data->ui_text_msg(FLASH_DONE, "Bad parameter");
+            return -1;
+        }
         adbhost adb(handle , dev->GetDevId());
         const wchar_t *conf_file = img->get_package_config();
         char *conf_file_char ;
@@ -1348,6 +1351,10 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
             data->ui_text_msg(FLASH_DONE, "Finish. QCN updated.");
         }
     } else if (status == DEVICE_FLASH) {
+        if (handle == NULL) {
+             data->ui_text_msg(FLASH_DONE, "Bad parameter");
+            return -1;
+        }
         fastboot fb(handle);
         FlashImageInfo const * image;
 

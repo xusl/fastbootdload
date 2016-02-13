@@ -215,7 +215,7 @@ static bool NeedResend(TResult result)
 }
 
 //-----------------------------------------------------------------------------
-ProgressCallback CDLData::func = NULL;
+//ProgressCallback CDLData::func = NULL;
 
 CDLData::CDLData
         (
@@ -224,8 +224,9 @@ CDLData::CDLData
                 int adlPort
                 )
 {
+    m_Callback = NULL;
+    m_CallbackData = NULL;
     m_packetDll = packetDll;
-
     m_packetDll->SetPacketType(PKT_TYPE_HDLC);
     this->m_pDLImgInfo = pDLImgInfo;
 
@@ -1491,8 +1492,6 @@ SIDE EFFECTS
 
 void CDLData::UpdateProgress(uint8 percent)
 {
-
-
     /* avoid too many update painting */
     if (percent == lastdone)
     {
@@ -1503,8 +1502,8 @@ void CDLData::UpdateProgress(uint8 percent)
 
     lastdone = percent;
 
-    if (func != NULL)
-        func(dlPort,percent);
+    if (m_Callback != NULL)
+        m_Callback(m_CallbackData, dlPort,percent);
 }
 
 
@@ -1521,9 +1520,10 @@ SIDE EFFECTS
 ===========================================================================*/
 
 
-void CDLData::RegisterCallback(ProgressCallback callback)
+void CDLData::RegisterCallback(ProgressCallback callback, void *data)
 {
-    func = callback;
+    m_Callback = callback;
+    m_CallbackData = data;
 }
 
 TResult CDLData::WriteDashboardVer(char* Ver)

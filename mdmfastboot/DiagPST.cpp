@@ -6,6 +6,12 @@
 #include "PortStateUI.h"
 #include <strstream>
 
+void DiagPSTDownloadProgress(void *data, int port,uint16 percent) {
+UsbWorkData * worker = (UsbWorkData * )data;
+if(worker != NULL)
+worker->SetProgress(percent);
+}
+
 DiagPST::DiagPST(UsbWorkData * worker, map<string,FileBufStruct> & filebuffer):
 Software_size (0),
     m_iMobileId(0),
@@ -26,6 +32,9 @@ Software_size (0),
     m_pCustdataInfo = new TCustDataInfoType();
     memset(m_pDLImgInfo, 0, sizeof(TDLImgInfoType));
     memset(m_pCustdataInfo, 0, sizeof(TCustDataInfoType));
+    m_pCustdata = new CCustData(m_DLLPacket, m_pCustdataInfo);
+    m_pCustdata->RegisterCallback(DiagPSTDownloadProgress, (void *) worker);
+    m_dlData->RegisterCallback(DiagPSTDownloadProgress ,(void *) worker);
 
     if(0){
         JRDdiagCmd  DIAGCmd (m_DLLPacket);
@@ -53,7 +62,7 @@ DiagPST::~DiagPST(void){
     DELETE_IF(m_sahara);
     DELETE_IF(m_newDIAGCmd);
     DELETE_IF(m_dlData);
-    //DELETE_IF(m_pCustdataInfo);
+    DELETE_IF(m_pCustdata);
 
     if (m_DLLPacket != NULL) {
         m_DLLPacket->Uninit();
@@ -317,14 +326,15 @@ bool DiagPST::DownloadCustomerInfo()
    *     Write custom_info.xml    *
    ********************************/
 
-    if(!m_blDownloadMode)
+    if(m_blDownloadMode)
     {
+        return true;
+    }
         TResult result = EOK;
 
         m_Worker->SetPromptMsg("E_PRG_DOWNLOAD_CUSTOMERINFO");
 
-        for(int i = 0; i < 3; i++)
-        {
+        for(int i = 0; i < 3; i++){
             int32 offset = 0;
             uint32 remain_len = 0;
             char* content;
@@ -334,7 +344,6 @@ bool DiagPST::DownloadCustomerInfo()
             if(it == m_dlFileBuffer.end())
             {
                 m_Worker->SetPromptMsg("can not find the file custom_info.xml!");
-                SLEEP(6000);
                 return false;
             }
             it->second.isDownload=false;
@@ -342,21 +351,16 @@ bool DiagPST::DownloadCustomerInfo()
             remain_len = m_dlFileBuffer.at("custom_info.xml").uFileLens;
             content = (char*)m_dlFileBuffer.at("custom_info.xml").strFileBuf;
 
-            while(offset == 0 || remain_len > 0)
-            {
+            while(offset == 0 || remain_len > 0) {
                 uint32 write_len = 0;
-                if(remain_len > XML_FILE_LEN)
-                {
+                if(remain_len > XML_FILE_LEN){
                     write_len = XML_FILE_LEN;
-                }
-                else
-                {
+                } else {
                     write_len = remain_len;
                 }
 
                 result = m_newDIAGCmd->WriteConfigXml(offset,E_JRD_CUSTOM_INFO_XML,content + offset,write_len);
-                if(FAILURE(result))
-                {
+                if(FAILURE(result)) {
                     ERR("COM%d write custom_info.xml fail, i = ",m_dlPort,i);
                     break;
                 }
@@ -374,10 +378,9 @@ bool DiagPST::DownloadCustomerInfo()
         if (FAILURE(result))
         {
             m_Worker->SetPromptMsg("download custom_info.xml failed!");
-            SLEEP(3000);
             return false;
         }
-    }
+
     return true;
 }
 
@@ -669,24 +672,21 @@ bool DiagPST::RequestExternalVersion()
 {
     //-------------------request external version------------------//
     TResult result = EOK;
+    char pExternal[VERSION_LEN] = {0};
 
-    char pExternal[VERSION_LEN] ;
-    memset(&pExternal,0, sizeof(jrd_diag_get_version_rsp_type));
-
-    for(int i = 0; i < 20;i++)
-    {
-        result = m_newDIAGCmd->RequestVersion(E_JRD_EXTERNAL_VERSION,(char *)(&pExternal));
-        INFO("COM%d: Request external version, version = %s",
-            m_dlPort,pExternal);
-        if(pExternal != NULL && '\0' != pExternal[0])
+    for(int i = 0; i < 20;i++)  {
+        result = m_newDIAGCmd->RequestVersion(E_JRD_EXTERNAL_VERSION, pExternal);
+        INFO("COM%d: Request external version, version = %s", m_dlPort,pExternal);
+        if( '\0' != pExternal[0] && SUCCESS(result))
         {
            break;
         }
         SLEEP(1000);
     }
-#ifdef FEATURE_TPST
-    setVerCallBack(m_dlPort,pExternal,FIRMWARE_VER);
-    setVerCallBack(m_dlPort,"NA",LINUX_VER);
+
+    m_Worker->ui_text_msg(FIRMWARE_VER, pExternal);
+    m_Worker->ui_text_msg(LINUX_VER, "NA");
+ #ifdef FEATURE_TPST
     setVerCallBack(m_dlPort,"NA",PTS_VER);
 #endif
     return true;
@@ -753,7 +753,8 @@ bool DiagPST::RunTimeDiag() {
 bool DiagPST::DownloadPrg() {
     /* download PRG */
     TImgBufType* pPrgImg = &m_pDLImgInfo->prg;
-    const char * prg = "NPRG9x07.mbn";
+    const char * prg = PST_PRG_STR;
+    TResult result =EOK;
 
     map<string,FileBufStruct>::iterator iter=m_dlFileBuffer.find(prg);
     if(iter!=m_dlFileBuffer.end()) {
@@ -763,10 +764,14 @@ bool DiagPST::DownloadPrg() {
 
         m_Worker->SetPromptMsg("download NPRG9x07.mbn");
 
-
+/*
+if device in debug mode, it will enter tpst mode, and the com port of diag is changed.
+*/
             m_sahara->SwitchToDLoadMode();
 
-    m_sahara->DownloadPrg(pPrgImg->data,pPrgImg->len,m_dlPort,m_blDownloadMode);
+    result = m_sahara->DownloadPrg(pPrgImg->data,pPrgImg->len,m_dlPort,m_blDownloadMode);
+    if (FAILURE(result))
+        LOGE("Download PRG %s failed", m_dlFileBuffer.at(prg).strFileName);
     return true;
  }
 

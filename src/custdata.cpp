@@ -37,7 +37,7 @@
  */
 #define FS_FEATURE_BITS 0x00000000
 
-ProgressCallback CCustData::func = NULL;
+//ProgressCallback CCustData::func = NULL;
 
 bool check_backup_data_ok(cust_data_info_s_type* custdata_info)
 {
@@ -51,6 +51,8 @@ CCustData::CCustData( CPacket* packetDll,
     m_uRatio = 0;
     m_uBaseRatio = 0;
     m_pDIAGCmd = NULL;
+    m_Callback = NULL;
+    m_CallbackData = NULL;
     this->m_pCustDataInfo = pCustDataInfo;
     this->m_pItems = NULL;
     this->m_uCount = 0;
@@ -548,8 +550,8 @@ TResult CCustData::WriteFile
             lastdone = percent;
 
                 //SendMessage(hWnd, WM_USER_PROGRESS, port, percent);
-            if (func != NULL)
-            func(dlPort,percent);
+            if (m_Callback != NULL)
+            m_Callback(m_CallbackData, dlPort,percent);
         }
 
         /* If done with written */
@@ -1233,9 +1235,10 @@ bool CCustData::WriteBandConfigItems(unsigned int dsat_syssel_val[4])
   return true;
 }
 
-void CCustData::RegisterCallback(ProgressCallback callback)
+void CCustData::RegisterCallback(ProgressCallback callback, void *data)
 {
-    func = callback;
+    m_Callback = callback;
+    m_CallbackData = data;
 }
 
 //add by jie.li 2012-06-27

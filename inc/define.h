@@ -399,9 +399,8 @@ typedef enum
 #define  W_PTR(var)  ((word *) (void *) &(var))
 #define  D_PTR(var)  ((dword *) (void *) &(var))
 
-#define OK 0
-#define SUCCESS(result) ((result == OK) ? true : false)
-#define FAILURE(result) ((result != OK) ? true : false)
+#define SUCCESS(result) (result == EOK)
+#define FAILURE(result) (result != EOK)
 
 /*******************************************************/
 // memory operation define

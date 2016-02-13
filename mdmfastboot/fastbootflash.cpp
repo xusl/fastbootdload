@@ -278,7 +278,7 @@ bool flash_image::AddFileBuffer(const wchar_t *partition, const wchar_t *lpath, 
         afBuf.strFileBuf = (uint8*)load_file(lpath, &afBuf.uFileLens);
         if(afBuf.strFileBuf != NULL) {
         afBuf.strFileName = strdup(fn);
-        afBuf.isDownload=false;
+        afBuf.isDownload= true;
         strcpy((char *)(afBuf.partition + 2), part);
         m_dlFileBuffer.insert(std::pair<string,FileBufStruct>(fn,afBuf));
         }

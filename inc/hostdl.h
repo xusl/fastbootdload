@@ -13,7 +13,7 @@ using namespace std;
 
 class CPacket;
 
-   typedef void (*ProgressCallback)(int port,uint16 percent);
+   typedef void (*ProgressCallback)(void *data, int port,uint16 percent);
    typedef void (*updateDLstate)(int port,string msg);
 
 class CDLData
@@ -25,8 +25,7 @@ public:
 	void    SetRatioParams(uint8 ratio, uint8 base);
 	TResult SendHelloPacket(void);
 	TResult SendResetCmd(void);
-        static  ProgressCallback func;
-        void    RegisterCallback(ProgressCallback callback);
+        void    RegisterCallback(ProgressCallback callback, void *data);
 
         //add by minghui.zhang 2013-11-05   delete
         TResult DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  uint32 Software_size);
@@ -86,6 +85,10 @@ private:
         //WinMsgProApp         *m_mainApp;
         uint32               m_totalCount;  //add by minghui.zhang calculate download file total size
         bool                 is9X25;         //add by minghui.zhang fix progress bar issue
+
+        //static
+          ProgressCallback m_Callback;
+        void *m_CallbackData;
 };
 
 #endif //_DL_DATA_H_
