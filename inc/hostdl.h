@@ -14,7 +14,7 @@ using namespace std;
 class CPacket;
 
    typedef void (*ProgressCallback)(void *data, int port,uint16 percent);
-   typedef void (*updateDLstate)(int port,string msg);
+   typedef void (*updateDLstate)(void *data, int port,string msg);
 
 class CDLData
 {
@@ -25,7 +25,7 @@ public:
 	void    SetRatioParams(uint8 ratio, uint8 base);
 	TResult SendHelloPacket(void);
 	TResult SendResetCmd(void);
-        void    RegisterCallback(ProgressCallback callback, void *data);
+        void    RegisterCallback(ProgressCallback progerssCb, updateDLstate stateCb,void *data);
 
         //add by minghui.zhang 2013-11-05   delete
         TResult DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  uint32 Software_size);
@@ -59,6 +59,7 @@ private:
 
 	/* UI displaying functions */
 	void UpdateProgress(uint8 percent);
+  void PormptDownloadImage(string imageName, const char *partitionName);
 
 
         CPacket*             m_packetDll;
@@ -88,6 +89,7 @@ private:
 
         //static
           ProgressCallback m_Callback;
+        updateDLstate m_StateCb;
         void *m_CallbackData;
 };
 

@@ -193,6 +193,7 @@ PCHAR WideStrToMultiStr(PCWCH WideStr)
     if (nBytes == 0)
     {
         delete [] MultiStr;
+        LOGE("Convert string %S failed.", WideStr);
         return NULL;
     }
 

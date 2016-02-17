@@ -75,15 +75,8 @@ TResult SAHARACmd::DownloadPrg_9X07(uint8* prgbuf, size_t len,int myPort, bool b
 {
     TResult result = EOK;
     imgBuf = prgbuf;
-
     imgLen = len;
-
-
-#ifdef Q_OS_WIN32
     Sleep(3000);
-#else
-    SLEEP(3000);
-#endif
 
     for(int i = 0; i < 5;i++)
     {
@@ -100,38 +93,13 @@ TResult SAHARACmd::DownloadPrg_9X07(uint8* prgbuf, size_t len,int myPort, bool b
         {
             break;
         }
-        if(i == 4)
-        {
-            // return EFAILED;
-        }
     }
     //send hello response package
     SaharaHelloRsp();
-//#ifdef download_9X07_PRG
-    //result = GetReadDataAckCmd_9X07_PRG();
-//#else
-
-
-        result = GetReadDataAckCmd_9X07_PRG();
+    result = GetReadDataAckCmd_9X07_PRG();
 
     SaharaDone();
     return EOK;
-
-    for(int i = 0; i < 5;i++)
-    {
-        result = GetDoneRsp();
-
-        if(SUCCESS(result))
-        {
-            break;
-        }
-        if(i == 4)
-        {
-            return EFAILED;
-        }
-    }
-
-    return result;
 }
 
 TResult SAHARACmd::DownloadPrg(uint8* prgbuf, size_t len,int myPort, bool blDownLoadMode)

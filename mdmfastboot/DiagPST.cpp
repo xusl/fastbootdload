@@ -12,6 +12,12 @@ if(worker != NULL)
 worker->SetProgress(percent);
 }
 
+void DiagPSTDownloadState(void *data, int port, string msg) {
+UsbWorkData * worker = (UsbWorkData * )data;
+if(worker != NULL)
+worker->ui_text_msg(PROMPT_TEXT, msg.c_str());
+}
+
 DiagPST::DiagPST(UsbWorkData * worker, map<string,FileBufStruct> & filebuffer):
 Software_size (0),
     m_iMobileId(0),
@@ -34,7 +40,7 @@ Software_size (0),
     memset(m_pCustdataInfo, 0, sizeof(TCustDataInfoType));
     m_pCustdata = new CCustData(m_DLLPacket, m_pCustdataInfo);
     m_pCustdata->RegisterCallback(DiagPSTDownloadProgress, (void *) worker);
-    m_dlData->RegisterCallback(DiagPSTDownloadProgress ,(void *) worker);
+    m_dlData->RegisterCallback(DiagPSTDownloadProgress, DiagPSTDownloadState, (void *) worker);
 
     if(0){
         JRDdiagCmd  DIAGCmd (m_DLLPacket);
@@ -103,7 +109,7 @@ bool DiagPST::RequestDeviceStatus()
 {
     TResult result = EOK;
 
-    m_Worker->SetPromptMsg("GETTING DEVICE STATUS");
+    SetPromptMsg("GETTING DEVICE STATUS");
 
     bool requestNormalStatus = false;
     bool requestDLStatus = false;
@@ -164,14 +170,14 @@ bool DiagPST::RequestDeviceStatus()
 
     if (FAILURE(result))
     {
-        m_Worker->SetPromptMsg("Request device mode failed!");
+        SetPromptMsg("Request device mode failed!");
 
         return false;
     }
 
     if (m_blDownloadMode)
     {
-        m_Worker->SetPromptMsg("E_PRG_DEVICE_IN_DL_MODE");
+        SetPromptMsg("E_PRG_DEVICE_IN_DL_MODE");
     }
     return true;
 }
@@ -180,12 +186,12 @@ bool DiagPST::EraseSimlock()
 {
    if (!m_blDownloadMode && m_bEraseSimlock)
     {
-        m_Worker->SetPromptMsg("ERASE SIMLOCK");
+        SetPromptMsg("ERASE SIMLOCK");
         TResult result = m_newDIAGCmd->EraseSimLock();
 
         if (FAILURE(result))
         {
-            m_Worker->SetPromptMsg("erase simlock failed!");
+            SetPromptMsg("erase simlock failed!");
             SLEEP(6000);
             return false;
         }
@@ -203,7 +209,7 @@ bool DiagPST::checkIfFlashTypeMatchNormalMode()
     TResult result = m_newDIAGCmd->RequestFlashType((char *)(&pFlash_Type));
     if (FAILURE(result) && (strlen(pFlash_Type) != 4))
     {
-        m_Worker->SetPromptMsg("Request Flash Type error!");
+        SetPromptMsg("Request Flash Type error!");
         return false;
     }
     //compare the flash type
@@ -223,7 +229,7 @@ bool DiagPST::checkIfFlashTypeMatchNormalMode()
        ||((pPcFlash_Type.mid(4,2).toDouble()) != (pFlash_Type[2]))
        ||((pPcFlash_Type.mid(6,2).toDouble()) != (pFlash_Type[3])))
     {
-        m_Worker->SetPromptMsg("Flash Type is not match!");
+        SetPromptMsg("Flash Type is not match!");
         return false;
     }
 #endif
@@ -274,8 +280,10 @@ bool DiagPST::GenerateFTFiles()
         }
         if (FAILURE(result))
         {
-            m_Worker->SetPromptMsg(" Generate FT Files error!");
-            return false;
+            SetPromptMsg(" Generate FT Files error!");
+            //TODO::
+            //return false;
+            return true;
         }
     }
     return true;
@@ -289,14 +297,14 @@ bool DiagPST::StorePIC() {
     {
         string strFileName = it->first;
         if (strFileName.find("poweron_logo.bmp") != std::string::npos){
-            m_Worker->SetPromptMsg("Store poweron_logo.bmp ");
+            SetPromptMsg("Store poweron_logo.bmp ");
             it->second.isDownload=false;
 
             TResult result = m_newDIAGCmd->StorePIC(m_dlFileBuffer.at(strFileName).strFileBuf, m_dlFileBuffer.at(strFileName).uFileLens);
 
             INFO("send diag Store PIC !");
             if (FAILURE(result)) {
-                m_Worker->SetPromptMsg("Store poweron_logo.bmp failed!");
+                SetPromptMsg("Store poweron_logo.bmp failed!");
                 return false;
             }
         }
@@ -310,8 +318,10 @@ bool DiagPST::SetFuncFive()
     {
         if (FAILURE(m_newDIAGCmd->SetFuncFive(0)))
         {
-            m_Worker->SetPromptMsg("Set at+func=5,0 error!");
-            return false;
+            SetPromptMsg("Set at+func=5,0 error!");
+            return true;
+            //TODO::
+            //return false;
         }
 
         SLEEP(1000);
@@ -332,7 +342,7 @@ bool DiagPST::DownloadCustomerInfo()
     }
         TResult result = EOK;
 
-        m_Worker->SetPromptMsg("E_PRG_DOWNLOAD_CUSTOMERINFO");
+        SetPromptMsg("E_PRG_DOWNLOAD_CUSTOMERINFO");
 
         for(int i = 0; i < 3; i++){
             int32 offset = 0;
@@ -343,7 +353,7 @@ bool DiagPST::DownloadCustomerInfo()
 
             if(it == m_dlFileBuffer.end())
             {
-                m_Worker->SetPromptMsg("can not find the file custom_info.xml!");
+                SetPromptMsg("can not find the file custom_info.xml!");
                 return false;
             }
             it->second.isDownload=false;
@@ -377,7 +387,7 @@ bool DiagPST::DownloadCustomerInfo()
         }
         if (FAILURE(result))
         {
-            m_Worker->SetPromptMsg("download custom_info.xml failed!");
+            SetPromptMsg("download custom_info.xml failed!");
             return false;
         }
 
@@ -389,7 +399,7 @@ bool DiagPST::checkIfPackageMatchNormalMode()
     //if(m_imgVersion == IMG_VERSION_8)
         if (MDM9x30_MOBILE_ID == m_iMobileId)
         {
-        m_Worker->SetPromptMsg("IMG package not match!");
+        SetPromptMsg("IMG package not match!");
         return true;
     }
 
@@ -422,7 +432,7 @@ bool DiagPST::checkIfPartitionMatchNormalMode()
 
         if (FAILURE(result) || pPartitionVersion == NULL || '\0' == pPartitionVersion[0])
         {
-            m_Worker->SetPromptMsg("Request partition Version error!");
+            SetPromptMsg("Request partition Version error!");
             return false;
         }
 
@@ -432,8 +442,8 @@ bool DiagPST::checkIfPartitionMatchNormalMode()
         //INFO("COM%d: PC partition Version, version = %s",
         // m_dlPort,pPcPartition.c_str());
         string pFWPartitionVersion(pPartitionVersion);
-        vector<PCCH> list1;
-        vector<PCCH> list2;
+        vector<string> list1;
+        vector<string> list2;
         char pcPartitionVersion[VERSION_LEN]={0};
         StringSplit(pPartitionVersion,"_", list1);
         strcpy(pcPartitionVersion, pPcPartition.c_str());
@@ -451,7 +461,7 @@ bool DiagPST::checkIfPartitionMatchNormalMode()
         }
         if (pFWPartitionVersion != pPcPartition)
         {
-            m_Worker->SetPromptMsg("partition type not match!");
+            SetPromptMsg("partition type not match!");
             return false;
         }
     }
@@ -461,7 +471,7 @@ bool DiagPST::checkIfPartitionMatchNormalMode()
 bool DiagPST::checkIfPackageMatchDlMode()
 {
     TResult result = EOK;
-    m_Worker->SetPromptMsg("REQUEST MOBILE ID");
+    SetPromptMsg("REQUEST MOBILE ID");
 
     result = m_sahara->CmdExecute(SAHARA_EXEC_CMD_GET_MOBILE_ID);
     int32 len = 0;
@@ -490,12 +500,12 @@ bool DiagPST::checkIfPackageMatchDlMode()
         {
              if (m_iMobileId!=MDM9x30_MOBILE_ID)
               {
-                m_Worker->SetPromptMsg("in download mode IMG package unmatched!");
+                SetPromptMsg("in download mode IMG package unmatched!");
                 return false;
              }
          }
 
-            m_Worker->SetPromptMsg("REQUEST FW VERSION");
+            SetPromptMsg("REQUEST FW VERSION");
             m_sahara->CmdExecute(SAHARA_EXEC_CMD_GET_FW_VERSION);
             int32 len = 0;
             string fwVer = "";
@@ -516,7 +526,7 @@ bool DiagPST::checkIfPackageMatchDlMode()
 
             m_sahara->saharaswitchMode(SAHARA_MODE_IMAGE_TX_PENDING);
     } else {
-        m_Worker->SetPromptMsg("in download request mobile ID fail!");
+        SetPromptMsg("in download request mobile ID fail!");
         return false;
     }
     return true;
@@ -532,7 +542,7 @@ bool DiagPST::RequestFirmwarVerAndMobileIdNormalMode()
         INFO("COM%d RequestFirmwareVer failed",m_dlPort);
         /* if request firmware fails, notify GUI and return false */
 
-        m_Worker->SetPromptMsg("READ FW VERSION failed");
+        SetPromptMsg("READ FW VERSION failed");
         return false;
     }
 
@@ -541,7 +551,7 @@ bool DiagPST::RequestFirmwarVerAndMobileIdNormalMode()
     {
         INFO("COM%d pVersion.ver_strings == NULL",m_dlPort);
         /* if firmware version length is NULL, notify GUI and return false */
-        m_Worker->SetPromptMsg("E_RES_ERR_READ_FW_VERSION");
+        SetPromptMsg("E_RES_ERR_READ_FW_VERSION");
 
         return false;
     }
@@ -562,11 +572,11 @@ bool DiagPST::SwitchOfflineMode()
         bool bOk = m_pCustdata->ChangeOfflineMode(MODE_CHANGE_OFFLINE_DIGITAL_MODE);
         if (bOk)
         {
-            m_Worker->SetPromptMsg("Swtich offile mode ok!");
+            SetPromptMsg("Swtich offile mode ok!");
         }
         else
         {
-            m_Worker->SetPromptMsg("Swtich offline mode fails!");
+            SetPromptMsg("Swtich offline mode fails!");
         }
     return bOk;
 
@@ -721,7 +731,7 @@ bool DiagPST::RunTimeDiag() {
 
     if(m_blDownloadMode)
     {
-        m_Worker->SetPromptMsg("DEVICE in Download mode");
+        SetPromptMsg("DEVICE in Download mode");
     }
     CompareVersions();
 
@@ -750,48 +760,67 @@ bool DiagPST::RunTimeDiag() {
 }
 
 
-bool DiagPST::DownloadPrg() {
+bool DiagPST::DownloadPrg(const wchar_t* config) {
     /* download PRG */
-    TImgBufType* pPrgImg = &m_pDLImgInfo->prg;
-    const char * prg = PST_PRG_STR;
-    TResult result =EOK;
+    TImgBufType *pPrgImg = &m_pDLImgInfo->prg;
+    const wchar_t  *prg = PST_NPRG;
+    wchar_t     filename[MAX_PATH];
+    TResult     result = EOK;
 
-    map<string,FileBufStruct>::iterator iter=m_dlFileBuffer.find(prg);
+    if (m_blDownloadMode)
+        prg = PST_ENPRG;
+
+    int data_len = GetPrivateProfileString(DIAGPST_SECTION,
+                                           prg,
+                                           NULL,
+                                           filename,
+                                           MAX_PATH,
+                                           config);
+
+    if (data_len == 0) {
+        LOGE("Can not found prg file %S in configuration file %S.", prg, config);
+        return false;
+    }
+    char * fn = WideStrToMultiStr(filename);
+    if (fn == NULL)
+        return false;
+
+    map<string,FileBufStruct>::iterator iter=m_dlFileBuffer.find(fn);
     if(iter!=m_dlFileBuffer.end()) {
-        pPrgImg->data = m_dlFileBuffer.at(prg).strFileBuf;
-        pPrgImg->len = m_dlFileBuffer.at(prg).uFileLens;
+        pPrgImg->data = m_dlFileBuffer.at(fn).strFileBuf;
+        pPrgImg->len = m_dlFileBuffer.at(fn).uFileLens;
     }
 
-        m_Worker->SetPromptMsg("download NPRG9x07.mbn");
+    if (pPrgImg->data == NULL) {
+        SetPromptMsg("Can not found PRG image.");
+        return false;
+    }
 
-/*
-if device in debug mode, it will enter tpst mode, and the com port of diag is changed.
-*/
-            m_sahara->SwitchToDLoadMode();
+    SetPromptMsg("download PRG");
 
-    result = m_sahara->DownloadPrg(pPrgImg->data,pPrgImg->len,m_dlPort,m_blDownloadMode);
+    /*
+       if device in debug mode, it will enter tpst mode, and the com port of diag is changed.
+       */
+    m_sahara->SwitchToDLoadMode();
+
+    result = m_sahara->DownloadPrg_9X07(pPrgImg->data,pPrgImg->len,m_dlPort,m_blDownloadMode);
     if (FAILURE(result))
-        LOGE("Download PRG %s failed", m_dlFileBuffer.at(prg).strFileName);
+        LOGE("Download PRG %s failed", m_dlFileBuffer.at(fn).strFileName);
     return true;
- }
+}
 
-bool DiagPST::Calculate_length()
-{
+bool DiagPST::Calculate_length() {
     std::map<string,FileBufStruct>::iterator it;
-    for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++)
-    {
-        if(it->second.isDownload)
-        {
-            string Only_DownLoad("appsboot.mbntz.mbnsbl1.mbnrpm.mbnboot.img");
+    for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++) {
+        if(it->second.isDownload) {
+            string Only_DownLoad("appsboot.mbn,tz.mbn,sbl1.mbn,rpm.mbn,appsboot_fastboot.mbn");
             string mode=it->first;
-            if(Only_DownLoad.find(mode)!=-1)
+            if(Only_DownLoad.find(mode)!=-1) {
                 Software_size+=it->second.uFileLens;
-            else
-            {
+            } else {
                it->second.isDownload=false;
 //               it->second.isDownload_fast=true;
            }
-
         }
     }
     return true;
@@ -801,45 +830,47 @@ bool DiagPST::DownloadImages() {
     uint32 base = 0;
     TResult result = EOK;
 
-    if(Software_size>0)
-    {
-        m_Worker->SetPromptMsg("begin downloading image .");
+    if(Software_size > 0) {
+        SetPromptMsg("begin downloading image .");
         m_dlData->SetRatioParams(100 - base, base);
         SLEEP(500);
         result = m_dlData->DLoad9X07ImagesUsePtn(m_dlFileBuffer, Software_size);
+        //result = m_dlData->DLoad9X25ImagesUsePtn(m_dlFileBuffer, Software_size);
 
-        if (FAILURE(result))
-        {
+        if (FAILURE(result)) {
             return false;
         }
-        m_Worker->SetPromptMsg("Close serial port");
+        SetPromptMsg("Close serial port");
         m_dlData->SendResetCmd();
-    }
-    else
-    {
+    } else {
         m_DIAGCmd->RestartDevice();
-        result = m_newDIAGCmd->DisableDiagServer();
+        DisableDiagServer();
     }
 
     return true;
 }
 
 
-BOOL DiagPST::StringSplit(char * content,  PCHAR lineDelim, std::vector<PCCH>& dataOut)
-{
-  char *str1, *token;
-  char *saveptr1;
-  int j;
-  char* chTemp;
-  for (j = 1, str1 = content; ; j++, str1 = NULL) {
-    token = strtok_s(str1, lineDelim, &saveptr1);
-    if (token == NULL)
-      break;
+BOOL DiagPST::StringSplit(char * content,  PCHAR lineDelim, std::vector<string>& dataOut) {
+    char *str1, *token;
+    char *saveptr1;
+    int j;
+    char* chTemp;
+    for (j = 1, str1 = content; ; j++, str1 = NULL) {
+        token = strtok_s(str1, lineDelim, &saveptr1);
+        if (token == NULL)
+            break;
 
-	chTemp = new char[MAX_PATH];
-	memset(chTemp,0,MAX_PATH);
-	strcpy_s(chTemp,MAX_PATH,token);
-    dataOut.push_back(chTemp);
-  }
-  return TRUE;
+        //chTemp = new char[MAX_PATH];
+        //memset(chTemp,0,MAX_PATH);
+        //strcpy_s(chTemp,MAX_PATH,token);
+
+        dataOut.push_back(token);
+    }
+    return TRUE;
+}
+
+VOID DiagPST::SetPromptMsg(PCCH msg) {
+    INFO("%s: %s", m_Worker->GetDevTag(), msg);
+    m_Worker->SetPromptMsg(msg);
 }

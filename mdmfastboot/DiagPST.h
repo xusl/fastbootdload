@@ -47,7 +47,7 @@ public:
     virtual bool RunTimeDiag();
     virtual bool DownloadImages();
     virtual bool DownloadCustomerInfo();
-    virtual bool DownloadPrg();
+    virtual bool DownloadPrg(const wchar_t* config);
     virtual bool Calculate_length();
 
 private:
@@ -66,7 +66,8 @@ private:
 
     bool RequestFirmwarVerAndMobileIdNormalMode();
     bool RequestExternalVersion();
-    BOOL StringSplit(char * content, PCHAR lineDelim, std::vector<PCCH>& dataOut);
+    VOID SetPromptMsg(PCCH msg);
+    BOOL StringSplit(char * content, PCHAR lineDelim, std::vector<string>& dataOut);
 
 
 

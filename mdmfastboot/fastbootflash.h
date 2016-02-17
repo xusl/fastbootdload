@@ -48,8 +48,8 @@
 #define DIAGPST_SECTION         L"pst_diag"
 #define PKG_SECTION             L"package"
 #define PKG_PATH                L"path"
-#define PST_PRG_WCS             L"pst_prg"
-#define PST_PRG_STR              "pst_prg"
+#define PST_NPRG                 L"pst_nprg"
+#define PST_ENPRG               L"pst_enprg"
 
 static const int PARTITION_NUM_MAX = 32;
 static const int PARTITION_NAME_LEN = 32;

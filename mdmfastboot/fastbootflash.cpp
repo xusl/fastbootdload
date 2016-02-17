@@ -267,9 +267,9 @@ int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write
   return 0;
 }
 
-bool flash_image::AddFileBuffer(const wchar_t *partition, const wchar_t *lpath, const wchar_t *filName) {
+bool flash_image::AddFileBuffer(const wchar_t *partition, const wchar_t *lpath, const wchar_t *fileName) {
     char * part = WideStrToMultiStr(partition);
-    char * fn = WideStrToMultiStr(filName);
+    char * fn = WideStrToMultiStr(fileName);
     //int bytes = sizeof (wchar_t) * (2+ wcslen(pkgPath)+ wcslen(filName));
     //wchar_t *lpath = (wchar_t *)malloc(bytes);
     if (part != NULL && fn != NULL && lpath != NULL){
@@ -281,6 +281,7 @@ bool flash_image::AddFileBuffer(const wchar_t *partition, const wchar_t *lpath, 
         afBuf.isDownload= true;
         strcpy((char *)(afBuf.partition + 2), part);
         m_dlFileBuffer.insert(std::pair<string,FileBufStruct>(fn,afBuf));
+        LOGE("Insert diag file %s , partition %s", fn, part);
         }
     }
     DELETE_IF(part);
@@ -580,7 +581,7 @@ BOOL flash_image::reset(BOOL free_only) {
     for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++)
     {
         FREE_IF(it->second.strFileBuf);
-
+ FREE_IF(it->second.strFileName);
     }
 
 	return TRUE;
@@ -683,7 +684,7 @@ UINT fastboot::port_text_msg(void* data, const char *fmt,  ... ) {
 
 	UsbWorkData* wd = (UsbWorkData*) data;
     wd->ui_text_msg(PROMPT_TEXT, buffer);
-	INFO("%s: %s", wd->devIntf->GetDevTag(), buffer);
+	INFO("%s: %s", wd->GetDevTag(), buffer);
 
     return 0;
 }

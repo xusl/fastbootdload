@@ -988,7 +988,8 @@ BOOL CmdmfastbootDlg::RejectCDROM(VOID){
     vector<CDevLabel>::iterator iter;
     CSCSICmd scsi = CSCSICmd();
     GetDevLabelByGUID(&GUID_DEVINTERFACE_CDROM, SRV_CDROM, devicePath, false);
-    //GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath, false);
+
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath, false);
 
     for(iter = devicePath.begin();iter != devicePath.end(); ++ iter) {
         CString path = iter->GetDevPath();
@@ -1285,7 +1286,7 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
         if(result)
             result = pst.Calculate_length();
         if(result)
-            result = pst.DownloadPrg();
+            result = pst.DownloadPrg(data->hWnd->m_ConfigPath.GetString());
         if(result)
             result = pst.DownloadImages();
         dev->SetDeviceStatus(DEVICE_CHECK);
