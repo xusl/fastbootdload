@@ -48,6 +48,9 @@
 #define IDC_SCHE_REMOVE                 1038
 #define IDC_SPIN1                       1039
 #define IDC_STATIC_SETTING              1040
+#define IDC_TPST_VERSION                1041
+#define IDC_EDIT_PTS_VERSION            1042
+#define IDC_VERSION_GROUP               1043
 #define ID_ABOUT_ABOUT                  32771
 #define ID_HELP_HELP                    32772
 #define ID_ABOUT_                       32773
@@ -61,7 +64,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        133
 #define _APS_NEXT_COMMAND_VALUE         32777
-#define _APS_NEXT_CONTROL_VALUE         1041
+#define _APS_NEXT_CONTROL_VALUE         1044
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
