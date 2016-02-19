@@ -8,6 +8,7 @@ typedef enum
 	LINUX_VER,
 	SYSTEM_VER,
 	USERDATA_VER,
+	PTS_VER,
 	TITLE,
 	PROGRESS_VAL,
 	PROMPT_TITLE,
@@ -46,12 +47,13 @@ public:
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV Ö§³Ö
-
+  BOOL OnInitDialog();
 	DECLARE_MESSAGE_MAP()
 
 
 public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+  afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 
 public:
 	int iID;
@@ -60,4 +62,5 @@ public:
 	UIInfo m_PortLinuxVer;
 	UIInfo m_PortProgressInfo;
 	UIInfo m_PortProgressValue;
+  //CBrush m_Brush;
 };

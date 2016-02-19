@@ -1457,7 +1457,7 @@ void CDLData::PormptDownloadImage(string imageName, const char *partitionName)
     msg +=imageName;
     msg += " into partition ";
     msg += partitionName;
-    LOGI("%s", msg.c_str());
+    LOGI("COM%d: %s", dlPort, msg.c_str());
 
     if (m_StateCb != NULL) {
         m_StateCb(m_CallbackData, dlPort, msg);

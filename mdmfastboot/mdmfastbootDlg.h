@@ -37,6 +37,7 @@ enum
   USB_STAT_IDLE,
   USB_STAT_WORKING,
   USB_STAT_SWITCH,
+  USB_STAT_SWITCHED,
   USB_STAT_FINISH,
   USB_STAT_ERROR,
 };
@@ -54,11 +55,12 @@ class UsbWorkData{
     BOOL Start(DeviceInterfaces* devIntf, UINT nElapse, BOOL flashdirect);
     BOOL Finish(VOID);
     BOOL SwitchDev(UINT nElapse);
+    BOOL SetSwitchedStatus();
     UINT ui_text_msg(UI_INFO_TYPE info_type, PCCH msg);
     UINT SetProgress(int progress);
     UINT SetPromptMsg(PCCH msg) { return ui_text_msg(PROMPT_TEXT, msg);};
     const char *GetDevTag() { return devIntf->GetDevTag();};
-
+    BOOL Log(const char * msg);
 
   private:
     DeviceCoordinator *pCoordinator;
@@ -164,7 +166,9 @@ public:
   BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);
   BOOL UpdatePackageInfo(BOOL update = TRUE);
-  BOOL RemoveDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+  BOOL HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+  BOOL HandleDeviceArrived(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+
   BOOL SetupDevice(int evt);
   static void CALLBACK DeviceEventTimerProc(HWND hWnd,  UINT nMsg,  UINT_PTR nIDEvent,  DWORD dwTime);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);

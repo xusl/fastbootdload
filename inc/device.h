@@ -274,9 +274,10 @@ class DeviceCoordinator {
     ~DeviceCoordinator();
     DeviceInterfaces *GetValidDevice();
     BOOL GetDevice(const wchar_t *const devPath, DeviceInterfaces** outDevIntf);
-    DeviceInterfaces* AddDevice(CDevLabel& dev, TDevType type);
+    BOOL AddDevice(CDevLabel& dev, TDevType type, DeviceInterfaces** intfs);
     BOOL RemoveDevice(DeviceInterfaces*const & devIntf);
     BOOL IsEmpty();
+    BOOL Reset();
     VOID Dump(VOID);
 
   private:

@@ -615,10 +615,14 @@ int fastboot::match(char *str, const char **value, unsigned count)
 int fastboot::cb_default(void* data, Action *a, int status, char *resp)
 {
     if (status) {
-        port_text_msg(data, "FAILED (%s)\n", resp);
+        port_text_msg(data, "FAILED (%s)", resp);
     } else {
-        uint64 split = now();
-        port_text_msg(data, "OKAY [%7.3fs]\n", (split - a->start));
+        long long split = now();
+        long long elapse = (split - a->start);
+
+        //%lld, refer to  adbhost::END;  %I64d
+        port_text_msg(data, "OKAY [%lld.%03llds].",
+                elapse / MILLS_SECONDS, (elapse % MILLS_SECONDS) / 1000LL);
         a->start = split;
     }
     return status;
@@ -635,7 +639,7 @@ int fastboot::cb_check(void* data, Action *a, int status, char *resp, int invert
     int write_len;
 
     if (status) {
-        port_text_msg(data, "FAILED (%s)\n", resp);
+        port_text_msg(data, "FAILED (%s)", resp);
         return status;
     }
 
@@ -644,7 +648,9 @@ int fastboot::cb_check(void* data, Action *a, int status, char *resp, int invert
 
     if (yes) {
         long long split = now();
-        port_text_msg(data,"OKAY [%7.3fs]\n", (split - a->start));
+        long long elapse = (split - a->start);
+        port_text_msg(data,"OKAY [%lld.%03llds]",
+            elapse / MILLS_SECONDS, (elapse % MILLS_SECONDS) / 1000LL);
         a->start = split;
         return 0;
     }
@@ -708,7 +714,7 @@ int fastboot::cb_do_nothing(void* data, Action *a, int status, char *resp)
 int fastboot::cb_display(void* data, Action *a, int status, char *resp)
 {
     if (status) {
-        port_text_msg(data, "%s FAILED (%s)\n", a->cmd, resp);
+        port_text_msg(data, "%s FAILED (%s)", a->cmd, resp);
         return status;
     }
     //fprintf(stderr, "%s: %s\n", (char*) a->data, resp);
@@ -787,9 +793,7 @@ Action * fastboot::queue_action(unsigned op, const char *fmt, ...)
     action_last = a;
     a->op = op;
     a->func = cb_default;
-
     a->start = -1;
-
     return a;
 }
 
@@ -829,7 +833,7 @@ void fastboot::fb_queue_display(const char *var, const char *prettyname)
 {
     Action *a;
     a = queue_action(OP_QUERY, "getvar:%s", var);
-    a->data = strdup(prettyname);
+    a->data = (void *)prettyname;// strdup(prettyname);
     if (a->data == 0) ERROR("out of memory");
     a->func = cb_display;
 }
@@ -879,6 +883,7 @@ void fastboot::fb_execute_queue(usb_handle *usb, void* data)
     char resp[FB_RESPONSE_SZ+1];
     int status;
     long long start = -1;
+    long long elapse = 0;
     unsigned total_size = image_size();
     unsigned flashed_size = 0;
 	bool bIsBreak = false;
@@ -918,7 +923,7 @@ void fastboot::fb_execute_queue(usb_handle *usb, void* data)
 				bIsBreak = true;
         } else if (a->op == OP_NOTICE) {
             //fprintf(stderr,"%s\n",(char*)a->data);
-            port_text_msg(data, "%s\n",(char*)a->data);
+            port_text_msg(data, "%s",(char*)a->data);
         } else {
             ERROR("bogus action");
         }
@@ -928,15 +933,16 @@ void fastboot::fb_execute_queue(usb_handle *usb, void* data)
 
     }
 
-	if (bIsBreak)
+	elapse = now() - start;
+    if (bIsBreak)
 	{
-		port_text_msg(data, "download breaked. total time: %.3fs\n",
-          (now() - start) / MILLS_SECONDS);
+		port_text_msg(data, "download breaked. total time: %lld.%03llds",
+          elapse / MILLS_SECONDS, (elapse % MILLS_SECONDS) / 1000LL);
 	}
 	else
 	{
-		port_text_msg(data, "finished. total time: %.3fs\n",
-          (now() - start) / MILLS_SECONDS);
+		port_text_msg(data, "finished. total time: %lld.%03llds",
+          elapse / MILLS_SECONDS, (elapse % MILLS_SECONDS) / 1000LL);
 	}
 }
 

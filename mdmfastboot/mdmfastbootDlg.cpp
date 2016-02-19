@@ -83,6 +83,7 @@ BOOL UsbWorkData::IsIdle() {
 BOOL UsbWorkData::Clean(BOOL noCleanUI) {
   usb = NULL;
   devIntf->SetDeviceStatus(DEVICE_UNKNOW);
+  devIntf->SetAttachStatus(false);
   stat = USB_STAT_IDLE;
   work = NULL;
   update_qcn = FALSE;
@@ -94,6 +95,7 @@ BOOL UsbWorkData::Clean(BOOL noCleanUI) {
 }
 
 BOOL UsbWorkData::Reset(VOID) {
+    LOGD("Do reset");
     if (stat == USB_STAT_WORKING) {
       if (work != NULL) //Delete, or ExitInstance
         work->PostThreadMessage( WM_QUIT, NULL, NULL );
@@ -114,14 +116,15 @@ BOOL UsbWorkData::Reset(VOID) {
 }
 
 BOOL UsbWorkData::Abort(VOID) {
-      stat = USB_STAT_ERROR;
-  hWnd->KillTimer((UINT_PTR)this);
+    stat = USB_STAT_ERROR;
+    hWnd->KillTimer((UINT_PTR)this);
     return TRUE;
 }
 
 BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, UINT nElapse, BOOL flashdirect) {
     ASSERT(pDevIntf != NULL);
     devIntf = pDevIntf;
+    LOGD("Start thread to work!");
 
   //TODO::
   usb = devIntf->GetUsbHandle(flashdirect);
@@ -153,15 +156,27 @@ BOOL UsbWorkData::Finish(VOID) {
 
 
 BOOL UsbWorkData::SwitchDev(UINT nElapse) {
+  usb_close(usb);
   usb = NULL;
   work = NULL;
   stat = USB_STAT_SWITCH;
+  devIntf->SetAttachStatus(false);
+
   /*Set switch timeout*/
   hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);
     return TRUE;
 }
 
-
+BOOL UsbWorkData::SetSwitchedStatus() {
+    if ( stat == USB_STAT_SWITCH) {
+        LOGI("Kill switch timer");
+        hWnd->KillTimer((UINT_PTR)this);
+        stat = USB_STAT_SWITCHED;
+    } else {
+        Log("device does not in switch mode");
+    }
+    return TRUE;
+}
 UINT UsbWorkData::ui_text_msg(UI_INFO_TYPE info_type, PCCH msg) {
   UIInfo* info = new UIInfo();
 
@@ -185,6 +200,11 @@ UINT UsbWorkData::SetProgress(int progress) {
                   (WPARAM)info,
                   (LPARAM)this);
     return 0;
+}
+
+BOOL UsbWorkData::Log(const char * msg) {
+    LOGI("%s::%s", GetDevTag() , msg);
+    return TRUE;
 }
 
 // CmdmfastbootDlg ¶Ô»°¿ò
@@ -334,9 +354,8 @@ BOOL CmdmfastbootDlg::IsHaveUsbWork(void) {
 */
 UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(wchar_t *devPath) {
      DeviceInterfaces* devIntf;
-    if(mDevCoordinator.GetDevice(devPath, &devIntf)) {
-        devIntf->SetDeviceStatus(DEVICE_UNKNOW);
-        LOGI("Remove device %S", devPath);
+    if(!mDevCoordinator.GetDevice(devPath, &devIntf)) {
+        return NULL;
     }
 
   // first search the before, for switch device.
@@ -717,10 +736,10 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         case DBT_DEVTYP_VOLUME:
             {
                 /* enumerate devices and shiftdevice
-                * When device, twice this message , one is mass storage (composite device),
-                * another is cd-rom. use timer to delay, by reset timer, we only need enumerate
-                * one time actually.
-                */
+                 * When device, twice this message , one is mass storage (composite device),
+                 * another is cd-rom. use timer to delay, by reset timer, we only need enumerate
+                 * one time actually.
+                 */
                 LOGI("OnDeviceChange, get DBT_DEVTYP_VOLUME");
                 SetTimer(TIMER_EVT_REJECTCDROM, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
                 break;
@@ -729,23 +748,25 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
             {
                 LOGI("device arrive, DBT_DEVTYP_PORT");
                 //SetTimer(TIMER_EVT_COMPORT, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
-               HandleComDevice();
-            ScheduleDeviceWork(m_flashdirect);
-            break;
+                HandleDeviceArrived(pDevInf, dwData);
+                if(HandleComDevice())
+                    ScheduleDeviceWork(m_flashdirect);
+                break;
             }
         case DBT_DEVTYP_DEVICEINTERFACE:
             LOGI("device arrive, DBT_DEVTYP_DEVICEINTERFACE");
-                //SetTimer(TIMER_EVT_USBADB, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
-            EnumerateAdbDevice();
-            ScheduleDeviceWork(m_flashdirect);
+            //SetTimer(TIMER_EVT_USBADB, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
+            HandleDeviceArrived(pDevInf, dwData);
+            if(EnumerateAdbDevice())
+                ScheduleDeviceWork(m_flashdirect);
 
-                break;
+            break;
         }
     } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
         switch (phdr->dbch_devicetype) {
         case DBT_DEVTYP_DEVICEINTERFACE:
             {
-               // RemoveDevice(pDevInf, dwData);
+                HandleDeviceRemoved(pDevInf, dwData);
                 break;
             }
         case DBT_DEVTYP_VOLUME:
@@ -766,12 +787,22 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
     return TRUE;
 }
 
-BOOL CmdmfastbootDlg::RemoveDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam) {
-
+BOOL CmdmfastbootDlg::HandleDeviceArrived(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam) {
     ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
     UsbWorkData * data = FindUsbWorkData(pDevInf->dbcc_name);
     if (data == NULL) {
-        WARN("Can not find usbworkdata for %S", pDevInf->dbcc_name);
+        LOGD("Can not find usbworkdata for %S", pDevInf->dbcc_name);
+        return FALSE;
+    }
+    data->SetSwitchedStatus();
+    return TRUE;
+}
+
+BOOL CmdmfastbootDlg::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam) {
+    ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+    UsbWorkData * data = FindUsbWorkData(pDevInf->dbcc_name);
+    if (data == NULL) {
+        LOGD("Can not find usbworkdata for %S", pDevInf->dbcc_name);
         return FALSE;
     }
 
@@ -805,80 +836,75 @@ BOOL CmdmfastbootDlg::RemoveDevice(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARA
 
 LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 {
-  UsbWorkData* data = (UsbWorkData*)lParam;
-  UIInfo* uiInfo = (UIInfo*)wParam;
+    UsbWorkData* data = (UsbWorkData*)lParam;
+    UIInfo* uiInfo = (UIInfo*)wParam;
 
-  if ( uiInfo == NULL) {
-    ERROR("Invalid wParam");
-    return -1;
-  }
+    if (uiInfo == NULL) {
+        ERROR("Invalid wParam");
+        return -1;
+    }
 
-  if (data == NULL ) {
-    ERROR("Invalid lParam");
+    if (data == NULL ) {
+        ERROR("Invalid lParam");
+        delete uiInfo;
+        return -1;
+    }
+
+    switch(uiInfo->infoType ) {
+    case ADB_CHK_ABORT:
+        // WHEN ABORT, the device need remove manually, do not schedule next device into this UI port.
+        data->Abort();
+        data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
+        break;
+
+    case REBOOT_DEVICE:
+        data->SwitchDev(switch_timeout);
+        data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
+        data->ctl.SetInfo(PROMPT_TITLE, CString(""));
+        break;
+
+    case FLASH_DONE:
+        usb_close(data->usb);
+
+        mDevCoordinator.RemoveDevice(data->devIntf);
+
+        m_updated_number ++;
+        if (NULL == mDevCoordinator.IsEmpty()) {
+            AfxMessageBox(L"All devices is updated!");
+        }
+
+        if (!uiInfo->sVal.IsEmpty()) {
+            data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
+            data->ctl.SetInfo(PROMPT_TITLE, CString(""));
+        }
+
+        if (m_fix_port_map) {
+            // schedule next port now, and when  app receice device remove event,
+            // the current finished port is not in workdata set, for new device in the
+            // same port can not bootstrap in 1 seconds, even when there are no more
+            // idle device in other physical port.
+            //BUT THIS PRESUME IS NEED TEST.
+            sleep(1);
+
+            data->Clean(mDevCoordinator.IsEmpty());
+            ScheduleDeviceWork(m_flashdirect);
+        }
+        break;
+
+    case TITLE:
+        data->ctl.SetTitle(uiInfo->sVal);
+        break;
+
+    case PROGRESS_VAL:
+        data->ctl.SetProgress(uiInfo->iVal);
+        break;
+
+    default:
+        data->ctl.SetInfo(uiInfo->infoType, uiInfo->sVal);
+    }
+
     delete uiInfo;
-    return -1;
-  }
-
-  switch(uiInfo->infoType ) {
-  case ADB_CHK_ABORT:
-    // WHEN ABORT, the device need remove manually, do not schedule next device into this UI port.
-    data->Abort();
-    data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
-    break;
-
-  case REBOOT_DEVICE:
-    if (data->usb != NULL) {
-      //usb_switch_device(data->usb);
-      usb_close(data->usb);
-    }
-
-    data->SwitchDev(switch_timeout);
-    data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
-    data->ctl.SetInfo(PROMPT_TITLE, CString(""));
-    break;
-
-  case FLASH_DONE:
-    usb_close(data->usb);
-
-    mDevCoordinator.RemoveDevice(data->devIntf);
-
-      m_updated_number ++;
-  if (NULL == mDevCoordinator.IsEmpty()) {
-    AfxMessageBox(L"All devices is updated!");
-  }
-
-    if (!uiInfo->sVal.IsEmpty()) {
-      data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
-      data->ctl.SetInfo(PROMPT_TITLE, CString(""));
-    }
-
-    if (m_fix_port_map) {
-    // schedule next port now, and when  app receice device remove event,
-    // the current finished port is not in workdata set, for new device in the
-    // same port can not bootstrap in 1 seconds, even when there are no more
-    // idle device in other physical port.
-    //BUT THIS PRESUME IS NEED TEST.
-        sleep(1);
-
-    data->Clean(mDevCoordinator.IsEmpty());
-    ScheduleDeviceWork(m_flashdirect);
-    }
-    break;
-
-  case TITLE:
-    data->ctl.SetTitle(uiInfo->sVal);
-    break;
-
-  case PROGRESS_VAL:
-    data->ctl.SetProgress(uiInfo->iVal);
-    break;
-
-  default:
-    data->ctl.SetInfo(uiInfo->infoType, uiInfo->sVal);
-    }
-
-  delete uiInfo;
-  return 0;
+    return 0;
 }
 
 /*nIDEvent is the usb sn*/
@@ -890,7 +916,7 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
     return ;
   }
 
-  WARN("%s switch device timeout", data->devIntf->GetDevTag());
+  LOGW("%s switch device timeout", data->devIntf->GetDevTag());
 
   if (data->stat = USB_STAT_SWITCH) {
     //remove_switch_device(nIDEvent);
@@ -911,6 +937,7 @@ BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID) {
     vector<CDevLabel> AdbDev;
     vector<CDevLabel> FbDev;
     vector<CDevLabel>::iterator iter;
+    BOOL success = FALSE;
     bool match = false;
 
     GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_USBCCGP, AdbDev, true);
@@ -928,8 +955,11 @@ BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID) {
             if (iter->Match(&adb)) {
             //if (iter->MatchDevPath(handle->interface_name)) {
                 iter->Dump("adb interface");
-                handle->dev_intfs = mDevCoordinator.AddDevice(*iter, DEVTYPE_ADB);
+                if (!mDevCoordinator.AddDevice(*iter, DEVTYPE_ADB, &handle->dev_intfs))
+                    continue;
+
                 handle->dev_intfs->SetAdbHandle(handle);
+                success = TRUE;
                 match = true;
                 break;
             }
@@ -942,8 +972,11 @@ BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID) {
             if (iter->Match(&fb)) {
             //if (iter->MatchDevPath(handle->interface_name)) {
                 iter->Dump("fastboot interface");
-                handle->dev_intfs = mDevCoordinator.AddDevice(*iter, DEVTYPE_FASTBOOT);
+                if(!mDevCoordinator.AddDevice(*iter, DEVTYPE_FASTBOOT, &handle->dev_intfs))
+                    continue;
+
                 handle->dev_intfs->SetFastbootHandle(handle);
+                success = TRUE;
                 usb_dev_t status = handle->dev_intfs->GetDeviceStatus();
                 if ((m_flashdirect && status == DEVICE_PLUGIN) ||
                     status == DEVICE_PST ||
@@ -964,7 +997,7 @@ BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID) {
         LOGI("class %S %S",iter->GetParentIdPrefix(), iter->GetDevPath());
     }
 #endif
-    return TRUE;
+    return success;
 }
 
 BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
@@ -974,13 +1007,15 @@ BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
     //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
     vector<CDevLabel>::iterator iter;
     DeviceInterfaces* devintf;
+    BOOL success = FALSE;
 
     for (iter = devicePath.begin(); iter != devicePath.end();++iter) {
         iter->Dump(__FUNCTION__);
-        devintf = mDevCoordinator.AddDevice(*iter, DEVTYPE_DIAGPORT);
+        if(mDevCoordinator.AddDevice(*iter, DEVTYPE_DIAGPORT, NULL))
+            success = TRUE;
     }
     devicePath.clear();
-    return TRUE;
+    return success;
 }
 
 BOOL CmdmfastbootDlg::RejectCDROM(VOID){
@@ -1024,28 +1059,27 @@ BOOL CmdmfastbootDlg::RejectCDROM(VOID){
 
 BOOL CmdmfastbootDlg::SetupDevice(int evt) {
     switch(evt) {
-        case TIMER_EVT_ADBKILLED:
-            RejectCDROM();
-            EnumerateAdbDevice();
-            HandleComDevice();
+    case TIMER_EVT_ADBKILLED:
+        RejectCDROM();
+        if(EnumerateAdbDevice() || HandleComDevice())
             ScheduleDeviceWork(m_flashdirect);
-            break;
-        case TIMER_EVT_REJECTCDROM:
-            RejectCDROM();
-            break;
-        case TIMER_EVT_COMPORT:
-            HandleComDevice();
+        break;
+    case TIMER_EVT_REJECTCDROM:
+        RejectCDROM();
+        break;
+    case TIMER_EVT_COMPORT:
+        if(HandleComDevice())
             ScheduleDeviceWork(m_flashdirect);
-            break;
-        case TIMER_EVT_USBADB:
-            EnumerateAdbDevice();
+        break;
+    case TIMER_EVT_USBADB:
+        if(EnumerateAdbDevice())
             ScheduleDeviceWork(m_flashdirect);
-            break;
-        default:
-            break;
-        }
-   // if (evt != TIMER_EVT_REJECTCDROM)
-   //     ScheduleDeviceWork(m_flashdirect);
+        break;
+    default:
+        break;
+    }
+    // if (evt != TIMER_EVT_REJECTCDROM)
+    //     ScheduleDeviceWork(m_flashdirect);
 
     mDevCoordinator.Dump();
     return TRUE;
@@ -1057,7 +1091,7 @@ BOOL CmdmfastbootDlg::SetupDevice(int evt) {
    DWORD dwTime    // system time
 )
 {
-    CmdmfastbootDlg  *dlg = (CmdmfastbootDlg*)hWnd ;
+    CmdmfastbootDlg  *dlg = (CmdmfastbootDlg*)hWnd;
     ::KillTimer(hWnd, nIDEvent);//must kill timer explicit, otherwise, the timer will expire periodically.
     dlg->SetupDevice(nIDEvent) ;
 }
@@ -1280,6 +1314,7 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     data->ui_text_msg(TITLE, dev->GetDevTag());
     if (status == DEVICE_PLUGIN) {
         DiagPST pst(data, img->GetFileBuffer());
+        data->ui_text_msg(PROMPT_TITLE, "Begin download by Diag");
         bool result = pst.DownloadCheck();
         if(result)
             result = pst.RunTimeDiag();
@@ -1289,7 +1324,13 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
             result = pst.DownloadPrg(data->hWnd->m_ConfigPath.GetString());
         if(result)
             result = pst.DownloadImages();
-        dev->SetDeviceStatus(DEVICE_CHECK);
+        if(result) {
+            dev->SetDeviceStatus(DEVICE_FLASH);
+            data->ui_text_msg(REBOOT_DEVICE, "Enter fastboot");
+        } else {
+            data->ui_text_msg(FLASH_DONE, "Diag PST occur error! Please check log");
+        }
+        //dev->SetDeviceStatus(DEVICE_CHECK);
     } else if (status == DEVICE_CHECK) {
         if (handle == NULL) {
              data->ui_text_msg(FLASH_DONE, "Bad parameter");
@@ -1358,6 +1399,7 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
         }
         fastboot fb(handle);
         FlashImageInfo const * image;
+        data->ui_text_msg(PROMPT_TITLE, "fastboot download");
 
         fb.fb_queue_display("product","product");
         fb.fb_queue_display("version","version");
@@ -1410,7 +1452,9 @@ BOOL CmdmfastbootDlg::ScheduleDeviceWork(BOOL flashdirect) {
     DeviceInterfaces* idleDev;
     UsbWorkData* workdata;
     BOOL NonePort;
+    LOGD("==========Begin ScheduleDeviceWork==============");
     while(NULL != (idleDev = mDevCoordinator.GetValidDevice())) {
+        idleDev->Dump(__FUNCTION__);
         NonePort= TRUE;
         for (int i=0; i < m_nPort; i++) {
             workdata = m_workdata[i];
@@ -1427,6 +1471,7 @@ BOOL CmdmfastbootDlg::ScheduleDeviceWork(BOOL flashdirect) {
         if (NonePort)
             break;
     }
+    LOGD("==========END ScheduleDeviceWork==============");
 
     return TRUE;
 }
@@ -1607,7 +1652,7 @@ void CmdmfastbootDlg::OnBnClickedStart()
 	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_DISABLED|MF_GRAYED);
 	if (SetWorkStatus(TRUE, FALSE)) {
 	//AdbUsbHandler(true);
-    ScheduleDeviceWork(m_flashdirect);
+    SetupDevice(TIMER_EVT_ADBKILLED);
 	}
 
   //::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
@@ -1619,6 +1664,10 @@ void CmdmfastbootDlg::OnBnClickedButtonStop()
 	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_ENABLED);
 	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_ENABLED);
     SetWorkStatus(FALSE, FALSE);
+    mDevCoordinator.Reset();
+    for (int i= 0; i < m_nPort; i++) {
+        m_workdata[i]->Reset();
+      }
 }
 
 void CmdmfastbootDlg::OnClose()
@@ -1652,7 +1701,6 @@ void CmdmfastbootDlg::OnBnClickedCancel()
   }
 
   OnCancel();
-
 }
 
 void CmdmfastbootDlg::OnDestroy()

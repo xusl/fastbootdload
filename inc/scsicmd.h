@@ -15,7 +15,7 @@
 typedef unsigned char      uint8;
 typedef unsigned short     uint16;
 typedef unsigned int       uint32;
-typedef unsigned long      uint64;
+typedef unsigned long long     uint64;
 
 #define SPT_CDB_LENGTH 32
 #define SPT_SENSE_LENGTH          (32)

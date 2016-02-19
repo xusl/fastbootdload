@@ -25,6 +25,15 @@ void CPortStateUI::DoDataExchange(CDataExchange* pDX)
 	CDialog::DoDataExchange(pDX);
 }
 
+BOOL CPortStateUI::OnInitDialog()
+{
+  CDialog::OnInitDialog();
+  //m_Brush.CreateSolidBrush(RGB(0,0,0));
+  //GetDlgItem(IDC_DL_INFO)->SetWindowText(_T("Yy......"));
+
+  return TRUE;
+}
+
 void CPortStateUI::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
 {
 	switch(infoType)
@@ -50,12 +59,16 @@ void CPortStateUI::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
 	case USERDATA_VER:
 		GetDlgItem(IDC_EDIT_USERDATA_VER)->SetWindowText(strInfo.GetBuffer());
 		break;
+    default:
+        return;
 	}
+    strInfo.ReleaseBuffer();
 }
 
 void CPortStateUI::SetTitle(CString strInfo)
 {
 	GetDlgItem(IDC_GROUP)->SetWindowText(strInfo.GetBuffer());
+    strInfo.ReleaseBuffer();
 }
 
 void CPortStateUI::SetProgress(int iPercent)
@@ -77,6 +90,7 @@ void CPortStateUI::Init(int iPortID)
 
 BEGIN_MESSAGE_MAP(CPortStateUI, CDialog)
 	ON_WM_SIZE()
+	ON_WM_CTLCOLOR()
 END_MESSAGE_MAP()
 
 
@@ -100,6 +114,22 @@ void CPortStateUI::OnSize(UINT nType, int cx, int cy)
 	GetDlgItem(IDC_PROGRESS1)->SetWindowPos(0, space, cy-3*rect.bottom, cx-2*space, rect.bottom, 0);
 	GetDlgItem(IDC_DL_INFO)->SetWindowPos(0, space, cy-1*rect.bottom, cx-2*space, rect.bottom-10, 0);
 #endif
+}
+
+
+afx_msg HBRUSH CPortStateUI::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor) {
+    HBRUSH brush = CDialog::OnCtlColor(pDC, pWnd, nCtlColor);
+    if(nCtlColor == CTLCOLOR_STATIC){
+      if(pWnd->GetDlgCtrlID()== IDC_DL_INFO) {
+           pDC->SetTextColor(RGB(255,0,0)); //ÎÄ×ÖÑÕÉ«
+           //pDC->SetBkColor(RGB(251, 247, 200));
+           pDC->SetBkMode(TRANSPARENT);//Í¸Ã÷
+           //return (HBRUSH)::GetStockObject(NULL_BRUSH);
+           //return (HBRUSH) m_Brush.GetSafeHandle();
+       }
+      }
+
+    return brush;
 }
 
 void CPortStateUI::Reset(void)

@@ -168,8 +168,9 @@ bool DeviceInterfaces::Match(const DeviceInterfaces * const & devIntf) const {
 
 bool DeviceInterfaces::MatchDevPath(const wchar_t * devPath) const {
     LOGE("DO DeviceInterfaces::operator == 2");
-    if ( *mAdb == devPath || *mDiag == devPath ||
-        *mFastboot == devPath)
+    if ( (mAdb != NULL && (*mAdb == devPath)) ||
+        (mDiag != NULL && (*mDiag == devPath)) ||
+        (mFastboot != NULL && (*mFastboot == devPath)))
         return true;
     return false;
 }
@@ -190,7 +191,6 @@ DeviceInterfaces & DeviceInterfaces::operator =(const DeviceInterfaces & devIntf
 
 VOID DeviceInterfaces::SetDeviceStatus(usb_dev_t status) {
     mDeviceActive = status;
-
 }
 
 VOID DeviceInterfaces::DeleteMemory(VOID) {
@@ -225,6 +225,10 @@ DeviceCoordinator::DeviceCoordinator() :
 }
 
 DeviceCoordinator::~DeviceCoordinator() {
+    Reset();
+}
+
+BOOL DeviceCoordinator::Reset() {
     list<DeviceInterfaces*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
         DeviceInterfaces* item = *it;
@@ -233,6 +237,7 @@ DeviceCoordinator::~DeviceCoordinator() {
         //*it = NULL;
     }
     mDevintfList.clear();
+    return TRUE;
 }
 
 DeviceInterfaces *DeviceCoordinator::GetValidDevice() {
@@ -270,7 +275,7 @@ BOOL DeviceCoordinator::GetDevice(const wchar_t * const devPath, DeviceInterface
     return FALSE;
 }
 
-DeviceInterfaces* DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type) {
+BOOL DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type, DeviceInterfaces** intfs) {
     DeviceInterfaces* newDevIntf = NULL;
     DeviceInterfaces temp;
     temp.SetIntf(dev, type);
@@ -282,17 +287,26 @@ DeviceInterfaces* DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type) {
     }
 
     if (it != mDevintfList.end()) {
-        LOGI("Update exist device");
         newDevIntf = *it;
-        //(*it)->SetDeviceStatus(DEVICE_PLUGIN);
-        (*it)->SetIntf(dev, type);
+        if((*it)->GetAttachStatus()) {
+            LOGI("the exit device is attached, do not update the device");
+            return FALSE;
+        } else {
+            LOGI("Update exist device");
+            if (newDevIntf->GetDeviceStatus() == DEVICE_UNKNOW)
+                (*it)->SetDeviceStatus(DEVICE_PLUGIN);
+            (*it)->SetIntf(dev, type);
+        }
     } else {
         LOGI("Create new device");
         newDevIntf = new DeviceInterfaces(temp);
         newDevIntf->SetDeviceStatus(DEVICE_PLUGIN);
         mDevintfList.push_back(newDevIntf);
     }
-    return newDevIntf;
+    if (intfs != NULL) {
+        *intfs = newDevIntf;
+    }
+    return TRUE;
 }
 
 BOOL DeviceCoordinator::RemoveDevice(DeviceInterfaces* const & devIntf)  {
@@ -349,7 +363,7 @@ CDevLabel::CDevLabel(const wchar_t * devPath,
             snb = sne;
             sne = (wchar_t*)wcschr(sne, sep);
             if (sne == NULL || sne - devPath >= len) {
-                LOGE("In step %d , %c is not found", i, sep);
+                LOGE("In step %d , '%c' is not found", i, sep);
                 return;
             }
         }
