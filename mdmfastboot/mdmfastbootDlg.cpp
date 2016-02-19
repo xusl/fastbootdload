@@ -10,6 +10,7 @@
 #include "adbhost.h"
 #include "usb_vendors.h"
 #include "DiagPST.h"
+#include "AdbPST.h"
 #include <ImgUnpack.h>
 
 #ifdef _DEBUG
@@ -56,8 +57,9 @@ END_MESSAGE_MAP()
 
 UsbWorkData::UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator) {
     hWnd = dlg;
-    ctl.Create(IDD_PORT_STATE, dlg);
-    ctl.Init(index);
+    pCtl = new CPortStateUI;
+    pCtl->Create(IDD_PORT_STATE, dlg);
+    pCtl->Init(index);
     usb = NULL;
     stat = USB_STAT_IDLE;
     //workdata->img = m_image;
@@ -70,7 +72,7 @@ UsbWorkData::UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coo
 }
 
 UsbWorkData::~UsbWorkData() {
-    ;
+    DELETE_IF(pCtl);
 }
 
 BOOL UsbWorkData::IsIdle() {
@@ -90,7 +92,7 @@ BOOL UsbWorkData::Clean(BOOL noCleanUI) {
   partition_nr = 0;
   ZeroMemory(flash_partition, sizeof(flash_partition));
   if(!noCleanUI)
-      ctl.Reset();
+      pCtl->Reset();
     return TRUE;
 }
 
@@ -150,7 +152,6 @@ BOOL UsbWorkData::Finish(VOID) {
   //data->work = NULL;
   //KILL work timer.
   hWnd->KillTimer((UINT_PTR)this);
-
     return TRUE;
 }
 
@@ -178,7 +179,7 @@ BOOL UsbWorkData::SetSwitchedStatus() {
     return TRUE;
 }
 UINT UsbWorkData::ui_text_msg(UI_INFO_TYPE info_type, PCCH msg) {
-  UIInfo* info = new UIInfo();
+  UIInfo* info = new UIInfo;
 
   //if (FLASH_DONE && data->hWnd->m_fix_port_map)
   //  sleep(1);
@@ -192,8 +193,7 @@ UINT UsbWorkData::ui_text_msg(UI_INFO_TYPE info_type, PCCH msg) {
 }
 
 UINT UsbWorkData::SetProgress(int progress) {
-        UIInfo* info = new UIInfo();
-
+    UIInfo* info = new UIInfo;
     info->infoType = PROGRESS_VAL;
     info->iVal = progress;
     hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
@@ -302,7 +302,7 @@ BOOL CmdmfastbootDlg::SetPortDialogs(int x, int y,  int w, int h)
     for (c = 0; c < C_NUM; c++) {
       if (r * C_NUM + c >= m_nPort) break;
 
-      port = &(m_workdata[r * C_NUM + c]->ctl);
+      port = m_workdata[r * C_NUM + c]->pCtl;
       port->SetWindowPos(0,
                          x + c * pw,
                          y + r * ph,
@@ -778,7 +778,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
             }
         case DBT_DEVTYP_PORT:
             {
-                LOGI("device arrive, DBT_DEVTYP_PORT");
+                LOGI("device removed, DBT_DEVTYP_PORT");
                 break;
             }
         }
@@ -854,13 +854,13 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
     case ADB_CHK_ABORT:
         // WHEN ABORT, the device need remove manually, do not schedule next device into this UI port.
         data->Abort();
-        data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
+        data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
         break;
 
     case REBOOT_DEVICE:
         data->SwitchDev(switch_timeout);
-        data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
-        data->ctl.SetInfo(PROMPT_TITLE, CString(""));
+        data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
+        data->pCtl->SetInfo(PROMPT_TITLE, CString(""));
         break;
 
     case FLASH_DONE:
@@ -874,8 +874,8 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
         }
 
         if (!uiInfo->sVal.IsEmpty()) {
-            data->ctl.SetInfo(PROMPT_TEXT, uiInfo->sVal);
-            data->ctl.SetInfo(PROMPT_TITLE, CString(""));
+            data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
+            data->pCtl->SetInfo(PROMPT_TITLE, CString(""));
         }
 
         if (m_fix_port_map) {
@@ -892,15 +892,15 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
         break;
 
     case TITLE:
-        data->ctl.SetTitle(uiInfo->sVal);
+        data->pCtl->SetTitle(uiInfo->sVal);
         break;
 
     case PROGRESS_VAL:
-        data->ctl.SetProgress(uiInfo->iVal);
+        data->pCtl->SetProgress(uiInfo->iVal);
         break;
 
     default:
-        data->ctl.SetInfo(uiInfo->infoType, uiInfo->sVal);
+        data->pCtl->SetInfo(uiInfo->infoType, uiInfo->sVal);
     }
 
     delete uiInfo;
@@ -1096,194 +1096,6 @@ BOOL CmdmfastbootDlg::SetupDevice(int evt) {
     dlg->SetupDevice(nIDEvent) ;
 }
 
-
-UINT CmdmfastbootDlg::adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH command,
-                                              UI_INFO_TYPE info_type)
-{
-  PCHAR resp = NULL;
-  int  resp_len;
-  int ret;
-  ret = adb.shell(command, (void **)&resp, &resp_len);
-  if (ret ==0 && resp != NULL) {
-    if (UI_DEFAULT == info_type) {
-      data->ui_text_msg(PROMPT_TITLE, command);
-      data->ui_text_msg(PROMPT_TEXT, resp);
-    } else {
-      data->ui_text_msg(info_type, resp);
-    }
-    free(resp);
-    return 0;
-  }
-
-  return -1;
-}
-
-//"nv read %d" , id
-//"nv write %d %s" ,id, value
-UINT CmdmfastbootDlg::adb_update_NV(adbhost& adb, UsbWorkData* data,  flash_image  *const image) {
-  unsigned int index = 0;
-  const char* cmd;
-    PCHAR resp = NULL;
-  int  resp_len;
-  int ret;
-
-  if (data == NULL || NULL == image) {
-    ERROR("Bad parameter.");
-    return -1;
-  }
-
-  if (!data->update_qcn) {
-    INFO("Do not need update qcn.");
-    return -1;
-  }
-  //TODO:: first enter offline-mode.
-
-  if (image->qcn_cmds_enum_init(NULL) == FALSE) {
-    ERROR("qcn_cmds_enum_init FAILED.");
-    return -1;
-  }
-
-  while ((cmd = image->qcn_cmds_enum_next(index)) != NULL) {
-    //DEBUG("cmd is %s", cmd);
-    ret = adb.shell(cmd, (void **)&resp, &resp_len);
-    FREE_IF(resp);
-   index++;
-  }
-
-  return 0;
-}
-
-UINT CmdmfastbootDlg::adb_write_IMEI(adbhost& adb, UsbWorkData* data) {
-    PCHAR resp = NULL;
-    int  resp_len;
-    int ret;
-    ret = adb.shell("nv write 15002 1", (void **)&resp, &resp_len);
-
-    FREE_IF(resp);
-
-    //imei 15 letters.
-    adb.shell("imeiop write 860440020101686", (void **)&resp, &resp_len);
-    FREE_IF(resp);
-    ret = adb.shell("nv write 15002 0", (void **)&resp, &resp_len);
-    FREE_IF(resp);
-    return 0;
-}
-
-//#define VERSION_CMP_TEST
-UINT CmdmfastbootDlg::adb_hw_check(adbhost& adb, UsbWorkData* data) {
-  PCHAR resp = NULL;
-  int  resp_len;
-  int ret;
-  ret = adb.shell("hwinfo_check", (void **)&resp, &resp_len);
-  if (ret ==0 && resp != NULL) {
-    ret = strcmp(resp, "match");
-    if (ret == 0) {
-      data->ui_text_msg( PROMPT_TEXT, "hardware is match!");
-    } else {
-      data->ui_text_msg(PROMPT_TITLE, "hwinfo_check return ");
-      data->ui_text_msg(PROMPT_TEXT, resp);
-      WARN("hwinfo_check return \"%s\"", resp);
-    }
-
-    free(resp);
- #ifdef VERSION_CMP_TEST
-     return 0;
- #else
-    return ret;
- #endif
-  } else {
-    return -1;
-  }
-}
-
-UINT CmdmfastbootDlg::adb_sw_version_cmp(adbhost& adb, UsbWorkData* data){
-  PCHAR resp = NULL;
-  int  resp_len;
-  int ret;
-  ret = adb.shell("swinfo_compare", (void **)&resp, &resp_len);
-
-  //test code
-  #ifdef VERSION_CMP_TEST
-  free(resp);
-  resp = strdup("A5:match,Q6:match,QCN:mismatch");
-  #endif
-
-  if (ret ==0 && resp != NULL) {
-    //A5:mismatch,Q6:match,QCN:mismatch
-    // strtok_s OR strtok split string by replcae delimited char into '\0'
-    // so constant string is not applied.
-    char *result, *sub_result, *token, *subtoken;
-    char *context, *sub_context;
-
-    for (result = resp; ; result = NULL) {
-      token = strtok_s(result, ",", &context);
-      if (token == NULL) {
-        ERROR("%s contain none \",\"", result);
-        break;
-      }
-
-      for (sub_result = token; ; sub_result = NULL) {
-        subtoken = strtok_s(sub_result, ":", &sub_context);
-        if (subtoken == NULL) {
-          ERROR("%s contain none \":\"", sub_result);
-        } else {
-          ret+=sw_version_parse(data, sub_result, sub_context);
-        }
-        break;
-      }
-    }
-    free(resp);
-  }
-  return ret;
-
-}
-
-UINT CmdmfastbootDlg::sw_version_parse(UsbWorkData* data,PCCH key, PCCH value) {
-   PWCHAR a5_partition[] = {L"boot", L"system", L"modem", L"aboot", L"jrdresource", L"rpm",L"efs2",L"cdrom",L"tz",L"sbl"};
-   PWCHAR q6_partition[] = {L"dsp1", L"dsp2", L"dsp3", L"mibib", L"sbl2", L"adsp", L"qdsp", L"mba",  L"sdi"};
-   PWCHAR *partition;
-   int count,i;
-  // int index;
-
-   if (stricmp(value, "mismatch")) {
-    INFO("Not valid value %s", value);
-    return 0;
-   }
-
-  if (stricmp(key , "a5") == 0) {
-    partition = a5_partition;
-    count = sizeof(a5_partition)/ sizeof(a5_partition[0]);
-    data->ui_text_msg(PROMPT_TEXT, "A5 firmware can update");
-  } else if (stricmp(key , "q6") == 0) {
-    partition = q6_partition;
-    count = sizeof(q6_partition)/ sizeof(q6_partition[0]);
-    data->ui_text_msg(PROMPT_TEXT, "Q6 firmware can update.");
-  } else if (stricmp(key , "qcn") == 0) {
-    data->ui_text_msg(PROMPT_TEXT, "QCN can update.");
-    data->update_qcn = TRUE;
-    return 1;
-  } else {
-    ERROR("Not valid key %d", key);
-    return 0;
-  }
-
-  //for (index = 0;  index < PARTITION_NUM_MAX; index++)
-  //  if (NULL == data->flash_partition[index])
-  //    break;
-
-  for (i =0; i < count && data->partition_nr < PARTITION_NUM_MAX; i++) {
-     data->flash_partition[data->partition_nr] =
-    data->hWnd->m_image->get_partition_info(*(partition+i), NULL, NULL);
-     if (data->flash_partition[data->partition_nr] != NULL) {
-      data->partition_nr++;
-     } else {
-      ERROR("Partition %S : no data available.", *(partition+i));
-     }
-  }
-
-  return 1;
-}
-
 /*
 * update flow is done here. Do update business logically.
 */
@@ -1294,7 +1106,6 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     DeviceInterfaces *dev;
     int result;
     BOOL ignore_version;
-    BOOL force_update;
     usb_dev_t status ;
 
     if (data == NULL ||  data->hWnd == NULL || data->hWnd->m_image == NULL) {
@@ -1308,7 +1119,6 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     //TODO:: an option for this is better., such as force_update.
     //when m_flashdirect set , force_update must set.
     ignore_version = data->hWnd->m_flashdirect;
-    force_update = data->hWnd->m_forceupdate;
     status = dev->GetDeviceStatus();
 
     data->ui_text_msg(TITLE, dev->GetDevTag());
@@ -1336,62 +1146,8 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
              data->ui_text_msg(FLASH_DONE, "Bad parameter");
             return -1;
         }
-        adbhost adb(handle , dev->GetDevId());
-        const wchar_t *conf_file = img->get_package_config();
-        char *conf_file_char ;
-
-        adb_shell_command(adb,data, "cat /proc/version",LINUX_VER);
-        adb_shell_command(adb,data, "cat /etc/version",SYSTEM_VER);
-        adb_shell_command(adb,data, "cat /usr/version",USERDATA_VER);
-
-        if (force_update) {
-            sw_version_parse(data, "a5", "mismatch");
-            sw_version_parse(data, "q6", "mismatch");
-            sw_version_parse(data, "qcn", "mismatch");
-        } else {
-            if (INVALID_FILE_ATTRIBUTES == GetFileAttributes(conf_file)) {
-                data->ui_text_msg(ADB_CHK_ABORT, "no config.xml in the package, abort!");
-                return -1;
-            }
-
-            conf_file_char = WideStrToMultiStr(conf_file);
-            if (conf_file_char == NULL) {
-                data->ui_text_msg(ADB_CHK_ABORT, "out of memory, abort!");
-                return -1;
-            }
-
-            adb.sync_push(conf_file_char, "/tmp/config.xml");
-            data->ui_text_msg(PROMPT_TEXT, "Copy config.xml to /tmp/config.xml.");
-            delete conf_file_char;
-
-            result = adb_hw_check(adb,data);
-            if (result != 0) {
-                data->ui_text_msg(ADB_CHK_ABORT, "hardware check failed, abort!");
-                return -1;
-            }
-
-            result = adb_sw_version_cmp(adb,data);
-            if (result < 0) {
-                data->ui_text_msg(ADB_CHK_ABORT, "firmware version check failed, abort!");
-                return -1;
-            } else if (result ==0) {
-                data->ui_text_msg(FLASH_DONE, "firmware is the NEWEST. DO NOT UPDATE.");
-                return 0;
-            }
-        }
-
-        //prepare , do something that before flash image.
-        //adb_update_NV(adb, data, img);
-        //adb_write_IMEI(adb, data);
-        //adb_shell_command(adb,data, "trace -r");
-        //adb_shell_command(adb,data, "backup");
-        if (data->partition_nr > 0) {
-            adb.reboot_bootloader(m_module_name);
-            data->ui_text_msg(REBOOT_DEVICE, "reboot bootloader");
-        } else {
-            // that is mean just update qcn
-            data->ui_text_msg(FLASH_DONE, "Finish. QCN updated.");
-        }
+        AdbPST pst(data->hWnd->m_forceupdate, m_module_name);
+        pst.DoPST(data, img, dev);
     } else if (status == DEVICE_FLASH) {
         if (handle == NULL) {
              data->ui_text_msg(FLASH_DONE, "Bad parameter");

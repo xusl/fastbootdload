@@ -17,14 +17,13 @@ when        who             what
 
 using namespace std;
 
-
-typedef signed char int8;         /* 8 bit signed */
-typedef unsigned char uint8;      /* 8 bit unsigned */
-typedef short int16;              /* 16 bit signed */
-typedef unsigned short uint16;    /* 16 bit unsigned */
-typedef int int32;                /* 32 bit signed */
-typedef unsigned int uint32;      /* 32 bit unsigned */
-
+typedef unsigned long long     uint64;
+typedef signed char       int8;         /* 8 bit signed */
+typedef unsigned char     uint8;      /* 8 bit unsigned */
+typedef short             int16;              /* 16 bit signed */
+typedef unsigned short    uint16;    /* 16 bit unsigned */
+typedef int               int32;                /* 32 bit signed */
+typedef unsigned int      uint32;      /* 32 bit unsigned */
 #define word		uint16
 
 #define OPENLOG     "OPENLOG.txt"

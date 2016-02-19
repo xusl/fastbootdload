@@ -102,6 +102,12 @@
     <ClCompile Include="..\src\XmlParser.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="AdbPST.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="PST.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DlWorker.h">
@@ -135,6 +141,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="DiagPST.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="AdbPST.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="PST.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

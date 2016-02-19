@@ -12,6 +12,7 @@
 #include "usb_adb.h"
 #include <atlutil.h>
 #include "fastbootflash.h"
+#include "PST.h"
 #include "DlWorker.h"
 
 #include "adbhost.h"
@@ -41,42 +42,6 @@ enum
   USB_STAT_FINISH,
   USB_STAT_ERROR,
 };
-
-class CmdmfastbootDlg;
-
-class UsbWorkData{
-  public:
-    UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator);
-    ~UsbWorkData();
-    BOOL Clean(BOOL noCleanUI=TRUE);
-    BOOL IsIdle();
-    BOOL Reset(VOID);
-    BOOL Abort(VOID);
-    BOOL Start(DeviceInterfaces* devIntf, UINT nElapse, BOOL flashdirect);
-    BOOL Finish(VOID);
-    BOOL SwitchDev(UINT nElapse);
-    BOOL SetSwitchedStatus();
-    UINT ui_text_msg(UI_INFO_TYPE info_type, PCCH msg);
-    UINT SetProgress(int progress);
-    UINT SetPromptMsg(PCCH msg) { return ui_text_msg(PROMPT_TEXT, msg);};
-    const char *GetDevTag() { return devIntf->GetDevTag();};
-    BOOL Log(const char * msg);
-
-  private:
-    DeviceCoordinator *pCoordinator;
-
-  public:
-    CmdmfastbootDlg  *hWnd;
-    CPortStateUI      ctl;
-    CWinThread       *work;
-    usb_handle       *usb;
-    //this is the serial number for logical ui.
-    DeviceInterfaces*  devIntf;
-    int              stat;
-    FlashImageInfo const * flash_partition[PARTITION_NUM_MAX];
-    short           partition_nr;
-    BOOL            update_qcn;
-} ;
 
 #define THREADPOOL_SIZE	4
 static const int PORT_NUM_MAX = 9;
@@ -117,6 +82,8 @@ protected:
   unsigned int m_updated_number;
 
  friend CSettingsDlg;
+
+ public:
   //configuration
   BOOL m_pack_img;
   BOOL m_fix_port_map;
@@ -183,13 +150,6 @@ public:
 
 public:
     static UINT usb_work(LPVOID wParam);
-    static UINT adb_hw_check(adbhost& adb, UsbWorkData* data);
-    static UINT adb_sw_version_cmp(adbhost& adb, UsbWorkData* data);
-    static UINT sw_version_parse(UsbWorkData* data,PCCH key, PCCH value);
-    static UINT adb_shell_command(adbhost& adb, UsbWorkData* data, PCCH command,
-                                UI_INFO_TYPE info = UI_DEFAULT);
-    static UINT adb_write_IMEI(adbhost& adb, UsbWorkData* data);
-    static UINT adb_update_NV(adbhost& adb, UsbWorkData* data,  flash_image  *const image);
 
 private:
     BOOL InitSettingDlg(void);

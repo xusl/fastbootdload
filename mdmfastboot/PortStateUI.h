@@ -1,30 +1,6 @@
 #pragma once
 
-
-typedef enum
-{
-	FIRMWARE_VER,
-	QCN_VER,
-	LINUX_VER,
-	SYSTEM_VER,
-	USERDATA_VER,
-	PTS_VER,
-	TITLE,
-	PROGRESS_VAL,
-	PROMPT_TITLE,
-	PROMPT_TEXT,
-	ADB_CHK_ABORT,
-	REBOOT_DEVICE,
-	FLASH_DONE,
-	UI_DEFAULT,
-}UI_INFO_TYPE;
-
-struct UIInfo
-{
-	UI_INFO_TYPE	infoType;
-	int				iVal;
-	CString			sVal;
-};
+#include "PST.h"
 
 // CPortStateUI ¶Ô»°¿ò
 

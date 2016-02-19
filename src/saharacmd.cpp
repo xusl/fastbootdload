@@ -76,21 +76,16 @@ TResult SAHARACmd::DownloadPrg_9X07(uint8* prgbuf, size_t len,int myPort, bool b
     TResult result = EOK;
     imgBuf = prgbuf;
     imgLen = len;
-    Sleep(3000);
+    //Sleep(3000);
 
-    for(int i = 0; i < 5;i++)
-    {
+    for(int i = 0; i < 5; i++)  {
         //wait to receive hello package
-        if(blDownLoadMode)
-        {
+        if(blDownLoadMode) {
             result = GetHelloAckCmdInDlMode();
-        }
-        else
-        {
+        } else {
             result = GetHelloAckCmd();
         }
-        if(SUCCESS(result))
-        {
+        if(SUCCESS(result)) {
             break;
         }
     }
@@ -212,7 +207,7 @@ TResult SAHARACmd::GetHelloAckCmdInDlMode()
     result = m_packetDll->SaharaDLReceive(rsp_ptr,rlen);
     if (FAILURE(result))
     {
-        ReInitPacket("Download mode,GetHelloAckCmd:fail to receive Hello");
+        ReInitPacket(__FUNCTION__" Download mode, fail to receive Hello");
         m_packetDll->Uninit();
         return result;
     }
@@ -220,7 +215,7 @@ TResult SAHARACmd::GetHelloAckCmdInDlMode()
 
     if (rsp.command != CMD_HELLO)
     {
-        ReInitPacket("Download mode,GetHelloAckCmd:receive not Hello");
+        ReInitPacket(__FUNCTION__" Download mode, receive not Hello");
         result = EFAILED;
     }
     return result;
@@ -368,17 +363,16 @@ TResult SAHARACmd::SaharaHelloRsp()
     //req.status = 0;
     req.status = SUCCESS;
 
-
     DECLARE_CMD_PTR(cmd_ptr);
     START_BUILDING_CMD(CMD_HELLO_RSP);
     memcpy(cmd_ptr->buf, &req, len);
     cmd_ptr->length += len;
 
     result = this->SendCmd(cmd_ptr, &rlen);
-    INFO("COM%d SaharaHelloRsp:send %04X",port,*(cmd_ptr->buf));
+    LOGI("COM%d SaharaHelloRsp:send %04X",port,*(cmd_ptr->buf));
     if (FAILURE(result))
     {
-        ERR("COM%d Send Sahara hello respose Cmd failed",port);
+        LOGE("COM%d Send Sahara hello respose Cmd failed",port);
         return result;
     }
 
@@ -678,7 +672,7 @@ TResult SAHARACmd::SendCmd(cmd_buffer_s_type* cmd_ptr, uint32* rlen)
 
 TResult SAHARACmd::ReInitPacket(const char* info)
 {
-    LOGE("COM%d '%s'", port, info);
+    LOGE("COM%d: %s", port, info);
     m_packetDll->Uninit();
     m_packetDll->Init((unsigned short)port);
 

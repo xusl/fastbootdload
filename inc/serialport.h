@@ -16,6 +16,8 @@ when        who             what
 #include "define.h"
 /***************************************************************************/
 /***************************************************************************/
+#define PORT_TIMEOUT  5000			// timeout each operation default
+
 class CSerialPort
 {
 public:
@@ -33,7 +35,7 @@ public:
     TResult Send(uint8* pBuff, uint32 lSize, uint32 *pCount);
     TResult Receive(uint8* pBuff, uint32 lSize, uint32 *pCount);
     TResult ClearBuffer(void);
-    TResult SetTimeOut(uint32 Millisecond = 5000);
+    TResult SetTimeOut(uint32 Millisecond = PORT_TIMEOUT);
 
     unsigned int	GetTimeOut(void);
     unsigned short  GetComPort(void);

@@ -263,6 +263,7 @@
     <ClCompile Include="..\src\scsicmd.cpp" />
     <ClCompile Include="..\src\serialport.cpp" />
     <ClCompile Include="..\src\XmlParser.cpp" />
+    <ClCompile Include="AdbPST.cpp" />
     <ClCompile Include="DiagPST.cpp" />
     <ClCompile Include="fastbootflash.cpp" />
     <ClCompile Include="..\src\list.cpp" />
@@ -270,6 +271,7 @@
     <ClCompile Include="mdmfastboot.cpp" />
     <ClCompile Include="mdmfastbootDlg.cpp" />
     <ClCompile Include="PortStateUI.cpp" />
+    <ClCompile Include="PST.cpp" />
     <ClCompile Include="qcnlib\QcnParser.cpp" />
     <ClCompile Include="SettingsDlg.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -285,11 +287,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\serialport\serialport.h" />
+    <ClInclude Include="AdbPST.h" />
     <ClInclude Include="DiagPST.h" />
     <ClInclude Include="DlWorker.h" />
     <ClInclude Include="fastbootflash.h" />
     <ClInclude Include="mdmfastboot.h" />
     <ClInclude Include="mdmfastbootDlg.h" />
+    <ClInclude Include="PST.h" />
     <ClInclude Include="qcnlib\QcnParser.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SettingsDlg.h" />
