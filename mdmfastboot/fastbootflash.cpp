@@ -74,7 +74,7 @@ int fastboot::cb_default(void* data, Action *a, int status, char *resp)
 
         //%lld, refer to  adbhost::END;  %I64d
         port_text_msg(data, "OKAY [%lld.%03llds].",
-                elapse / MILLS_SECONDS, (elapse % MILLS_SECONDS) / 1000LL);
+                elapse / MILLS_SECONDS, (elapse % MILLS_SECONDS) / MICRO_SECONDS);
         a->start = split;
     }
     return status;
@@ -388,12 +388,12 @@ void fastboot::fb_execute_queue(usb_handle *usb, void* data)
 	elapse = now() - start;
     if (bIsBreak)
 	{
-		port_text_msg(data, "download breaked. total time: %lld.%03llds",
+		port_text_msg(data, "fastboot download breaked. total time: %lld.%03llds",
           elapse / MILLS_SECONDS, (elapse % MILLS_SECONDS) / 1000LL);
 	}
 	else
 	{
-		port_text_msg(data, "finished. total time: %lld.%03llds",
+		port_text_msg(data, "fastboot download finished. total time: %lld.%03llds",
           elapse / MILLS_SECONDS, (elapse % MILLS_SECONDS) / 1000LL);
 	}
 }

@@ -263,7 +263,9 @@ BOOL DeviceCoordinator::GetDevice(const wchar_t * const devPath, DeviceInterface
     }
     return FALSE;
 #endif
-    ASSERT(devPath != NULL);
+    if(devPath == NULL)
+        return FALSE;
+
     list<DeviceInterfaces*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
         if((*it)->MatchDevPath(devPath) && (*it)->GetDeviceStatus()) {

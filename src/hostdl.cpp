@@ -1160,7 +1160,7 @@ TResult CDLData::DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
     /* Keep send hello packet until reach max retry */
     for (i = 0; i < MAX_HELLO_PACKET_NUM; ++i)
     {
-        DBGD("COM%d: Send HELLO packet %d ...",dlPort, i);
+        LOGD("COM%d: Send HELLO packet %d ...",dlPort, i);
         result = this->SendHelloPacket();
         if (SUCCESS(result))
         {
@@ -1177,7 +1177,7 @@ TResult CDLData::DLoad9X25ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
     result = this->SendSecMode();
     if (FAILURE(result))
     {
-        DBGD("COM%d: Send SECMODE packet failed!", dlPort);
+        LOGD("COM%d: Send SECMODE packet failed!", dlPort);
         return EHOSTDLSECMODE;
     }
     /* send partition table*/
@@ -1301,35 +1301,33 @@ TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
     uint32  len = 0;
     int     i;
     for (i = 0; i < MAX_DUMMY_PACKET_NUM; ++i) {
-        DBGD("COM%d: Send DUMMY packet %d ...",dlPort, i);
+        LOGD("COM%d: Send DUMMY packet %d ...",dlPort, i);
         result = this->SendDummyData();
+        SLEEP(SEND_DUMMY_INTERVAL);
         if (SUCCESS(result)) {
             break;
         }
-        SLEEP(SEND_DUMMY_INTERVAL);
     }
     if (FAILURE(result)) {
         return EHOSTDLDUMMY;
     }
 
-    SLEEP(SEND_DUMMY_INTERVAL);
     /* Keep send hello packet until reach max retry */
     for (i = 0; i < MAX_HELLO_PACKET_NUM; ++i) {
-        DBGD("COM%d: Send HELLO packet %d ...",dlPort, i);
+        LOGD("COM%d: Send HELLO packet %d ...",dlPort, i);
         result = this->SendHelloPacket();
+        SLEEP(SEND_HELLO_INTERVAL);
         if (SUCCESS(result)) {
             break;
         }
-        SLEEP(SEND_HELLO_INTERVAL);
     }
     if (FAILURE(result)) {
         return EHOSTDLHELLO;
     }
-    SLEEP(1000);
     /* send security mode*/
     result = this->SendSecMode();
     if (FAILURE(result)) {
-        DBGD("COM%d: Send SECMODE packet failed!",dlPort);
+        LOGD("COM%d: Send SECMODE packet failed!",dlPort);
         return EHOSTDLSECMODE;
     }
     /* send partition table*/

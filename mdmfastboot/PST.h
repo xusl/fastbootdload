@@ -139,6 +139,8 @@ class UsbWorkData{
     UINT SetProgress(int progress);
     UINT SetPromptMsg(PCCH msg) { return ui_text_msg(PROMPT_TEXT, msg);};
     const char *GetDevTag() { return devIntf->GetDevTag();};
+    float GetElapseSeconds();
+    BOOL SetInfo(UI_INFO_TYPE infoType, CString strInfo);
     BOOL Log(const char * msg);
 
   private:
@@ -155,5 +157,6 @@ class UsbWorkData{
     FlashImageInfo const * flash_partition[PARTITION_NUM_MAX];
     short           partition_nr;
     BOOL            update_qcn;
+    long long       start_time_tick;
 } ;
 

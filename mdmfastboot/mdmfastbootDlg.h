@@ -134,7 +134,7 @@ public:
   BOOL SetDlgItemPos(UINT nID, int x, int y);
   BOOL UpdatePackageInfo(BOOL update = TRUE);
   BOOL HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
-  BOOL HandleDeviceArrived(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+  BOOL HandleDeviceArrived(wchar_t *devPath);
 
   BOOL SetupDevice(int evt);
   static void CALLBACK DeviceEventTimerProc(HWND hWnd,  UINT nMsg,  UINT_PTR nIDEvent,  DWORD dwTime);
