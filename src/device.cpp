@@ -46,18 +46,11 @@ CDevLabel* DeviceInterfaces::SetAdbIntf(CDevLabel& intf) {
 
 CDevLabel* DeviceInterfaces::SetDiagIntf(CDevLabel& intf) {
     DELETE_IF(mDiag);
-
-
-
     mDiag = new CDevLabel(intf);
-
-
-
     return mDiag;
 }
 
-
-  CPacket* DeviceInterfaces::GetPacket() {
+CPacket* DeviceInterfaces::GetPacket() {
     if (mDiag == NULL)
         return NULL;
 
@@ -85,11 +78,11 @@ VOID DeviceInterfaces::UpdateDevTag() {
     if(mDiag != NULL ) {
         //wsprintf
         if (mAdb != NULL || mFastboot != NULL )
-    snprintf(mTag, DEV_TAG_LEN, "COM%d (0X%X.%d)", mDiag->GetComPortNum(), sn, port);
-    else
-    snprintf(mTag, DEV_TAG_LEN, "COM%d", mDiag->GetComPortNum());
+            snprintf(mTag, DEV_TAG_LEN, "COM%d (0X%X.%d)", mDiag->GetComPortNum(), sn, port);
+        else
+            snprintf(mTag, DEV_TAG_LEN, "COM%d", mDiag->GetComPortNum());
     } else {
-     snprintf(mTag, DEV_TAG_LEN, "Device: 0X%X (%d)", sn, port);
+        snprintf(mTag, DEV_TAG_LEN, "Device: 0X%X (%d)", sn, port);
     }
 }
 
@@ -147,7 +140,7 @@ bool DeviceInterfaces::operator ==(const DeviceInterfaces * const & devIntf) con
 }
 
 bool DeviceInterfaces::Match(const DeviceInterfaces * const & devIntf) const {
-        if (this == devIntf)
+    if (this == devIntf)
         return true;
 
     CDevLabel* adb = devIntf->GetAdbIntf();
@@ -217,7 +210,14 @@ VOID DeviceInterfaces::Dump(const char *tag) {
     LOGD("DeviceInterfaces::Dump END ");
 }
 
-
+BOOL DeviceInterfaces::Reset() {
+    mActiveIntf = NULL;
+    mAdbHandle = NULL;
+    mFbHandle= NULL;
+    SetDeviceStatus(DEVICE_UNKNOW);
+    SetAttachStatus(false);
+   return TRUE;
+}
 DeviceCoordinator::DeviceCoordinator() :
     mDevintfList()
 {
@@ -313,12 +313,12 @@ BOOL DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type, DeviceInterface
 
 BOOL DeviceCoordinator::RemoveDevice(DeviceInterfaces* const & devIntf)  {
     ASSERT(devIntf != NULL);
-    LOGE("RemoveDevice , NOW DO NOTHING!");
-#if 0
+    LOGE("RemoveDevice !");
+    devIntf->Reset();
     mDevintfList.remove(devIntf);
     devIntf->DeleteMemory();
     delete devIntf;
-#endif
+
     return TRUE;
 }
 

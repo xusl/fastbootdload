@@ -25,7 +25,7 @@ Software_size (0),
     m_blDownloadMode(false),
     m_dlFileBuffer(filebuffer)
 {
-    DeviceInterfaces *dev =worker->devIntf;
+    DeviceInterfaces *dev =worker->mActiveDevIntf;
     m_Worker = worker;
     m_DLLPacket = dev->GetPacket();
     m_DIAGCmd = new CDIAGCmd(m_DLLPacket);

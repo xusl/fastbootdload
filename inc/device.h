@@ -246,6 +246,7 @@ class DeviceInterfaces {
   const char *GetDevTag() const{  return mTag;};
   long long GetTimeElapse() { return mEndTimeStamp - mBeginTimeStamp;};
   VOID Dump(const char *tag);
+  BOOL Reset();
 
   private:
     long long     mBeginTimeStamp;
@@ -255,7 +256,7 @@ class DeviceInterfaces {
 
     usb_handle*  mAdbHandle;
     usb_handle*  mFbHandle;
-    usb_dev_t       mDeviceActive;  //Device is exactly exist. For when enable fix logic port,
+    usb_dev_t    mDeviceActive;  //Device is exactly exist. For when enable fix logic port,
                                //we do not remove DeviceInterfaces object.
     CDevLabel  *mActiveIntf;  //interface which now we operate
     CDevLabel  *mAdb;       //Adb interface, appear in debug configuration

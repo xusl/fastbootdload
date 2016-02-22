@@ -122,6 +122,7 @@ typedef struct _UIInfo_
 
 class CmdmfastbootDlg;
 class CPortStateUI;
+#define WORK_NAME_LEN 16
 
 class UsbWorkData{
   public:
@@ -135,13 +136,16 @@ class UsbWorkData{
     BOOL Finish(VOID);
     BOOL SwitchDev(UINT nElapse);
     BOOL SetSwitchedStatus();
+    DWORD  WaitForDevSwitchEvt(DWORD dwMilliseconds = INFINITE);
+    DWORD  SetDevSwitchEvt(BOOL flashdirect);
     UINT ui_text_msg(UI_INFO_TYPE info_type, PCCH msg);
     UINT SetProgress(int progress);
     UINT SetPromptMsg(PCCH msg) { return ui_text_msg(PROMPT_TEXT, msg);};
-    const char *GetDevTag() { return devIntf->GetDevTag();};
+    const char *GetDevTag() { return mActiveDevIntf->GetDevTag();};
     float GetElapseSeconds();
     BOOL SetInfo(UI_INFO_TYPE infoType, CString strInfo);
     BOOL Log(const char * msg);
+    int GetStatus() { return stat;};
 
   private:
     DeviceCoordinator *pCoordinator;
@@ -150,9 +154,12 @@ class UsbWorkData{
     CmdmfastbootDlg  *hWnd;
     CPortStateUI      *pCtl;
     CWinThread       *work;
+    HANDLE            mDevSwitchEvt;
+    wchar_t          mName[WORK_NAME_LEN];
     usb_handle       *usb;
     //this is the serial number for logical ui.
-    DeviceInterfaces*  devIntf;
+    DeviceInterfaces*  mActiveDevIntf;
+    DeviceInterfaces*  mMapDevIntf;
     int              stat;
     FlashImageInfo const * flash_partition[PARTITION_NUM_MAX];
     short           partition_nr;
