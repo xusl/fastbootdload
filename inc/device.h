@@ -244,13 +244,13 @@ class DeviceInterfaces {
   CPacket* GetPacket();
   VOID UpdateDevTag();
   const char *GetDevTag() const{  return mTag;};
-  long long GetTimeElapse() { return mEndTimeStamp - mBeginTimeStamp;};
+  //long long GetTimeElapse() { return mEndTimeStamp - mBeginTimeStamp;};
   VOID Dump(const char *tag);
   BOOL Reset();
 
   private:
-    long long     mBeginTimeStamp;
-    long long     mEndTimeStamp;
+    //long long     mBeginTimeStamp;
+    //long long     mEndTimeStamp;
     bool       mAttachUiPort;
     char       mTag[DEV_TAG_LEN];
 

@@ -21,7 +21,9 @@ flash_image::flash_image(const wchar_t* config):
   qcn_ver("Unknown"),
   nv_buffer(NULL),
   nv_num(0),
-  nv_cmd(NULL)
+  nv_cmd(NULL),
+  mDiagDlImgSize(0),
+  mFbDlImgSize(0)
 {
   CString path;
   int data_len;
@@ -189,9 +191,7 @@ int flash_image::read_fastboot_config(const wchar_t* config) {
 
 int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write, const wchar_t* config)
 {
-
   FlashImageInfo* img = NULL;
-
   if (partition == NULL || lpath == NULL) {
     ERROR("Bad parameter");
     return -1;
@@ -257,6 +257,36 @@ bool flash_image::AddFileBuffer(const wchar_t *partition, const wchar_t *lpath, 
     return true;
 }
 
+int flash_image::GetDiagDlImgSize() {
+    if (mDiagDlImgSize != 0)
+        return mDiagDlImgSize;
+
+    std::map<string,FileBufStruct>::iterator it;
+    for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++) {
+        if(it->second.isDownload) {
+            string Only_DownLoad("appsboot.mbn,tz.mbn,sbl1.mbn,rpm.mbn,appsboot_fastboot.mbn");
+            string mode=it->first;
+            if(Only_DownLoad.find(mode)!=-1) {
+                mDiagDlImgSize+=it->second.uFileLens;
+            } else {
+               it->second.isDownload=false;
+           }
+        }
+    }
+    return mDiagDlImgSize;
+}
+
+int flash_image::GetFbDlImgSize() {
+    if (mFbDlImgSize != 0)
+        return mFbDlImgSize;
+    FlashImageInfo const *image = image_enum_init();
+    for(;image != NULL; image = image_enum_next(image)) {
+        if (image->need_download) {
+            mFbDlImgSize += image->size;
+        }
+    }
+    return mFbDlImgSize;
+}
 
 const wchar_t * flash_image::get_package_dir(void) {
     return pkg_dir;

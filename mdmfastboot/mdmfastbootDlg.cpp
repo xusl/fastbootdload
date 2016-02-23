@@ -54,7 +54,6 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialog)
 END_MESSAGE_MAP()
 
-
 UsbWorkData::UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator) {
     hWnd = dlg;
     pCtl = new CPortStateUI;
@@ -426,7 +425,7 @@ UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(wchar_t *devPath) {
         continue;
 
     if (item->MatchDevPath(devPath)&&
-      (m_workdata[i]->stat != USB_STAT_IDLE))
+      (m_workdata[i]->GetStatus()  != USB_STAT_IDLE))
       return m_workdata[i];
   }
 
@@ -872,7 +871,7 @@ BOOL CmdmfastbootDlg::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf
         return FALSE;
     }
 
-    UINT stat = data->stat;
+    UINT stat = data->GetStatus();
     if (stat == USB_STAT_WORKING) {
         // the device is plugin off when in working, that is because some accident.
         //the accident power-off in switch is handle by the timer.
@@ -987,9 +986,9 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
   LOGW("%s switch device timeout", data->mActiveDevIntf->GetDevTag());
   return ;
 
-  if (data->stat = USB_STAT_SWITCH) {
+  if (data->GetStatus()  == USB_STAT_SWITCH) {
     //remove_switch_device(nIDEvent);
-  } else if (data->stat = USB_STAT_WORKING){
+  } else if (data->GetStatus()  == USB_STAT_WORKING){
     if (data->work != NULL) //Delete, or ExitInstance
       data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
     usb_close(data->usb);
@@ -1173,7 +1172,6 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
     flash_image  *img;
     DeviceInterfaces *dev;
     int result;
-    BOOL ignore_version;
     usb_dev_t status ;
 
     if (data == NULL ||  data->hWnd == NULL || data->hWnd->m_image == NULL) {
@@ -1183,9 +1181,6 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
 
     dev = data->mActiveDevIntf;
     img = data->hWnd->m_image;
-    //TODO:: an option for this is better., such as force_update.
-    //when m_flashdirect set , force_update must set.
-    ignore_version = data->hWnd->m_flashdirect;
     status = dev->GetDeviceStatus();
 
     data->ui_text_msg(TITLE, dev->GetDevTag());
@@ -1199,8 +1194,11 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
             result = pst.Calculate_length();
         if(result)
             result = pst.DownloadPrg(data->hWnd->m_ConfigPath.GetString());
-        if(result)
-            result = pst.DownloadImages();
+        if(result) {
+            uint32 diagsize = img->GetDiagDlImgSize();
+            uint32 fbsize = img->GetFbDlImgSize();
+            result = pst.DownloadImages(((diagsize + fbsize ) * 100)/fbsize, 0);
+        }
         if(result) {
             dev->SetDeviceStatus(DEVICE_FLASH);
             data->ui_text_msg(REBOOT_DEVICE, "Enter fastboot");
@@ -1214,19 +1212,15 @@ UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
 
 handle = data->usb;
 status = dev->GetDeviceStatus();
-
-    if (status == DEVICE_CHECK) {
         if (handle == NULL) {
              data->ui_text_msg(FLASH_DONE, "Bad parameter");
             return -1;
         }
+
+    if (status == DEVICE_CHECK) {
         AdbPST pst(data->hWnd->m_forceupdate, m_module_name);
         pst.DoPST(data, img, dev);
     } else if (status == DEVICE_FLASH) {
-        if (handle == NULL) {
-             data->ui_text_msg(FLASH_DONE, "Bad parameter");
-            return -1;
-        }
         fastboot fb(handle);
         FlashImageInfo const * image;
         data->ui_text_msg(PROMPT_TITLE, "fastboot download");
@@ -1235,28 +1229,25 @@ status = dev->GetDeviceStatus();
         fb.fb_queue_display("version","version");
         fb.fb_queue_display("serialno","serialno");
         fb.fb_queue_display("kernel","kernel");
-
+#if 0
+        //this is check new image version and firmware version by adb
         for (int index = 0; index < data->partition_nr; index++) {
             image = data->flash_partition[index];
             if (image->need_download) {
                 fb.fb_queue_flash(image->partition_str, image->data, image->size);
             }
         }
-
-        if (data->partition_nr == 0 && ignore_version) {
+#endif
             image = img->image_enum_init();
-
             for(;image != NULL ; ) {
                 if (image->need_download) {
                     fb.fb_queue_flash(image->partition_str, image->data, image->size);
                 }
                 image = img->image_enum_next(image);
             }
-        }
 
         //  fb.fb_queue_reboot();
-        fb.fb_execute_queue(handle, data);
-
+        fb.fb_execute_queue(handle, data, img->GetDiagDlImgSize());
         data->ui_text_msg(FLASH_DONE, NULL);
         dev->SetDeviceStatus(DEVICE_REMOVED);
     }

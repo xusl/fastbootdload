@@ -826,13 +826,12 @@ bool DiagPST::Calculate_length() {
     return true;
 }
 
-bool DiagPST::DownloadImages() {
-    uint32 base = 0;
+bool DiagPST::DownloadImages(uint8 ratio, uint8 base) {
     TResult result = EOK;
 
     if(Software_size > 0) {
         SetPromptMsg("begin downloading image .");
-        m_dlData->SetRatioParams(100 - base, base);
+        m_dlData->SetRatioParams(ratio, base);
         SLEEP(500);
         result = m_dlData->DLoad9X07ImagesUsePtn(m_dlFileBuffer, Software_size);
         //result = m_dlData->DLoad9X25ImagesUsePtn(m_dlFileBuffer, Software_size);

@@ -45,7 +45,7 @@ public:
     virtual void initCustDataInfo();
     virtual bool DownloadCheck();
     virtual bool RunTimeDiag();
-    virtual bool DownloadImages();
+    virtual bool DownloadImages(uint8 ratio, uint8 base);
     virtual bool DownloadCustomerInfo();
     virtual bool DownloadPrg(const wchar_t* config);
     virtual bool Calculate_length();

@@ -1361,8 +1361,6 @@ TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
     }
     /* calculate all images buffer length, hd files not included */
     uint32 total = Software_size;
-
-    uint8 base = this->m_uBaseRatio;
     std::map<string,FileBufStruct>::iterator it;
     for (it = FileBufMap.begin(); it != FileBufMap.end(); it++) {
         if(!it->second.isDownload) {
@@ -1393,7 +1391,6 @@ TResult CDLData::DLoad9X07ImagesUsePtn(map<string,FileBufStruct> &FileBufMap,  u
             }
         }
     }
-    this->m_uBaseRatio = base;
     this->UpdateProgress(this->m_uBaseRatio + this->m_uTotalRatio);
     return result ;
 }

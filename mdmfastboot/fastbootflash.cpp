@@ -329,15 +329,15 @@ unsigned fastboot::image_size(void) {
     return total_size;
 }
 
-void fastboot::fb_execute_queue(usb_handle *usb, void* data)
+void fastboot::fb_execute_queue(usb_handle *usb, void* data, int pad_size)
 {
     Action *a;
     char resp[FB_RESPONSE_SZ+1];
     int status;
     long long start = -1;
     long long elapse = 0;
-    unsigned total_size = image_size();
-    unsigned flashed_size = 0;
+    unsigned total_size = image_size() + pad_size;
+    unsigned flashed_size = 0 + pad_size;
 	bool bIsBreak = false;
 
     a = action_list;

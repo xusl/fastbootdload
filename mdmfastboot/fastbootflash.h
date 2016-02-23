@@ -77,7 +77,7 @@ public:
    void fb_queue_command(const char *cmd, const char *msg);
    void fb_queue_download(const char *name, void *data, unsigned size);
    void fb_queue_notice(const char *notice);
-   void fb_execute_queue(usb_handle *usb,void* data);
+   void fb_execute_queue(usb_handle *usb,void* data, int pad_size);
 
 private:
    Action *action_list;

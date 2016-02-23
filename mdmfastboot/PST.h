@@ -58,6 +58,8 @@ class flash_image{
 	  BOOL set_download_flag(CString strPartitionName, bool bDownload);
     int read_fastboot_config(const wchar_t* config);
     int read_diagpst_config(const wchar_t* config);
+    int GetDiagDlImgSize();
+    int GetFbDlImgSize();
 
      bool AddFileBuffer(const wchar_t *partition, const wchar_t *pkgPath, const wchar_t *filName);
      map<string,FileBufStruct> GetFileBuffer() { return m_dlFileBuffer;};
@@ -81,6 +83,8 @@ class flash_image{
     char ** nv_buffer;
     char * nv_cmd;
     map<string,FileBufStruct>  m_dlFileBuffer;
+    uint32          mDiagDlImgSize;
+    uint32          mFbDlImgSize;
     CString a5sw_kern_ver;
     CString a5sw_usr_ver;
     CString a5sw_sys_ver;
@@ -149,21 +153,21 @@ class UsbWorkData{
 
   private:
     DeviceCoordinator *pCoordinator;
+    long long       start_time_tick;
+    HANDLE          mDevSwitchEvt;
+    wchar_t         mName[WORK_NAME_LEN];
+    int             stat;
 
   public:
     CmdmfastbootDlg  *hWnd;
-    CPortStateUI      *pCtl;
+    CPortStateUI     *pCtl;
     CWinThread       *work;
-    HANDLE            mDevSwitchEvt;
-    wchar_t          mName[WORK_NAME_LEN];
     usb_handle       *usb;
     //this is the serial number for logical ui.
     DeviceInterfaces*  mActiveDevIntf;
     DeviceInterfaces*  mMapDevIntf;
-    int              stat;
-    FlashImageInfo const * flash_partition[PARTITION_NUM_MAX];
+    FlashImageInfo const *flash_partition[PARTITION_NUM_MAX];
     short           partition_nr;
     BOOL            update_qcn;
-    long long       start_time_tick;
 } ;
 
