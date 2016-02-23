@@ -114,7 +114,7 @@ BOOL UsbWorkData::Clean(BOOL noCleanUI) {
   work = NULL;
   update_qcn = FALSE;
   partition_nr = 0;
-  start_time_tick = -1;
+  //start_time_tick = -1;
   ZeroMemory(flash_partition, sizeof(flash_partition));
   if(!noCleanUI)
       pCtl->Reset();
@@ -138,8 +138,9 @@ BOOL UsbWorkData::Reset(VOID) {
     } else {
       return FALSE;
     }
+    start_time_tick = -1;
 
-    Clean(FALSE);
+    Clean(TRUE);
     return TRUE;
 }
 
@@ -159,8 +160,8 @@ BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, UINT nElapse, BOOL flashdire
   usb_set_work(usb, TRUE);
   mActiveDevIntf->SetAttachStatus(true);
   stat = USB_STAT_WORKING;
-  if (start_time_tick == -1)
-      start_time_tick = now();
+  start_time_tick = now();
+  pCtl->Reset();
   work = AfxBeginThread(CmdmfastbootDlg::usb_work, this);
 
   if (work != NULL) {
@@ -181,7 +182,9 @@ BOOL UsbWorkData::Finish(VOID) {
      mActiveDevIntf  != NULL &&
      mActiveDevIntf->GetDiagIntf() != NULL &&
      mActiveDevIntf->GetFastbootIntf() != NULL) {
-    mMapDevIntf = new DeviceInterfaces(*mActiveDevIntf);
+    mMapDevIntf = new DeviceInterfaces();
+    mMapDevIntf->SetDiagIntf(*mActiveDevIntf->GetDiagIntf());
+    mMapDevIntf->SetFastbootIntf(*mActiveDevIntf->GetFastbootIntf());
   }
   usb_close(usb);
   Clean(TRUE);
@@ -927,12 +930,6 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
         break;
 
     case FLASH_DONE:
-        data->Finish();
-        m_updated_number ++;
-        if (NULL == mDevCoordinator.IsEmpty()) {
-           // AfxMessageBox(L"All devices is updated!");
-        }
-
         if (!uiInfo->sVal.IsEmpty()) {
             data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
             data->pCtl->SetInfo(PROMPT_TITLE, CString(""));
@@ -940,6 +937,12 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
             CString prompt;
             prompt.Format(_T("Update device sucessfully, elapse %.3fSeconds"), data->GetElapseSeconds());
             data->pCtl->SetInfo(PROMPT_TITLE, prompt);
+        }
+
+        data->Finish();
+        m_updated_number ++;
+        if (NULL == mDevCoordinator.IsEmpty()) {
+           // AfxMessageBox(L"All devices is updated!");
         }
 
         if (!m_fix_port_map) {
@@ -1262,9 +1265,6 @@ status = dev->GetDeviceStatus();
 
 
 BOOL CmdmfastbootDlg::ScheduleDeviceWork(BOOL flashdirect) {
-    usb_handle* handle;
-    UsbWorkData* data;
-
     if (!m_bWork) {
         // INFO("do not work now.");
         return FALSE;
@@ -1278,36 +1278,33 @@ BOOL CmdmfastbootDlg::ScheduleDeviceWork(BOOL flashdirect) {
      */
     DeviceInterfaces* idleDev;
     UsbWorkData* workdata;
-    BOOL NonePort;
     LOGD("==========Begin ScheduleDeviceWork==============");
-    while(NULL != (idleDev = mDevCoordinator.GetValidDevice())) {
-        idleDev->Dump(__FUNCTION__);
-        NonePort= TRUE;
-        for (int i=0; i < m_nPort; i++) {
-            workdata = m_workdata[i];
-            DeviceInterfaces* item = workdata->mMapDevIntf;
-            if (item == NULL)
-                item = workdata->mActiveDevIntf;
-            if (workdata->GetStatus() == USB_STAT_WORKING)
-                continue;
-            else if (workdata->GetStatus() == USB_STAT_SWITCH) {
+
+    for (int i=0; i < m_nPort; i++) {
+        workdata = m_workdata[i];
+        DeviceInterfaces* item = workdata->mMapDevIntf;
+        if (item == NULL)
+            item = workdata->mActiveDevIntf;
+
+        if (workdata->GetStatus() == USB_STAT_WORKING)
+            continue;
+
+        while(NULL != (idleDev = mDevCoordinator.GetValidDevice())) {
+            idleDev->Dump(__FUNCTION__);
+            if (workdata->GetStatus() == USB_STAT_SWITCH) {
                 ASSERT(item != NULL);
                 if (!item->Match(idleDev))
                     continue;
 
                 workdata->SetDevSwitchEvt(flashdirect);
-                NonePort = FALSE;
                 break;
             }
 
             if (m_fix_port_map == FALSE || item == NULL || item->Match(idleDev)) {
                 workdata->Start(idleDev, work_timeout, flashdirect);
-                NonePort = FALSE;
                 break;
             }
         }
-        if (NonePort)
-            break;
     }
     LOGD("==========END ScheduleDeviceWork==============");
 
@@ -1502,7 +1499,6 @@ void CmdmfastbootDlg::OnBnClickedButtonStop()
 	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_ENABLED);
 	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_ENABLED);
     SetWorkStatus(FALSE, FALSE);
-    mDevCoordinator.Reset();
     for (int i= 0; i < m_nPort; i++) {
         m_workdata[i]->Reset();
       }
