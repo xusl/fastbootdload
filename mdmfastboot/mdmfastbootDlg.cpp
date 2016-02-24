@@ -20,7 +20,6 @@
 #pragma	 comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")
 
-//static UINT usb_work(LPVOID wParam);
 MODULE_NAME CmdmfastbootDlg::m_module_name;
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
@@ -161,7 +160,7 @@ BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, UINT nElapse, BOOL flashdire
   stat = USB_STAT_WORKING;
   start_time_tick = now();
   pCtl->Reset();
-  work = AfxBeginThread(CmdmfastbootDlg::usb_work, this);
+  work = AfxBeginThread(CmdmfastbootDlg::RunDevicePST, this);
 
   if (work != NULL) {
     INFO("Schedule work for %s with timeout %d seconds!", mActiveDevIntf->GetDevTag(), nElapse);
@@ -590,35 +589,24 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
     m_forceupdate = TRUE; /*Now fw build system can not handle config.xml, so set it to true*/
   }
 
-#if 0
-  CString path;
+  mAppConf.ReadConfigIni();
 
   unsigned int size;
-  GetAppPath(path);
-  path += "/config1.xml";
-  void *data = load_file(path.GetString(), &size);
+  void *data = load_file(mAppConf.GetPkgConfXmlPath(), &size);
   XmlParser parser1;
-  //parser1.Parse((PCCH)data);
-  parser1.Parse("<?wsx version \"1.0\" ?><smil> \
-           <media src = \"welcome1.asf\"/>cdcddddddddd</smil>");
-
-
+  parser1.Parse((PCCH)data, size);
+  //parser1.Parse("<?wsx version \"1.0\" ?><smil> \
+  //         <media src = \"welcome1.asf\"/>cdcddddddddd</smil>");
+  LOGE(" xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
   XmlParser parser;
 
-  GetAppPath(path);
-  path += "/config.xml";
-  parser.Parse(path.GetString());
+  parser.Parse(mAppConf.GetPkgConfXmlPath());
   string refs;
   parser.getElementsByTagName(L"RECOVERYFS", refs);
   LOGE("RECOVERYFS value %sxxxxxxxxxxxxxxxxxxxxx", refs.c_str());
 
-  ImgUnpack imgunpack;
-
-    //
-  imgunpack.UnpackDownloadImg(L"F:\\EE40VB_00_00.00_11_20160202\\DownloadImage\\Download.img"
-  , m_ConfigPath.GetString());
-
-#endif
+  ImgUnpack img;
+  img.UnpackDlImg(mAppConf.GetPkgDlImgPath(),mAppConf.GetAppConfIniPath());
 
   return TRUE;
 }
@@ -1166,7 +1154,7 @@ BOOL CmdmfastbootDlg::SetupDevice(int evt) {
 /*
 * update flow is done here. Do update business logically.
 */
-UINT CmdmfastbootDlg::usb_work(LPVOID wParam) {
+UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
     UsbWorkData* data = (UsbWorkData*)wParam;
     usb_handle * handle;
     flash_image  *img;

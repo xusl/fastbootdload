@@ -28,7 +28,7 @@ ImgUnpack::~ImgUnpack() {
 }
 
 
-BOOL ImgUnpack::UnpackDownloadImg(const wchar_t *lpath, const wchar_t* config_file) {
+BOOL ImgUnpack::UnpackDlImg(const wchar_t *lpath, const wchar_t* config_file) {
     uint32 size;
     BYTE* pImgData = (BYTE*)load_file(lpath, &size);
     char headVerBuf[VERSION_HEAD_LEN] = {0};
@@ -135,7 +135,7 @@ bool ImgUnpack::ReadVersionInfo() {
     if(it != m_downloadFileBuffer.end()) {
         uint8* pXmlBuf = m_downloadFileBuffer.at(XML_NAME).strFileBuf;
         XmlParser *m_LocalConfig = new XmlParser();
-        m_LocalConfig->Parse((PCCH)pXmlBuf);
+        m_LocalConfig->Parse((PCCH)pXmlBuf, m_downloadFileBuffer.at(XML_NAME).uFileLens);
 
         versionMap.clear();
         string value=m_LocalConfig->get_XML_Value("External_Ver");

@@ -251,6 +251,7 @@
     <ClCompile Include="..\src\adb_auth_host.cpp" />
     <ClCompile Include="..\src\adbhost.cpp" />
     <ClCompile Include="..\src\adb_dev_register.cpp" />
+    <ClCompile Include="..\src\ConfigIni.cpp" />
     <ClCompile Include="..\src\custdata.cpp" />
     <ClCompile Include="..\src\device.cpp" />
     <ClCompile Include="..\src\diagcmd.cpp" />

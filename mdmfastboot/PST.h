@@ -11,16 +11,7 @@ static const int PARTITION_NUM_MAX = 32;
 static const int PARTITION_NAME_LEN = 32;
 static const int PARTITION_TBL_LEN = PARTITION_NUM_MAX * PARTITION_NAME_LEN;
 
-#define PKG_CONFIG_XML          L"config.xml"
-#define PKG_STATIC_QCN          L"static.qcn"
 
-#define PARTITIONTBL_SECTION    L"partition_table"
-#define PARTITIONTBL_DL		      L"partition_dl"
-#define DIAGPST_SECTION         L"pst_diag"
-#define PKG_SECTION             L"package"
-#define PKG_PATH                L"path"
-#define PST_NPRG                 L"pst_nprg"
-#define PST_ENPRG               L"pst_enprg"
 
 
 typedef struct FlashImageInfo {

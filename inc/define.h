@@ -289,6 +289,17 @@ typedef enum
 }DL_RESULT_STATE_EVENT;
 
 /*-------------------------------------------------------------------------*/
+#define PKG_CONFIG_XML          L"config.xml"
+#define PKG_STATIC_QCN          L"static.qcn"
+
+#define PARTITIONTBL_SECTION    L"partition_table"
+#define PARTITIONTBL_DL		      L"partition_dl"
+#define DIAGPST_SECTION         L"pst_diag"
+#define PKG_SECTION             L"package"
+#define PKG_PATH                L"path"
+#define PST_NPRG                 L"pst_nprg"
+#define PST_ENPRG               L"pst_enprg"
+
 
 /* SB Architecture 1.0 */
 #define PRGCOMBINE_NAME			"nandprgcombined.mbn"

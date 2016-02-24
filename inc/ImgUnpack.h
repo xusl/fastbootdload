@@ -12,7 +12,8 @@ public:
     ImgUnpack();
     ~ImgUnpack();
 
-    BOOL UnpackDownloadImg(const wchar_t *lpath, const wchar_t* config_file);
+    BOOL UnpackDlImg(const wchar_t *lpath, const wchar_t* config_file);
+    map<string,FileBufStruct> GetFileBuffer() { return m_downloadFileBuffer;};
 
 private:
   bool ReadVersionInfo();

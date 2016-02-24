@@ -22,6 +22,7 @@
 #include "scsicmd.h"
 #include "diagcmd.h"
 #include "jrddiagcmd.h"
+#include <ConfigIni.h>
 #include "XmlParser.h"
 
 enum
@@ -44,7 +45,6 @@ enum
 };
 
 #define THREADPOOL_SIZE	4
-static const int PORT_NUM_MAX = 9;
 
 enum
 {
@@ -97,6 +97,8 @@ protected:
 
 	//CThreadPool<CDlWorker> m_dlWorkerPool;
   CString m_ConfigPath;
+
+  ConfigIni   mAppConf;
   flash_image *m_image;
   UsbWorkData* m_workdata[PORT_NUM_MAX];
   CListCtrl  *m_imglist;
@@ -149,7 +151,7 @@ public:
 	afx_msg void OnDestroy();
 
 public:
-    static UINT usb_work(LPVOID wParam);
+    static UINT RunDevicePST(LPVOID wParam);
 
 private:
     BOOL InitSettingDlg(void);
