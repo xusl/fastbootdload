@@ -9,6 +9,7 @@
 #include "saharacmd.h"
 #include <map>
 #include <string>
+#include "XmlParser.h"
 
 using namespace std;
 
@@ -29,7 +30,7 @@ typedef struct
 class DiagPST
 {
 public:
-    DiagPST(UsbWorkData * worker, map<string,FileBufStruct> &filebuffer);
+    DiagPST(UsbWorkData * worker, XmlParser *xmlParser, map<string,FileBufStruct> &filebuffer);
     ~DiagPST(void);
 
 
@@ -66,7 +67,7 @@ private:
 
     bool RequestFirmwarVerAndMobileIdNormalMode();
     bool RequestExternalVersion();
-    VOID SetPromptMsg(PCCH msg);
+    VOID SetPromptMsg(const char *fmt,  ...);
     BOOL StringSplit(char * content, PCHAR lineDelim, std::vector<string>& dataOut);
 
 
@@ -84,6 +85,7 @@ private:
     uint32                           Software_size;
     TDLImgInfoType                  *m_pDLImgInfo;
     TCustDataInfoType               *m_pCustdataInfo;
+    XmlParser                       *m_LocalConfigXml;
 
     bool                            m_blDownloadMode;
     bool                            m_bRestore;

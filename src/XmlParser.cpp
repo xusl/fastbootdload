@@ -192,7 +192,7 @@ void XmlParser::ParseElement(CComPtr<IXMLDOMNode> &spNode, CString& NodeName) {
         }
         spChildNode.Release();
     }
-EXIT:
+//EXIT:
     spChildNodeList.Release();
 }
 

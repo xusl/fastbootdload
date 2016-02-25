@@ -4,15 +4,14 @@
 #include <string>
 #include <map>
 #include "device.h"
+#include <XmlParser.h>
+#include <ConfigIni.h>
 
 using namespace std;
 
 static const int PARTITION_NUM_MAX = 32;
 static const int PARTITION_NAME_LEN = 32;
 static const int PARTITION_TBL_LEN = PARTITION_NUM_MAX * PARTITION_NAME_LEN;
-
-
-
 
 typedef struct FlashImageInfo {
     struct FlashImageInfo *next;
@@ -121,7 +120,8 @@ class CPortStateUI;
 
 class UsbWorkData{
   public:
-    UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator);
+    UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator,
+      ConfigIni *appConf, XmlParser *xmlParser);
     ~UsbWorkData();
     BOOL Clean(BOOL noCleanUI=TRUE);
     BOOL IsIdle();
@@ -141,6 +141,7 @@ class UsbWorkData{
     BOOL SetInfo(UI_INFO_TYPE infoType, CString strInfo);
     BOOL Log(const char * msg);
     int GetStatus() { return stat;};
+    XmlParser *GetXmlParser() { return mPLocalConfigXml;};
 
   private:
     DeviceCoordinator *pCoordinator;
@@ -158,6 +159,8 @@ class UsbWorkData{
     DeviceInterfaces*  mActiveDevIntf;
     DeviceInterfaces*  mMapDevIntf;
     FlashImageInfo const *flash_partition[PARTITION_NUM_MAX];
+    ConfigIni      *mPAppConf;
+    XmlParser      *mPLocalConfigXml;
     short           partition_nr;
     BOOL            update_qcn;
 } ;

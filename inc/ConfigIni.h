@@ -3,7 +3,7 @@
 #include "define.h"
 #include <map>
 #include <string>
-#include <XmlParser.h>
+
 
 using namespace std;
 

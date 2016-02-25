@@ -53,7 +53,8 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialog)
 END_MESSAGE_MAP()
 
-UsbWorkData::UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator) {
+UsbWorkData::UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator,
+    ConfigIni *appConf, XmlParser *xmlParser) {
     hWnd = dlg;
     pCtl = new CPortStateUI;
     pCtl->Create(IDD_PORT_STATE, dlg);
@@ -63,6 +64,8 @@ UsbWorkData::UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coo
     mDevSwitchEvt = ::CreateEvent(NULL,TRUE,FALSE,mName);
     ASSERT(mDevSwitchEvt != NULL);
     pCoordinator = coordinator;
+    mPAppConf = appConf;
+    mPLocalConfigXml = xmlParser;
     mActiveDevIntf = NULL;
     mMapDevIntf = NULL;
     Clean(TRUE);
@@ -598,11 +601,10 @@ BOOL CmdmfastbootDlg::InitSettingConfig()
   //parser1.Parse("<?wsx version \"1.0\" ?><smil> \
   //         <media src = \"welcome1.asf\"/>cdcddddddddd</smil>");
   LOGE(" xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-  XmlParser parser;
 
-  parser.Parse(mAppConf.GetPkgConfXmlPath());
+  m_LocalConfigXml.Parse(mAppConf.GetPkgConfXmlPath());
   string refs;
-  parser.getElementsByTagName(L"RECOVERYFS", refs);
+  m_LocalConfigXml.getElementsByTagName(L"RECOVERYFS", refs);
   LOGE("RECOVERYFS value %sxxxxxxxxxxxxxxxxxxxxx", refs.c_str());
 
   ImgUnpack img;
@@ -671,7 +673,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   InitSettingDlg();
 
   for (int i = 0; i < m_nPort; i++) {
-    m_workdata[i] = new UsbWorkData(i, this, &mDevCoordinator);
+    m_workdata[i] = new UsbWorkData(i, this, &mDevCoordinator, &mAppConf, &m_LocalConfigXml);
   }
   //SetUpDevice(NULL, 0, &GUID_DEVCLASS_USB,  _T("USB"));
   //SetUpAdbDevice(NULL, 0);
@@ -1173,7 +1175,7 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
 
     data->ui_text_msg(TITLE, dev->GetDevTag());
     if (status == DEVICE_PLUGIN) {
-        DiagPST pst(data, img->GetFileBuffer());
+        DiagPST pst(data, data->GetXmlParser(), img->GetFileBuffer());
         data->ui_text_msg(PROMPT_TITLE, "Begin download by Diag");
         bool result = pst.DownloadCheck();
         if(result)

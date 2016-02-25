@@ -99,6 +99,7 @@ protected:
   CString m_ConfigPath;
 
   ConfigIni   mAppConf;
+  XmlParser   m_LocalConfigXml;
   flash_image *m_image;
   UsbWorkData* m_workdata[PORT_NUM_MAX];
   CListCtrl  *m_imglist;

@@ -18,11 +18,12 @@ if(worker != NULL)
 worker->ui_text_msg(PROMPT_TEXT, msg.c_str());
 }
 
-DiagPST::DiagPST(UsbWorkData * worker, map<string,FileBufStruct> & filebuffer):
+DiagPST::DiagPST(UsbWorkData * worker, XmlParser *xmlParser, map<string,FileBufStruct> & filebuffer):
 Software_size (0),
     m_iMobileId(0),
     m_FirmwareVersion(""),
     m_blDownloadMode(false),
+    m_LocalConfigXml(xmlParser),
     m_dlFileBuffer(filebuffer)
 {
     DeviceInterfaces *dev =worker->mActiveDevIntf;
@@ -418,19 +419,19 @@ bool DiagPST::checkIfPartitionMatchNormalMode()
     if(!m_bForceMode && !m_blDownloadMode)
     {
         char pPartitionVersion[VERSION_LEN] ;
-        memset(&pPartitionVersion,0, sizeof pPartitionVersion);
 
         for(int i = 0; i < 25;i++)
         {
-            result = m_newDIAGCmd->RequestVersion(E_JRD_PARTITION_VERSION,(char *)(&pPartitionVersion));
+            memset(pPartitionVersion,0, sizeof pPartitionVersion);
+            result = m_newDIAGCmd->RequestVersion(E_JRD_PARTITION_VERSION,pPartitionVersion);
             INFO("COM%d: Request partition Version, version = %s",m_dlPort,pPartitionVersion);
-            if(pPartitionVersion != NULL && '\0' != pPartitionVersion[0]) {
+            if(SUCCESS(result) || strlen(pPartitionVersion) > 0) {
                 break;
             }
             SLEEP(1000);
         }
 
-        if (FAILURE(result) || pPartitionVersion == NULL || '\0' == pPartitionVersion[0])
+        if (FAILURE(result) || strlen(pPartitionVersion) == 0)
         {
             SetPromptMsg("Request partition Version error!");
             return false;
@@ -438,7 +439,7 @@ bool DiagPST::checkIfPartitionMatchNormalMode()
 
         //compare the partition version
         //TODO::
-        string pPcPartition = "";//m_LocalConfigXml->get_XML_Value( "PARTITION");
+        string pPcPartition = m_LocalConfigXml->get_XML_Value( "PARTITION");
         //INFO("COM%d: PC partition Version, version = %s",
         // m_dlPort,pPcPartition.c_str());
         string pFWPartitionVersion(pPartitionVersion);
@@ -446,7 +447,7 @@ bool DiagPST::checkIfPartitionMatchNormalMode()
         vector<string> list2;
         char pcPartitionVersion[VERSION_LEN]={0};
         StringSplit(pPartitionVersion,"_", list1);
-        strcpy(pcPartitionVersion, pPcPartition.c_str());
+        strcpy_s(pcPartitionVersion, pPcPartition.c_str());
         StringSplit(pcPartitionVersion, "_", list2);
 
         if(list1.size() > 3)
@@ -487,7 +488,7 @@ bool DiagPST::checkIfPackageMatchDlMode()
         //QString mobileID = QString("%1%2").arg(buf[1],0,16).arg(buf[0],0,16);
         //bool ok;
         //m_iMobileId = mobileID.toInt(&ok, 16);
-        snprintf(data, 5, "%2x%2x", buf[1], buf[0]);
+        _snprintf_s(data, 5, "%2x%2x", buf[1], buf[0]);
         m_iMobileId = strtol(data, &end, 16);
 
         delete []buf;
@@ -796,7 +797,7 @@ bool DiagPST::DownloadPrg(const wchar_t* config) {
         return false;
     }
 
-    SetPromptMsg("download PRG");
+    SetPromptMsg("download PRG: %s", fn);
 
     /*
        if device in debug mode, it will enter tpst mode, and the com port of diag is changed.
@@ -805,7 +806,7 @@ bool DiagPST::DownloadPrg(const wchar_t* config) {
 
     result = m_sahara->DownloadPrg_9X07(pPrgImg->data,pPrgImg->len,m_dlPort,m_blDownloadMode);
     if (FAILURE(result))
-        LOGE("Download PRG %s failed", m_dlFileBuffer.at(fn).strFileName);
+        SetPromptMsg("Download PRG %s failed", m_dlFileBuffer.at(fn).strFileName);
     return true;
 }
 
@@ -869,7 +870,15 @@ BOOL DiagPST::StringSplit(char * content,  PCHAR lineDelim, std::vector<string>&
     return TRUE;
 }
 
-VOID DiagPST::SetPromptMsg(PCCH msg) {
-    INFO("%s: %s", m_Worker->GetDevTag(), msg);
-    m_Worker->SetPromptMsg(msg);
+VOID DiagPST::SetPromptMsg(const char *fmt,  ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    char buffer[256]={0};
+
+    //snprintf is not work properly .  vsprintf or _snprintf or _vsnprintf is OK.
+    _vsnprintf_s(buffer, sizeof(buffer), fmt, ap);
+    va_end(ap);
+
+    LOGI("%s: %s", m_Worker->GetDevTag(), buffer);
+    m_Worker->SetPromptMsg(buffer);
 }

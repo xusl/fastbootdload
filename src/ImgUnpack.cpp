@@ -21,17 +21,28 @@ ImgUnpack::ImgUnpack():
     versionMap.clear();
     m_efsFileName.clear();
     nvItemsIgnore.clear();
+    m_LocalConfig = new XmlParser();
 }
 
 ImgUnpack::~ImgUnpack() {
-    ;
+    delete m_LocalConfig;;
 }
 
 
 BOOL ImgUnpack::UnpackDlImg(const wchar_t *lpath, const wchar_t* config_file) {
+    if (lpath == NULL || config_file == NULL) {
+        return FALSE;
+    }
+
     uint32 size;
     BYTE* pImgData = (BYTE*)load_file(lpath, &size);
     char headVerBuf[VERSION_HEAD_LEN] = {0};
+
+    if(pImgData == NULL) {
+        LOGE("Can not load download image : %S", lpath);
+        return FALSE;
+    }
+
     memcpy(headVerBuf, pImgData, VERSION_HEAD_LEN);
     IMGVerS* pImgVer = (IMGVerS *)headVerBuf;
     imgVersion = pImgVer->imgVer;
@@ -134,7 +145,7 @@ bool ImgUnpack::ReadVersionInfo() {
     map<string,FileBufStruct>::iterator it = m_downloadFileBuffer.find(XML_NAME);
     if(it != m_downloadFileBuffer.end()) {
         uint8* pXmlBuf = m_downloadFileBuffer.at(XML_NAME).strFileBuf;
-        XmlParser *m_LocalConfig = new XmlParser();
+
         m_LocalConfig->Parse((PCCH)pXmlBuf, m_downloadFileBuffer.at(XML_NAME).uFileLens);
 
         versionMap.clear();
@@ -156,7 +167,7 @@ bool ImgUnpack::ReadVersionInfo() {
             versionMap[XML_KEY_QCN_VER] =m_LocalConfig->get_XML_Value("QCN");
             versionMap[XML_KEY_PTS_VER] = m_LocalConfig->get_XML_Value("PTS_Number");
         }
-        delete m_LocalConfig;
+
     }
     return true;
 }

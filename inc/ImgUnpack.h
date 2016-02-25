@@ -14,6 +14,7 @@ public:
 
     BOOL UnpackDlImg(const wchar_t *lpath, const wchar_t* config_file);
     map<string,FileBufStruct> GetFileBuffer() { return m_downloadFileBuffer;};
+    const XmlParser *GetConfXmlParser() { return m_LocalConfig;};
 
 private:
   bool ReadVersionInfo();
@@ -33,4 +34,5 @@ private:
     map<string, string>             versionMap;
     vector<string>                  m_efsFileName;
     vector<string>                  nvItemsIgnore;
+    XmlParser                      *m_LocalConfig;
 };

@@ -242,7 +242,7 @@ void *load_file(LPCWSTR fn, unsigned *_sz)
                        NULL );
 
     if (file == INVALID_HANDLE_VALUE) {
-        fprintf(stderr, "load_file: file open failed (rc=%ld)\n", GetLastError());
+        LOGE("load_file: file open failed (rc=%ld)\n", GetLastError());
         return NULL;
     }
 
@@ -252,7 +252,7 @@ void *load_file(LPCWSTR fn, unsigned *_sz)
     if (file_size > 0) {
         data = (char*) malloc( file_size + 1 );
         if (data == NULL) {
-            fprintf(stderr, "load_file: could not allocate %ld bytes\n", file_size );
+            LOGE("load_file: could not allocate %ld bytes\n", file_size );
             file_size = 0;
         } else {
             DWORD  out_bytes;
@@ -289,7 +289,7 @@ void *load_file(LPCWSTR fn, unsigned *_sz)
                 }
 
                 if (retry_failed) {
-                    fprintf(stderr, "load_file: could not read %ld bytes from '%s'\n", file_size, fn);
+                    LOGE("load_file: could not read %ld bytes from '%s'\n", file_size, fn);
                     free(data);
                     data      = NULL;
                     file_size = 0;
@@ -297,7 +297,7 @@ void *load_file(LPCWSTR fn, unsigned *_sz)
             }
         }
     } else {
-        fprintf(stderr, "load_file: file empty or negative size %ld\n", file_size);
+        LOGE("load_file: file empty or negative size %ld\n", file_size);
     }
     CloseHandle( file );
 
