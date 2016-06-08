@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{8d1f56d3-e84c-46e3-80b8-13d84bea2692}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;rc;def;r;odl;idl;hpj;bat</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{4283ce2e-7aec-4c03-afa9-4ea2150c80b6}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Firmware.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="JN51xx_BootLoader.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="programmer.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="uart_win.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ChipID.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ftd2xx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="header.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="JN51xx_BootLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="programmer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="programmer_private.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uart.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\JennicModuleProgrammer-v1_0\JennicModuleProgrammer-v1_0\JennicModuleProgrammer\Library\Build\FlashProgrammerExtension\FlashProgrammerExtension_JN5168.bin">
+      <Filter>Source Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
+</Project>
