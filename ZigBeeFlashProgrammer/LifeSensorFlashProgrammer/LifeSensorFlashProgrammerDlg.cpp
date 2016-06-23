@@ -2,16 +2,101 @@
 //
 
 #include "stdafx.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+
+#if defined POSIX
+#include <termios.h>
+#include <pthread.h>
+#elif defined WIN32
+#include <conio.h>
+#include <Windows.h>
+#endif
+
+//#include <sys/time.h>
+//#include <unistd.h>
 #include "LifeSensorFlashProgrammer.h"
 #include "LifeSensorFlashProgrammerDlg.h"
 
+#include "programmer.h"
+
+//#define __STDC__ TRUE
+#define vDelay(a) usleep(a * 1000)
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
 static char THIS_FILE[] = __FILE__;
 #endif
 
+#ifndef VERSION
+#error Version is not defined!
+#else
+const char *Version = "1.0 (r" VERSION ")";
+#endif
+
+unsigned char MAC_ADDR[8] = {0x00, 0x00 ,0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+unsigned char MAC_UI[8] = {0x00, 0x00 ,0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+typedef struct
+{
+    const char*     pcFirmwareFile;
+    const char*     pcDumpFlashFile;
+    teEepromErase   eEepromErase;
+    const char*     pcLoadEEPROMFile;
+    const char*     pcDumpEEPROMFile;
+
+    unsigned char*  pcMAC_Address;
+    uint64_t        u64MAC_Address;
+
+    int             iInitialSpeed;
+    int             iProgramSpeed;
+    int             iVerify;
+    int             iVerbosity;
+
+    int             iThreadNum;
+    int             iThreadTotal;
+    tsConnection    sConnection;
+#if defined POSIX
+    pthread_t       sThread;
+#elif defined WIN32
+    HANDLE          hThread;
+#endif
+    uint32_t thread_times;
+} tsProgramThreadArgs;
+
+static tsProgramThreadArgs sProgramThreadArgs = {
+    "FLASH",
+    NULL,
+    E_ERASE_EEPROM_ALL,//erase eeprom
+    NULL,
+    NULL,
+    NULL,
+    0,
+    38400,
+    1000000,
+    1,  //flash verify
+    0,
+	0,
+	0,
+    E_CONNECT_SERIAL,
+	NULL,
+	NULL,
+	0,
+	NULL
+};
+
+#if defined POSIX
+static void *pvProgramThread(void* pvData);
+#elif defined WIN32
+static DWORD dwProgramThread(void* pvData);
+#endif
+
 char *FlashFilePath = NULL;
+tsConnection    *asConnections     = NULL;
+tsProgramThreadArgs *asThreads      = NULL;
+uint32_t        u32NumConnections   = 0;
+uint32_t        NumOfDevicesProgrammed = 0;
 
 #define COLOR_RED 0x0000FF
 #define COLOR_BLUE 0xFF0000
@@ -71,21 +156,21 @@ BEGIN_MESSAGE_MAP(CAboutDlg, CDialog)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
-// CJN516xFlashProgrammerDlg dialog
+// LifeSensorFlashProgrammerDlg dialog
 
-CJN516xFlashProgrammerDlg::CJN516xFlashProgrammerDlg(CWnd* pParent /*=NULL*/)
-	: CDialog(CJN516xFlashProgrammerDlg::IDD, pParent)
+LifeSensorFlashProgrammerDlg::LifeSensorFlashProgrammerDlg(CWnd* pParent /*=NULL*/)
+	: CDialog(LifeSensorFlashProgrammerDlg::IDD, pParent)
 {
-	//{{AFX_DATA_INIT(CJN516xFlashProgrammerDlg)
+	//{{AFX_DATA_INIT(LifeSensorFlashProgrammerDlg)
 	//}}AFX_DATA_INIT
 	// Note that LoadIcon does not require a subsequent DestroyIcon in Win32
 	m_hIcon = AfxGetApp()->LoadIcon(IDI_ICON_ANIMAL);
 }
 
-void CJN516xFlashProgrammerDlg::DoDataExchange(CDataExchange* pDX)
+void LifeSensorFlashProgrammerDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
-	//{{AFX_DATA_MAP(CJN516xFlashProgrammerDlg)
+	//{{AFX_DATA_MAP(LifeSensorFlashProgrammerDlg)
 	DDX_Control(pDX, IDC_CLI, m_cli);
 	DDX_Control(pDX, IDC_MAC8, m_mac8);
 	DDX_Control(pDX, IDC_MAC7, m_mac7);
@@ -106,8 +191,8 @@ void CJN516xFlashProgrammerDlg::DoDataExchange(CDataExchange* pDX)
 	//}}AFX_DATA_MAP
 }
 
-BEGIN_MESSAGE_MAP(CJN516xFlashProgrammerDlg, CDialog)
-	//{{AFX_MSG_MAP(CJN516xFlashProgrammerDlg)
+BEGIN_MESSAGE_MAP(LifeSensorFlashProgrammerDlg, CDialog)
+	//{{AFX_MSG_MAP(LifeSensorFlashProgrammerDlg)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
@@ -120,9 +205,9 @@ BEGIN_MESSAGE_MAP(CJN516xFlashProgrammerDlg, CDialog)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
-// CJN516xFlashProgrammerDlg message handlers
+// LifeSensorFlashProgrammerDlg message handlers
 
-BOOL CJN516xFlashProgrammerDlg::OnInitDialog()
+BOOL LifeSensorFlashProgrammerDlg::OnInitDialog()
 {
 	CDialog::OnInitDialog();
 
@@ -162,8 +247,10 @@ BOOL CJN516xFlashProgrammerDlg::OnInitDialog()
 	m_Verify.SetCheck(TRUE);
 	m_Verify.EnableWindow(FALSE);
 
-	m_cli.SetCheck(TRUE);
-	m_cli.EnableWindow(FALSE);
+    //m_cli.SetCheck(TRUE);
+	//m_cli.EnableWindow(FALSE);
+	m_cli.SetCheck(FALSE);
+	m_cli.EnableWindow(TRUE);
 
 	m_Progress.SetRange(0,100);
 
@@ -185,7 +272,7 @@ BOOL CJN516xFlashProgrammerDlg::OnInitDialog()
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
-void CJN516xFlashProgrammerDlg::OnSysCommand(UINT nID, LPARAM lParam)
+void LifeSensorFlashProgrammerDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
 	if ((nID & 0xFFF0) == IDM_ABOUTBOX)
 	{
@@ -202,7 +289,7 @@ void CJN516xFlashProgrammerDlg::OnSysCommand(UINT nID, LPARAM lParam)
 //  to draw the icon.  For MFC applications using the document/view model,
 //  this is automatically done for you by the framework.
 
-void CJN516xFlashProgrammerDlg::OnPaint()
+void LifeSensorFlashProgrammerDlg::OnPaint()
 {
 	if (IsIconic())
 	{
@@ -229,94 +316,10 @@ void CJN516xFlashProgrammerDlg::OnPaint()
 
 // The system calls this to obtain the cursor to display while the user drags
 //  the minimized window.
-HCURSOR CJN516xFlashProgrammerDlg::OnQueryDragIcon()
+HCURSOR LifeSensorFlashProgrammerDlg::OnQueryDragIcon()
 {
 	return (HCURSOR) m_hIcon;
 }
-
-#define __STDC__ TRUE
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-
-#if defined POSIX
-#include <termios.h>
-#include <pthread.h>
-#elif defined WIN32
-#include <conio.h>
-#include <Windows.h>
-#endif
-
-//#include <sys/time.h>
-//#include <unistd.h>
-
-#include "programmer.h"
-
-#define vDelay(a) usleep(a * 1000)
-
-#ifndef VERSION
-#error Version is not defined!
-#else
-const char *Version = "1.0 (r" VERSION ")";
-#endif
-
-unsigned char MAC_ADDR[8] = {0x00, 0x00 ,0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-unsigned char MAC_UI[8] = {0x00, 0x00 ,0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-typedef struct
-{
-    const char*     pcFirmwareFile;
-    const char*     pcDumpFlashFile;
-    teEepromErase   eEepromErase;
-    const char*     pcLoadEEPROMFile;
-    const char*     pcDumpEEPROMFile;
-
-    unsigned char*  pcMAC_Address;
-    uint64_t        u64MAC_Address;
-
-    int             iInitialSpeed;
-    int             iProgramSpeed;
-    int             iVerify;
-    int             iVerbosity;
-
-    int             iThreadNum;
-    int             iThreadTotal;
-    tsConnection    sConnection;
-#if defined POSIX
-    pthread_t       sThread;
-#elif defined WIN32
-    HANDLE          hThread;
-#endif
-    uint32_t thread_times;
-} tsProgramThreadArgs;
-
-static tsProgramThreadArgs sProgramThreadArgs =
-{
-    "FLASH",
-    NULL,
-    E_ERASE_EEPROM_ALL,//erase eeprom
-    NULL,
-    NULL,
-    NULL,
-    0,
-    38400,
-    1000000,
-    1,  //flash verify
-    0,
-	0,
-	0,
-    E_CONNECT_SERIAL,
-	NULL,
-	NULL,
-	0,
-	NULL
-};
-
-#if defined POSIX
-static void *pvProgramThread(void* pvData);
-#elif defined WIN32
-static DWORD dwProgramThread(void* pvData);
-#endif
 
 
 teStatus cbProgress(void *pvUser, const char *pcTitle, const char *pcText, int iNumSteps, int iProgress)
@@ -360,13 +363,6 @@ teStatus cbConfirm(void *pvUser, const char *pcTitle, const char *pcText)
     return E_PRG_ABORTED;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
-//global variables
-	tsConnection    *asConnections     = NULL;
-    tsProgramThreadArgs *asThreads      = NULL;
-    uint32_t        u32NumConnections   = 0;
-	uint32_t        NumOfDevicesProgrammed = 0;
-    int             i=0;
-	int iListDevices =0;
 
 void IncreaseMACAddr(unsigned char * mac)
 {
@@ -461,14 +457,13 @@ BOOL StartApplication(CString cppAppName, CString cppCommandLine)
     return TRUE;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
-DWORD CJN516xFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
+DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
     //printf("JennicModuleProgrammer Version: %s (libprogrammer version %s)\n", Version, pcPRG_Version);
     CString temp;
     CString temp2;
 
     if (Operation == GetComPorts) {
         tsPRG_Context       sContext;
-        iListDevices =1;
         //uint32_t            u32NumConnections;
         //tsConnection*       asConnections = NULL;
         unsigned int         i;
@@ -525,25 +520,19 @@ DWORD CJN516xFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
                         DEFAULT_PITCH  |  FF_SWISS,  //  nPitchAndFamily
                         _T("MS Sans Serif" ));  //  lpszFac
 
-        for (i = 0; i < u32NumConnections; i++)
-        {
+        for (i = 0; i < u32NumConnections; i++) {
             CRect rect;
-            if(i<13)
-            {
+            if(i<13) {
                 rect.left = 30;
                 rect.bottom = 40 + i*20;
                 rect.top = 30 + i*20;
                 rect.right = 200;
-            }
-            else if(i<26)
-            {
+            } else if(i<26) {
                 rect.left = 30 + 150;
                 rect.bottom = 40 + (i-13)*20;
                 rect.top = 30 + (i-13)*20;
                 rect.right = 200 + 150;
-            }
-            else if(i<39)
-            {
+            } else if(i<39) {
                 rect.left = 30 + 300;
                 rect.bottom = 40 + (i-26)*20;
                 rect.top = 30 + (i-26)*20;
@@ -551,7 +540,9 @@ DWORD CJN516xFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
             }
 
             p_CheckBox[i] = new CButton();
-            p_CheckBox[i]->Create(_T(asConnections[i].pcName), WS_TABSTOP | WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, rect, this, 1100 + i );
+            p_CheckBox[i]->Create(_T(asConnections[i].pcName),
+                                  WS_TABSTOP | WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                                  rect, this, 1100 + i );
             p_CheckBox[i]->SetCheck(TRUE);
         }
 
@@ -572,7 +563,7 @@ DWORD CJN516xFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
 
         if(m_cli.GetCheck() == TRUE)
         {
-            for (i = 0; i < u32NumConnections; i++)
+            for (int i = 0; i < u32NumConnections; i++)
             {
                 m_Progress.SetPos((i*100)/u32NumConnections);
 
@@ -614,7 +605,7 @@ DWORD CJN516xFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
         }
         else
         {
-            for (i = 0; i < u32NumConnections; i++)
+            for (int i = 0; i < u32NumConnections; i++)
             {
                 m_Progress.SetPos((i*100)/u32NumConnections);
 
@@ -870,7 +861,7 @@ done:
 
 }
 
-CButton* CJN516xFlashProgrammerDlg::NewCheckBox(int nID,CRect rect,int nStyle)
+CButton* LifeSensorFlashProgrammerDlg::NewCheckBox(int nID,CRect rect,int nStyle)
 {
 CString m_Caption;
 m_Caption.LoadString(nID);
@@ -888,7 +879,7 @@ void CharToDigit(unsigned char* temp_char)
 		*temp_char -= 48;
 }
 
-void CJN516xFlashProgrammerDlg::OnProgram()
+void LifeSensorFlashProgrammerDlg::OnProgram()
 {
 	// TODO: Add your control notification handler code here
 	// Get the devicec need to be programmed
@@ -1070,17 +1061,17 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 
 }
 
-void CJN516xFlashProgrammerDlg::OnClose()
+void LifeSensorFlashProgrammerDlg::OnClose()
 {
 	// TODO: Add your message handler code here and/or call default
 	free(asConnections);
 	free(asThreads);
-	for (i = 0; i < u32NumConnections; i++)
+	for (int i = 0; i < u32NumConnections; i++)
         delete p_CheckBox[i];
 	CDialog::OnClose();
 }
 
-void CJN516xFlashProgrammerDlg::OnOpen()
+void LifeSensorFlashProgrammerDlg::OnOpen()
 {
 	// TODO: Add your control notification handler code here
 	 CFileDialog dlg(TRUE, "bin", "*.bin", NULL, "JN516x flash file(*.bin)",NULL);
@@ -1104,7 +1095,7 @@ void CJN516xFlashProgrammerDlg::OnOpen()
      }
 }
 
-void CJN516xFlashProgrammerDlg::OnComlist()
+void LifeSensorFlashProgrammerDlg::OnComlist()
 {
 	m_Progress.SetPos(0);
 	Main_Entry(GetComPorts);
@@ -1112,7 +1103,7 @@ void CJN516xFlashProgrammerDlg::OnComlist()
 	m_Program.SetText("Program");
 }
 
-void CJN516xFlashProgrammerDlg::OnMacEn()
+void LifeSensorFlashProgrammerDlg::OnMacEn()
 {
     if(m_mac_en.GetCheck() == TRUE)
     {

@@ -54,7 +54,7 @@ BOOL CJN516xFlashProgrammerApp::InitInstance()
 	Enable3dControlsStatic();	// Call this when linking to MFC statically
 #endif
 
-	CJN516xFlashProgrammerDlg dlg;
+	LifeSensorFlashProgrammerDlg dlg;
 	m_pMainWnd = &dlg;
 	int nResponse = dlg.DoModal();
 	if (nResponse == IDOK)

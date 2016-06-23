@@ -1,8 +1,8 @@
 // JN516x Flash ProgrammerDlg.h : header file
 //
 
-#if !defined(AFX_JN516XFLASHPROGRAMMERDLG_H__8649422B_BC30_4A5F_9A3C_6D0F0805BC8A__INCLUDED_)
-#define AFX_JN516XFLASHPROGRAMMERDLG_H__8649422B_BC30_4A5F_9A3C_6D0F0805BC8A__INCLUDED_
+#if !defined(AFX_LIFESENSORFLASHPROGRAMMERDLG_H__8649422B_BC30_4A5F_9A3C_6D0F0805BC8A__INCLUDED_)
+#define AFX_LIFESENSORFLASHPROGRAMMERDLG_H__8649422B_BC30_4A5F_9A3C_6D0F0805BC8A__INCLUDED_
 
 #if _MSC_VER > 1000
 #pragma once
@@ -11,7 +11,7 @@
 #include "MyButton.h"
 
 /////////////////////////////////////////////////////////////////////////////
-// CJN516xFlashProgrammerDlg dialog
+// LifeSensorFlashProgrammerDlg dialog
 typedef enum Operation
 {
 	GetComPorts = 0,
@@ -20,15 +20,15 @@ typedef enum Operation
 
 #define MAX 100
 
-class CJN516xFlashProgrammerDlg : public CDialog
+class LifeSensorFlashProgrammerDlg : public CDialog
 {
 // Construction
 public:
-	CJN516xFlashProgrammerDlg(CWnd* pParent = NULL);	// standard constructor
+	LifeSensorFlashProgrammerDlg(CWnd* pParent = NULL);	// standard constructor
     DWORD Main_Entry(Operation_t Operation);
 	CButton* NewCheckBox(int nID,CRect rect,int nStyle);
 // Dialog Data
-	//{{AFX_DATA(CJN516xFlashProgrammerDlg)
+	//{{AFX_DATA(LifeSensorFlashProgrammerDlg)
 	enum { IDD = IDD_JN516XFLASHPROGRAMMER_DIALOG };
 	CButton	m_cli;
 	CEdit	m_mac8;
@@ -50,7 +50,7 @@ public:
 	//}}AFX_DATA
 
 	// ClassWizard generated virtual function overrides
-	//{{AFX_VIRTUAL(CJN516xFlashProgrammerDlg)
+	//{{AFX_VIRTUAL(LifeSensorFlashProgrammerDlg)
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 	//}}AFX_VIRTUAL
@@ -62,7 +62,7 @@ protected:
 	CString m_FilePath;
 
 	// Generated message map functions
-	//{{AFX_MSG(CJN516xFlashProgrammerDlg)
+	//{{AFX_MSG(LifeSensorFlashProgrammerDlg)
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();

@@ -828,7 +828,7 @@ teStatus ePRG_FlashVerify(tsPRG_Context *psContext, tcbFW_Progress cbProgress, v
 
 teStatus LIBPROGRAMMER ePRG_FlashDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progress cbProgress, void *pvUser)
 {
-    int iFd;
+    FILE * iFd;
     int n;
     const uint8_t u8ChunkSize = 128;
     
@@ -1126,7 +1126,7 @@ teStatus ePRG_EepromErase(tsPRG_Context *psContext, teEepromErase eErase, tcbFW_
 teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progress cbProgress, void *pvUser)
 {
     const uint8_t u8ChunkSize = 128;
-    int iFd;
+    FILE * iFd;
     uint32_t n;
     teStatus eStatus;
     tsChipDetails *psChipDetails;
@@ -1163,13 +1163,13 @@ teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progr
         if ((eStatus = ePRG_FwGetInfo(&sContext, FLASHPROGRAMMEREXTENSION_JN5168_BIN)) != E_PRG_OK)
         {
             /* Error with file. FW module has displayed error so just exit. */
-            close(iFd);
+            fclose(iFd);
             return ePRG_SetStatus(psContext, eStatus, "loading extension binary");
         }
         
         if ((eStatus = ePRG_MemoryLoadExecute(&sContext, NULL, ePRG_ConfirmAlways, NULL)) != E_PRG_OK)
         {
-            close(iFd);
+            fclose(iFd);
             return ePRG_SetStatus(psContext, eStatus, "loading extension binary into RAM");
         }
        
@@ -1248,7 +1248,7 @@ teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progr
 teStatus ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoadFile, tcbFW_Progress cbProgress, void *pvUser)
 {
     uint8_t u8ChunkSize;
-    int iFd;
+    FILE * iFd;
     uint32_t n;
     teStatus eStatus;
     tsChipDetails *psChipDetails;
@@ -1609,7 +1609,7 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
     /* Send chip id request */
     if(eBL_ChipIdRead(psContext, &psChipDetails->u32ChipId) != E_PRG_OK)
     {
-        //DBG_vPrintf(TRACE_PROGRAMMER, "Error reading chip id\n");
+        DBG_vPrintf(TRACE_PROGRAMMER, "Error reading chip id\n");
 
         /* That failed so it might be an old device that doesn't support the command, try reading it directly */
         if (eBL_MemoryRead(psContext, 0x100000FC, 4, au8Buffer) != E_PRG_OK)
