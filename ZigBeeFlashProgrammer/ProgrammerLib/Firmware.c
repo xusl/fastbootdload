@@ -275,7 +275,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
         }
     }
     
-    psFwPriv = malloc(sizeof(tsFwPrivate));
+    psFwPriv = (tsFwPrivate *)malloc(sizeof(tsFwPrivate));
     if (!psFwPriv)
     {
         return E_PRG_OUT_OF_MEMORY;
@@ -308,7 +308,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
         return ePRG_SetStatus(psContext, E_PRG_ERROR, "(%s)", pcPRG_GetLastErrorMessage(psContext));
     }
     
-    psFwPriv->pu8Firmware = MapViewOfFile(psFwPriv->hMapping, FILE_MAP_COPY, 0, 0, psFwPriv->dwFileSize);
+    psFwPriv->pu8Firmware = (uint8_t *)MapViewOfFile(psFwPriv->hMapping, FILE_MAP_COPY, 0, 0, psFwPriv->dwFileSize);
     
     if (!psFwPriv->pu8Firmware)
     {

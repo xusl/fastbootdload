@@ -49,7 +49,6 @@
 /****************************************************************************/
 /***        Include files                                                 ***/
 /****************************************************************************/
-
 #include <stdio.h>
 //#include <unistd.h>
 //#include <stdint.h>
@@ -60,7 +59,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include "log.h"
 
 #if defined WIN32
 #include <Windows.h>
@@ -422,6 +421,9 @@ teStatus LIBPROGRAMMER ePRG_Init(tsPRG_Context *psContext)
 		bin_file[i++] = ch;
 	}			
 */
+
+
+StartLogging("LifeSensor.log", "debug,log,info,warn,error", "all");
     bin_file = bin_extension;
 	memset(psContext, 0, sizeof(tsPRG_Context));
     
@@ -445,11 +447,13 @@ teStatus LIBPROGRAMMER ePRG_Destroy(tsPRG_Context *psContext)
 
 	//free(bin_file);
     free(psContext->pvPrivate);
+    
+    StopLogging();
     return E_PRG_OK;
 }
 
 
-char *LIBPROGRAMMER pcPRG_GetLastStatusMessage(tsPRG_Context *psContext)
+char * pcPRG_GetLastStatusMessage(tsPRG_Context *psContext)
 {
     tsPRG_PrivateContext *psPriv = (tsPRG_PrivateContext *)psContext->pvPrivate;
     
@@ -585,7 +589,7 @@ teStatus ePRG_FlashErase(tsPRG_Context *psContext, tcbFW_Progress cbProgress, vo
     {
         return ePRG_SetStatus(psContext, eStatus, "reading flash ID");
     }
-    //DBG_vPrintf(TRACE_PROGRAMMER, "FlashId: %04x\n", u16FlashId);
+    LOGD("FlashId: %04x", u16FlashId);
 
     /* Set the flash type */
     if((eStatus = eBL_FlashSelectDevice(psContext, u16FlashId)) != E_PRG_OK)
@@ -616,12 +620,12 @@ teStatus ePRG_FlashErase(tsPRG_Context *psContext, tcbFW_Progress cbProgress, vo
     }
 
     /* Ensure that flash is erased */
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Checking flash is blank...\n");
+    LOGD("Checking flash is blank...");
     memset(au8Buffer2, 0xFF, 64);
 
     if ((eStatus = eBL_FlashRead(psContext, 0, 64, au8Buffer1)) != E_PRG_OK)
     {
-        return ePRG_SetStatus(psContext, eStatus, "reading Flash at address 0x%08X\n", 0);
+        return ePRG_SetStatus(psContext, eStatus, "reading Flash at address 0x%08X", 0);
     }
     else
     {
@@ -765,7 +769,7 @@ teStatus ePRG_FlashVerify(tsPRG_Context *psContext, tcbFW_Progress cbProgress, v
     {
         return ePRG_SetStatus(psContext, eStatus, "reading flash ID");
     }
-    //DBG_vPrintf(TRACE_PROGRAMMER, "FlashId: %04x\n", u16FlashId);
+    LOGD("FlashId: %04x", u16FlashId);
 
     /* Set the flash type */
     if((eStatus = eBL_FlashSelectDevice(psContext, u16FlashId)) != E_PRG_OK)
@@ -795,13 +799,13 @@ teStatus ePRG_FlashVerify(tsPRG_Context *psContext, tcbFW_Progress cbProgress, v
 
         if ((eStatus = eBL_FlashRead(psContext, n, u8ChunkSize, au8Buffer1)) != E_PRG_OK)
         {
-            return ePRG_SetStatus(psContext, eStatus, "reading Flash at address 0x%08X\n", n);
+            return ePRG_SetStatus(psContext, eStatus, "reading Flash at address 0x%08X", n);
         }
         else
         {
             if (memcmp(psFWImage->pu8ImageData + n, au8Buffer1, u8ChunkSize))
             {
-                return ePRG_SetStatus(psContext, E_PRG_VERIFICATION_FAILED, "at address 0x%08X\n", n);
+                return ePRG_SetStatus(psContext, E_PRG_VERIFICATION_FAILED, "at address 0x%08X", n);
             }
         }
 
@@ -852,13 +856,13 @@ teStatus LIBPROGRAMMER ePRG_FlashDump(tsPRG_Context *psContext, char *pcDumpFile
         if ((eStatus = eBL_FlashRead(psContext, n, u8ChunkSize, au8Buffer)) != E_PRG_OK)
         {
             fclose(iFd);
-            return ePRG_SetStatus(psContext, eStatus, "reading Flash at address 0x%08X\n", n);
+            return ePRG_SetStatus(psContext, eStatus, "reading Flash at address 0x%08X", n);
         }
         if (fwrite(au8Buffer,u8ChunkSize,1,iFd) < 0)
 //        if (write(iFd, au8Buffer, u8ChunkSize) < 0)
         {
             fclose(iFd);
-            return ePRG_SetStatus(psContext, E_PRG_ERROR_WRITING, "file at address 0x%08X\n", n);
+            return ePRG_SetStatus(psContext, E_PRG_ERROR_WRITING, "file at address 0x%08X", n);
         }
         
         if (cbProgress)
@@ -915,12 +919,12 @@ teStatus ePRG_MemoryLoadExecute(tsPRG_Context *psContext, tcbFW_Progress cbProgr
     {
         return eStatus;
     }
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Text Start 0x%08x - Length %d bytes\n", psFWImage->u32TextSectionLoadAddress, psFWImage->u32TextSectionLength);
-    //DBG_vPrintf(TRACE_PROGRAMMER, "BSS  Start 0x%08x - Length %d bytes\n", psFWImage->u32BssSectionLoadAddress, psFWImage->u32BssSectionLength);
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Reset entry point 0x%08x\n", psFWImage->u32ResetEntryPoint);
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Wake  entry point 0x%08x\n", psFWImage->u32WakeUpEntryPoint);
+    LOGD("Text Start 0x%08x - Length %d bytes", psFWImage->u32TextSectionLoadAddress, psFWImage->u32TextSectionLength);
+    LOGD("BSS  Start 0x%08x - Length %d bytes", psFWImage->u32BssSectionLoadAddress, psFWImage->u32BssSectionLength);
+    LOGD("Reset entry point 0x%08x", psFWImage->u32ResetEntryPoint);
+    LOGD("Wake  entry point 0x%08x", psFWImage->u32WakeUpEntryPoint);
 
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Loading .text\n");
+    LOGD("Loading .text");
     
     if (cbProgress)
     {
@@ -944,19 +948,19 @@ teStatus ePRG_MemoryLoadExecute(tsPRG_Context *psContext, tcbFW_Progress cbProgr
         
         if((eStatus = eBL_MemoryWrite(psContext, psFWImage->u32TextSectionLoadAddress + n, u8ChunkSize, psFWImage->pu8TextData + n)) != E_PRG_OK)
         {
-            return ePRG_SetStatus(psContext, eStatus, "writing chunk at address 0x%08X\n", psFWImage->u32TextSectionLoadAddress + n);
+            return ePRG_SetStatus(psContext, eStatus, "writing chunk at address 0x%08X", psFWImage->u32TextSectionLoadAddress + n);
         }
 
         /* Verify the memory contents */
         if ((eStatus = eBL_MemoryRead(psContext, psFWImage->u32TextSectionLoadAddress + n, u8ChunkSize, au8Buffer)) != E_PRG_OK)
         {
-            return ePRG_SetStatus(psContext, eStatus, "reading at address 0x%08X\n", psFWImage->u32TextSectionLoadAddress + n);
+            return ePRG_SetStatus(psContext, eStatus, "reading at address 0x%08X", psFWImage->u32TextSectionLoadAddress + n);
         }
         else
         {
             if (memcmp(psFWImage->pu8TextData + n, au8Buffer, u8ChunkSize))
             {
-                return ePRG_SetStatus(psContext, E_PRG_VERIFICATION_FAILED, "at address 0x%08X\n", psFWImage->u32TextSectionLoadAddress + n);
+                return ePRG_SetStatus(psContext, E_PRG_VERIFICATION_FAILED, "at address 0x%08X", psFWImage->u32TextSectionLoadAddress + n);
             }
         }
 
@@ -969,7 +973,7 @@ teStatus ePRG_MemoryLoadExecute(tsPRG_Context *psContext, tcbFW_Progress cbProgr
         }
     }
 
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Clearing .bss     \n"); 
+    LOGD("Clearing .bss     "); 
     if (cbProgress)
     {
         if (cbProgress(pvUser, "Loading program in RAM", "Clearing .bss", psFWImage->u32TextSectionLength + psFWImage->u32BssSectionLength, psFWImage->u32TextSectionLength) != E_PRG_OK)
@@ -993,7 +997,7 @@ teStatus ePRG_MemoryLoadExecute(tsPRG_Context *psContext, tcbFW_Progress cbProgr
             }
             if((eStatus = eBL_MemoryWrite(psContext, psFWImage->u32BssSectionLoadAddress + n, u8ChunkSize, au8Buffer)) != E_PRG_OK)
             {
-                return ePRG_SetStatus(psContext, eStatus, "writing bss at address 0x%08X\n", psFWImage->u32BssSectionLoadAddress + n);
+                return ePRG_SetStatus(psContext, eStatus, "writing bss at address 0x%08X", psFWImage->u32BssSectionLoadAddress + n);
             }
             
             if (cbProgress)
@@ -1013,7 +1017,7 @@ teStatus ePRG_MemoryLoadExecute(tsPRG_Context *psContext, tcbFW_Progress cbProgr
         }
     }
 
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Starting module application\n");
+    LOGD("Starting module application");
     
     return ePRG_SetStatus(psContext, eBL_MemoryExecute(psContext, psFWImage->u32ResetEntryPoint), "executing program in RAM");
 }
@@ -1181,13 +1185,13 @@ teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progr
             if ((eStatus = eBL_EEPROMRead(psContext, n, u8ChunkSize, au8Buffer)) != E_PRG_OK)
             {
                 fclose(iFd);
-                return ePRG_SetStatus(psContext, eStatus, "reading EEPROM at address 0x%08X\n", n);
+                return ePRG_SetStatus(psContext, eStatus, "reading EEPROM at address 0x%08X", n);
             }
             
             if (fwrite(au8Buffer,u8ChunkSize,1,iFd) < 0)
             {
                 fclose(iFd);
-                return ePRG_SetStatus(psContext, E_PRG_ERROR_WRITING, "file at address 0x%08X\n", n);
+                return ePRG_SetStatus(psContext, E_PRG_ERROR_WRITING, "file at address 0x%08X", n);
             }
             
             if (cbProgress)
@@ -1266,7 +1270,7 @@ teStatus ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoadFile, tcbFW_Pr
         return ePRG_SetStatus(psContext, E_PRG_UNSUPPORED_CHIP, "");
     }
 
-	printf("pc LoadFile %s\n",pcLoadFile);
+	printf("pc LoadFile %s",pcLoadFile);
     iFd = fopen(pcLoadFile, "rb+");
     if (iFd < 0)
     {
@@ -1304,22 +1308,22 @@ teStatus ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoadFile, tcbFW_Pr
             
             if (u8ChunkSize <= 0)
             {
-                //DBG_vPrintf(TRACE_PROGRAMMER, "End of EEPROM load file at address 0x%08X\n", n);
+                LOGD("End of EEPROM load file at address 0x%08X", n);
 				break;
             }
             
             if ((n + u8ChunkSize) > psChipDetails->u32EepromSize)
             {
-                //DBG_vPrintf(TRACE_PROGRAMMER, "File is larger than the device EEPROM\n", n);
+                LOGD("File is larger than the device EEPROM", n);
                 break;
             }
             
-            //DBG_vPrintf(TRACE_PROGRAMMER, "Write %d bytes to EEPROM address 0x%08X\n", u8ChunkSize, n);
+            LOGD("Write %d bytes to EEPROM address 0x%08X", u8ChunkSize, n);
             
             if ((eStatus = eBL_EEPROMWrite(psContext, n, u8ChunkSize, au8Buffer)) != E_PRG_OK)
             {
                 fclose(iFd);
-                return ePRG_SetStatus(psContext, eStatus, "loading EEPROM at address 0x%08X\n", n);
+                return ePRG_SetStatus(psContext, eStatus, "loading EEPROM at address 0x%08X", n);
             }
             
             if (cbProgress)
@@ -1579,13 +1583,13 @@ char *pcPRG_GetLastErrorMessage(tsPRG_Context *psContext)
 
 void vPRG_WaitMs(uint32_t u32TimeoutMs)
 {
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Delay %dms...", u32TimeoutMs);
+    LOGD("Delay %dms...", u32TimeoutMs);
 #if defined POSIX
     usleep(u32TimeoutMs * 1000);
 #elif defined WIN32
     Sleep(u32TimeoutMs);
 #endif
-    //DBG_vPrintf(TRACE_PROGRAMMER, "waited\n");
+    LOGD("waited");
 }
 
 /****************************************************************************/
@@ -1597,7 +1601,7 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
     uint8_t au8Buffer[6];
     tsChipDetails *psChipDetails = &psContext->sChipDetails;
     
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Get Chip ID\n");
+    LOGD("Get Chip ID");
     
     if(psChipDetails == NULL)
     {
@@ -1609,12 +1613,12 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
     /* Send chip id request */
     if(eBL_ChipIdRead(psContext, &psChipDetails->u32ChipId) != E_PRG_OK)
     {
-        DBG_vPrintf(TRACE_PROGRAMMER, "Error reading chip id\n");
+        LOGD("Error reading chip id");
 
         /* That failed so it might be an old device that doesn't support the command, try reading it directly */
         if (eBL_MemoryRead(psContext, 0x100000FC, 4, au8Buffer) != E_PRG_OK)
         {
-            //DBG_vPrintf(TRACE_PROGRAMMER, "Error Reading processor ID register\n");
+            LOGD("Error Reading processor ID register");
             return E_PRG_ERROR;
         }
         else
@@ -1625,15 +1629,15 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
             psChipDetails->u32ChipId |= au8Buffer[3] << 0;
         }
     }
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Chip ID: 0x%08X\n", psContext->sChipDetails.u32ChipId);
+    LOGD("Chip ID: 0x%08X", psContext->sChipDetails.u32ChipId);
     
     if (CHIP_ID_PART(psChipDetails->u32ChipId) == CHIP_ID_PART(CHIP_ID_JN5168))
     {
-        //DBG_vPrintf(TRACE_PROGRAMMER, "Reading 6x data\n");
+        LOGD("Reading 6x data");
 
         if (eBL_MemoryRead(psContext, JN516X_BOOTLOADER_VERSION_ADDRESS, 4, au8Buffer) != E_PRG_OK)
         {
-            //DBG_vPrintf(TRACE_PROGRAMMER, "Error Reading bootloader version\n");
+            LOGD("Error Reading bootloader version");
             return E_PRG_ERROR;
         }
         else
@@ -1643,12 +1647,12 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
             psChipDetails->u32BootloaderVersion |= au8Buffer[2] << 8;
             psChipDetails->u32BootloaderVersion |= au8Buffer[3] << 0;
             
-            //DBG_vPrintf(TRACE_PROGRAMMER, "JN516x Bootloader version 0x%08x\n", psChipDetails->u32BootloaderVersion);
+            LOGD("JN516x Bootloader version 0x%08x", psChipDetails->u32BootloaderVersion);
         }
 
         if (eBL_MemoryRead(psContext, JN516X_INDEX_SECTOR_DEVICE_CONFIG_ADDR, 4, au8Buffer) != E_PRG_OK)
         {
-            //DBG_vPrintf(TRACE_PROGRAMMER, "Error Reading config from flash index sector\n");
+            LOGD("Error Reading config from flash index sector");
             return E_PRG_ERROR;
         }
         else
@@ -1665,18 +1669,18 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
             psChipDetails->u32RamSize       = ((psChipDetails->u32RamSize + 1) * 8) * 1024;
             psChipDetails->u32FlashSize     = ((psChipDetails->u32FlashSize + 1) * 32) * 1024;
             
-            //DBG_vPrintf(TRACE_PROGRAMMER, "JN516x RAM size:     %dk\n", psChipDetails->u32RamSize / 1024);
-            //DBG_vPrintf(TRACE_PROGRAMMER, "JN516x Flash size:   %dk\n", psChipDetails->u32FlashSize / 1024);
-            //DBG_vPrintf(TRACE_PROGRAMMER, "JN516x EEPROM size:  %dk\n", psChipDetails->u32EepromSize / 1024);
-            //DBG_vPrintf(TRACE_PROGRAMMER, "JN516x Bootloader version 0x%08x\n", psChipDetails->u32BootloaderVersion);
-            //DBG_vPrintf(TRACE_PROGRAMMER, "JN516x Supported firmware 0x%08x\n", psChipDetails->u32SupportedFirmware);
+            LOGD("JN516x RAM size:     %dk", psChipDetails->u32RamSize / 1024);
+            LOGD("JN516x Flash size:   %dk", psChipDetails->u32FlashSize / 1024);
+            LOGD("JN516x EEPROM size:  %dk", psChipDetails->u32EepromSize / 1024);
+            LOGD("JN516x Bootloader version 0x%08x", psChipDetails->u32BootloaderVersion);
+            LOGD("JN516x Supported firmware 0x%08x", psChipDetails->u32SupportedFirmware);
         }
     }
     else
     {
         if (eBL_MemoryRead(psContext, JN514X_ROM_ID_ADDR, 4, au8Buffer) != E_PRG_OK)
         {
-            //DBG_vPrintf(TRACE_PROGRAMMER, "Error Reading ROM ID\n");
+            LOGD("Error Reading ROM ID");
             return E_PRG_ERROR;
         }
         else
@@ -1721,7 +1725,7 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
         default:                        psChipDetails->pcChipName = "Unknown";     break;
     }
     
-    //DBG_vPrintf(TRACE_PROGRAMMER, "Chip Name: %s\n", psContext->sChipDetails.pcChipName);
+    LOGD("Chip Name: %s", psContext->sChipDetails.pcChipName);
     
     return E_PRG_OK;
 }
@@ -1742,17 +1746,17 @@ static teStatus ePRG_ChipGetMacAddress(tsPRG_Context *psContext)
     switch(CHIP_ID_PART(psChipDetails->u32ChipId))
     {
         case CHIP_ID_PART(CHIP_ID_JN5148_REV2A):
-            //DBG_vPrintf(TRACE_PROGRAMMER, "JN5148 ");
+            LOGD("JN5148 ");
             switch (CHIP_ID_VESION(psChipDetails->u32ChipId))
             {
                 case CHIP_ID_VESION(CHIP_ID_JN5148_REV2D):
                 case CHIP_ID_VESION(CHIP_ID_JN5148_REV2E):
-                    //DBG_vPrintf(TRACE_PROGRAMMER, "multi-image bootloader\n");
+                    LOGD("multi-image bootloader");
                     eStatus = eBL_FlashRead(psContext, JN514X_MIB_MAC_ADDRESS_LOCATION, 8, psChipDetails->au8MacAddress);
                     break;
                     
                 default:
-                    //DBG_vPrintf(TRACE_PROGRAMMER, "single image bootloader\n");
+                    LOGD("single image bootloader");
                     eStatus = eBL_FlashRead(psContext, JN514X_MAC_ADDRESS_LOCATION, 8, psChipDetails->au8MacAddress);
                     break;
             }
@@ -1768,19 +1772,19 @@ static teStatus ePRG_ChipGetMacAddress(tsPRG_Context *psContext)
             /* First we read the customer specific MAC address, and if its not all F's, we use that */
             eStatus = eBL_MemoryRead(psContext, JN516X_CUSTOMER_MAC_ADDRESS_LOCATION, 8, psChipDetails->au8MacAddress);
             
-            //DBG_vPrintf(TRACE_PROGRAMMER, "Customer MAC Address: %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n", 
-            //    psChipDetails->au8MacAddress[0] & 0xFF, psChipDetails->au8MacAddress[1] & 0xFF, psChipDetails->au8MacAddress[2] & 0xFF, psChipDetails->au8MacAddress[3] & 0xFF, 
-            //    psChipDetails->au8MacAddress[4] & 0xFF, psChipDetails->au8MacAddress[5] & 0xFF, psChipDetails->au8MacAddress[6] & 0xFF, psChipDetails->au8MacAddress[7] & 0xFF);
+            LOGD("Customer MAC Address: %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", 
+                psChipDetails->au8MacAddress[0] & 0xFF, psChipDetails->au8MacAddress[1] & 0xFF, psChipDetails->au8MacAddress[2] & 0xFF, psChipDetails->au8MacAddress[3] & 0xFF, 
+                psChipDetails->au8MacAddress[4] & 0xFF, psChipDetails->au8MacAddress[5] & 0xFF, psChipDetails->au8MacAddress[6] & 0xFF, psChipDetails->au8MacAddress[7] & 0xFF);
 
             /* If its all F's, read factory assigned MAC */
             if(memcmp(psChipDetails->au8MacAddress, au8InvalidMac, 8) == 0)
             {
-                //DBG_vPrintf(TRACE_PROGRAMMER, "No customer MAC address - using factory\n");
+                LOGD("No customer MAC address - using factory");
                 eStatus = eBL_MemoryRead(psContext, JN516X_MAC_ADDRESS_LOCATION, 8, psChipDetails->au8MacAddress);
                 
-                //DBG_vPrintf(TRACE_PROGRAMMER, "Factory MAC Address:  %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n", 
-                //    psChipDetails->au8MacAddress[0] & 0xFF, psChipDetails->au8MacAddress[1] & 0xFF, psChipDetails->au8MacAddress[2] & 0xFF, psChipDetails->au8MacAddress[3] & 0xFF, 
-                //    psChipDetails->au8MacAddress[4] & 0xFF, psChipDetails->au8MacAddress[5] & 0xFF, psChipDetails->au8MacAddress[6] & 0xFF, psChipDetails->au8MacAddress[7] & 0xFF);
+                LOGD("Factory MAC Address:  %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", 
+                    psChipDetails->au8MacAddress[0] & 0xFF, psChipDetails->au8MacAddress[1] & 0xFF, psChipDetails->au8MacAddress[2] & 0xFF, psChipDetails->au8MacAddress[3] & 0xFF, 
+                    psChipDetails->au8MacAddress[4] & 0xFF, psChipDetails->au8MacAddress[5] & 0xFF, psChipDetails->au8MacAddress[6] & 0xFF, psChipDetails->au8MacAddress[7] & 0xFF);
             }
             break;
 
@@ -1803,22 +1807,22 @@ static teStatus ePRG_SetUpImage(tsPRG_Context *psContext, tsFW_Info *psFWImage, 
         case CHIP_ID_PART(CHIP_ID_JN5142_REV1A):
         case CHIP_ID_PART(CHIP_ID_JN5142_REV1B):
         case CHIP_ID_PART(CHIP_ID_JN5142_REV1C):
-            //DBG_vPrintf(TRACE_PROGRAMMER, "multi-image bootloader\n");
+            LOGD("multi-image bootloader");
             memcpy(&psFWImage->pu8ImageData[JN514X_MIB_MAC_ADDRESS_LOCATION], psChipDetails->au8MacAddress, 8);
             break;
      
         case CHIP_ID_PART(CHIP_ID_JN5148_REV2A):
-            //DBG_vPrintf(TRACE_PROGRAMMER, "JN5148 ");
+            LOGD("JN5148 ");
             switch (CHIP_ID_VESION(psChipDetails->u32ChipId))
             {
                 case CHIP_ID_VESION(CHIP_ID_JN5148_REV2D):
                 case CHIP_ID_VESION(CHIP_ID_JN5148_REV2E):
-                    //DBG_vPrintf(TRACE_PROGRAMMER, "multi-image bootloader\n");
+                    LOGD("multi-image bootloader");
                     memcpy(&psFWImage->pu8ImageData[JN514X_MIB_MAC_ADDRESS_LOCATION], psChipDetails->au8MacAddress, 8);
                     break;
                     
                 default:
-                    //DBG_vPrintf(TRACE_PROGRAMMER, "single image bootloader\n");
+                    LOGD("single image bootloader");
                     memcpy(&psFWImage->pu8ImageData[JN514X_MAC_ADDRESS_LOCATION], psChipDetails->au8MacAddress, 8);
                     break;
             }

@@ -21,6 +21,7 @@
 #include "LifeSensorFlashProgrammerDlg.h"
 
 #include "programmer.h"
+#include "log.h"
 
 //#define __STDC__ TRUE
 #define vDelay(a) usleep(a * 1000)
@@ -228,7 +229,8 @@ BOOL LifeSensorFlashProgrammerDlg::OnInitDialog()
 			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
 		}
 	}
-
+    
+    
 	// Set the icon for this dialog.  The framework does this automatically
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
@@ -563,7 +565,7 @@ DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
 
         if(m_cli.GetCheck() == TRUE)
         {
-            for (int i = 0; i < u32NumConnections; i++)
+            for (unsigned int i = 0; i < u32NumConnections; i++)
             {
                 m_Progress.SetPos((i*100)/u32NumConnections);
 
@@ -605,7 +607,7 @@ DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
         }
         else
         {
-            for (int i = 0; i < u32NumConnections; i++)
+            for (unsigned int i = 0; i < u32NumConnections; i++)
             {
                 m_Progress.SetPos((i*100)/u32NumConnections);
 
@@ -883,7 +885,7 @@ void LifeSensorFlashProgrammerDlg::OnProgram()
 {
 	// TODO: Add your control notification handler code here
 	// Get the devicec need to be programmed
-	int i;
+	unsigned int i;
 	CString temp;
 	unsigned char mac_temp;
 	m_Program.EnableWindow(FALSE);
@@ -1069,6 +1071,7 @@ void LifeSensorFlashProgrammerDlg::OnClose()
 	for (int i = 0; i < u32NumConnections; i++)
         delete p_CheckBox[i];
 	CDialog::OnClose();
+ 
 }
 
 void LifeSensorFlashProgrammerDlg::OnOpen()

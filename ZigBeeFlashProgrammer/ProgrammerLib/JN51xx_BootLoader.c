@@ -83,6 +83,7 @@
 
 typedef enum
 {
+    E_BL_MSG_TYPE_FLASH_DEFAULT                                = 0x00, //add by shawn
     E_BL_MSG_TYPE_FLASH_ERASE_REQUEST                   = 0x07,
     E_BL_MSG_TYPE_FLASH_ERASE_RESPONSE                  = 0x08,
     E_BL_MSG_TYPE_FLASH_PROGRAM_REQUEST                 = 0x09,
@@ -217,8 +218,8 @@ tsBL_FlashDevice asFlashDevices[] = {
 
 teStatus eBL_SetBaudrate(tsPRG_Context *psContext, uint32_t u32Baudrate)
 {
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
     uint8_t au8Buffer[6];
     uint32_t u32Divisor;
     
@@ -254,8 +255,8 @@ teStatus eBL_SetBaudrate(tsPRG_Context *psContext, uint32_t u32Baudrate)
 teStatus eBL_ChipIdRead(tsPRG_Context *psContext, uint32_t *pu32ChipId)
 {
 
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
     uint8_t u8RxDataLen = 0;
     uint8_t au8Buffer[BOOTLOADER_MAX_MESSAGE_LENGTH];
 
@@ -296,8 +297,8 @@ teStatus eBL_ChipIdRead(tsPRG_Context *psContext, uint32_t *pu32ChipId)
 teStatus eBL_FlashIdRead(tsPRG_Context *psContext, uint16_t *pu16FlashId)
 {
 
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
     uint8_t u8RxDataLen = 0;
     uint8_t au8Buffer[BOOTLOADER_MAX_MESSAGE_LENGTH];
 
@@ -338,8 +339,8 @@ teStatus eBL_FlashIdRead(tsPRG_Context *psContext, uint16_t *pu16FlashId)
 teStatus eBL_FlashSelectDevice(tsPRG_Context *psContext, uint16_t u16FlashId)
 {
 	int n;
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
     uint8_t au8Buffer[6];
 
     /* Search for flash type given flash device id code */
@@ -382,8 +383,8 @@ teStatus eBL_FlashSelectDevice(tsPRG_Context *psContext, uint16_t u16FlashId)
  ****************************************************************************/
 teStatus eBL_FlashStatusRegisterWrite(tsPRG_Context *psContext, uint8_t u8StatusReg)
 {
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
     //DBG_vPrintf(TRACE_BOOTLOADER, "Writing %02x to flash status register\n", u8StatusReg);
 
@@ -409,8 +410,8 @@ teStatus eBL_FlashStatusRegisterWrite(tsPRG_Context *psContext, uint8_t u8Status
 teStatus eBL_MemoryExecute(tsPRG_Context *psContext, uint32_t u32Address)
 {
 	uint8_t au8CmdBuffer[4];
-	teBL_Response eResponse = 0;
-	teBL_MessageType eRxType = 0;
+	teBL_Response eResponse = E_BL_RESPONSE_OK;
+	teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
     //DBG_vPrintf(TRACE_BOOTLOADER, "Execute code at 0x%08X\n", u32Address);
     
@@ -441,8 +442,8 @@ teStatus eBL_MemoryRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u
 {
 	uint8_t u8RxDataLen = 0;
 	uint8_t au8CmdBuffer[6];
-	teBL_Response eResponse = 0;
-	teBL_MessageType eRxType = 0;
+	teBL_Response eResponse = E_BL_RESPONSE_OK;
+	teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
 	if(u8Length > 0xfc || pu8Buffer == NULL)
 	{
@@ -483,8 +484,8 @@ teStatus eBL_MemoryRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u
 teStatus eBL_MemoryWrite(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t *pu8Buffer)
 {
 	uint8_t au8CmdBuffer[6];
-	teBL_Response eResponse = 0;
-	teBL_MessageType eRxType = 0;
+	teBL_Response eResponse = E_BL_RESPONSE_OK;
+	teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
 	if(u8Length > 0xfc || pu8Buffer == NULL)
 	{
@@ -518,8 +519,8 @@ teStatus eBL_MemoryWrite(tsPRG_Context *psContext, uint32_t u32Address, uint8_t 
  ****************************************************************************/
 teStatus eBL_FlashErase(tsPRG_Context *psContext)
 {
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
     eResponse = eBL_Request(psContext, BL_TIMEOUT_10S, E_BL_MSG_TYPE_FLASH_ERASE_REQUEST, 0, NULL, 0, NULL, &eRxType, NULL, NULL);
     return eBL_CheckResponse(NULL, eResponse, eRxType, E_BL_MSG_TYPE_FLASH_ERASE_RESPONSE);
@@ -543,8 +544,8 @@ teStatus eBL_FlashRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8
 {
 	uint8_t u8RxDataLen = 0;
 	uint8_t au8CmdBuffer[6];
-	teBL_Response eResponse = 0;
-	teBL_MessageType eRxType = 0;
+	teBL_Response eResponse = E_BL_RESPONSE_OK;
+	teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
 	if(u8Length > 0xfc || pu8Buffer == NULL)
 	{
@@ -587,8 +588,8 @@ teStatus eBL_FlashRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8
 teStatus eBL_FlashWrite(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t *pu8Buffer)
 {
     uint8_t au8CmdBuffer[4];
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
     if(u8Length > 0xfc || pu8Buffer == NULL)
     {
@@ -608,8 +609,8 @@ teStatus eBL_FlashWrite(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u
 teStatus eBL_EEPROMErase(tsPRG_Context *psContext, int iEraseAll)
 {
     uint8_t au8CmdBuffer[1];
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
     au8CmdBuffer[0] = (uint8_t)(iEraseAll) & 0xff;
 
@@ -622,8 +623,8 @@ teStatus eBL_EEPROMRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u
 {
     uint8_t u8RxDataLen = 0;
     uint8_t au8CmdBuffer[6];
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
     if(u8Length > 0xfc || pu8Buffer == NULL)
     {
@@ -653,8 +654,8 @@ teStatus eBL_EEPROMRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u
 teStatus eBL_EEPROMWrite(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t *pu8Buffer)
 {
     uint8_t au8CmdBuffer[4];
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
     if(u8Length > 0xfc || pu8Buffer == NULL)
     {
@@ -675,8 +676,8 @@ teStatus eBL_EEPROMWrite(tsPRG_Context *psContext, uint32_t u32Address, uint8_t 
 teStatus eBL_IndexSectorWrite(tsPRG_Context *psContext, uint8_t u8Page, uint8_t u8WordNumber, uint8_t au8Data[16])
 {
     uint8_t au8CmdBuffer[18];
-    teBL_Response eResponse = 0;
-    teBL_MessageType eRxType = 0;
+    teBL_Response eResponse = E_BL_RESPONSE_OK;
+    teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
     au8CmdBuffer[0] = u8Page;
     au8CmdBuffer[1] = u8WordNumber;
@@ -872,8 +873,8 @@ static teBL_Response eBL_ReadMessage(tsPRG_Context *psContext, int iTimeoutMicro
 		return E_BL_RESPONSE_CRC_ERROR;
 	}
 
-	*peType = au8Msg[0];
-	eResponse = au8Msg[1];
+	*peType = (teBL_MessageType)au8Msg[0];
+	eResponse = (teBL_Response)au8Msg[1];
     if (pu8Length)
     {
         *pu8Length = u8Length - 3;

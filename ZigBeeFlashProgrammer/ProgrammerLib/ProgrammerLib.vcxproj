@@ -72,6 +72,10 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <PreprocessorDefinitions>LIBPROGRAMMER_BUILD;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <PrecompiledHeaderOutputFile>
+      </PrecompiledHeaderOutputFile>
     </ClCompile>
     <ResourceCompile>
       <Culture>0x0409</Culture>
@@ -86,6 +90,7 @@
   <ItemGroup>
     <ClCompile Include="Firmware.c" />
     <ClCompile Include="JN51xx_BootLoader.c" />
+    <ClCompile Include="log.c" />
     <ClCompile Include="programmer.c" />
     <ClCompile Include="uart_win.c" />
   </ItemGroup>
@@ -94,6 +99,7 @@
     <ClInclude Include="ftd2xx.h" />
     <ClInclude Include="header.h" />
     <ClInclude Include="JN51xx_BootLoader.h" />
+    <ClInclude Include="log.h" />
     <ClInclude Include="programmer.h" />
     <ClInclude Include="programmer_private.h" />
     <ClInclude Include="uart.h" />

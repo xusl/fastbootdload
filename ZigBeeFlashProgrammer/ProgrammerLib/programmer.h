@@ -64,21 +64,6 @@ extern "C" {
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
 
-#define FALSE   0
-#define TRUE    1
-
-#ifndef WIN32
-#ifdef LIBPROGRAMMER_BUILD
-#define LIBPROGRAMMER __declspec(dllexport)
-#else
-#define LIBPROGRAMMER __declspec(dllimport)
-#endif /* LIBPROGRAMMER_BUILD */
-
-#else /* WIN32 */
-
-#define LIBPROGRAMMER
-
-#endif /* WIN32 */
 
 
 /****************************************************************************/
@@ -216,7 +201,7 @@ typedef teStatus(*tcbFW_Confirm)(void *pvUser, const char *pcTitle, const char *
 /****************************************************************************/
 
 /** Version string for libprogrammer */
-extern const char * LIBPROGRAMMER pcPRG_Version;
+LIBPROGRAMMER extern const char *  pcPRG_Version;
 
 /****************************************************************************/
 /***        Local Variables                                               ***/
@@ -243,7 +228,7 @@ teStatus LIBPROGRAMMER ePRG_Destroy(tsPRG_Context *psContext);
  *  error state. On success it will return the string "Success".
  *  \return String containing description of last operation status.
  */
-char *LIBPROGRAMMER pcPRG_GetLastStatusMessage(tsPRG_Context *psContext);
+LIBPROGRAMMER char *  pcPRG_GetLastStatusMessage(tsPRG_Context *psContext);
 
 
 /** Get a list of available connections for use by the programmer. Once the list has been used it should be destroyed using
@@ -420,6 +405,7 @@ teStatus LIBPROGRAMMER ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoad
  *  \return E_PRG_OK on success
  */
 teStatus LIBPROGRAMMER ePRG_MACAddressSet(tsPRG_Context *psContext, uint8_t au8MacAddress[8], tcbFW_Progress cbProgress, tcbFW_Confirm cbConfirm, void *pvUser);
+
 
 
 /****************************************************************************/

@@ -140,14 +140,14 @@ teStatus ePRG_ConnectionListInit(tsPRG_Context *psContext, uint32_t *pu32NumConn
             LPBYTE pcData;
             DWORD dwIndex = 0;
             
-            pcName = malloc(dwMaxValueNameSizeInBytes);
+            pcName = (char *)malloc(dwMaxValueNameSizeInBytes);
             if (!pcName)
             {
                 RegCloseKey(hSERIALCOMM);
                 return ePRG_SetStatus(psContext, E_PRG_OUT_OF_MEMORY, "");
             }
             
-            pcData = malloc(dwMaxValueDataSizeInBytes);
+            pcData = (LPBYTE)malloc(dwMaxValueDataSizeInBytes);
             if (!pcData)
             {
                 free(pcName);
@@ -164,7 +164,7 @@ teStatus ePRG_ConnectionListInit(tsPRG_Context *psContext, uint32_t *pu32NumConn
                 DWORD dwResult;
 
                 //DBG_vPrintf(TRACE_UART, "Reallocate %p to size %d\n", *pasConnections, ((*pu32NumConnections)+1) * sizeof(tsConnection));
-                asNewConnections = realloc(*pasConnections, ((*pu32NumConnections)+1) * sizeof(tsConnection));
+                asNewConnections = (tsConnection *)realloc(*pasConnections, ((*pu32NumConnections)+1) * sizeof(tsConnection));
                 if (!asNewConnections)
                 {
                     free(pcName);
@@ -264,7 +264,7 @@ teStatus ePRG_ConnectionUartOpen(tsPRG_Context *psContext, tsConnection *psConne
         InitializeCriticalSection(&csFTDISection);
     }
     
-    psCommsPriv = realloc(psContext->pvPrivate, sizeof(tsCommsPrivate));
+    psCommsPriv = (tsCommsPrivate *)realloc(psContext->pvPrivate, sizeof(tsCommsPrivate));
     if (!psCommsPriv)
     {
         printf("realloc failed\r\n");

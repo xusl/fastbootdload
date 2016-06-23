@@ -102,9 +102,8 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>..\ProgrammerLib\programmerlib.lib;libs\ftd2xx.lib;WS2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(Configuration)\programmerlib.lib;libs\ftd2xx.lib;WS2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Version>0.1</Version>
-      <AdditionalOptions>/VERBOSE %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
