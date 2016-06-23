@@ -2,8 +2,8 @@
 //
 
 #include "stdafx.h"
-#include "JN516x Flash Programmer.h"
-#include "JN516x Flash ProgrammerDlg.h"
+#include "LifeSensorFlashProgrammer.h"
+#include "LifeSensorFlashProgrammerDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -148,7 +148,7 @@ BOOL CJN516xFlashProgrammerDlg::OnInitDialog()
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
-	
+
 	// TODO: Add extra initialization here
 	//Init UI
 	m_BaudRate.InsertString(0,"1000000");
@@ -177,11 +177,11 @@ BOOL CJN516xFlashProgrammerDlg::OnInitDialog()
 	m_mac1.LimitText(2);
 	m_mac2.LimitText(2);
 	m_mac3.LimitText(2);
-	m_mac4.LimitText(2);	
+	m_mac4.LimitText(2);
 	m_mac5.LimitText(2);
 	m_mac6.LimitText(2);
 	m_mac7.LimitText(2);
-	m_mac8.LimitText(2);	
+	m_mac8.LimitText(2);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -202,7 +202,7 @@ void CJN516xFlashProgrammerDlg::OnSysCommand(UINT nID, LPARAM lParam)
 //  to draw the icon.  For MFC applications using the document/view model,
 //  this is automatically done for you by the framework.
 
-void CJN516xFlashProgrammerDlg::OnPaint() 
+void CJN516xFlashProgrammerDlg::OnPaint()
 {
 	if (IsIconic())
 	{
@@ -234,58 +234,6 @@ HCURSOR CJN516xFlashProgrammerDlg::OnQueryDragIcon()
 	return (HCURSOR) m_hIcon;
 }
 
-// JN516x Program CLI.cpp : Defines the entry point for the console application.
-//
-
-//#include "stdafx.h"
-//#include "windows.h"
-/****************************************************************************
- *
- * MODULE:             Jennic Module Programmer
- *
- * COMPONENT:          Main file
- *
- * VERSION:            $Name:  $
- *
- * REVISION:           $Revision: 1.2 $
- *
- * DATED:              $Date: 2009/03/02 13:33:44 $
- *
- * STATUS:             $State: Exp $
- *
- * AUTHOR:             Matt Redfearn
- *
- * DESCRIPTION:
- *
- *
- * LAST MODIFIED BY:   $Author: lmitch $
- *                     $Modtime: $
- *
- ****************************************************************************
- *
- * This software is owned by NXP B.V. and/or its supplier and is protected
- * under applicable copyright laws. All rights are reserved. We grant You,
- * and any third parties, a license to use this software solely and
- * exclusively on NXP products [NXP Microcontrollers such as JN5148, JN5142, JN5139]. 
- * You, and any third parties must reproduce the copyright and warranty notice
- * and any other legend of ownership on each copy or partial copy of the 
- * software.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
-
- * Copyright NXP B.V. 2012. All rights reserved
- *
- ***************************************************************************/
 #define __STDC__ TRUE
 
 #include <stdio.h>
@@ -330,7 +278,7 @@ typedef struct
     int             iProgramSpeed;
     int             iVerify;
     int             iVerbosity;
-    
+
     int             iThreadNum;
     int             iThreadTotal;
     tsConnection    sConnection;
@@ -342,7 +290,7 @@ typedef struct
     uint32_t thread_times;
 } tsProgramThreadArgs;
 
-static tsProgramThreadArgs sProgramThreadArgs = 
+static tsProgramThreadArgs sProgramThreadArgs =
 {
     "FLASH",
     NULL,
@@ -370,35 +318,12 @@ static void *pvProgramThread(void* pvData);
 static DWORD dwProgramThread(void* pvData);
 #endif
 
-void print_usage_exit(char *argv[])
-{
-    printf("Usage: %s\n", argv[0]);
-    printf("  Arguments:\n");
-    printf("    -s --serial        <serial device> Serial device for 15.4 device, e.g. COM1, /dev/ttyS1\n");
-    printf("  Options:\n");
-    printf("    -V --verbosity     <verbosity>     Verbosity level. Increse/decrease amount of debug information. Default %d.\n", sProgramThreadArgs.iVerbosity);
-    printf("    -l --list                          List available devices\n");
-    printf("    -I --initialbaud   <rate>          Set initial baud rate\n");
-    printf("    -P --programbaud   <rate>          Set programming baud rate\n");
-    printf("    -f --loadflash     <filename>      Load device flash with the given firmware file.\n");
-    printf("    -F --dumpflash     <filename>      Dump device flash contents into a file.\n");
-    printf("       --eepromerase=<full,pdm>        Erase the chip EEPROM. Optional argument to specify pdm only or full EEPROM erase.\n");
-    printf("    -e --loadeeprom    <filename>      Load device EEPROM contents from a file.\n");
-    printf("    -E --dumpeeprom    <filename>      Dump device EEPROM contents into a file.\n");
-    printf("    -v --verify                        Verify image. If specified, verify the image programmedwas loaded correctly.\n");
-    printf("    -m --mac           <MAC Address>   Set MAC address of device. If this is not specified, the address is read from flash.\n");
-    //exit(EXIT_FAILURE);
-}
 
 teStatus cbProgress(void *pvUser, const char *pcTitle, const char *pcText, int iNumSteps, int iProgress)
 {
     tsProgramThreadArgs *psArgs = (tsProgramThreadArgs *)pvUser;
-    
-    if (psArgs->iVerbosity > 0)
-    {
-#if defined POSIX
-        //printf("%c[A", 0x1B);
-#endif
+
+    if (psArgs->iVerbosity > 0) {
         printf("%15s: %s: %3d%%\n", psArgs->sConnection.pcName, pcText, (iProgress * 100) / iNumSteps);
     }
     return E_PRG_OK;
@@ -413,21 +338,21 @@ teStatus cbConfirm(void *pvUser, const char *pcTitle, const char *pcText)
     tcgetattr( STDIN_FILENO, &sOldt);
     sNewt = sOldt;
 
-    sNewt.c_lflag &= ~(ICANON);          
+    sNewt.c_lflag &= ~(ICANON);
     tcsetattr(STDIN_FILENO, TCSANOW, &sNewt);
 #endif /* POSIX */
-    
+
     printf("--- %s ---\n", pcTitle);
     printf("%s\n\n", pcText);
     printf("Y/N\n");
 
 #if defined POSIX
-    c = getc(stdin); 
+    c = getc(stdin);
     tcsetattr( STDIN_FILENO, TCSANOW, &sOldt);
 #elif defined WIN32
     c = _getch();
 #endif /* POSIX */
-    
+
     if ((c == 'Y') || (c == 'y'))
     {
         return E_PRG_OK;
@@ -436,13 +361,13 @@ teStatus cbConfirm(void *pvUser, const char *pcTitle, const char *pcText)
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 //global variables
-	tsConnection    *asConnections     = NULL;   
+	tsConnection    *asConnections     = NULL;
     tsProgramThreadArgs *asThreads      = NULL;
     uint32_t        u32NumConnections   = 0;
 	uint32_t        NumOfDevicesProgrammed = 0;
     int             i=0;
 	int iListDevices =0;
-	
+
 void IncreaseMACAddr(unsigned char * mac)
 {
 	mac[7]++;
@@ -469,7 +394,7 @@ void IncreaseMACAddr(unsigned char * mac)
 								mac[0] ++;
 							}
 						}
-					}					
+					}
 				}
 			}
 		}
@@ -477,400 +402,340 @@ void IncreaseMACAddr(unsigned char * mac)
 }
 BOOL StartApplication(CString cppAppName, CString cppCommandLine)
 {
-	BOOL is_ProcessCreated; 
-    STARTUPINFO S_Info; 
+	BOOL is_ProcessCreated;
+    STARTUPINFO S_Info;
 	DWORD dwExitCode;
-	PROCESS_INFORMATION P_Info; 
-	CString cppStr; 
-	memset( &S_Info, 0, sizeof(STARTUPINFO) ); 
-	S_Info.cb = sizeof(STARTUPINFO); 
+	PROCESS_INFORMATION P_Info;
+	CString cppStr;
+	memset( &S_Info, 0, sizeof(STARTUPINFO) );
+	S_Info.cb = sizeof(STARTUPINFO);
 	SYSTEMTIME start_time,stop_time;
- 
-	// set the initial directory 
-	//SetCurrentDirectory(m_cInitialDir); 
+
+	// set the initial directory
+	//SetCurrentDirectory(m_cInitialDir);
 	GetLocalTime(&start_time);
- 
-	// start the program 
-	is_ProcessCreated = CreateProcess ( 
-		NULL,                // executable file name 
-		(LPTSTR)(LPCTSTR)cppCommandLine,	// pointer to command line string  
-		NULL,	// pointer to process security attributes  
-		NULL,	// pointer to thread security attributes  
-		FALSE,	// handle inheritance flag  
-		0,		// creation flags  
-		NULL,	// pointer to new environment block  
-		NULL,	// pointer to current directory name  
-		&S_Info,// pointer to STARTUPINFO  
-		&P_Info // pointer to PROCESS_INFORMATION  
-	); 
- 
-	// test if it fails 
-	if (is_ProcessCreated == FALSE) 
-	{ 
-		if (GetLastError() == ERROR_FILE_NOT_FOUND) 
-        { 
-			cppStr.Format ("application not implemented in this board", cppAppName); 
-			MessageBox(NULL,cppStr, "Application not found", MB_ICONERROR); 
-        } 
-		else 
-        { 
-            cppStr.Format ("Cannot start %s application", cppAppName); 
-			MessageBox(NULL,cppStr, "Application launching failed", MB_ICONERROR); 
-        } 
- 
-        return FALSE; 
-	}
-	else
-	{
+
+	// start the program
+	is_ProcessCreated = CreateProcess (
+		NULL,                // executable file name
+		(LPTSTR)(LPCTSTR)cppCommandLine,	// pointer to command line string
+		NULL,	// pointer to process security attributes
+		NULL,	// pointer to thread security attributes
+		FALSE,	// handle inheritance flag
+		0,		// creation flags
+		NULL,	// pointer to new environment block
+		NULL,	// pointer to current directory name
+		&S_Info,// pointer to STARTUPINFO
+		&P_Info // pointer to PROCESS_INFORMATION
+	);
+
+	// test if it fails
+	if (is_ProcessCreated == FALSE) {
+		if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+			cppStr.Format ("application not implemented in this board", cppAppName);
+			MessageBox(NULL,cppStr, "Application not found", MB_ICONERROR);
+        } else {
+            cppStr.Format ("Cannot start %s application", cppAppName);
+			MessageBox(NULL,cppStr, "Application launching failed", MB_ICONERROR);
+        }
+
+        return FALSE;
+	} else {
 		CloseHandle(P_Info.hThread);
 		WaitForSingleObject(P_Info.hProcess, INFINITE);
 		GetExitCodeProcess(P_Info.hProcess, &dwExitCode);
 		CloseHandle(P_Info.hProcess);
-		if(dwExitCode != 0)
-		{
+		if(dwExitCode != 0) {
 			return FALSE;
-		}
-		else
-		{	
+		} else {
 			GetLocalTime(&stop_time);
 			//DWORD time_elaps = stop_time.wMinute*60*1000 + stop_time.wSecond*1000 + stop_time.wMilliseconds - start_time.wMinute*60*1000  - start_time.wSecond*1000  - start_time.wMilliseconds;
-		    //if(time_elaps < 0x3400) 
+		    //if(time_elaps < 0x3400)
 				//return FALSE;
 		}
 	}
 
-    // wait for the application - mandatory for some applications 
-    WaitForInputIdle(P_Info.hProcess, 1000);  
-  
-    return TRUE; 
-}		
-////////////////////////////////////////////////////////////////////////////////////////////////
-DWORD CJN516xFlashProgrammerDlg::Main_Entry(Operation_t Operation)
-{ 
-    //printf("JennicModuleProgrammer Version: %s (libprogrammer version %s)\n", Version, pcPRG_Version);
-	CString temp;
-	CString temp2;
+    // wait for the application - mandatory for some applications
+    WaitForInputIdle(P_Info.hProcess, 1000);
 
-	if (Operation == GetComPorts)
-    {
+    return TRUE;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////
+DWORD CJN516xFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
+    //printf("JennicModuleProgrammer Version: %s (libprogrammer version %s)\n", Version, pcPRG_Version);
+    CString temp;
+    CString temp2;
+
+    if (Operation == GetComPorts) {
         tsPRG_Context       sContext;
-		iListDevices =1;
+        iListDevices =1;
         //uint32_t            u32NumConnections;
         //tsConnection*       asConnections = NULL;
         unsigned int         i;
 
-		for (i = 0; i < u32NumConnections; i++)
-			delete p_CheckBox[i];
-        
+        for (i = 0; i < u32NumConnections; i++)
+            delete p_CheckBox[i];
+
         if (ePRG_Init(&sContext) != E_PRG_OK)
         {
             //fprintf(stderr, "Error initialising context\n");
             return -1;
         }
-        
+
         if (ePRG_ConnectionListInit(&sContext, &u32NumConnections, &asConnections) != E_PRG_OK)
         {
             //printf("Error getting connection list: %s\n", pcPRG_GetLastStatusMessage(&sContext));
             return -1;
         }
-/*        printf("Available connections:\n");
-        for (i = 0; i < u32NumConnections; i++)
-        {   
-        	if(asConnections[i].portName[8] == 'V')
-            	printf("%s %s\n", asConnections[i].pcName, asConnections[i].portName);
-        }*/
-       	tsConnection *asNewConnection = (tsConnection *)realloc(asConnections, sizeof(tsConnection) * (u32NumConnections + 1));
-        asConnections = asNewConnection; 
+        /*        printf("Available connections:\n");
+                  for (i = 0; i < u32NumConnections; i++)
+                  {
+                  if(asConnections[i].portName[8] == 'V')
+                  printf("%s %s\n", asConnections[i].pcName, asConnections[i].portName);
+                  }*/
+        tsConnection *asNewConnection = (tsConnection *)realloc(asConnections, sizeof(tsConnection) * (u32NumConnections + 1));
+        asConnections = asNewConnection;
         /*if (ePRG_ConnectionListDestroy(&sContext, u32NumConnections, &asConnections) != E_PRG_OK)
+          {
+          printf("Error destroying connection list: %s\n", pcPRG_GetLastStatusMessage(&sContext));
+          return -1;
+          }
+
+          if (ePRG_Destroy(&sContext) != E_PRG_OK)
+          {
+          fprintf(stderr, "Error destorying context\n");
+          return -1;
+          }
+          */
+
+        CFont  * f;
+        f = new CFont;
+        f -> CreateFont(18,  //  nHeight
+                        0 ,  //  nWidth
+                        0 ,  //  nEscapement
+                        0 ,  //  nOrientation
+                        FW_BOLD,  //  nWeight
+                        TRUE,  //  bItalic
+                        FALSE,  //  bUnderline
+                        0 ,  //  cStrikeOut
+                        ANSI_CHARSET,  //  nCharSet
+                        OUT_DEFAULT_PRECIS,  //  nOutPrecision
+                        CLIP_DEFAULT_PRECIS,  //  nClipPrecision
+                        DEFAULT_QUALITY,  //  nQuality
+                        DEFAULT_PITCH  |  FF_SWISS,  //  nPitchAndFamily
+                        _T("MS Sans Serif" ));  //  lpszFac
+
+        for (i = 0; i < u32NumConnections; i++)
         {
-            printf("Error destroying connection list: %s\n", pcPRG_GetLastStatusMessage(&sContext));
-           return -1;
+            CRect rect;
+            if(i<13)
+            {
+                rect.left = 30;
+                rect.bottom = 40 + i*20;
+                rect.top = 30 + i*20;
+                rect.right = 200;
+            }
+            else if(i<26)
+            {
+                rect.left = 30 + 150;
+                rect.bottom = 40 + (i-13)*20;
+                rect.top = 30 + (i-13)*20;
+                rect.right = 200 + 150;
+            }
+            else if(i<39)
+            {
+                rect.left = 30 + 300;
+                rect.bottom = 40 + (i-26)*20;
+                rect.top = 30 + (i-26)*20;
+                rect.right = 200 + 300;
+            }
+
+            p_CheckBox[i] = new CButton();
+            p_CheckBox[i]->Create(_T(asConnections[i].pcName), WS_TABSTOP | WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, rect, this, 1100 + i );
+            p_CheckBox[i]->SetCheck(TRUE);
         }
-        
-        if (ePRG_Destroy(&sContext) != E_PRG_OK)
-      	{
-            fprintf(stderr, "Error destorying context\n");
+
+        if(asThreads == NULL)
+            asThreads = (tsProgramThreadArgs *)malloc(sizeof(tsProgramThreadArgs) * u32NumConnections);
+        else
+            asThreads = (tsProgramThreadArgs *)realloc(asThreads,sizeof(tsProgramThreadArgs) * u32NumConnections);
+
+        if (!asThreads)
+        {
+            //printf("Memory allocation failure\n");
             return -1;
         }
-        */
-        /* Nothing else to do. */
-        //return 0;
+    } else if(Operation == Program) {
+        NumOfDevicesProgrammed = 0;
+        m_Program.SetForeColor(COLOR_BLUE);
+        m_Program.SetText("Start Programming ...");
 
-		CFont  * f; 
-		f = new CFont; 
-		f -> CreateFont(18,  //  nHeight  
-        0 ,  //  nWidth  
-       0 ,  //  nEscapement  
-       0 ,  //  nOrientation  
-      FW_BOLD,  //  nWeight  
-      TRUE,  //  bItalic  
-      FALSE,  //  bUnderline  
-       0 ,  //  cStrikeOut  
-      ANSI_CHARSET,  //  nCharSet  
-      OUT_DEFAULT_PRECIS,  //  nOutPrecision  
-      CLIP_DEFAULT_PRECIS,  //  nClipPrecision  
-      DEFAULT_QUALITY,  //  nQuality  
-      DEFAULT_PITCH  |  FF_SWISS,  //  nPitchAndFamily  
-      _T("MS Sans Serif" ));  //  lpszFac
+        if(m_cli.GetCheck() == TRUE)
+        {
+            for (i = 0; i < u32NumConnections; i++)
+            {
+                m_Progress.SetPos((i*100)/u32NumConnections);
 
-		for (i = 0; i < u32NumConnections; i++)
-        {  
-			CRect rect;
-			if(i<13)
-			{
-				rect.left = 30;
-				rect.bottom = 40 + i*20;
-				rect.top = 30 + i*20;
-				rect.right = 200;
-			}
-			else if(i<26)
-			{
-				rect.left = 30 + 150;
-				rect.bottom = 40 + (i-13)*20;
-				rect.top = 30 + (i-13)*20;
-				rect.right = 200 + 150;
-			}
-			else if(i<39)
-			{
-				rect.left = 30 + 300;
-				rect.bottom = 40 + (i-26)*20;
-				rect.top = 30 + (i-26)*20;
-				rect.right = 200 + 300;
-			}
+                if(!p_CheckBox[i]->GetCheck())
+                    continue;
 
-			p_CheckBox[i] = new CButton();
-			p_CheckBox[i]->Create(_T(asConnections[i].pcName), WS_TABSTOP | WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, rect, this, 1100 + i ); 
-			//p_CheckBox[i]->Create(_T(asConnections[0].pcName), WS_TABSTOP | WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, rect, this, 1100 + i ); 
-			p_CheckBox[i]->SetCheck(TRUE);
-		}
+                //CreatePorcess
+                //build command line
+                CString CommandLine;
+                CommandLine = "JN51xxProgrammer.exe -s ";
+                CommandLine += asConnections[i].pcName;
+                CommandLine +=" -V 0";
+                CommandLine +=" -P ";
+                CommandLine +="1000000";
+                CommandLine +=" --eraseeeprom full";
+                CommandLine +=" -f ";
+                CommandLine += FlashFilePath;
 
-    if(asThreads == NULL)
-		asThreads = (tsProgramThreadArgs *)malloc(sizeof(tsProgramThreadArgs) * u32NumConnections);
-	else
-		asThreads = (tsProgramThreadArgs *)realloc(asThreads,sizeof(tsProgramThreadArgs) * u32NumConnections);
+                //lauch process
+                if (StartApplication("", CommandLine) == FALSE)
+                {
+                    temp.Empty();
+                    temp.Format("%s : ",asConnections[i].pcName);
 
-    if (!asThreads)
-    {
-        //printf("Memory allocation failure\n");
-        return -1;
+                    m_Program.SetForeColor(COLOR_RED);
+                    m_Program.SetText("FlashCLI error");
+                    UpdateData(FALSE);
+                    p_CheckBox[i]->SetCheck(FALSE);
+                }
+                else
+                {
+                    NumOfDevicesProgrammed ++;
+                    CString temp;
+                    temp.Format("Programming : %d ... ", NumOfDevicesProgrammed);
+                    m_Program.SetForeColor(COLOR_BLUE);
+                    m_Program.SetText(temp);
+                }
+            }
+        }
+        else
+        {
+            for (i = 0; i < u32NumConnections; i++)
+            {
+                m_Progress.SetPos((i*100)/u32NumConnections);
+
+                if(!p_CheckBox[i]->GetCheck())
+                    continue;
+
+                memcpy(&asThreads[i], &sProgramThreadArgs, sizeof(tsProgramThreadArgs));
+
+                asThreads[i].sConnection = asConnections[i];
+                asThreads[i].thread_times = 0;
+
+
+                for(int k=0;k<8;k++)
+                {
+                    MAC_ADDR[k] = MAC_UI[k];
+                }
+
+                if(m_mac_en.GetCheck() == TRUE)
+                    asThreads[i].pcMAC_Address = MAC_ADDR;
+                else
+                    asThreads[i].pcMAC_Address = NULL;
+
+                //thread_begin:
+                asThreads[i].hThread = CreateThread(NULL, 0, (unsigned long (__stdcall *)(void *))dwProgramThread, &asThreads[i], 0, NULL);
+                if (!asThreads[i].hThread)
+                {
+                    continue;//printf("Error starting thread for device %s\n", asThreads[i].sConnection.pcName);
+                }
+
+                WaitForSingleObject(asThreads[i].hThread, INFINITE);
+
+                unsigned long dwExitCode;
+                GetExitCodeThread(asThreads[i].hThread, &dwExitCode);
+                asThreads[i].thread_times ++;
+                if(dwExitCode == 0)
+                {
+                    NumOfDevicesProgrammed ++;
+                    CString temp;
+                    temp.Format("Programming : %d ... ", NumOfDevicesProgrammed);
+                    m_Program.SetForeColor(COLOR_BLUE);
+                    m_Program.SetText(temp);
+                    //printf("------   %s  : Programed OK  -------- \n", asThreads[i].sConnection.pcName);
+                }
+                //		else if(asThreads[i].thread_times <= 10)
+                //		{
+                //			printf("thread retry...\n");
+                //			goto thread_begin;
+                //		}
+                else
+                {
+                    temp.Empty();
+                    temp.Format("%s : ",asConnections[i].pcName);
+                    switch(dwExitCode)
+                    {
+                    case FlashFileNotFound :
+                        temp2 = temp +  "FlashFileNotFound";
+                        break;
+                    case FlashVerificationError :
+                        temp2 = temp +  "FlashVerificationError";
+                        break;
+                    case FlashFileError :
+                        temp2 = temp +  "FlashFileError";
+                        break;
+                    case COMPortNotRespond :
+                        temp2 = temp +  "COMPortNotRespond";
+                        break;
+                    case EepromEraseError :
+                        temp2 = temp +  "EepromEraseError";
+                        break;
+                    case MACprogrammingError :
+                        temp2 = temp +  "MACprogrammingError";
+                        break;
+                    default :
+                        break;
+                    }
+                    m_Program.SetForeColor(COLOR_RED);
+                    m_Program.SetText(temp2);
+                    UpdateData(FALSE);
+                    p_CheckBox[i]->SetCheck(FALSE);
+                }
+
+                //advance MAC address
+                if(m_mac_en.GetCheck() == TRUE)
+                {
+                    IncreaseMACAddr(MAC_UI);
+
+                    temp.Format("%.2x",MAC_UI[0]);
+                    m_mac8.SetWindowText(temp);
+
+                    temp.Format("%.2x",MAC_UI[1]);
+                    m_mac7.SetWindowText(temp);
+
+                    temp.Format("%.2x",MAC_UI[2]);
+                    m_mac6.SetWindowText(temp);
+
+                    temp.Format("%.2x",MAC_UI[3]);
+                    m_mac5.SetWindowText(temp);
+
+                    temp.Format("%.2x",MAC_UI[4]);
+                    m_mac4.SetWindowText(temp);
+
+                    temp.Format("%.2x",MAC_UI[5]);
+                    m_mac3.SetWindowText(temp);
+
+                    temp.Format("%.2x",MAC_UI[6]);
+                    m_mac2.SetWindowText(temp);
+
+                    temp.Format("%.2x",MAC_UI[7]);
+                    m_mac1.SetWindowText(temp);
+                }
+
+            }
+            //printf("Number of Devices Programmed : %d\n",NumOfDevicesProgrammed);
+        }
+
     }
- }
-else if(Operation == Program)
-{    
-	NumOfDevicesProgrammed = 0;
-	m_Program.SetForeColor(COLOR_BLUE);
-	m_Program.SetText("Start Programming ...");
-   
-/*
-    for (i = 0; i < u32NumConnections; i++)
-    {
-        memcpy(&asThreads[i], &sProgramThreadArgs, sizeof(tsProgramThreadArgs));
-        
-        asThreads[i].sConnection = asConnections[i];        
-        asThreads[i].hThread = CreateThread(NULL, 0, (unsigned long (__stdcall *)(void *))dwProgramThread, &asThreads[i], 0, NULL);
-        if (!asThreads[i].hThread) 
-        {
-            printf("Error starting thread for device %s\n", asThreads[i].sConnection.pcName);
-        }
-    }
 
-    for (i = 0; i < u32NumConnections; i++)
-    {
-        //void *pvRetval;
-#if defined POSIX
-        if (pthread_join(asThreads[i].sThread, &pvRetval))
-        {
-            printf("Error joining thread for device %s\n", asConnections[i].pcName);
-        }
-#elif defined WIN32
-
-        WaitForSingleObject(asThreads[i].hThread, INFINITE);
-
-        unsigned long dwExitCode;
-		GetExitCodeThread(asThreads[i].hThread, &dwExitCode);
-		if(dwExitCode != 0)
-		{
-			printf("error programming %s \r\n ",asConnections[i].pcName);
-			return FALSE;
-		}
-#endif       
-    }  */
-
-if(m_cli.GetCheck() == TRUE)
-{
-	for (i = 0; i < u32NumConnections; i++)
-    {		
-		m_Progress.SetPos((i*100)/u32NumConnections);
-		
-		if(!p_CheckBox[i]->GetCheck())
-			continue;
-
-		//CreatePorcess
-		//build command line
-		CString CommandLine;
-		CommandLine = "JN51xxProgrammer.exe -s ";
-		CommandLine += asConnections[i].pcName;
-		CommandLine +=" -V 0";
-		CommandLine +=" -P ";
-		CommandLine +="1000000";
-		CommandLine +=" --eraseeeprom full";
-		CommandLine +=" -f ";
-		CommandLine += FlashFilePath;
-
-		//lauch process
-		if (StartApplication("", CommandLine) == FALSE) 
-		{
-			temp.Empty();
-			temp.Format("%s : ",asConnections[i].pcName);
-			
-			m_Program.SetForeColor(COLOR_RED);
-			m_Program.SetText("FlashCLI error");
-		    UpdateData(FALSE); 
-			p_CheckBox[i]->SetCheck(FALSE); 
-		}
-		else
-		{
-			NumOfDevicesProgrammed ++;
-			CString temp;
-			temp.Format("Programming : %d ... ", NumOfDevicesProgrammed);
-			m_Program.SetForeColor(COLOR_BLUE);
-			m_Program.SetText(temp);
-		}
-	}
-}
-else
-{    
-    for (i = 0; i < u32NumConnections; i++)
-    {		
-		m_Progress.SetPos((i*100)/u32NumConnections);
-		
-		if(!p_CheckBox[i]->GetCheck())
-			continue;
-
-        memcpy(&asThreads[i], &sProgramThreadArgs, sizeof(tsProgramThreadArgs));
-        
-        asThreads[i].sConnection = asConnections[i]; 
-		asThreads[i].thread_times = 0;
-
-
-		for(int k=0;k<8;k++)
-		{
-			MAC_ADDR[k] = MAC_UI[k]; 
-		}
-
-		if(m_mac_en.GetCheck() == TRUE)
-			asThreads[i].pcMAC_Address = MAC_ADDR;
-		else
-			asThreads[i].pcMAC_Address = NULL;
-
-//thread_begin:		
-        asThreads[i].hThread = CreateThread(NULL, 0, (unsigned long (__stdcall *)(void *))dwProgramThread, &asThreads[i], 0, NULL);
-        if (!asThreads[i].hThread) 
-        {
-            continue;//printf("Error starting thread for device %s\n", asThreads[i].sConnection.pcName);
-        }
-
-        //void *pvRetval;
-#if defined POSIX
-        if (pthread_join(asThreads[i].sThread, &pvRetval))
-        {
-            printf("Error joining thread for device %s\n", asConnections[i].pcName);
-        }
-#elif defined WIN32
-
-        WaitForSingleObject(asThreads[i].hThread, INFINITE);
-
-        unsigned long dwExitCode;
-		GetExitCodeThread(asThreads[i].hThread, &dwExitCode);
-		asThreads[i].thread_times ++;
-		if(dwExitCode == 0)
-		{
-			NumOfDevicesProgrammed ++;
-			CString temp;
-			temp.Format("Programming : %d ... ", NumOfDevicesProgrammed);
-			m_Program.SetForeColor(COLOR_BLUE);
-			m_Program.SetText(temp);
-			//printf("------   %s  : Programed OK  -------- \n", asThreads[i].sConnection.pcName);
-		}
-//		else if(asThreads[i].thread_times <= 10)
-//		{
-//			printf("thread retry...\n");
-//			goto thread_begin;
-//		}
-		else
-		{
-			temp.Empty();
-			temp.Format("%s : ",asConnections[i].pcName);
-			switch(dwExitCode)
-			{
-			case FlashFileNotFound :
-				temp2 = temp +  "FlashFileNotFound";
-				break;
-			case FlashVerificationError :
-				temp2 = temp +  "FlashVerificationError";
-				break;
-			case FlashFileError :
-				temp2 = temp +  "FlashFileError";
-				break;
-			case COMPortNotRespond :
-				temp2 = temp +  "COMPortNotRespond";
-				break;
-			case EepromEraseError :
-				temp2 = temp +  "EepromEraseError";
-				break;
-			case MACprogrammingError :
-				temp2 = temp +  "MACprogrammingError";
-				break;
-			default :
-				break;
-			}
-			m_Program.SetForeColor(COLOR_RED);
-			m_Program.SetText(temp2);
-		    UpdateData(FALSE); 
-			p_CheckBox[i]->SetCheck(FALSE);
-		}
-
-		//advance MAC address
-		if(m_mac_en.GetCheck() == TRUE)
-		{
-			IncreaseMACAddr(MAC_UI);
-			
-			temp.Format("%.2x",MAC_UI[0]);
-			m_mac8.SetWindowText(temp);
-			
-			temp.Format("%.2x",MAC_UI[1]);
-			m_mac7.SetWindowText(temp);
-			
-			temp.Format("%.2x",MAC_UI[2]);
-			m_mac6.SetWindowText(temp);
-			
-			temp.Format("%.2x",MAC_UI[3]);
-			m_mac5.SetWindowText(temp);
-			
-			temp.Format("%.2x",MAC_UI[4]);
-			m_mac4.SetWindowText(temp);
-			
-			temp.Format("%.2x",MAC_UI[5]);
-			m_mac3.SetWindowText(temp);
-			
-			temp.Format("%.2x",MAC_UI[6]);
-			m_mac2.SetWindowText(temp);
-			
-			temp.Format("%.2x",MAC_UI[7]);
-			m_mac1.SetWindowText(temp);
-		}
-			
-    }
-#endif       
-	//printf("Number of Devices Programmed : %d\n",NumOfDevicesProgrammed);
+return 0;
 }
 
-}
 
-    return 0;
-}
-
-    
 #if defined POSIX
 static void *pvProgramThread(void* pvData)
 #elif defined WIN32
@@ -886,17 +751,17 @@ static DWORD dwProgramThread(void *pvData)
 		error = COMPortNotRespond;
         return error;
     }
-    
+
     switch (psArgs->sConnection.eType)
     {
         case (E_CONNECT_SERIAL):
             psArgs->sConnection.uDetails.sSerial.u32BaudRate = psArgs->iInitialSpeed;
 			break;
-            
+
         default:
             break;
     }
-    
+
     if (ePRG_ConnectionOpen(&sContext, &psArgs->sConnection) != E_PRG_OK)
     {
 		error = COMPortNotRespond;
@@ -909,7 +774,7 @@ static DWORD dwProgramThread(void *pvData)
     	goto done;
 	}
     if (psArgs->iInitialSpeed != psArgs->iProgramSpeed)
-    {     
+    {
         psArgs->sConnection.uDetails.sSerial.u32BaudRate = psArgs->iProgramSpeed;
 
         if (ePRG_ConnectionUpdate(&sContext, &psArgs->sConnection) != E_PRG_OK)
@@ -918,24 +783,24 @@ static DWORD dwProgramThread(void *pvData)
             return error;
         }
     }
-    
+
     if (psArgs->pcFirmwareFile)
     {
         /* Have file to program */
 		//if (ePRG_FwOpen(&sContext, "C:\\flashfile.bin") != E_PRG_OK)
-        //if (ePRG_FwOpen(&sContext, (char *)psArgs->pcFirmwareFile) != E_PRG_OK)	
+        //if (ePRG_FwOpen(&sContext, (char *)psArgs->pcFirmwareFile) != E_PRG_OK)
 		if (ePRG_FwOpen(&sContext, FlashFilePath) != E_PRG_OK)
         {
 			error = FlashFileError;
             goto done;
         }
-        
+
         if (ePRG_FlashProgram(&sContext, cbProgress, cbConfirm, psArgs) != E_PRG_OK)
         {
 			error = FlashFileError;
             goto done;
         }
-        
+
         if (psArgs->iVerify)
         {
             printf("Verifying\n");
@@ -951,8 +816,8 @@ static DWORD dwProgramThread(void *pvData)
 		error = FlashFileNotFound;
         goto done;
 	}
-    
-    
+
+
     if (psArgs->eEepromErase != E_ERASE_EEPROM_NONE)
     {
         if (ePRG_EepromErase(&sContext, psArgs->eEepromErase, cbProgress, psArgs) != E_PRG_OK)
@@ -970,7 +835,7 @@ static DWORD dwProgramThread(void *pvData)
             return error;
         }
     }
-    
+
 done:
     //if (psArgs->iInitialSpeed != psArgs->iProgramSpeed)
     {
@@ -990,12 +855,12 @@ done:
 			return COMPortNotRespond;
         }
     }
- 
+
     if (ePRG_ConnectionClose(&sContext) != E_PRG_OK)
     {
         return COMPortNotRespond;
     }
-    
+
     if (ePRG_Destroy(&sContext) != E_PRG_OK)
     {
         return COMPortNotRespond;
@@ -1013,7 +878,7 @@ CButton *p_Button = new CButton();
 ASSERT_VALID(p_Button);
 p_Button->Create( m_Caption, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | nStyle, rect, this, nID );
 return p_Button;
-} 
+}
 
 void CharToDigit(unsigned char* temp_char)
 {
@@ -1023,7 +888,7 @@ void CharToDigit(unsigned char* temp_char)
 		*temp_char -= 48;
 }
 
-void CJN516xFlashProgrammerDlg::OnProgram() 
+void CJN516xFlashProgrammerDlg::OnProgram()
 {
 	// TODO: Add your control notification handler code here
 	// Get the devicec need to be programmed
@@ -1044,7 +909,7 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 		mac_temp = temp.GetAt(0);
 		CharToDigit(&mac_temp);
 		mac_temp = (mac_temp<<4);
-		
+
         MAC_UI[7] = mac_temp;
 
 		mac_temp = temp.GetAt(1);
@@ -1057,7 +922,7 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 		mac_temp = temp.GetAt(0);
 		CharToDigit(&mac_temp);
 		mac_temp = (mac_temp<<4);
-		
+
         MAC_UI[6] = mac_temp;
 
 		mac_temp = temp.GetAt(1);
@@ -1070,7 +935,7 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 		mac_temp = temp.GetAt(0);
 		CharToDigit(&mac_temp);
 		mac_temp = (mac_temp<<4);
-		
+
         MAC_UI[5] = mac_temp;
 
 		mac_temp = temp.GetAt(1);
@@ -1083,7 +948,7 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 		mac_temp = temp.GetAt(0);
 		CharToDigit(&mac_temp);
 		mac_temp = (mac_temp<<4);
-		
+
         MAC_UI[4] = mac_temp;
 
 		mac_temp = temp.GetAt(1);
@@ -1096,7 +961,7 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 		mac_temp = temp.GetAt(0);
 		CharToDigit(&mac_temp);
 		mac_temp = (mac_temp<<4);
-		
+
         MAC_UI[3] = mac_temp;
 
 		mac_temp = temp.GetAt(1);
@@ -1109,7 +974,7 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 		mac_temp = temp.GetAt(0);
 		CharToDigit(&mac_temp);
 		mac_temp = (mac_temp<<4);
-		
+
         MAC_UI[2] = mac_temp;
 
 		mac_temp = temp.GetAt(1);
@@ -1122,7 +987,7 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 		mac_temp = temp.GetAt(0);
 		CharToDigit(&mac_temp);
 		mac_temp = (mac_temp<<4);
-		
+
         MAC_UI[1] = mac_temp;
 
 		mac_temp = temp.GetAt(1);
@@ -1135,7 +1000,7 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 		mac_temp = temp.GetAt(0);
 		CharToDigit(&mac_temp);
 		mac_temp = (mac_temp<<4);
-		
+
         MAC_UI[0] = mac_temp;
 
 		mac_temp = temp.GetAt(1);
@@ -1205,7 +1070,7 @@ void CJN516xFlashProgrammerDlg::OnProgram()
 
 }
 
-void CJN516xFlashProgrammerDlg::OnClose() 
+void CJN516xFlashProgrammerDlg::OnClose()
 {
 	// TODO: Add your message handler code here and/or call default
 	free(asConnections);
@@ -1215,12 +1080,12 @@ void CJN516xFlashProgrammerDlg::OnClose()
 	CDialog::OnClose();
 }
 
-void CJN516xFlashProgrammerDlg::OnOpen() 
+void CJN516xFlashProgrammerDlg::OnOpen()
 {
 	// TODO: Add your control notification handler code here
-	 CFileDialog dlg(TRUE, "bin", "*.bin", NULL, "JN516x flash file(*.bin)",NULL); 
-	 if(dlg.DoModal()==IDOK)   
-     { 
+	 CFileDialog dlg(TRUE, "bin", "*.bin", NULL, "JN516x flash file(*.bin)",NULL);
+	 if(dlg.DoModal()==IDOK)
+     {
 		 m_FilePath = dlg.GetPathName();
 		 int total = m_FilePath.GetLength();
 		 int current = 0;
@@ -1232,48 +1097,46 @@ void CJN516xFlashProgrammerDlg::OnOpen()
 
 		 m_Open.SetWindowText(dlg.GetFileName());
 		 m_Progress.SetPos(0);
-		 UpdateData(FALSE); 
+		 UpdateData(FALSE);
 
 		 m_Program.SetForeColor(COLOR_BLUE);
 		 m_Program.SetText("Program");
-     }                                      
+     }
 }
 
-void CJN516xFlashProgrammerDlg::OnComlist() 
+void CJN516xFlashProgrammerDlg::OnComlist()
 {
-	// TODO: Add your control notification handler code here
 	m_Progress.SetPos(0);
 	Main_Entry(GetComPorts);
 	m_Program.SetForeColor(COLOR_BLUE);
 	m_Program.SetText("Program");
 }
 
-void CJN516xFlashProgrammerDlg::OnMacEn() 
+void CJN516xFlashProgrammerDlg::OnMacEn()
 {
-	// TODO: Add your control notification handler code here
-	if(m_mac_en.GetCheck() == TRUE)
-	{
-		m_mac1.EnableWindow(TRUE);
-		m_mac2.EnableWindow(TRUE);
-		m_mac3.EnableWindow(TRUE);
-		m_mac4.EnableWindow(TRUE);
-	
-		m_mac5.EnableWindow(TRUE);
-		m_mac6.EnableWindow(TRUE);
-		m_mac7.EnableWindow(TRUE);
-		m_mac8.EnableWindow(TRUE);
-	}
-	else
-	{
-		m_mac1.EnableWindow(FALSE);
-		m_mac2.EnableWindow(FALSE);
-		m_mac3.EnableWindow(FALSE);
-		m_mac4.EnableWindow(FALSE);
-	
-		m_mac5.EnableWindow(FALSE);
-		m_mac6.EnableWindow(FALSE);
-		m_mac7.EnableWindow(FALSE);
-		m_mac8.EnableWindow(FALSE);
-	}
+    if(m_mac_en.GetCheck() == TRUE)
+    {
+        m_mac1.EnableWindow(TRUE);
+        m_mac2.EnableWindow(TRUE);
+        m_mac3.EnableWindow(TRUE);
+        m_mac4.EnableWindow(TRUE);
+
+        m_mac5.EnableWindow(TRUE);
+        m_mac6.EnableWindow(TRUE);
+        m_mac7.EnableWindow(TRUE);
+        m_mac8.EnableWindow(TRUE);
+    }
+    else
+    {
+        m_mac1.EnableWindow(FALSE);
+        m_mac2.EnableWindow(FALSE);
+        m_mac3.EnableWindow(FALSE);
+        m_mac4.EnableWindow(FALSE);
+
+        m_mac5.EnableWindow(FALSE);
+        m_mac6.EnableWindow(FALSE);
+        m_mac7.EnableWindow(FALSE);
+        m_mac8.EnableWindow(FALSE);
+    }
 }
 

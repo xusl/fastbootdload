@@ -116,14 +116,14 @@ typedef enum
 typedef struct
 {
     teConnectionType    eType;
-    char *              pcName; //COM?
+    char *              pcName;
 	char *              portName;//
     
     union
     {
         struct
         {
-        	uint32_t    u32BaudRate;
+			uint32_t    u32BaudRate;
         } sNone;
         
         struct

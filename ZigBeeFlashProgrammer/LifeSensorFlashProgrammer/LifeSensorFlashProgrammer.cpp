@@ -2,8 +2,8 @@
 //
 
 #include "stdafx.h"
-#include "JN516x Flash Programmer.h"
-#include "JN516x Flash ProgrammerDlg.h"
+#include "LifeSensorFlashProgrammer.h"
+#include "LifeSensorFlashProgrammerDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
