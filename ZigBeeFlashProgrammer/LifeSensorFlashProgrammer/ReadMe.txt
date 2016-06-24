@@ -18,11 +18,11 @@ JN516x Flash Programmer.dsp
 JN516x Flash Programmer.h
     This is the main header file for the application.  It includes other
     project specific headers (including Resource.h) and declares the
-    CJN516xFlashProgrammerApp application class.
+    LifeSensorFlashProgrammerApp application class.
 
 JN516x Flash Programmer.cpp
     This is the main application source file that contains the application
-    class CJN516xFlashProgrammerApp.
+    class LifeSensorFlashProgrammerApp.
 
 JN516x Flash Programmer.rc
     This is a listing of all of the Microsoft Windows resources that the

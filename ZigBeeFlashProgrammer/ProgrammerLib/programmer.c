@@ -481,8 +481,6 @@ teStatus LIBPROGRAMMER ePRG_Init(tsPRG_Context *psContext)
 	}			
 */
 
-
-StartLogging("LifeSensor.log", "debug,log,info,warn,error", "all");
     bin_file = bin_extension;
 	memset(psContext, 0, sizeof(tsPRG_Context));
     
@@ -507,7 +505,6 @@ teStatus LIBPROGRAMMER ePRG_Destroy(tsPRG_Context *psContext)
 	//free(bin_file);
     free(psContext->pvPrivate);
     
-    StopLogging();
     return E_PRG_OK;
 }
 

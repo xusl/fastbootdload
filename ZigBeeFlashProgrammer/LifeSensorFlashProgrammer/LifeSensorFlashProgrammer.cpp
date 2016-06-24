@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "LifeSensorFlashProgrammer.h"
 #include "LifeSensorFlashProgrammerDlg.h"
+#include "log.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -12,10 +13,10 @@ static char THIS_FILE[] = __FILE__;
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
-// CJN516xFlashProgrammerApp
+// LifeSensorFlashProgrammerApp
 
-BEGIN_MESSAGE_MAP(CJN516xFlashProgrammerApp, CWinApp)
-	//{{AFX_MSG_MAP(CJN516xFlashProgrammerApp)
+BEGIN_MESSAGE_MAP(LifeSensorFlashProgrammerApp, CWinApp)
+	//{{AFX_MSG_MAP(LifeSensorFlashProgrammerApp)
 		// NOTE - the ClassWizard will add and remove mapping macros here.
 		//    DO NOT EDIT what you see in these blocks of generated code!
 	//}}AFX_MSG
@@ -23,23 +24,23 @@ BEGIN_MESSAGE_MAP(CJN516xFlashProgrammerApp, CWinApp)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
-// CJN516xFlashProgrammerApp construction
+// LifeSensorFlashProgrammerApp construction
 
-CJN516xFlashProgrammerApp::CJN516xFlashProgrammerApp()
+LifeSensorFlashProgrammerApp::LifeSensorFlashProgrammerApp()
 {
 	// TODO: add construction code here,
 	// Place all significant initialization in InitInstance
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// The one and only CJN516xFlashProgrammerApp object
+// The one and only LifeSensorFlashProgrammerApp object
 
-CJN516xFlashProgrammerApp theApp;
+LifeSensorFlashProgrammerApp theApp;
 
 /////////////////////////////////////////////////////////////////////////////
-// CJN516xFlashProgrammerApp initialization
+// LifeSensorFlashProgrammerApp initialization
 
-BOOL CJN516xFlashProgrammerApp::InitInstance()
+BOOL LifeSensorFlashProgrammerApp::InitInstance()
 {
 	AfxEnableControlContainer();
 
@@ -54,6 +55,7 @@ BOOL CJN516xFlashProgrammerApp::InitInstance()
 //	Enable3dControlsStatic();	// Call this when linking to MFC statically
 #endif
     
+    StartLogging("LifeSensor.log", "debug,log,info,warn,error", "all");
 	LifeSensorFlashProgrammerDlg dlg;
 	m_pMainWnd = &dlg;
 	int nResponse = dlg.DoModal();
@@ -67,6 +69,7 @@ BOOL CJN516xFlashProgrammerApp::InitInstance()
 		// TODO: Place code here to handle when the dialog is
 		//  dismissed with Cancel
 	}
+    StopLogging();
     
 	// Since the dialog has been closed, return FALSE so that we exit the
 	//  application, rather than start the application's message pump.

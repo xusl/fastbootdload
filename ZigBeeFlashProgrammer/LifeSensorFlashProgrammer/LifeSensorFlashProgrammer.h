@@ -15,25 +15,25 @@
 #include "resource.h"		// main symbols
 
 /////////////////////////////////////////////////////////////////////////////
-// CJN516xFlashProgrammerApp:
+// LifeSensorFlashProgrammerApp:
 // See JN516x Flash Programmer.cpp for the implementation of this class
 //
 
-class CJN516xFlashProgrammerApp : public CWinApp
+class LifeSensorFlashProgrammerApp : public CWinApp
 {
 public:
-	CJN516xFlashProgrammerApp();
+	LifeSensorFlashProgrammerApp();
 
 // Overrides
 	// ClassWizard generated virtual function overrides
-	//{{AFX_VIRTUAL(CJN516xFlashProgrammerApp)
+	//{{AFX_VIRTUAL(LifeSensorFlashProgrammerApp)
 	public:
 	virtual BOOL InitInstance();
 	//}}AFX_VIRTUAL
 
 // Implementation
 
-	//{{AFX_MSG(CJN516xFlashProgrammerApp)
+	//{{AFX_MSG(LifeSensorFlashProgrammerApp)
 		// NOTE - the ClassWizard will add and remove member functions here.
 		//    DO NOT EDIT what you see in these blocks of generated code !
 	//}}AFX_MSG

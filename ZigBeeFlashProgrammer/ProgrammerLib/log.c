@@ -15,6 +15,8 @@ when        who        what
 #include "log.h"
 #include <stdio.h>
 #include <process.h>//for getpid()
+#include <windows.h>
+//#define FEATURE_THREAD_SYNC
 //-----------------------------------------------------------------------------
 #ifdef FEATURE_THREAD_SYNC
 #include <afxmt.h>
@@ -46,23 +48,6 @@ const char * basename(const char * f_name) {
 	return f_name + i;
 }
 
-/*===========================================================================
-DESCRIPTION
-	Start logging message to App and/or local disk file according to the
-	logging mask.
-
-DEPENDENCIES
-	None
-
-RETURN VALUE
-	None
-
-SIDE EFFECTS
-	Logging file will be open if file logging supported. This cannot be called
-	again before StopLogging is called, otherwise it takes no effect.
-
-===========================================================================*/
-
 
 
 /*===========================================================================
@@ -92,7 +77,6 @@ void WriteLog
 {
 #ifdef FEATURE_LOG_SYS
 #define MAX_BUF_LEN     (4096 * 8)
-
   int   nBuf;
   char  szBuffer[MAX_BUF_LEN] = {0};
 
@@ -100,7 +84,7 @@ void WriteLog
   char  szFormat[FORMAT_SIZE] = {0};
   //      char timestr[40];
    // time_t clk = time( NULL );
-
+    SYSTEMTIME time;
   va_list args;
   if (!(mask & type))
   {
@@ -116,31 +100,16 @@ void WriteLog
     return;
   }
   va_start(args, fmtstr);
-  
-  //_snprintf(buf,MAX_BUF_LEN, "%4d-%02d-%02d %02d:%02d:%02d.%03d  %8s  %s",
-  //			time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
-  //			time.wSecond, time.wMilliseconds,  msg, fmtstr);
-
-  nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%8s %s\n",
-                    msg, fmtstr);
+    
+  GetLocalTime(&time);
+  nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %6s %s\n",
+                   time.wHour, time.wMinute,time.wSecond, msg, fmtstr);
 
 #ifdef FEATURE_THREAD_SYNC
   g_Lock.Lock();
 #endif
-
- // if (nBuf < COUNTOF(szFormat)) {
-//    nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), szFormat, args);
-//  } else {
-//    nBuf = _snprintf(szBuffer, COUNTOF(szBuffer), "Log Error, format buffer length is smaller than format.");
-//  }
-
-
-    //sprintf( timestr, "%s", ctime( &clk ) );
-   // timestr[ strlen( timestr ) - 1 ] = '\0';
           vfprintf(gLogFp, szFormat, args);
-
   va_end(args);
-
   //ASSERT(nBuf >= 0);
 
 #ifdef FEATURE_LOG_FILE
@@ -152,12 +121,6 @@ void WriteLog
   g_Lock.Unlock();
 #endif
 #endif //FEATURE_LOG_FILE
-
-
-#if _DEBUG
-  strcat(szBuffer, "\n");
-//  afxDump << szBuffer;
-#endif // _DEBUG
 
 #endif // FEATURE_LOG_SYS
 }

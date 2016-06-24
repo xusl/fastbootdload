@@ -66,7 +66,7 @@ typedef enum {
 
 
 #ifdef FEATURE_LOG_FUNC_NAME
-#define TRACE_FMT " %20s %04d %20s "
+#define TRACE_FMT " %16s %04d %-20s "
 #define LOG_TRACE basename(__FILE__),__LINE__,__FUNCTION__
 #else
 #define TRACE_FMT " %20s %04d "
