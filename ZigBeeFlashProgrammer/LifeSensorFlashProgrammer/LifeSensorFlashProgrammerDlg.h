@@ -1,4 +1,4 @@
-// JN516x Flash ProgrammerDlg.h : header file
+// LifeSensorFlashProgrammerDlg.h : header file
 //
 
 #if !defined(AFX_LIFESENSORFLASHPROGRAMMERDLG_H__8649422B_BC30_4A5F_9A3C_6D0F0805BC8A__INCLUDED_)
@@ -29,8 +29,8 @@ public:
 	CButton* NewCheckBox(int nID,CRect rect,int nStyle);
 // Dialog Data
 	//{{AFX_DATA(LifeSensorFlashProgrammerDlg)
-	enum { IDD = IDD_JN516XFLASHPROGRAMMER_DIALOG };
-	CButton	m_cli;
+	enum { IDD = IDD_FLASHPROGRAMMER_DIALOG };
+
 	CEdit	m_mac8;
 	CEdit	m_mac7;
 	CEdit	m_mac6;
@@ -72,6 +72,7 @@ protected:
 	afx_msg void OnOpen();
 	afx_msg void OnComlist();
 	afx_msg void OnMacEn();
+    afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 };
@@ -79,4 +80,4 @@ protected:
 //{{AFX_INSERT_LOCATION}}
 // Microsoft Visual C++ will insert additional declarations immediately before the previous line.
 
-#endif // !defined(AFX_JN516XFLASHPROGRAMMERDLG_H__8649422B_BC30_4A5F_9A3C_6D0F0805BC8A__INCLUDED_)
+#endif // !defined(AFX_LifeSensorFLASHPROGRAMMERDLG_H__8649422B_BC30_4A5F_9A3C_6D0F0805BC8A__INCLUDED_)

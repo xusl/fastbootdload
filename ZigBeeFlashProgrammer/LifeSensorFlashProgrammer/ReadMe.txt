@@ -1,46 +1,46 @@
 ========================================================================
-       MICROSOFT FOUNDATION CLASS LIBRARY : JN516x Flash Programmer
+       MICROSOFT FOUNDATION CLASS LIBRARY : LifeSensor Flash Programmer
 ========================================================================
 
 
-AppWizard has created this JN516x Flash Programmer application for you.  This application
+AppWizard has created this LifeSensor Flash Programmer application for you.  This application
 not only demonstrates the basics of using the Microsoft Foundation classes
 but is also a starting point for writing your application.
 
 This file contains a summary of what you will find in each of the files that
-make up your JN516x Flash Programmer application.
+make up your LifeSensor Flash Programmer application.
 
-JN516x Flash Programmer.dsp
+LifeSensorFlashProgrammer.dsp
     This file (the project file) contains information at the project level and
     is used to build a single project or subproject. Other users can share the
     project (.dsp) file, but they should export the makefiles locally.
 
-JN516x Flash Programmer.h
+LifeSensorFlashProgrammer.h
     This is the main header file for the application.  It includes other
     project specific headers (including Resource.h) and declares the
     LifeSensorFlashProgrammerApp application class.
 
-JN516x Flash Programmer.cpp
+LifeSensorFlashProgrammer.cpp
     This is the main application source file that contains the application
     class LifeSensorFlashProgrammerApp.
 
-JN516x Flash Programmer.rc
+LifeSensorFlashProgrammer.rc
     This is a listing of all of the Microsoft Windows resources that the
     program uses.  It includes the icons, bitmaps, and cursors that are stored
     in the RES subdirectory.  This file can be directly edited in Microsoft
 	Visual C++.
 
-JN516x Flash Programmer.clw
+LifeSensorFlashProgrammer.clw
     This file contains information used by ClassWizard to edit existing
     classes or add new classes.  ClassWizard also uses this file to store
     information needed to create and edit message maps and dialog data
     maps and to create prototype member functions.
 
-res\JN516x Flash Programmer.ico
+res\LifeSensorFlashProgrammer.ico
     This is an icon file, which is used as the application's icon.  This
-    icon is included by the main resource file JN516x Flash Programmer.rc.
+    icon is included by the main resource file LifeSensorFlashProgrammer.rc.
 
-res\JN516x Flash Programmer.rc2
+res\LifeSensorFlashProgrammer.rc2
     This file contains resources that are not edited by Microsoft 
 	Visual C++.  You should place all resources not editable by
 	the resource editor in this file.
@@ -52,10 +52,10 @@ res\JN516x Flash Programmer.rc2
 
 AppWizard creates one dialog class:
 
-JN516x Flash ProgrammerDlg.h, JN516x Flash ProgrammerDlg.cpp - the dialog
-    These files contain your CJN516xFlashProgrammerDlg class.  This class defines
+LifeSensorFlashProgrammerDlg.h, LifeSensorFlashProgrammerDlg.cpp - the dialog
+    These files contain your CLifeSensorFlashProgrammerDlg class.  This class defines
     the behavior of your application's main dialog.  The dialog's
-    template is in JN516x Flash Programmer.rc, which can be edited in Microsoft
+    template is in LifeSensorFlashProgrammer.rc, which can be edited in Microsoft
 	Visual C++.
 
 
@@ -64,7 +64,7 @@ Other standard files:
 
 StdAfx.h, StdAfx.cpp
     These files are used to build a precompiled header (PCH) file
-    named JN516x Flash Programmer.pch and a precompiled types file named StdAfx.obj.
+    named LifeSensorFlashProgrammer.pch and a precompiled types file named StdAfx.obj.
 
 Resource.h
     This is the standard header file, which defines new resource IDs.

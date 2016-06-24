@@ -1,4 +1,4 @@
-// JN516x Flash ProgrammerDlg.cpp : implementation file
+// LifeSensorFlashProgrammerDlg.cpp : implementation file
 //
 
 #include "stdafx.h"
@@ -6,7 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-
+#include <setupapi.h>
+#include <dbt.h>
 #if defined POSIX
 #include <termios.h>
 #include <pthread.h>
@@ -253,7 +254,7 @@ void LifeSensorFlashProgrammerDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(LifeSensorFlashProgrammerDlg)
-	DDX_Control(pDX, IDC_CLI, m_cli);
+
 	DDX_Control(pDX, IDC_MAC8, m_mac8);
 	DDX_Control(pDX, IDC_MAC7, m_mac7);
 	DDX_Control(pDX, IDC_MAC6, m_mac6);
@@ -278,6 +279,7 @@ BEGIN_MESSAGE_MAP(LifeSensorFlashProgrammerDlg, CDialog)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+    ON_WM_DEVICECHANGE()
 	ON_BN_CLICKED(IDC_PROGRAM, OnProgram)
 	ON_WM_CLOSE()
 	ON_BN_CLICKED(IDC_OPEN, OnOpen)
@@ -329,11 +331,6 @@ BOOL LifeSensorFlashProgrammerDlg::OnInitDialog()
 
 	m_Verify.SetCheck(TRUE);
 	m_Verify.EnableWindow(FALSE);
-
-    //m_cli.SetCheck(TRUE);
-	//m_cli.EnableWindow(FALSE);
-	m_cli.SetCheck(FALSE);
-	m_cli.EnableWindow(TRUE);
 
 	m_Progress.SetRange(0,100);
 
@@ -539,6 +536,49 @@ BOOL StartApplication(CString cppAppName, CString cppCommandLine)
 
     return TRUE;
 }
+
+BOOL LifeSensorFlashProgrammerDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
+{
+    if (dwData == 0)
+    {
+        //LOGD("OnDeviceChange, dwData == 0 .EventType: 0x%x", nEventType);
+        return FALSE;
+    }
+
+    DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
+    PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
+
+    //DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x", nEventType, phdr->dbch_devicetype);
+
+    if (nEventType == DBT_DEVICEARRIVAL) {
+        switch( phdr->dbch_devicetype ) {
+        case DBT_DEVTYP_DEVNODE:
+            LOGW("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
+            break;
+
+        case DBT_DEVTYP_PORT:
+            {
+                LOGI("device arrive, DBT_DEVTYP_PORT");
+                //SetTimer(TIMER_EVT_COMPORT, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
+                //HandleDeviceArrived(pDevInf->dbcc_name);
+                //if(HandleComDevice())
+                //    ScheduleDeviceWork(m_flashdirect);
+                break;
+            }
+        }
+    } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
+        switch (phdr->dbch_devicetype) {
+        case DBT_DEVTYP_PORT:
+            {
+                LOGI("device removed, DBT_DEVTYP_PORT");
+                break;
+            }
+        }
+    }
+
+    return TRUE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////
 DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
     //printf("JennicModuleProgrammer Version: %s (libprogrammer version %s)\n", Version, pcPRG_Version);
@@ -547,8 +587,6 @@ DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
 
     if (Operation == GetComPorts) {
         tsPRG_Context       sContext;
-        //uint32_t            u32NumConnections;
-        //tsConnection*       asConnections = NULL;
         unsigned int         i;
 
         for (i = 0; i < u32NumConnections; i++)
@@ -643,51 +681,7 @@ DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
         NumOfDevicesProgrammed = 0;
         m_Program.SetForeColor(COLOR_BLUE);
         m_Program.SetText("Start Programming ...");
-
-        if(m_cli.GetCheck() == TRUE)
-        {
-            for (unsigned int i = 0; i < u32NumConnections; i++)
-            {
-                m_Progress.SetPos((i*100)/u32NumConnections);
-
-                if(!p_CheckBox[i]->GetCheck())
-                    continue;
-
-                //CreatePorcess
-                //build command line
-                CString CommandLine;
-                CommandLine = "JN51xxProgrammer.exe -s ";
-                CommandLine += asConnections[i].pcName;
-                CommandLine +=" -V 0";
-                CommandLine +=" -P ";
-                CommandLine +="1000000";
-                CommandLine +=" --eraseeeprom full";
-                CommandLine +=" -f ";
-                CommandLine += FlashFilePath;
-
-                //lauch process
-                if (StartApplication("", CommandLine) == FALSE)
-                {
-                    temp.Empty();
-                    temp.Format("%s : ",asConnections[i].pcName);
-
-                    m_Program.SetForeColor(COLOR_RED);
-                    m_Program.SetText("FlashCLI error");
-                    UpdateData(FALSE);
-                    p_CheckBox[i]->SetCheck(FALSE);
-                }
-                else
-                {
-                    NumOfDevicesProgrammed ++;
-                    CString temp;
-                    temp.Format("Programming : %d ... ", NumOfDevicesProgrammed);
-                    m_Program.SetForeColor(COLOR_BLUE);
-                    m_Program.SetText(temp);
-                }
-            }
-        }
-        else
-        {
+                
             for (unsigned int i = 0; i < u32NumConnections; i++)
             {
                 m_Progress.SetPos((i*100)/u32NumConnections);
@@ -699,7 +693,6 @@ DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
 
                 asThreads[i].sConnection = asConnections[i];
                 asThreads[i].thread_times = 0;
-
 
                 for(int k=0;k<8;k++)
                 {
@@ -803,9 +796,7 @@ DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
             }
             //printf("Number of Devices Programmed : %d\n",NumOfDevicesProgrammed);
         }
-
-    }
-
+    
 return 0;
 }
 
@@ -1162,7 +1153,7 @@ void LifeSensorFlashProgrammerDlg::OnClose()
 void LifeSensorFlashProgrammerDlg::OnOpen()
 {
 	// TODO: Add your control notification handler code here
-	 CFileDialog dlg(TRUE, "bin", "*.bin", NULL, "JN516x flash file(*.bin)",NULL);
+	 CFileDialog dlg(TRUE, "bin", "*.bin", NULL, "LifeSensor flash file(*.bin)",NULL);
 	 if(dlg.DoModal()==IDOK)
      {
 		 m_FilePath = dlg.GetPathName();

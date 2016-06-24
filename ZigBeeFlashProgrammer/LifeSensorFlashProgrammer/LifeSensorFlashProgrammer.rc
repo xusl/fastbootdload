@@ -1,4 +1,4 @@
-//Microsoft Developer Studio generated resource script.
+// Microsoft Visual C++ generated resource script.
 //
 #include "resource.h"
 
@@ -13,13 +13,11 @@
 #undef APSTUDIO_READONLY_SYMBOLS
 
 /////////////////////////////////////////////////////////////////////////////
-// Chinese (P.R.C.) resources
+// Chinese (Simplified, PRC) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
-#ifdef _WIN32
 LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
 #pragma code_page(936)
-#endif //_WIN32
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -27,18 +25,18 @@ LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
 // TEXTINCLUDE
 //
 
-1 TEXTINCLUDE DISCARDABLE 
+1 TEXTINCLUDE 
 BEGIN
     "resource.h\0"
 END
 
-2 TEXTINCLUDE DISCARDABLE 
+2 TEXTINCLUDE 
 BEGIN
     "#include ""afxres.h""\r\n"
     "\0"
 END
 
-3 TEXTINCLUDE DISCARDABLE 
+3 TEXTINCLUDE 
 BEGIN
     "#define _AFX_NO_SPLITTER_RESOURCES\r\n"
     "#define _AFX_NO_OLE_RESOURCES\r\n"
@@ -50,7 +48,7 @@ BEGIN
     "LANGUAGE 9, 1\r\n"
     "#pragma code_page(1252)\r\n"
     "#endif //_WIN32\r\n"
-    "#include ""res\\JN516x Flash Programmer.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
+    "#include ""res\\LifeSensorFlashProgrammer.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
     "#include ""afxres.rc""         // Standard components\r\n"
     "#endif\r\n"
     "\0"
@@ -66,76 +64,63 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDR_MAINFRAME           ICON    DISCARDABLE     "res\\animal.ico"
-IDI_ICON_ANIMAL         ICON    DISCARDABLE     "res\\icon1.ico"
-IDI_ICON_HAND           ICON    DISCARDABLE     "res\\hand.ICO"
-#endif    // Chinese (P.R.C.) resources
+IDR_MAINFRAME           ICON                    "res\\animal.ico"
+IDI_ICON_ANIMAL         ICON                    "res\\icon1.ico"
+IDI_ICON_HAND           ICON                    "res\\hand.ICO"
+#endif    // Chinese (Simplified, PRC) resources
 /////////////////////////////////////////////////////////////////////////////
 
 
 /////////////////////////////////////////////////////////////////////////////
-// English (U.S.) resources
+// English (United States) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
-#ifdef _WIN32
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #pragma code_page(1252)
-#endif //_WIN32
 
 /////////////////////////////////////////////////////////////////////////////
 //
 // Dialog
 //
 
-IDD_ABOUTBOX DIALOG DISCARDABLE  0, 0, 235, 55
-STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "About JN516x Flash Programmer"
+IDD_ABOUTBOX DIALOG 0, 0, 235, 55
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About LifeSensor Flash Programmer"
 FONT 8, "MS Sans Serif"
 BEGIN
     ICON            IDI_ICON_ANIMAL,IDC_STATIC,11,17,20,20
-    LTEXT           "JN516x Flash Programmer Version 1.0",IDC_STATIC,40,10,
-                    119,8,SS_NOPREFIX
+    LTEXT           "LifeSensor Flash Programmer Version 1.0",IDC_STATIC,40,10,119,8,SS_NOPREFIX
     LTEXT           "Copyright (C) 2014",IDC_STATIC,40,25,119,8
     DEFPUSHBUTTON   "OK",IDOK,178,7,50,14,WS_GROUP
 END
 
-IDD_JN516XFLASHPROGRAMMER_DIALOG DIALOGEX 0, 0, 457, 282
-STYLE DS_MODALFRAME | DS_3DLOOK | WS_MINIMIZEBOX | WS_POPUP | WS_VISIBLE | 
-    WS_CAPTION | WS_SYSMENU
+IDD_FLASHPROGRAMMER_DIALOG DIALOGEX 0, 0, 457, 282
+STYLE DS_SETFONT | DS_MODALFRAME | DS_3DLOOK | WS_MINIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_APPWINDOW
-CAPTION "JN516x Flash Tool"
-FONT 8, "MS Sans Serif"
+CAPTION "LifeSensor Flash Tool"
+FONT 8, "MS Sans Serif", 0, 0, 0x1
 BEGIN
     GROUPBOX        "Available Connections",IDC_STATIC,7,3,443,178
-    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",WS_BORDER,
-                    19,221,201,17
-    CONTROL         "Erase EEPROM",IDC_ERASE,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,110,199,67,10
-    CONTROL         "FLASH verify",IDC_VERIFY,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,176,200,62,10
-    COMBOBOX        IDC_BAUDRATE,53,199,51,70,CBS_DROPDOWNLIST | CBS_SORT | 
-                    WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",WS_BORDER,19,221,201,17
+    CONTROL         "Erase EEPROM",IDC_ERASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,110,199,67,10
+    CONTROL         "FLASH verify",IDC_VERIFY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,176,200,62,10
+    COMBOBOX        IDC_BAUDRATE,53,199,51,70,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
     PUSHBUTTON      "Program",IDC_PROGRAM,240,220,203,48
     GROUPBOX        "",IDC_STATIC,7,184,443,91
     PUSHBUTTON      "Open File",IDC_OPEN,19,246,201,17
     PUSHBUTTON      "COM",IDC_COMLIST,20,195,26,19
     EDITTEXT        IDC_MAC8,318,198,13,13,ES_UPPERCASE | ES_AUTOHSCROLL
-    CONTROL         "MAC",IDC_MAC_EN,"Button",BS_AUTOCHECKBOX | WS_DISABLED | 
-                    WS_TABSTOP,290,200,28,10
-    EDITTEXT        IDC_MAC7,334,198,13,13,ES_CENTER | ES_UPPERCASE | 
-                    ES_AUTOHSCROLL
+    CONTROL         "MAC",IDC_MAC_EN,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,290,200,28,10
+    EDITTEXT        IDC_MAC7,334,198,13,13,ES_CENTER | ES_UPPERCASE | ES_AUTOHSCROLL
     EDITTEXT        IDC_MAC6,350,198,13,13,ES_UPPERCASE | ES_AUTOHSCROLL
     EDITTEXT        IDC_MAC5,366,198,13,13,ES_UPPERCASE | ES_AUTOHSCROLL
     EDITTEXT        IDC_MAC4,382,198,13,13,ES_UPPERCASE | ES_AUTOHSCROLL
     EDITTEXT        IDC_MAC3,398,198,13,13,ES_UPPERCASE | ES_AUTOHSCROLL
     EDITTEXT        IDC_MAC2,414,198,13,13,ES_UPPERCASE | ES_AUTOHSCROLL
     EDITTEXT        IDC_MAC1,430,198,13,13,ES_UPPERCASE | ES_AUTOHSCROLL
-    CONTROL         "CLI JN5169",IDC_CLI,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,238,200,48,10
 END
 
 
-#ifndef _MAC
 /////////////////////////////////////////////////////////////////////////////
 //
 // Version
@@ -158,15 +143,13 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-            VALUE "CompanyName", "\0"
-            VALUE "FileDescription", "JN516x Flash Programmer MFC Application\0"
-            VALUE "FileVersion", "1, 0, 0, 1\0"
-            VALUE "InternalName", "JN516x Flash Programmer\0"
-            VALUE "LegalCopyright", "Copyright (C) 2014\0"
-            VALUE "LegalTrademarks", "\0"
-            VALUE "OriginalFilename", "JN516x Flash Programmer.EXE\0"
-            VALUE "ProductName", "JN516x Flash Programmer Application\0"
-            VALUE "ProductVersion", "1, 0, 0, 1\0"
+            VALUE "FileDescription", "LifeSensor Flash Programmer MFC Application"
+            VALUE "FileVersion", "1, 0, 0, 1"
+            VALUE "InternalName", "LifeSensor Flash Programmer"
+            VALUE "LegalCopyright", "Copyright (C) 2014"
+            VALUE "OriginalFilename", "LifeSensorFlashProgrammer.EXE"
+            VALUE "ProductName", "LifeSensor Flash Programmer Application"
+            VALUE "ProductVersion", "1, 0, 0, 1"
         END
     END
     BLOCK "VarFileInfo"
@@ -175,8 +158,6 @@ BEGIN
     END
 END
 
-#endif    // !_MAC
-
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -184,7 +165,7 @@ END
 //
 
 #ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO DISCARDABLE 
+GUIDELINES DESIGNINFO
 BEGIN
     IDD_ABOUTBOX, DIALOG
     BEGIN
@@ -194,7 +175,7 @@ BEGIN
         BOTTOMMARGIN, 48
     END
 
-    IDD_JN516XFLASHPROGRAMMER_DIALOG, DIALOG
+    IDD_FLASHPROGRAMMER_DIALOG, DIALOG
     BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 450
@@ -210,12 +191,12 @@ END
 // String Table
 //
 
-STRINGTABLE DISCARDABLE 
+STRINGTABLE
 BEGIN
-    IDS_ABOUTBOX            "&About JN516x Flash Programmer..."
+    IDS_ABOUTBOX            "&About LifeSensor Flash Programmer..."
 END
 
-#endif    // English (U.S.) resources
+#endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////
 
 

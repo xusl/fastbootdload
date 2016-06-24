@@ -1,11 +1,11 @@
 //{{NO_DEPENDENCIES}}
-// Microsoft Developer Studio generated include file.
-// Used by JN516x Flash Programmer.rc
+// Microsoft Visual C++ generated include file.
+// Used by LifeSensorFlashProgrammer.rc
 //
 #define IDM_ABOUTBOX                    0x0010
 #define IDD_ABOUTBOX                    100
 #define IDS_ABOUTBOX                    101
-#define IDD_JN516XFLASHPROGRAMMER_DIALOG 102
+#define IDD_FLASHPROGRAMMER_DIALOG      102
 #define IDR_MAINFRAME                   128
 #define IDI_ICON_ANIMAL                 129
 #define IDI_ICON_HAND                   131
@@ -20,7 +20,6 @@
 #define IDC_MAC8                        1015
 #define IDC_MAC_EN                      1016
 #define IDC_MAC7                        1017
-#define IDC_CLI                         1018
 #define IDC_MAC6                        1019
 #define IDC_MAC5                        1020
 #define IDC_MAC4                        1021

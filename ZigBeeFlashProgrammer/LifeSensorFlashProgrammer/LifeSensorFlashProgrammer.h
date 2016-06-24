@@ -1,4 +1,4 @@
-// JN516x Flash Programmer.h : main header file for the JN516X FLASH PROGRAMMER application
+// LifeSensorFlashProgrammer.h : main header file for the LifeSensor Flash Programmer application
 //
 
 #if !defined(AFX_LIFESENSORFLASHPROGRAMMER_H__4339449D_0FC6_499D_B60D_FA76C9C46242__INCLUDED_)
@@ -16,7 +16,7 @@
 
 /////////////////////////////////////////////////////////////////////////////
 // LifeSensorFlashProgrammerApp:
-// See JN516x Flash Programmer.cpp for the implementation of this class
+// See LifeSensorFlashProgrammer.cpp for the implementation of this class
 //
 
 class LifeSensorFlashProgrammerApp : public CWinApp
@@ -46,4 +46,4 @@ public:
 //{{AFX_INSERT_LOCATION}}
 // Microsoft Visual C++ will insert additional declarations immediately before the previous line.
 
-#endif // !defined(AFX_JN516XFLASHPROGRAMMER_H__4339449D_0FC6_499D_B60D_FA76C9C46242__INCLUDED_)
+#endif // !defined(AFX_LifeSensorFLASHPROGRAMMER_H__4339449D_0FC6_499D_B60D_FA76C9C46242__INCLUDED_)

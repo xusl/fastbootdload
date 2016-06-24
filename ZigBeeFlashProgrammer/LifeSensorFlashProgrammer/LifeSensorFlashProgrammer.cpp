@@ -1,4 +1,4 @@
-// JN516x Flash Programmer.cpp : Defines the class behaviors for the application.
+// LifeSensorFlashProgrammer.cpp : Defines the class behaviors for the application.
 //
 
 #include "stdafx.h"
