@@ -343,6 +343,7 @@ void StopLogging(void)
 {
     if (gLogFp != NULL)
         fclose(gLogFp);
+        gLogFp = NULL;
 }
 
 

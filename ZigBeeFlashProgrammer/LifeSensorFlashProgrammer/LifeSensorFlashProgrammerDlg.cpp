@@ -19,7 +19,7 @@
 //#include <unistd.h>
 #include "LifeSensorFlashProgrammer.h"
 #include "LifeSensorFlashProgrammerDlg.h"
-
+#include "ChipID.h"
 #include "programmer.h"
 #include "log.h"
 
@@ -69,7 +69,7 @@ typedef struct
 static tsProgramThreadArgs sProgramThreadArgs = {
     "FLASH",
     NULL,
-    E_ERASE_EEPROM_ALL,//erase eeprom
+    E_ERASE_EEPROM_NONE, //E_ERASE_EEPROM_ALL,//erase eeprom   //modify by xusl 06.24
     NULL,
     NULL,
     NULL,
@@ -93,7 +93,7 @@ static void *pvProgramThread(void* pvData);
 static DWORD dwProgramThread(void* pvData);
 #endif
 
-char *FlashFilePath = NULL;
+char *FlashFilePath = "F:\\fastbootdload\\ZigBeeFlashProgrammer\\LifeSensorFlashProgrammer\\ZONE_JN5169_DR1199_CSW.bin";// NULL;
 tsConnection    *asConnections     = NULL;
 tsProgramThreadArgs *asThreads      = NULL;
 uint32_t        u32NumConnections   = 0;
@@ -111,6 +111,87 @@ typedef enum ErrorCode
 	EepromEraseError,
 	MACprogrammingError
 }ErrorCode_t,*pErrorCode_t;
+
+/** Import binary data from FlashProgrammerExtension_JN5168.bin */
+int _binary_FlashProgrammerExtension_JN5168_bin_start;
+int _binary_FlashProgrammerExtension_JN5168_bin_size;
+int _binary_FlashProgrammerExtension_JN5169_bin_start;
+int _binary_FlashProgrammerExtension_JN5169_bin_size;
+int _binary_FlashProgrammerExtension_JN5179_bin_start;
+int _binary_FlashProgrammerExtension_JN5179_bin_size;
+
+char * flashExtension = NULL;
+
+static int importExtension( char * file, int * start, int * size ) {
+    size_t bytestoread = 0;
+    
+    FILE* fp = NULL;
+    int bytesread;
+    if ( ( fp = fopen(file,"r") ) <= 0 ) {
+        LOGE("open %s failed", file);
+        return 0;
+    }
+
+    fseek( fp, 0L, SEEK_END );
+    bytestoread =ftell(fp);
+    fseek( fp, 0L, SEEK_SET );
+        
+    if ( ( flashExtension = (char *)malloc(bytestoread + 100 ) ) == NULL ) {
+        perror("malloc");
+        return 0;
+    }
+    
+    char * pbuf = flashExtension;
+    while ( !feof(fp)) {
+        if ( ( bytesread = fread( pbuf, bytestoread, 1, fp) ) < 0 ) {
+            break;
+        }
+        //bytestoread -= bytesread;
+        pbuf += bytesread;
+        }        
+    fclose(fp);
+        *start = (int)flashExtension;
+        *size  = bytestoread;
+        printf( "Loaded binary of %d bytes\n", *size );
+        return 1;
+    
+}
+
+//#define IOT_EXTENSION_PATH "/usr/share/iot"
+#define IOT_EXTENSION_PATH "."
+static teStatus ePRG_ImportExtension(tsPRG_Context *psContext)
+{
+    int ret = 0;
+    switch (CHIP_ID_PART(psContext->sChipDetails.u32ChipId))
+    {
+        case (CHIP_ID_PART(CHIP_ID_JN5168)):
+            ret = importExtension( IOT_EXTENSION_PATH "/FlashProgrammerExtension_JN5168.bin",
+                &_binary_FlashProgrammerExtension_JN5168_bin_start,
+                &_binary_FlashProgrammerExtension_JN5168_bin_size );
+            psContext->pu8FlashProgrammerExtensionStart    = (uint8_t *)_binary_FlashProgrammerExtension_JN5168_bin_start;
+            psContext->u32FlashProgrammerExtensionLength   = (uint32_t)_binary_FlashProgrammerExtension_JN5168_bin_size;
+            break;
+        case (CHIP_ID_PART(CHIP_ID_JN5169)):
+            ret = importExtension( IOT_EXTENSION_PATH "/FlashProgrammerExtension_JN5169.bin",
+                &_binary_FlashProgrammerExtension_JN5169_bin_start,
+                &_binary_FlashProgrammerExtension_JN5169_bin_size );
+            psContext->pu8FlashProgrammerExtensionStart    = (uint8_t *)_binary_FlashProgrammerExtension_JN5169_bin_start;
+            psContext->u32FlashProgrammerExtensionLength   = (uint32_t)_binary_FlashProgrammerExtension_JN5169_bin_size;
+            break;
+        case (CHIP_ID_PART(CHIP_ID_JN5179)):
+            ret = importExtension( IOT_EXTENSION_PATH "/FlashProgrammerExtension_JN5179.bin",
+                &_binary_FlashProgrammerExtension_JN5179_bin_start,
+                &_binary_FlashProgrammerExtension_JN5179_bin_size );
+            psContext->pu8FlashProgrammerExtensionStart    = (uint8_t *)_binary_FlashProgrammerExtension_JN5179_bin_start;
+            psContext->u32FlashProgrammerExtensionLength   = (uint32_t)_binary_FlashProgrammerExtension_JN5179_bin_size;
+            break;
+    }
+    if ( ret ) {
+        return E_PRG_OK;
+    }
+        
+    return E_PRG_ERROR;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // CAboutDlg dialog used for App About
@@ -813,6 +894,10 @@ static DWORD dwProgramThread(void *pvData)
 
     if (psArgs->eEepromErase != E_ERASE_EEPROM_NONE)
     {
+    if ( ePRG_ImportExtension(&sContext) != E_PRG_OK ) {
+			error = EepromEraseError;
+            return error;
+    }
         if (ePRG_EepromErase(&sContext, psArgs->eEepromErase, cbProgress, psArgs) != E_PRG_OK)
         {
 			error = EepromEraseError;

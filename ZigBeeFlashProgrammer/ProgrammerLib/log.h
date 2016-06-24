@@ -22,11 +22,15 @@ when        who        what
 #include  "stdlib.h"
 #include "stdarg.h"
 //#include "utils.h"
+#if defined __cplusplus
+extern "C" {
+#endif
+
 #define FEATURE_LOG_FILE
 #define FEATURE_LOG_SYS
 #define FEATURE_LOG_FUNC_NAME
 
-const char * basename(const char * f_name);
+LIBPROGRAMMER const char * basename(const char * f_name);
 #define COUNTOF(array) (sizeof(array)/sizeof(array[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 //-----------------------------------------------------------------------------
@@ -70,7 +74,7 @@ typedef enum {
 #endif
 
 //-----------------------------------------------------------------------------
-void WriteLog(AdbTrace tag, TLogMaskEnumType type, const char* msg, const char* fmtstr, ...);
+LIBPROGRAMMER void WriteLog(AdbTrace tag, TLogMaskEnumType type, const char* msg, const char* fmtstr, ...);
 
 
 //-----------------------------------------------------------------------------
@@ -107,4 +111,7 @@ void WriteLog(AdbTrace tag, TLogMaskEnumType type, const char* msg, const char* 
 
 //-----------------------------------------------------------------------------
 
+#if defined __cplusplus
+}
+#endif
 #endif //__LOG_H__

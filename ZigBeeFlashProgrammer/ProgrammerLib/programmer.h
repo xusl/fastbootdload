@@ -161,15 +161,28 @@ typedef struct
     uint32_t            u32BootloaderVersion;   /**< Bootloader version (JN516x series) */
     
     uint8_t             au8MacAddress[8];       /**< MAC Address */
+    uint8_t             boEEPpresent;                   /** EEPROM present flag */
 } tsChipDetails;
 
 
 /** Programmer context structure */
 typedef struct
 {
+    int                 iUartFD;
+    uint32_t            u32BaudRate;
+    
+    int                 iFirmwareFD;
+    uint32_t            u32FirmWareFileSize;
+    uint8_t *           pu8Firmware;
     tsFW_Info           sFirmwareInfo;          /**< Loaded firmware for the context */
     tsChipDetails       sChipDetails;           /**< Information about the connected device */
     void *              pvPrivate;              /**< Private context information */
+    uint8_t *           pu8FlashProgrammerExtensionStart;
+    uint32_t            u32FlashProgrammerExtensionLength;
+    uint32_t            u32BootloaderEntry;
+    uint32_t            u32FlashOffset;         /**< Offset within flash at which to load / dump an image. Default 0 (start) */
+    
+    uint32_t            u32EepromOffset;        /**< Offset within eeprom at which to load / dump an image. Default 0 (start) */
 } tsPRG_Context;
 
 

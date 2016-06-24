@@ -112,6 +112,12 @@
 /* Location of bootloader information in memory map */
 #define JN516X_BOOTLOADER_VERSION_ADDRESS       0x00000062
 #define JN516X_BOOTLOADER_ENTRY                 0x00000066
+/* JN517x definitions */
+
+/* Location of bootloader information in memory map */
+#define JN517X_BOOTLOADER_VERSION_ADDRESS               0x00000044
+// this address not needed for this implementation
+#define JN517X_BOOTLOADER_ENTRY                         0xFFFFFFFF
 
 /* Location of device configuration in memory map */
 #define JN516X_INDEX_SECTOR_DEVICE_CONFIG_ADDR  0x01001500
@@ -353,6 +359,10 @@ unsigned char bin_extension[BIN_LENGTH] = {
 
 static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext);
 static teStatus ePRG_ChipGetMacAddress(tsPRG_Context *psContext);
+static teStatus ePRG_ChipGetEEPROMenable(tsPRG_Context *psContext);
+static teStatus ePRG_ChipGetFlashProgrammerExtensionDetails(tsPRG_Context *psContext);
+static teStatus ePRG_FlashProgrammerExtensionLoad(tsPRG_Context *psContext, const char *pcOperation);
+static teStatus ePRG_FlashProgrammerExtensionReturn(tsPRG_Context *psContext);
 static teStatus ePRG_SetUpImage(tsPRG_Context *psContext, tsFW_Info *psFWImage, tsChipDetails *psChipDetails);
 static teStatus ePRG_ConfirmAlways(void *pvUser, const char *pcTitle, const char *pcText);
 
@@ -390,6 +400,55 @@ extern int binary_FlashProgrammerExtension_JN5168_bin_start;
 */
 unsigned char *bin_file;
 #define FLASHPROGRAMMEREXTENSION_JN5168_BIN bin_file
+#if defined POSIX
+extern int _binary_FlashProgrammerExtension_JN5168_bin_start;
+extern int _binary_FlashProgrammerExtension_JN5168_bin_size;
+#define FLASHPROGRAMMEREXTENSION_JN5168_BIN     ((uint8_t *)    &_binary_FlashProgrammerExtension_JN5168_bin_start)
+#ifdef __amd64__
+#define FLASHPROGRAMMEREXTENSION_JN5168_BIN_LEN ((uint64_t)     &_binary_FlashProgrammerExtension_JN5168_bin_size)
+#else
+#define FLASHPROGRAMMEREXTENSION_JN5168_BIN_LEN ((uint32_t)     &_binary_FlashProgrammerExtension_JN5168_bin_size)
+#endif
+#elif defined WIN32
+extern int binary_FlashProgrammerExtension_JN5168_bin_start;
+extern int binary_FlashProgrammerExtension_JN5168_bin_size;
+#define FLASHPROGRAMMEREXTENSION_JN5168_BIN     ((uint8_t *)    &binary_FlashProgrammerExtension_JN5168_bin_start)
+#define FLASHPROGRAMMEREXTENSION_JN5168_BIN_LEN ((uint32_t)     &binary_FlashProgrammerExtension_JN5168_bin_size)
+#endif
+
+/** Import binary data from FlashProgrammerExtension_JN5169.bin */
+#if defined POSIX
+extern int _binary_FlashProgrammerExtension_JN5169_bin_start;
+extern int _binary_FlashProgrammerExtension_JN5169_bin_size;
+#define FLASHPROGRAMMEREXTENSION_JN5169_BIN     ((uint8_t *)    &_binary_FlashProgrammerExtension_JN5169_bin_start)
+#ifdef __amd64__
+#define FLASHPROGRAMMEREXTENSION_JN5169_BIN_LEN ((uint64_t)     &_binary_FlashProgrammerExtension_JN5169_bin_size)
+#else
+#define FLASHPROGRAMMEREXTENSION_JN5169_BIN_LEN ((uint32_t)     &_binary_FlashProgrammerExtension_JN5169_bin_size)
+#endif
+#elif defined WIN32
+extern int binary_FlashProgrammerExtension_JN5169_bin_start;
+extern int binary_FlashProgrammerExtension_JN5169_bin_size;
+#define FLASHPROGRAMMEREXTENSION_JN5169_BIN     ((uint8_t *)    &binary_FlashProgrammerExtension_JN5169_bin_start)
+#define FLASHPROGRAMMEREXTENSION_JN5169_BIN_LEN ((uint32_t)     &binary_FlashProgrammerExtension_JN5169_bin_size)
+#endif
+
+/** Import binary data from FlashProgrammerExtension_JN5179.bin */
+#if defined POSIX
+extern int _binary_FlashProgrammerExtension_JN5179_bin_start;
+extern int _binary_FlashProgrammerExtension_JN5179_bin_size;
+#define FLASHPROGRAMMEREXTENSION_JN5179_BIN     ((uint8_t *)    &_binary_FlashProgrammerExtension_JN5179_bin_start)
+#ifdef __amd64__
+#define FLASHPROGRAMMEREXTENSION_JN5179_BIN_LEN ((uint64_t)     &_binary_FlashProgrammerExtension_JN5179_bin_size)
+#else
+#define FLASHPROGRAMMEREXTENSION_JN5179_BIN_LEN ((uint32_t)     &_binary_FlashProgrammerExtension_JN5179_bin_size)
+#endif
+#elif defined WIN32
+extern int binary_FlashProgrammerExtension_JN5179_bin_start;
+extern int binary_FlashProgrammerExtension_JN5179_bin_size;
+#define FLASHPROGRAMMEREXTENSION_JN5179_BIN     ((uint8_t *)    &binary_FlashProgrammerExtension_JN5179_bin_start)
+#define FLASHPROGRAMMEREXTENSION_JN5179_BIN_LEN ((uint32_t)     &binary_FlashProgrammerExtension_JN5179_bin_size)
+#endif
 
 /****************************************************************************/
 /***        Local Variables                                               ***/
@@ -1058,6 +1117,50 @@ teStatus ePRG_EepromErase(tsPRG_Context *psContext, teEepromErase eErase, tcbFW_
     }
     if(!BOOTLOADER_CAPABILITY_EEPROM_ACCESS(psChipDetails->u32BootloaderVersion))
     {
+        // printf( "RHM bin 2\n" );
+        /* For this bootloader we have to load an extension binary in to RAM first */
+        if ((eStatus = ePRG_FlashProgrammerExtensionLoad(psContext, "EEPROM access")) != E_PRG_OK)
+        {
+            // printf( "RHM bin 3\n" );
+            return eStatus;
+        }
+    }
+    if (cbProgress)
+    {
+        if (cbProgress(pvUser, "Erasing EEPROM", "Erasing EEPROM", 0, 0) != E_PRG_OK)
+        {
+            return ePRG_SetStatus(psContext, E_PRG_ABORTED, "");
+        }
+    }
+
+    if ((eStatus = eBL_EEPROMErase(psContext, iEraseAll)) != E_PRG_OK)
+    {
+        return ePRG_SetStatus(psContext, eStatus, "erasing EEPROM");
+    }
+
+    // printf( "RHM bin 4\n" );
+    if(!BOOTLOADER_CAPABILITY_EEPROM_ACCESS(psChipDetails->u32BootloaderVersion))
+    {
+        // printf( "RHM bin 5\n" );
+        /* Return to bootloader */
+        if ((eStatus = ePRG_FlashProgrammerExtensionReturn(psContext)) != E_PRG_OK)
+        {
+            // printf( "RHM bin 6\n" );
+            return eStatus;
+        }
+    }
+
+    if (cbProgress)
+    {
+        if (cbProgress(pvUser, "Erasing EEPROM", "Erasing EEPROM", 1, 1) != E_PRG_OK)
+        {
+            return ePRG_SetStatus(psContext, E_PRG_ABORTED, "");
+        }
+    }
+
+    return ePRG_SetStatus(psContext, E_PRG_OK, "");
+    #if 0
+    {
         /* For this bootloader we have to load an extension binary in to RAM first */
         tsPRG_Context sContext;
         uint32_t u32BaudRate;
@@ -1124,6 +1227,7 @@ teStatus ePRG_EepromErase(tsPRG_Context *psContext, teEepromErase eErase, tcbFW_
     {
         return ePRG_SetStatus(psContext, E_PRG_UNSUPPORED_CHIP, "");
     }
+    #endif
 }
 
 
@@ -1801,6 +1905,178 @@ static teStatus ePRG_ChipGetMacAddress(tsPRG_Context *psContext)
     }
 
     return eStatus;
+}
+
+static teStatus ePRG_ChipGetEEPROMenable(tsPRG_Context *psContext)
+{
+    tsChipDetails *psChipDetails;
+
+    if (!psContext)
+    {
+        return E_PRG_NULL_PARAMETER;
+    }
+
+    psChipDetails = &psContext->sChipDetails;
+
+    if(
+        (CHIP_ID_PART(psChipDetails->u32ChipId) == CHIP_ID_PART(CHIP_ID_JN5168)) ||
+        (CHIP_ID_PART(psChipDetails->u32ChipId) == CHIP_ID_PART(CHIP_ID_JN5169)) ||
+        (CHIP_ID_PART(psChipDetails->u32ChipId) == CHIP_ID_PART(CHIP_ID_JN5172))
+    )
+    {
+        LOGD("EEPROM is available\n");
+        psChipDetails->boEEPpresent = TRUE;
+    }
+    else
+    {
+        LOGD("EEPROM is NOT available\n");
+        psChipDetails->boEEPpresent = FALSE;
+    }
+
+    return ePRG_SetStatus(psContext, E_PRG_OK, "");
+}
+
+
+static teStatus ePRG_ChipGetFlashProgrammerExtensionDetails(tsPRG_Context *psContext)
+{
+    // printf( "RHM ext 1\n" );
+    tsChipDetails *psChipDetails;
+
+    psChipDetails = &psContext->sChipDetails;
+
+    switch(CHIP_ID_PART(psChipDetails->u32ChipId))
+    {
+        case CHIP_ID_PART(CHIP_ID_JN5168):
+            LOGD("Setting JN5168 flash programmer extension\n");
+            psContext->pu8FlashProgrammerExtensionStart    = FLASHPROGRAMMEREXTENSION_JN5168_BIN;
+            psContext->u32FlashProgrammerExtensionLength   = FLASHPROGRAMMEREXTENSION_JN5168_BIN_LEN;
+            psContext->u32BootloaderEntry                  = JN516X_BOOTLOADER_ENTRY;
+            break;
+
+        case CHIP_ID_PART(CHIP_ID_JN5169):
+            // printf( "RHM ext 69\n" );
+            LOGD("Setting JN5169 flash programmer extension\n");
+            psContext->pu8FlashProgrammerExtensionStart    = FLASHPROGRAMMEREXTENSION_JN5169_BIN;
+            psContext->u32FlashProgrammerExtensionLength   = FLASHPROGRAMMEREXTENSION_JN5169_BIN_LEN;
+            psContext->u32BootloaderEntry                  = JN516X_BOOTLOADER_ENTRY;
+            break;
+
+        case CHIP_ID_PART(CHIP_ID_JN5172):
+            LOGD("Setting JN5172 flash programmer extension\n");
+            psContext->pu8FlashProgrammerExtensionStart    = FLASHPROGRAMMEREXTENSION_JN5179_BIN;
+            psContext->u32FlashProgrammerExtensionLength   = FLASHPROGRAMMEREXTENSION_JN5179_BIN_LEN;
+            psContext->u32BootloaderEntry                  = JN517X_BOOTLOADER_ENTRY;
+            break;
+        default:
+            /* Extension not available - this may be ok, depending on what operations are attempted. */
+            LOGD("No flash programmer extension available\n");
+            break;
+    }
+    // printf( "RHM ext 3\n" );
+
+    return ePRG_SetStatus(psContext, E_PRG_OK, "");
+}
+
+
+static teStatus ePRG_FlashProgrammerExtensionLoad(tsPRG_Context *psContext, const char *pcOperation)
+{
+    /* Attempt to load the flash prorgammer extension for this device */
+    tsPRG_Context sContext;
+    teStatus eStatus;
+
+    if (!psContext)
+    {
+        return E_PRG_NULL_PARAMETER;
+    }
+    // printf( "bon 1\n" );
+    if ((psContext->pu8FlashProgrammerExtensionStart == NULL) || (psContext->u32FlashProgrammerExtensionLength == 0))
+    {
+        return ePRG_SetStatus(psContext, E_PRG_UNSUPPORTED_OPERATION, (char *)pcOperation);
+    }
+
+    // printf( "bon 2\n" );
+    LOGD("Loading flash programmer extension\n");
+
+    /* Copy context data for loading the extension programmer */
+    sContext = *psContext;
+    // printf( "bon 3 (%d)\n", psContext->u32FlashProgrammerExtensionLength );
+
+    /* get flash start */
+    if ((eStatus = ePRG_FwGetInfo(&sContext, psContext->pu8FlashProgrammerExtensionStart/*, psContext->u32FlashProgrammerExtensionLength*/)) != E_PRG_OK)
+    {
+        /* Error with file. FW module has displayed error so just exit. */
+        return ePRG_SetStatus(psContext, eStatus, "loading extension binary");
+    }
+    // printf( "bon 4\n" );
+
+    if ((eStatus = ePRG_MemoryLoadExecute(&sContext, NULL, ePRG_ConfirmAlways, NULL)) != E_PRG_OK)
+    {
+        // printf( "bon 5\n" );
+        return ePRG_SetStatus(psContext, eStatus, "loading extension binary into RAM");
+    }
+
+    // printf( "bon 6\n" );
+    return ePRG_SetStatus(psContext, E_PRG_OK, "");
+}
+
+
+static teStatus ePRG_FlashProgrammerExtensionReturn(tsPRG_Context *psContext)
+{
+    /* Return to the bootloader */
+    uint32_t u32BaudRate;
+    teStatus eStatus;
+    tsChipDetails *psChipDetails;
+
+    if (!psContext)
+    {
+        return E_PRG_NULL_PARAMETER;
+    }
+
+    psChipDetails = &psContext->sChipDetails;
+
+    LOGD("returning to bootloader\n");
+
+    if ((eStatus = eBL_MemoryExecute(psContext, psContext->u32BootloaderEntry)) != E_PRG_OK)
+    {
+        LOGD("1, ePRG_FlashProgrammerExtensionReturn \n");
+        return ePRG_SetStatus(psContext, eStatus, "executing bootloader");
+    }
+
+    #if 0
+    if(CHIP_ID_PART(psChipDetails->u32ChipId) != CHIP_ID_PART(CHIP_ID_JN5172))
+    {
+        // not required - Bootloader doesn't reset itself after FLASH extension exit
+        u32BaudRate = psContext->u32BaudRate;
+
+        psContext->u32BaudRate = 38400;
+
+        /* change local port to default speed of built in bootloader */
+        if ((eStatus = eUART_SetBaudRate(psContext->iUartFD, &psContext->sUartOptions, 38400)) != E_PRG_OK)
+        // if ((eStatus = ePRG_ConnectionUartUpdate(psContext, &psPriv->sConnection)) != E_PRG_OK)
+        {
+            LOGD("2, ePRG_FlashProgrammerExtensionReturn \n");
+            return ePRG_SetStatus(psContext, eStatus, "selecting baud rate");
+        }
+
+        // Wait 500ms for bootloader to switch back to 38400.
+        vPRG_WaitMs(500);
+
+        psContext->u32BaudRate = u32BaudRate;
+
+
+        /* Go back to selected speed */
+        if ((eStatus = eUART_SetBaudRate(psContext->iUartFD, &psContext->sUartOptions, u32BaudRate)) != E_PRG_OK)
+        // if ((eStatus = ePRG_ConnectionUpdate(psContext, &psPriv->sConnection)) != E_PRG_OK)
+        {
+            if (u32BaudRate == 0) {
+                LOGD("3,xxxxxxxxxxxx ePRG_FlashProgrammerExtensionReturn %d\n", u32BaudRate);
+            } else {
+                return ePRG_SetStatus(psContext, eStatus, "selecting baud rate");
+            }
+        }
+    }
+    #endif
+    return ePRG_SetStatus(psContext, E_PRG_OK, "");
 }
 
 
