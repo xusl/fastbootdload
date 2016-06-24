@@ -24,6 +24,7 @@ when        who        what
 //#include "utils.h"
 #define FEATURE_LOG_FILE
 #define FEATURE_LOG_SYS
+#define FEATURE_LOG_FUNC_NAME
 
 const char * basename(const char * f_name);
 #define COUNTOF(array) (sizeof(array)/sizeof(array[0]))

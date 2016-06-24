@@ -22,21 +22,27 @@
  *
  ****************************************************************************
  *
- * This software is owned by Jennic and/or its supplier and is protected
+ * This software is owned by NXP B.V. and/or its supplier and is protected
  * under applicable copyright laws. All rights are reserved. We grant You,
  * and any third parties, a license to use this software solely and
- * exclusively on Jennic products. You, and any third parties must reproduce
- * the copyright and warranty notice and any other legend of ownership on
- * each copy or partial copy of the software.
+ * exclusively on NXP products [NXP Microcontrollers such as JN5148, JN5142, JN5139]. 
+ * You, and any third parties must reproduce the copyright and warranty notice
+ * and any other legend of ownership on each copy or partial copy of the 
+ * software.
  *
- * THIS SOFTWARE IS PROVIDED "AS IS". JENNIC MAKES NO WARRANTIES, WHETHER
- * EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE,
- * ACCURACY OR LACK OF NEGLIGENCE. JENNIC SHALL NOT, IN ANY CIRCUMSTANCES,
- * BE LIABLE FOR ANY DAMAGES, INCLUDING, BUT NOT LIMITED TO, SPECIAL,
- * INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON WHATSOEVER.
- *
- * Copyright Jennic Ltd 2005, 2006. All rights reserved
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+
+ * Copyright NXP B.V. 2014. All rights reserved
  *
  ***************************************************************************/
 
@@ -89,13 +95,38 @@ extern "C" {
 #define CHIP_ID_JN5168                  0x00008686  /* Cougar COG05                                 */
 #define CHIP_ID_JN5168_COG07            0x10008686  /* Cougar COG07                                 */
 
+#define CHIP_ID_JN5169                  0x0000b686
+// variants
+#define CHIP_ID_JN5169_LR               0x0000b686
+#define CHIP_ID_JN5169_D               	0x0040b686
+#define CHIP_ID_JN5169_HR               0x0080b686
+#define CHIP_ID_JN5169_VHR              0x00c0b686
+#define CHIP_ID_JN5169_DONGLE           0x6000b686  /* RHM */
+
+#define CHIP_ID_JN5169_COG09A           0x00009686  /* Cougar COG09A                                */
+#define CHIP_ID_JN5169_COG10A           0x10009686  /* Cougar COG10A                                */
+#if (defined JN5172_FPGA)
+#define CHIP_ID_JN5172                  0x0800a686  /* Firefly FPGA                                 */
+#else
+#define CHIP_ID_JN5172                  0x0000a686  /* Firefly  */
+// variants
+#define CHIP_ID_JN5172_D                0x0000a686
+#define CHIP_ID_JN5172_LR               0x0040a686
+#define CHIP_ID_JN5172_HR               0x0080a686
+
+#define CHIP_ID_JN5179                  0x1000a686  /* MRA2 */
+
+#endif
 
 /* Macro to get components from the chip ID */
 #define CHIP_ID_MANUFACTURER(a)         (a & CHIP_ID_MANUFACTURER_ID_MASK)
 #define CHIP_ID_PART(a)                 (a & CHIP_ID_PART_MASK)
 #define CHIP_ID_VESION(a)               (a & CHIP_ID_MASK_VERSION_MASK)
 #define CHIP_ID_REVISION(a)             (a & CHIP_ID_REV_MASK)
-#define CHIP_ID(a)                      (a & ~CHIP_ID_REV_MASK)
+// updated this to cope with the mask revisions in 69/72
+// this macro added to cope with 4x
+#define CHIP_ID_WITH_METAL_MASK(a)      (a & ~CHIP_ID_REV_MASK)
+#define CHIP_ID(a)                      (a & ~CHIP_ID_REV_MASK & ~CHIP_ID_MASK_VERSION_MASK)
 
 
 /* SPI Flash device ID's  */
@@ -103,6 +134,13 @@ extern "C" {
 #define	FLASH_ST_M25P40			0x1212	/* ST microelectronics M25P40		*/
 #define	FLASH_SST_SST25VF010A	0xbf49	/* SST SST25VF010A					*/
 #define FLASH_INTERNAL			0xccee	/* Internal on-chip flash 			*/
+
+
+
+/* These bits within the bootloader version are used to flag capabilities of the bootloader. 
+ * The flag being present means the running bootloader can perform this task */
+#define BOOTLOADER_CAPABILITY_INDEX_SECTOR(a)   (a & (1 << 24))
+#define BOOTLOADER_CAPABILITY_EEPROM_ACCESS(a)  (a & (1 << 25))
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/

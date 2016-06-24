@@ -1056,7 +1056,7 @@ teStatus ePRG_EepromErase(tsPRG_Context *psContext, teEepromErase eErase, tcbFW_
         default:
             return ePRG_SetStatus(psContext, E_PRG_BAD_PARAMETER, "");
     }
-    if (psChipDetails->u32BootloaderVersion == 0x00080006)
+    if(!BOOTLOADER_CAPABILITY_EEPROM_ACCESS(psChipDetails->u32BootloaderVersion))
     {
         /* For this bootloader we have to load an extension binary in to RAM first */
         tsPRG_Context sContext;
@@ -1611,7 +1611,7 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
     memset(psChipDetails, 0, sizeof(tsChipDetails));
 
     /* Send chip id request */
-    if(eBL_ChipIdRead(psContext, &psChipDetails->u32ChipId) != E_PRG_OK)
+    if(eBL_ChipIdRead(psContext, &psChipDetails->u32ChipId, &psChipDetails->u32BootloaderVersion) != E_PRG_OK)
     {
         LOGD("Error reading chip id");
 
@@ -1631,7 +1631,11 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
     }
     LOGD("Chip ID: 0x%08X", psContext->sChipDetails.u32ChipId);
     
-    if (CHIP_ID_PART(psChipDetails->u32ChipId) == CHIP_ID_PART(CHIP_ID_JN5168))
+    if(
+        (CHIP_ID_PART(psChipDetails->u32ChipId) == CHIP_ID_PART(CHIP_ID_JN5168)) ||
+        (CHIP_ID_PART(psChipDetails->u32ChipId) == CHIP_ID_PART(CHIP_ID_JN5169)) ||
+        (CHIP_ID_PART(psChipDetails->u32ChipId) == CHIP_ID_PART(CHIP_ID_JN5172))
+    )
     {
         LOGD("Reading 6x data");
 
@@ -1657,14 +1661,14 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
         }
         else
         {
-            psChipDetails->u32EepromSize    = (4 * 1024) - 64; /* Final segment not usable */
-            psChipDetails->u32FlashSize     = (au8Buffer[3] & 0x07) >> 0;
+            psChipDetails->u32EepromSize    = (16 * 1024) - 64; /* Final segment not usable */
+            psChipDetails->u32FlashSize     = (au8Buffer[3] & 0x0F) >> 0;
             psChipDetails->u32RamSize       = (au8Buffer[3] & 0x30) >> 4;
             
             psChipDetails->u32SupportedFirmware = (
                 (psChipDetails->u32RamSize      << 16) |
                 (psChipDetails->u32FlashSize    << 24) |
-                (0x08));
+            (CHIP_ID_PART(psChipDetails->u32ChipId) >> 12));
             
             psChipDetails->u32RamSize       = ((psChipDetails->u32RamSize + 1) * 8) * 1024;
             psChipDetails->u32FlashSize     = ((psChipDetails->u32FlashSize + 1) * 32) * 1024;
@@ -1694,16 +1698,17 @@ static teStatus ePRG_ChipGetChipId(tsPRG_Context *psContext)
     
     switch (CHIP_ID(psChipDetails->u32ChipId))
     {
-        case (CHIP_ID(CHIP_ID_JN5148_REV2A)):    psChipDetails->pcChipName = "JN5148-001";  break;
-        case (CHIP_ID(CHIP_ID_JN5148_REV2B)):    psChipDetails->pcChipName = "JN5148-001";  break;
-        case (CHIP_ID(CHIP_ID_JN5148_REV2C)):    psChipDetails->pcChipName = "JN5148-001";  break;
-        case (CHIP_ID(CHIP_ID_JN5148_REV2D)):    psChipDetails->pcChipName = "JN5148J01";   break;
-        case (CHIP_ID(CHIP_ID_JN5148_REV2E)):    psChipDetails->pcChipName = "JN5148Z01";   break;
-        
-        case (CHIP_ID(CHIP_ID_JN5142_REV1A)):    psChipDetails->pcChipName = "JN5142";      break;
-        case (CHIP_ID(CHIP_ID_JN5142_REV1B)):    psChipDetails->pcChipName = "JN5142";      break;
-        case (CHIP_ID(CHIP_ID_JN5142_REV1C)):    psChipDetails->pcChipName = "JN5142J01";   break;
+        case (CHIP_ID_WITH_METAL_MASK(CHIP_ID_JN5148_REV2A)):    psChipDetails->pcChipName = "JN5148-001";  break;
+        case (CHIP_ID_WITH_METAL_MASK(CHIP_ID_JN5148_REV2B)):    psChipDetails->pcChipName = "JN5148-001";  break;
+        case (CHIP_ID_WITH_METAL_MASK(CHIP_ID_JN5148_REV2C)):    psChipDetails->pcChipName = "JN5148-001";  break;
+        case (CHIP_ID_WITH_METAL_MASK(CHIP_ID_JN5148_REV2D)):    psChipDetails->pcChipName = "JN5148J01";   break;
+        case (CHIP_ID_WITH_METAL_MASK(CHIP_ID_JN5148_REV2E)):    psChipDetails->pcChipName = "JN5148Z01";   break;
 
+        case (CHIP_ID_WITH_METAL_MASK(CHIP_ID_JN5142_REV1A)):    psChipDetails->pcChipName = "JN5142";      break;
+        case (CHIP_ID_WITH_METAL_MASK(CHIP_ID_JN5142_REV1B)):    psChipDetails->pcChipName = "JN5142";      break;
+        case (CHIP_ID_WITH_METAL_MASK(CHIP_ID_JN5142_REV1C)):    psChipDetails->pcChipName = "JN5142J01";   break;
+
+        case (CHIP_ID(CHIP_ID_JN5169)):                          psChipDetails->pcChipName = "JN5169";      break;
         case (CHIP_ID(CHIP_ID_JN5168)):         
             if (psChipDetails->u32FlashSize == (64 * 1024))
             {
@@ -1769,6 +1774,8 @@ static teStatus ePRG_ChipGetMacAddress(tsPRG_Context *psContext)
             break;
             
         case CHIP_ID_PART(CHIP_ID_JN5168):
+        case CHIP_ID_PART(CHIP_ID_JN5169):
+        case CHIP_ID_PART(CHIP_ID_JN5172):
             /* First we read the customer specific MAC address, and if its not all F's, we use that */
             eStatus = eBL_MemoryRead(psContext, JN516X_CUSTOMER_MAC_ADDRESS_LOCATION, 8, psChipDetails->au8MacAddress);
             
@@ -1829,6 +1836,8 @@ static teStatus ePRG_SetUpImage(tsPRG_Context *psContext, tsFW_Info *psFWImage, 
             break;
             
         case CHIP_ID_PART(CHIP_ID_JN5168):
+        case CHIP_ID_PART(CHIP_ID_JN5169):
+        case CHIP_ID_PART(CHIP_ID_JN5172):
             break;
 
         default:

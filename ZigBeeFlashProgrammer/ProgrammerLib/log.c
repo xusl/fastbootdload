@@ -120,30 +120,24 @@ void WriteLog
   //_snprintf(buf,MAX_BUF_LEN, "%4d-%02d-%02d %02d:%02d:%02d.%03d  %8s  %s",
   //			time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
   //			time.wSecond, time.wMilliseconds,  msg, fmtstr);
-#ifndef OPT_LOG
-  nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%8s %s",
+
+  nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%8s %s\n",
                     msg, fmtstr);
-#else
-#ifdef FEATURE_LOG_FILE
+
 #ifdef FEATURE_THREAD_SYNC
   g_Lock.Lock();
 #endif
 
-#ifdef FEATURE_THREAD_SYNC
-  g_Lock.Unlock();
-#endif
-#endif //FEATURE_LOG_FILE
-#endif
-  if (nBuf < COUNTOF(szFormat)) {
-    nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), szFormat, args);
-  } else {
-    nBuf = _snprintf(szBuffer, COUNTOF(szBuffer), "Log Error, format buffer length is smaller than format.");
-  }
+ // if (nBuf < COUNTOF(szFormat)) {
+//    nBuf = _vsnprintf(szBuffer, COUNTOF(szBuffer), szFormat, args);
+//  } else {
+//    nBuf = _snprintf(szBuffer, COUNTOF(szBuffer), "Log Error, format buffer length is smaller than format.");
+//  }
 
 
     //sprintf( timestr, "%s", ctime( &clk ) );
    // timestr[ strlen( timestr ) - 1 ] = '\0';
-          fprintf(gLogFp, szFormat, args);
+          vfprintf(gLogFp, szFormat, args);
 
   va_end(args);
 

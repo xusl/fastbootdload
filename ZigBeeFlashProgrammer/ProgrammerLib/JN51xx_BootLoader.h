@@ -65,6 +65,10 @@ extern "C" {
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
 
+#define FLASH_MANUFACTURER_JN516X   0xCC
+#define FLASH_DEVICE_JN516X         0xEE
+
+
 /****************************************************************************/
 /***        Type Definitions                                              ***/
 /****************************************************************************/
@@ -87,7 +91,7 @@ extern "C" {
 
 teStatus eBL_SetBaudrate(tsPRG_Context *psContext, uint32_t u32Baudrate);
 
-teStatus eBL_ChipIdRead(tsPRG_Context *psContext, uint32_t *pu32ChipId);
+teStatus eBL_ChipIdRead(tsPRG_Context *psContext, uint32_t *pu32ChipId, uint32_t *pu32BootloaderVersion);
 teStatus eBL_FlashIdRead(tsPRG_Context *psContext, uint16_t *pu16FlashId);
 
 teStatus eBL_MemoryExecute(tsPRG_Context *psContext, uint32_t u32Address);

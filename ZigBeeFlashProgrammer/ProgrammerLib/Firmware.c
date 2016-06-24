@@ -70,7 +70,7 @@
 #include "programmer.h"
 
 #include "programmer_private.h"
-//#include "dbg.h"
+#include "log.h"
 
 unsigned char binary_FlashProgrammerExtension_JN5168_bin_start;
 /****************************************************************************/
@@ -194,7 +194,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
         return ePRG_SetStatus(psContext, E_PRG_FAILED_TO_OPEN_FILE, "\"%s\" (%s)", pcFirmwareFile, pcPRG_GetLastErrorMessage(psContext));
     }
     
-    //DBG_vPrintf(TRACE_FIRMWARE, "opened FD %d\n", psFwPriv->iFirmwareFD);
+    LOGD("opened FD %d", psFwPriv->iFirmwareFD);
     
     if (fstat(psFwPriv->iFirmwareFD, &sb) == -1)
     {
@@ -207,7 +207,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
     
     /* Copy-on-write, changes are not written to the underlying file. */
     psFwPriv->pu8Firmware = mmap(NULL, psFwPriv->u32FileSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, psFwPriv->iFirmwareFD, 0);
-    //DBG_vPrintf(TRACE_FIRMWARE, "mapped file at %p\n", psFwPriv->pu8Firmware);
+    LOGD("mapped file at %p", psFwPriv->pu8Firmware);
     
     if (psFwPriv->pu8Firmware == MAP_FAILED)
     {
@@ -235,13 +235,13 @@ teStatus ePRG_FwClose(tsPRG_Context *psContext)
     {
         if (psFwPriv->pu8Firmware)
         {
-            //DBG_vPrintf(TRACE_FIRMWARE, "unmapping file at %p\n", psFwPriv->pu8Firmware);
+            LOGD("unmapping file at %p", psFwPriv->pu8Firmware);
             munmap(psFwPriv->pu8Firmware, psFwPriv->u32FileSize);
         }
 
         if (psFwPriv->iFirmwareFD)
         {
-            //DBG_vPrintf(TRACE_FIRMWARE, "closing FD %d\n", psFwPriv->iFirmwareFD);
+            LOGD("closing FD %d", psFwPriv->iFirmwareFD);
             close(psFwPriv->iFirmwareFD);
         }
         
@@ -264,11 +264,11 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
     }
     psPriv = (tsPRG_PrivateContext *)psContext->pvPrivate;
  
-    //DBG_vPrintf(TRACE_FIRMWARE, "Opening file name \"%s\"\n", pcFirmwareFile);
+    LOGD("Opening file name \"%s\"", pcFirmwareFile);
     
     if (psPriv->pvFwPrivate)
     {
-        //DBG_vPrintf(TRACE_FIRMWARE, "Closing existing file\n");
+        LOGD("Closing existing file");
         if (ePRG_FwClose(psContext) != E_PRG_OK)
         {
             return ePRG_SetStatus(psContext, E_PRG_ERROR, "closing existing file");
@@ -282,7 +282,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
     }
     psPriv->pvFwPrivate = psFwPriv;
 
-    //DBG_vPrintf(TRACE_FIRMWARE, "Opening file name \"%s\"\n", pcFirmwareFile);
+    LOGD("Opening file name \"%s\"", pcFirmwareFile);
     
     psFwPriv->hFile = CreateFile(pcFirmwareFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (psFwPriv->hFile == INVALID_HANDLE_VALUE)
@@ -299,7 +299,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
     
     psContext->sFirmwareInfo.u32ImageLength = (uint32_t)psFwPriv->dwFileSize;
     
-    //DBG_vPrintf(TRACE_FIRMWARE, "Opened file size %d\n", psFwPriv->dwFileSize);
+    LOGD("Opened file size %d", psFwPriv->dwFileSize);
     
     psFwPriv->hMapping = CreateFileMapping(psFwPriv->hFile, NULL, PAGE_READONLY, 0, 0, NULL);
     
@@ -336,19 +336,19 @@ teStatus ePRG_FwClose(tsPRG_Context *psContext)
     {
         if (psFwPriv->pu8Firmware)
         {
-            //DBG_vPrintf(TRACE_FIRMWARE, "unmapping file at %p\n", psFwPriv->pu8Firmware);
+            LOGD("unmapping file at %p", psFwPriv->pu8Firmware);
             UnmapViewOfFile(psFwPriv->pu8Firmware);
         }
         
         if (psFwPriv->hMapping != INVALID_HANDLE_VALUE)
         {
-            //DBG_vPrintf(TRACE_FIRMWARE, "Closing mapping handle\n");
+            LOGD("Closing mapping handle");
             CloseHandle(psFwPriv->hMapping);
         }
 
         if (psFwPriv->hFile)
         {
-            //DBG_vPrintf(TRACE_FIRMWARE, "Closing file handle\n");
+            LOGD("Closing file handle");
             CloseHandle(psFwPriv->hFile);
         }
         
@@ -370,7 +370,7 @@ teStatus ePRG_FwGetInfo(tsPRG_Context *psContext, uint8_t *pu8Firmware)
         return E_PRG_NULL_PARAMETER;
     }
     
-    //DBG_vPrintf(TRACE_FIRMWARE, "Getting info on file at 0x%p\n", pu8Firmware);
+    LOGD("Getting info on file at 0x%p", pu8Firmware);
     
     psHeader = (tsBL_BinHeaderV2 *)pu8Firmware;
 	
@@ -397,11 +397,10 @@ teStatus ePRG_FwGetInfo(tsPRG_Context *psContext, uint8_t *pu8Firmware)
         /* Pointer to text section in image for RAM */
         psContext->sFirmwareInfo.pu8TextData                  = &(psHeader->u8TextDataStart);
 
-        //DBG_vPrintf(TRACE_FIRMWARE, "Header size:           %d\n", sizeof(tsBL_BinHeaderV2));
-
-        //DBG_vPrintf(TRACE_FIRMWARE, "u32ROMVersion:         0x%08x\n", psContext->sFirmwareInfo.u32ROMVersion);
-        //DBG_vPrintf(TRACE_FIRMWARE, "u32DataSectionInfo:    0x%08x\n", ntohl(psHeader->u32DataSectionInfo));
-        //DBG_vPrintf(TRACE_FIRMWARE, "u32TextSectionLength:  0x%08x\n", (((ntohl(psHeader->u32DataSectionInfo)) & 0x0000FFFF) * 4));
+        LOGD("Header size:           %d", sizeof(tsBL_BinHeaderV2));
+        LOGD("u32ROMVersion:         0x%08x", psContext->sFirmwareInfo.u32ROMVersion);
+        LOGD("u32DataSectionInfo:    0x%08x", ntohl(psHeader->u32DataSectionInfo));
+        LOGD("u32TextSectionLength:  0x%08x", (((ntohl(psHeader->u32DataSectionInfo)) & 0x0000FFFF) * 4));
     }
     else
     {

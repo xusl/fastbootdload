@@ -25,9 +25,9 @@
  * This software is owned by NXP B.V. and/or its supplier and is protected
  * under applicable copyright laws. All rights are reserved. We grant You,
  * and any third parties, a license to use this software solely and
- * exclusively on NXP products [NXP Microcontrollers such as JN5148, JN5142, JN5139]. 
+ * exclusively on NXP products [NXP Microcontrollers such as JN5148, JN5142, JN5139].
  * You, and any third parties must reproduce the copyright and warranty notice
- * and any other legend of ownership on each copy or partial copy of the 
+ * and any other legend of ownership on each copy or partial copy of the
  * software.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
@@ -57,6 +57,7 @@
 
 #include "programmer.h"
 #include "windows.h"
+#include "log.h"
 
 #include "uart.h"
 //#include "dbg.h"
@@ -106,10 +107,10 @@ typedef enum
     E_BL_MSG_TYPE_SET_BAUD_RESPONSE                     = 0x28,
     E_BL_MSG_TYPE_FLASH_SELECT_TYPE_REQUEST             = 0x2c,
     E_BL_MSG_TYPE_FLASH_SELECT_TYPE_RESPONSE            = 0x2d,
-    
+
     E_BL_MSG_TYPE_GET_CHIPID_REQUEST                    = 0x32,
     E_BL_MSG_TYPE_GET_CHIPID_RESPONSE                   = 0x33,
-    
+
     /* Flash programmer extension commands */
     E_BL_MSG_TYPE_PDM_ERASE_REQUEST                     = 0x36,
     E_BL_MSG_TYPE_PDM_ERASE_RESPONSE                    = 0x37,
@@ -119,7 +120,7 @@ typedef enum
     E_BL_MSG_TYPE_EEPROM_READ_RESPONSE                  = 0x3B,
     E_BL_MSG_TYPE_EEPROM_WRITE_REQUEST                  = 0x3C,
     E_BL_MSG_TYPE_EEPROM_WRITE_RESPONSE                 = 0x3D,
-    
+
 }teBL_MessageType;
 
 
@@ -222,12 +223,12 @@ teStatus eBL_SetBaudrate(tsPRG_Context *psContext, uint32_t u32Baudrate)
     teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
     uint8_t au8Buffer[6];
     uint32_t u32Divisor;
-    
+
 //    //DBG_vPrintf(TRACE_BOOTLOADER, "Set BL Baud rate to %d\n", u32Baudrate);
-    
+
     // Divide 1MHz clock bu baudrate to get the divisor
     u32Divisor = 1000000 / u32Baudrate;
-    
+
     au8Buffer[0] = (uint8_t)u32Divisor;
     au8Buffer[1] = 0;
     au8Buffer[2] = 0;
@@ -252,7 +253,7 @@ teStatus eBL_SetBaudrate(tsPRG_Context *psContext, uint32_t u32Baudrate)
  * 				-1 if an error occurred
  *
  ****************************************************************************/
-teStatus eBL_ChipIdRead(tsPRG_Context *psContext, uint32_t *pu32ChipId)
+teStatus eBL_ChipIdRead(tsPRG_Context *psContext, uint32_t *pu32ChipId, uint32_t *pu32BootloaderVersion)
 {
 
     teBL_Response eResponse = E_BL_RESPONSE_OK;
@@ -260,24 +261,42 @@ teStatus eBL_ChipIdRead(tsPRG_Context *psContext, uint32_t *pu32ChipId)
     uint8_t u8RxDataLen = 0;
     uint8_t au8Buffer[BOOTLOADER_MAX_MESSAGE_LENGTH];
 
-	if(pu32ChipId == NULL)
-	{
-		return E_PRG_NULL_PARAMETER;
-	}
+    if(pu32ChipId == NULL)
+    {
+        return E_PRG_NULL_PARAMETER;
+    }
+
+    if(pu32BootloaderVersion == NULL)
+    {
+        return E_PRG_NULL_PARAMETER;
+    }
 
     eResponse = eBL_Request(psContext, BL_TIMEOUT_1S, E_BL_MSG_TYPE_GET_CHIPID_REQUEST, 0, NULL, 0, NULL, &eRxType, &u8RxDataLen, au8Buffer);
 
-    if (u8RxDataLen != 4)
+    if ((u8RxDataLen != 4) && (u8RxDataLen != 8))
     {
         return E_PRG_COMMS_FAILED;
     }
-    
-	*pu32ChipId  = au8Buffer[0] << 24;
-	*pu32ChipId |= au8Buffer[1] << 16;
-	*pu32ChipId |= au8Buffer[2] << 8;
-	*pu32ChipId |= au8Buffer[3] << 0;
 
-    return eBL_CheckResponse(NULL, eResponse, eRxType, E_BL_MSG_TYPE_GET_CHIPID_RESPONSE);
+    *pu32ChipId  = au8Buffer[0] << 24;
+    *pu32ChipId |= au8Buffer[1] << 16;
+    *pu32ChipId |= au8Buffer[2] << 8;
+    *pu32ChipId |= au8Buffer[3] << 0;
+
+    if(u8RxDataLen == 8)
+    {
+        // Bootloader version is included
+        *pu32BootloaderVersion  = au8Buffer[4] << 24;
+        *pu32BootloaderVersion |= au8Buffer[5] << 16;
+        *pu32BootloaderVersion |= au8Buffer[6] << 8;
+        *pu32BootloaderVersion |= au8Buffer[7] << 0;
+
+        LOGD("Bootloader Id Detected : u32BootloaderVersion = %x ", *pu32BootloaderVersion);
+    } else {
+        *pu32BootloaderVersion = 0;
+    }
+
+    return eBL_CheckResponse(__FUNCTION__, eResponse, eRxType, E_BL_MSG_TYPE_GET_CHIPID_RESPONSE);
 }
 
 
@@ -315,7 +334,7 @@ teStatus eBL_FlashIdRead(tsPRG_Context *psContext, uint16_t *pu16FlashId)
     {
         return E_PRG_COMMS_FAILED;
     }
-    
+
     *pu16FlashId  = au8Buffer[0] << 8;
     *pu16FlashId |= au8Buffer[1] << 0;
 
@@ -414,7 +433,7 @@ teStatus eBL_MemoryExecute(tsPRG_Context *psContext, uint32_t u32Address)
 	teBL_MessageType eRxType = E_BL_MSG_TYPE_FLASH_DEFAULT;
 
     //DBG_vPrintf(TRACE_BOOTLOADER, "Execute code at 0x%08X\n", u32Address);
-    
+
 	au8CmdBuffer[0] = (uint8_t)(u32Address >> 0)  & 0xff;
 	au8CmdBuffer[1] = (uint8_t)(u32Address >> 8)  & 0xff;
 	au8CmdBuffer[2] = (uint8_t)(u32Address >> 16) & 0xff;
@@ -561,7 +580,7 @@ teStatus eBL_FlashRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8
 	au8CmdBuffer[5] = 0;
 
 	eResponse = eBL_Request(psContext, BL_TIMEOUT_1S, E_BL_MSG_TYPE_FLASH_READ_REQUEST, 6, au8CmdBuffer, 0, NULL, &eRxType, &u8RxDataLen, pu8Buffer);
-    
+
     if (u8RxDataLen != u8Length)
     {
         //DBG_vPrintf(TRACE_BOOTLOADER, "Requested %d bytes, got %d\n", u8Length, u8RxDataLen);
@@ -640,7 +659,7 @@ teStatus eBL_EEPROMRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u
     au8CmdBuffer[5] = 0;
 
     eResponse = eBL_Request(psContext, BL_TIMEOUT_1S, E_BL_MSG_TYPE_EEPROM_READ_REQUEST, 6, au8CmdBuffer, 0, NULL, &eRxType, &u8RxDataLen, pu8Buffer);
-    
+
     if (u8RxDataLen != u8Length)
     {
         //DBG_vPrintf(TRACE_BOOTLOADER, "Requested %d bytes, got %d\n", u8Length, u8RxDataLen);
@@ -878,7 +897,7 @@ static teBL_Response eBL_ReadMessage(tsPRG_Context *psContext, int iTimeoutMicro
     if (pu8Length)
     {
         *pu8Length = u8Length - 3;
-        
+
         if (pu8Data)
         {
             memcpy(pu8Data, &au8Msg[2], *pu8Length);
@@ -886,7 +905,7 @@ static teBL_Response eBL_ReadMessage(tsPRG_Context *psContext, int iTimeoutMicro
     }
 
     //DBG_vPrintf(TRACE_BOOTLOADER, "Got response 0x%02x\n", eResponse);
-    
+
 	return eResponse;
 }
 
