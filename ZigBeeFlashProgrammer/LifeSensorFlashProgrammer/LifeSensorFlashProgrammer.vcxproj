@@ -107,6 +107,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="device.cpp" />
     <ClCompile Include="LifeSensorFlashProgrammer.cpp" />
     <ClCompile Include="LifeSensorFlashProgrammerDlg.cpp" />
     <ClCompile Include="MyButton.cpp" />
@@ -121,6 +122,7 @@
     <ResourceCompile Include="LifeSensorFlashProgrammer.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="device.h" />
     <ClInclude Include="LifeSensorFlashProgrammer.h" />
     <ClInclude Include="LifeSensorFlashProgrammerDlg.h" />
     <ClInclude Include="MyButton.h" />

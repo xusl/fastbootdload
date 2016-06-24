@@ -8,6 +8,7 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
+#include "device.h"
 #include "MyButton.h"
 
 /////////////////////////////////////////////////////////////////////////////
@@ -25,6 +26,7 @@ class LifeSensorFlashProgrammerDlg : public CDialog
 // Construction
 public:
 	LifeSensorFlashProgrammerDlg(CWnd* pParent = NULL);	// standard constructor
+    BOOL HandleComDevice(VOID);
     DWORD Main_Entry(Operation_t Operation);
 	CButton* NewCheckBox(int nID,CRect rect,int nStyle);
 // Dialog Data
@@ -60,7 +62,7 @@ protected:
 	HICON m_hIcon;
 	CButton *p_CheckBox[MAX];
 	CString m_FilePath;
-
+    DeviceCoordinator mDevCoordinator;
 	// Generated message map functions
 	//{{AFX_MSG(LifeSensorFlashProgrammerDlg)
 	virtual BOOL OnInitDialog();

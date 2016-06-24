@@ -163,16 +163,6 @@ teStatus ePRG_ConnectionListInit(tsPRG_Context *psContext, uint32_t *pu32NumConn
                 DWORD dwDataSize = dwMaxValueDataSizeInBytes;
                 DWORD dwResult;
 
-                //DBG_vPrintf(TRACE_UART, "Reallocate %p to size %d\n", *pasConnections, ((*pu32NumConnections)+1) * sizeof(tsConnection));
-                asNewConnections = (tsConnection *)realloc(*pasConnections, ((*pu32NumConnections)+1) * sizeof(tsConnection));
-                if (!asNewConnections)
-                {
-                    free(pcName);
-                    free(pcData);
-                    RegCloseKey(hSERIALCOMM);
-                    return ePRG_SetStatus(psContext, E_PRG_OUT_OF_MEMORY, "");
-                }
-                *pasConnections = asNewConnections;
                 
                 //DBG_vPrintf(TRACE_UART, "Get index %d\n", dwIndex);
                 dwResult = RegEnumValue(hSERIALCOMM, dwIndex, pcName, &dwValueNameSize, NULL, &dwType, pcData, &dwDataSize);
@@ -190,11 +180,22 @@ teStatus ePRG_ConnectionListInit(tsPRG_Context *psContext, uint32_t *pu32NumConn
                 }
                 
                 //If the value is of the correct type, then add it to the array
-                if (dwType == REG_SZ)
+                if (dwType == REG_SZ && strncmp(pcName , "\\Device\\VCP", 11) == 0)
                 {
                     //DBG_vPrintf(TRACE_UART, "Found name %s\n", pcName);
                     //DBG_vPrintf(TRACE_UART, "Found data %s\n", pcData);
                     
+                //DBG_vPrintf(TRACE_UART, "Reallocate %p to size %d\n", *pasConnections, ((*pu32NumConnections)+1) * sizeof(tsConnection));
+                asNewConnections = (tsConnection *)realloc(*pasConnections, ((*pu32NumConnections)+1) * sizeof(tsConnection));
+                if (!asNewConnections)
+                {
+                    free(pcName);
+                    free(pcData);
+                    RegCloseKey(hSERIALCOMM);
+                    return ePRG_SetStatus(psContext, E_PRG_OUT_OF_MEMORY, "");
+                }
+                *pasConnections = asNewConnections;
+
                     asNewConnections[*pu32NumConnections].eType   = E_CONNECT_SERIAL;
                     asNewConnections[*pu32NumConnections].pcName  = strdup((char*)pcData);
 					asNewConnections[*pu32NumConnections].portName  = strdup((char*)pcName);
@@ -208,13 +209,11 @@ teStatus ePRG_ConnectionListInit(tsPRG_Context *psContext, uint32_t *pu32NumConn
                     }
                     (*pu32NumConnections)++;
                 }
-                else
-                {
-                    free(pcData);
-                }
-                
+                                
                 dwIndex++;
             }
+             free(pcData);
+            free(pcName);
             RegCloseKey(hSERIALCOMM);
         }
         else

@@ -8,21 +8,17 @@
 #include <errno.h>
 #include <setupapi.h>
 #include <dbt.h>
-#if defined POSIX
-#include <termios.h>
-#include <pthread.h>
-#elif defined WIN32
 #include <conio.h>
 #include <Windows.h>
-#endif
-
-//#include <sys/time.h>
-//#include <unistd.h>
 #include "LifeSensorFlashProgrammer.h"
 #include "LifeSensorFlashProgrammerDlg.h"
 #include "ChipID.h"
 #include "programmer.h"
 #include "log.h"
+#include <initguid.h>
+#include <winioctl.h> 
+#include <devguid.h>
+#include "usbiodef.h"
 
 //#define __STDC__ TRUE
 #define vDelay(a) usleep(a * 1000)
@@ -125,7 +121,7 @@ char * flashExtension = NULL;
 
 static int importExtension( char * file, int * start, int * size ) {
     size_t bytestoread = 0;
-    
+
     FILE* fp = NULL;
     int bytesread;
     if ( ( fp = fopen(file,"r") ) <= 0 ) {
@@ -136,12 +132,12 @@ static int importExtension( char * file, int * start, int * size ) {
     fseek( fp, 0L, SEEK_END );
     bytestoread =ftell(fp);
     fseek( fp, 0L, SEEK_SET );
-        
+
     if ( ( flashExtension = (char *)malloc(bytestoread + 100 ) ) == NULL ) {
         perror("malloc");
         return 0;
     }
-    
+
     char * pbuf = flashExtension;
     while ( !feof(fp)) {
         if ( ( bytesread = fread( pbuf, bytestoread, 1, fp) ) < 0 ) {
@@ -149,13 +145,13 @@ static int importExtension( char * file, int * start, int * size ) {
         }
         //bytestoread -= bytesread;
         pbuf += bytesread;
-        }        
+        }
     fclose(fp);
         *start = (int)flashExtension;
         *size  = bytestoread;
         printf( "Loaded binary of %d bytes\n", *size );
         return 1;
-    
+
 }
 
 //#define IOT_EXTENSION_PATH "/usr/share/iot"
@@ -190,7 +186,7 @@ static teStatus ePRG_ImportExtension(tsPRG_Context *psContext)
     if ( ret ) {
         return E_PRG_OK;
     }
-        
+
     return E_PRG_ERROR;
 }
 
@@ -312,8 +308,8 @@ BOOL LifeSensorFlashProgrammerDlg::OnInitDialog()
 			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
 		}
 	}
-    
-    
+
+
 	// Set the icon for this dialog.  The framework does this automatically
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
@@ -335,7 +331,7 @@ BOOL LifeSensorFlashProgrammerDlg::OnInitDialog()
 	m_Progress.SetRange(0,100);
 
 	//Get COM Ports
-	Main_Entry(GetComPorts);
+	HandleComDevice();
 
 	m_Program.SetForeColor(COLOR_BLUE);
 	m_Program.SetTextFont(120,"Arial");
@@ -559,9 +555,7 @@ BOOL LifeSensorFlashProgrammerDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwD
         case DBT_DEVTYP_PORT:
             {
                 LOGI("device arrive, DBT_DEVTYP_PORT");
-                //SetTimer(TIMER_EVT_COMPORT, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
-                //HandleDeviceArrived(pDevInf->dbcc_name);
-                //if(HandleComDevice())
+                HandleComDevice();
                 //    ScheduleDeviceWork(m_flashdirect);
                 break;
             }
@@ -571,12 +565,34 @@ BOOL LifeSensorFlashProgrammerDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwD
         case DBT_DEVTYP_PORT:
             {
                 LOGI("device removed, DBT_DEVTYP_PORT");
+                HandleComDevice();
                 break;
             }
         }
     }
 
     return TRUE;
+}
+
+BOOL LifeSensorFlashProgrammerDlg::HandleComDevice(VOID) {
+    vector<CDevLabel> devicePath;
+    //GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_FTDIBUS, devicePath, false);
+    //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
+    //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
+    vector<CDevLabel>::iterator iter;
+    DeviceInterfaces* devintf;
+    BOOL success = FALSE;
+
+    for (iter = devicePath.begin(); iter != devicePath.end();++iter) {
+        iter->Dump(__FUNCTION__);
+        if(mDevCoordinator.AddDevice(*iter, DEVTYPE_DIAGPORT, NULL))
+            success = TRUE;
+    }
+    devicePath.clear();
+        
+	Main_Entry(GetComPorts);
+    return success;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -681,7 +697,7 @@ DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
         NumOfDevicesProgrammed = 0;
         m_Program.SetForeColor(COLOR_BLUE);
         m_Program.SetText("Start Programming ...");
-                
+
             for (unsigned int i = 0; i < u32NumConnections; i++)
             {
                 m_Progress.SetPos((i*100)/u32NumConnections);
@@ -796,7 +812,7 @@ DWORD LifeSensorFlashProgrammerDlg::Main_Entry(Operation_t Operation) {
             }
             //printf("Number of Devices Programmed : %d\n",NumOfDevicesProgrammed);
         }
-    
+
 return 0;
 }
 
@@ -935,8 +951,7 @@ done:
         return COMPortNotRespond;
     }
 
-	return error;;
-
+	return error;
 }
 
 CButton* LifeSensorFlashProgrammerDlg::NewCheckBox(int nID,CRect rect,int nStyle)
@@ -1147,7 +1162,7 @@ void LifeSensorFlashProgrammerDlg::OnClose()
 	for (int i = 0; i < u32NumConnections; i++)
         delete p_CheckBox[i];
 	CDialog::OnClose();
- 
+
 }
 
 void LifeSensorFlashProgrammerDlg::OnOpen()
@@ -1177,7 +1192,7 @@ void LifeSensorFlashProgrammerDlg::OnOpen()
 void LifeSensorFlashProgrammerDlg::OnComlist()
 {
 	m_Progress.SetPos(0);
-	Main_Entry(GetComPorts);
+    HandleComDevice();
 	m_Program.SetForeColor(COLOR_BLUE);
 	m_Program.SetText("Program");
 }
