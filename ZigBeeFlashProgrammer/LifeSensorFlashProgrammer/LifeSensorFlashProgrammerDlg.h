@@ -13,11 +13,55 @@
 
 /////////////////////////////////////////////////////////////////////////////
 // LifeSensorFlashProgrammerDlg dialog
-typedef enum Operation
+typedef enum ErrorCode
 {
-	GetComPorts = 0,
-	Program
-}Operation_t, *pOperation_t;
+	FlashFileNotFound = 1,
+	FlashVerificationError,
+	FlashFileError,
+	COMPortNotRespond,
+	EepromEraseError,
+	MACprogrammingError
+}ErrorCode_t,*pErrorCode_t;
+
+enum
+{
+	// UI Messages
+	UI_MESSAGE_BASE = (WM_USER + 1000),
+	UI_MESSAGE_PROGRAMMER,
+};
+
+enum
+{
+  TIMER_EVT_SCHEDULE = 0,
+  TIMER_EVT_ALL
+};
+
+#define TIMER_ELAPSE   (20 * 1000)
+
+typedef enum
+{
+  PRG_MSG_DEFAULT = 0,
+  PRG_MSG_PROMPT = 1,
+  PRG_MSG_ERROR = 2,
+  PRG_MSG_RESULT = 3,
+}PRG_MSG_TYPE;
+
+typedef struct _PrgMsg_
+{
+	PRG_MSG_TYPE	eType;
+	int				    iVal;
+	CString			  sVal;
+  PVOID         pData;
+
+  _PrgMsg_() {
+    eType = PRG_MSG_DEFAULT;
+    sVal = "";
+    iVal = -1;
+    pData = NULL;
+  }
+}PrgMsg;
+
+
 
 #define MAX 100
 
@@ -26,9 +70,9 @@ class LifeSensorFlashProgrammerDlg : public CDialog
 // Construction
 public:
 	LifeSensorFlashProgrammerDlg(CWnd* pParent = NULL);	// standard constructor
-    BOOL HandleComDevice(VOID);
-    DWORD Main_Entry(Operation_t Operation);
-	CButton* NewCheckBox(int nID,CRect rect,int nStyle);
+  BOOL HandleComDevice(VOID);
+  DWORD ScheduleProgrammer();
+  void SetMacByte(CEdit &edit, unsigned char * pValue);
 // Dialog Data
 	//{{AFX_DATA(LifeSensorFlashProgrammerDlg)
 	enum { IDD = IDD_FLASHPROGRAMMER_DIALOG };
@@ -49,6 +93,8 @@ public:
 	CProgressCtrl	m_Progress;
 	CComboBox	m_BaudRate;
 	CButton	m_Erase;
+
+
 	//}}AFX_DATA
 
 	// ClassWizard generated virtual function overrides
@@ -66,6 +112,7 @@ protected:
 	// Generated message map functions
 	//{{AFX_MSG(LifeSensorFlashProgrammerDlg)
 	virtual BOOL OnInitDialog();
+  LRESULT OnProgrammerMessage(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
@@ -74,7 +121,8 @@ protected:
 	afx_msg void OnOpen();
 	afx_msg void OnComlist();
 	afx_msg void OnMacEn();
-    afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
+  afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
+  afx_msg void OnTimer(UINT_PTR nIDEvent);
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 };
