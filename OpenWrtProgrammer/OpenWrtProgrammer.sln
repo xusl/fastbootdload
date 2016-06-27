@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MB01 Downloading Tool", "MB01 Downloading Tool\MB01 Downloading Tool.vcxproj", "{8045AAF8-7E68-4FEF-8E30-59335095C160}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LifeConnectFirmwareDownload", "LifeConnectFirmwareDownload\LifeConnectFirmwareDownload.vcxproj", "{23E4202E-2B9D-425A-8E09-0247DE02D4C6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8045AAF8-7E68-4FEF-8E30-59335095C160}.Debug|Win32.ActiveCfg = Debug|Win32
+		{8045AAF8-7E68-4FEF-8E30-59335095C160}.Debug|Win32.Build.0 = Debug|Win32
+		{8045AAF8-7E68-4FEF-8E30-59335095C160}.Release|Win32.ActiveCfg = Release|Win32
+		{8045AAF8-7E68-4FEF-8E30-59335095C160}.Release|Win32.Build.0 = Release|Win32
+		{23E4202E-2B9D-425A-8E09-0247DE02D4C6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{23E4202E-2B9D-425A-8E09-0247DE02D4C6}.Debug|Win32.Build.0 = Debug|Win32
+		{23E4202E-2B9D-425A-8E09-0247DE02D4C6}.Release|Win32.ActiveCfg = Release|Win32
+		{23E4202E-2B9D-425A-8E09-0247DE02D4C6}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
