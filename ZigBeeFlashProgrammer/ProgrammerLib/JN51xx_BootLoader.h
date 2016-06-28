@@ -57,7 +57,7 @@ extern "C" {
 /***        Include files                                                 ***/
 /****************************************************************************/
 
-//#include <stdint.h>
+#include <stdint.h>
 
 #include "programmer.h"
 
@@ -92,13 +92,15 @@ extern "C" {
 teStatus eBL_SetBaudrate(tsPRG_Context *psContext, uint32_t u32Baudrate);
 
 teStatus eBL_ChipIdRead(tsPRG_Context *psContext, uint32_t *pu32ChipId, uint32_t *pu32BootloaderVersion);
-teStatus eBL_FlashIdRead(tsPRG_Context *psContext, uint16_t *pu16FlashId);
 
 teStatus eBL_MemoryExecute(tsPRG_Context *psContext, uint32_t u32Address);
-teStatus eBL_MemoryRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t *pu8Buffer);
-teStatus eBL_MemoryWrite(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t *pu8Buffer);
+teStatus eBL_MemoryRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t u8BlockSize, uint8_t *pu8Buffer);
+teStatus eBL_MemoryWrite(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t u8BlockSize, uint8_t *pu8Buffer);
 
-teStatus eBL_FlashSelectDevice(tsPRG_Context *psContext, uint16_t u16FlashId);
+teStatus eBL_DiscoverFlash(tsPRG_Context *psContext, uint8_t u8ChipSelect, uint8_t *pu8ManufacturerID, uint8_t *pu8DeviceID, const char **ppcName, uint32_t *pu32FlashSize);
+teStatus eBL_FlashSelectDevice(tsPRG_Context *psContext, uint8_t u8ManufacturerID, uint8_t u8DeviceID, uint8_t u8ChipSelect);
+teStatus eBL_FlashIdRead(tsPRG_Context *psContext, uint8_t *pu8ManufacturerID, uint8_t *pu8DeviceID, const char **ppcName, uint32_t *pu32FlashSize);
+
 teStatus eBL_FlashStatusRegisterWrite(tsPRG_Context *psContext, uint8_t u8StatusReg);
 teStatus eBL_FlashErase(tsPRG_Context *psContext);
 teStatus eBL_FlashRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t *pu8Buffer);
@@ -108,7 +110,9 @@ teStatus eBL_EEPROMErase(tsPRG_Context *psContext, int iEraseAll);
 teStatus eBL_EEPROMRead(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t *pu8Buffer);
 teStatus eBL_EEPROMWrite(tsPRG_Context *psContext, uint32_t u32Address, uint8_t u8Length, uint8_t *pu8Buffer);
 
-teStatus eBL_IndexSectorWrite(tsPRG_Context *psContext, uint8_t u8Page, uint8_t u8WordNumber, uint8_t au8Data[16]);
+teStatus eBL_IndexSectorWrite(tsPRG_Context *psContext, uint8_t u8Page, uint8_t u8WordNumber, uint32_t au32Data[4]);
+
+teStatus eBL_Reset(tsPRG_Context *psContext);
 
 /****************************************************************************/
 /***        Local Functions                                               ***/

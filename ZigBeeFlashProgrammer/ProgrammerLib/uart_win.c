@@ -50,21 +50,24 @@
 /***        Include files                                                 ***/
 /****************************************************************************/
 
-//#include <stdint.h>
+#include <stdint.h>
 //#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
+#include <ctype.h>
+#include <assert.h>
 
-#include "windows.h"
+#include <windows.h>
+
 #include "ftd2xx.h"
 
 #include "programmer.h"
 
 #include "programmer_private.h"
 #include "uart.h"
-//#include "dbg.h"
+#include "dbg.h"
 
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
@@ -92,7 +95,83 @@ typedef struct
 /****************************************************************************/
 /***        Local Function Prototypes                                     ***/
 /****************************************************************************/
+#ifdef WINAPI
+#undef WINAPI
+#define WINAPI 
+#endif
 
+static FT_STATUS WINAPI (*FTdll_ListDevices)(
+	PVOID pArg1,
+	PVOID pArg2,
+	DWORD Flags
+	) = NULL;
+
+static FT_STATUS WINAPI (*FTdll_Open)(
+	int deviceNumber,
+	FT_HANDLE *pHandle
+	) = NULL;
+    
+static FT_STATUS WINAPI (*FTdll_Close)(
+    FT_HANDLE ftHandle
+    ) = NULL;
+
+static FT_STATUS WINAPI (*FTdll_ResetPort)(
+    FT_HANDLE ftHandle
+    ) = NULL;
+    
+static FT_STATUS WINAPI (*FTdll_GetComPortNumber)(
+    FT_HANDLE ftHandle,
+	LPLONG	lpdwComPortNumber
+	) = NULL;
+    
+static FT_STATUS WINAPI (*FTdll_Purge)(
+    FT_HANDLE ftHandle,
+	ULONG Mask
+	) = NULL;
+    
+static FT_STATUS WINAPI (*FTdll_SetTimeouts)(
+    FT_HANDLE ftHandle,
+	ULONG ReadTimeout,
+	ULONG WriteTimeout
+	) = NULL;
+    
+static FT_STATUS WINAPI (*FTdll_SetBitMode)(
+    FT_HANDLE ftHandle,
+    UCHAR ucMask,
+	UCHAR ucEnable
+    ) = NULL;
+
+static FT_STATUS WINAPI (*FTdll_SetLatencyTimer)(
+    FT_HANDLE ftHandle,
+    UCHAR ucLatency
+    ) = NULL;
+
+static FT_STATUS WINAPI (*FTdll_SetBaudRate)(
+    FT_HANDLE ftHandle,
+	ULONG BaudRate
+	) = NULL;
+    
+static FT_STATUS WINAPI (*FTdll_SetDataCharacteristics)(
+    FT_HANDLE ftHandle,
+	UCHAR WordLength,
+	UCHAR StopBits,
+	UCHAR Parity
+	) = NULL;
+
+static FT_STATUS WINAPI (*FTdll_Read)(
+    FT_HANDLE ftHandle,
+    LPVOID lpBuffer,
+    DWORD dwBytesToRead,
+    LPDWORD lpBytesReturned
+    ) = NULL;
+ 
+static FT_STATUS WINAPI (*FTdll_Write)(
+    FT_HANDLE ftHandle,
+    LPVOID lpBuffer,
+    DWORD dwBytesToWrite,
+    LPDWORD lpBytesWritten
+    ) = NULL;
+    
 static FT_HANDLE hPRG_FTDI_GetHandle(tsCommsPrivate *psCommsPriv);
 teStatus ePRG_FTDI_ModeProgramming(tsCommsPrivate *psCommsPriv);
 teStatus ePRG_FTDI_ModeRunning(tsCommsPrivate *psCommsPriv);
@@ -107,6 +186,8 @@ teStatus ePRG_FTDI_ModeRunning(tsCommsPrivate *psCommsPriv);
 
 static int iOpenDevices = 0;
 static CRITICAL_SECTION csFTDISection;
+
+static HMODULE hFtd2xxLibrary = NULL;
 
 /****************************************************************************/
 /***        Exported Functions                                            ***/
@@ -164,7 +245,6 @@ teStatus ePRG_ConnectionListInit(tsPRG_Context *psContext, uint32_t *pu32NumConn
                 DWORD dwResult;
 
                 
-                //DBG_vPrintf(TRACE_UART, "Get index %d\n", dwIndex);
                 dwResult = RegEnumValue(hSERIALCOMM, dwIndex, pcName, &dwValueNameSize, NULL, &dwType, pcData, &dwDataSize);
                 if (dwResult != ERROR_SUCCESS)
                 {
@@ -182,10 +262,9 @@ teStatus ePRG_ConnectionListInit(tsPRG_Context *psContext, uint32_t *pu32NumConn
                 //If the value is of the correct type, then add it to the array
                 if (dwType == REG_SZ && strncmp(pcName , "\\Device\\VCP", 11) == 0)
                 {
-                    //DBG_vPrintf(TRACE_UART, "Found name %s\n", pcName);
-                    //DBG_vPrintf(TRACE_UART, "Found data %s\n", pcData);
+                    DBG_vPrintf(TRACE_UART, "Found name %s\n", pcName);
+                    DBG_vPrintf(TRACE_UART, "Found data %s\n", pcData);
                     
-                //DBG_vPrintf(TRACE_UART, "Reallocate %p to size %d\n", *pasConnections, ((*pu32NumConnections)+1) * sizeof(tsConnection));
                 asNewConnections = (tsConnection *)realloc(*pasConnections, ((*pu32NumConnections)+1) * sizeof(tsConnection));
                 if (!asNewConnections)
                 {
@@ -198,7 +277,6 @@ teStatus ePRG_ConnectionListInit(tsPRG_Context *psContext, uint32_t *pu32NumConn
 
                     asNewConnections[*pu32NumConnections].eType   = E_CONNECT_SERIAL;
                     asNewConnections[*pu32NumConnections].pcName  = strdup((char*)pcData);
-					asNewConnections[*pu32NumConnections].portName  = strdup((char*)pcName);
                     
                     // Check strdup succeeded
                     if (!asNewConnections[*pu32NumConnections].pcName)
@@ -254,9 +332,15 @@ teStatus ePRG_ConnectionUartOpen(tsPRG_Context *psContext, tsConnection *psConne
 {
     char acDevice[16];
     tsCommsPrivate *psCommsPriv;
-	COMMTIMEOUTS timeouts;//={0};
+    int i;
     
-    //DBG_vPrintf(TRACE_UART, "Using UART device %s\n", psConnection->pcName);
+    for (i = 0; i < strlen(psConnection->pcName); i++)
+    {
+        // Make name uppercase so that it compares correctly with FTDI device names (lpsw5640)
+        psConnection->pcName[i] = toupper(psConnection->pcName[i]);
+    }
+    
+    DBG_vPrintf(TRACE_UART, "Using UART device %s\n", psConnection->pcName);
     
     if (++iOpenDevices == 1)
     {
@@ -266,7 +350,6 @@ teStatus ePRG_ConnectionUartOpen(tsPRG_Context *psContext, tsConnection *psConne
     psCommsPriv = (tsCommsPrivate *)realloc(psContext->pvPrivate, sizeof(tsCommsPrivate));
     if (!psCommsPriv)
     {
-        printf("realloc failed\r\n");
         return ePRG_SetStatus(psContext, E_PRG_OUT_OF_MEMORY, "");
     }
     psContext->pvPrivate = psCommsPriv;
@@ -286,40 +369,49 @@ teStatus ePRG_ConnectionUartOpen(tsPRG_Context *psContext, tsConnection *psConne
     
     if (psCommsPriv->hFTDIHandle)
     {
-        //DBG_vPrintf(TRACE_UART, "Opened FTDI device\n");;
-        
-        // Enter programming mode
-        if (ePRG_FTDI_ModeProgramming(psCommsPriv) != E_PRG_OK)
+        DBG_vPrintf(TRACE_UART, "Opened FTDI device\n");
+       
+        // Reset port in case another program has left it in a unexpected state
+        if (!FT_SUCCESS(FTdll_ResetPort(psCommsPriv->hFTDIHandle)))
         {
-            //DBG_vPrintf(TRACE_UART, "Could not set FTDI into programming mode\n");
-             printf("Could not set FTDI into programming mode\n");
-		}
-        else
+            DBG_vPrintf(TRACE_UART, "Error resetting port");
+        }
+       
+        if (psContext->sFlags.bAutoProgramReset)
         {
-            /* If we managed to reset the device correctly, 
-            * the bootloader will now be running at 1Mbaud for 100ms 
-            * - wait for it to return to normal speed */
-            vPRG_WaitMs(200);
+            // Enter programming mode
+            if (ePRG_FTDI_ModeProgramming(psCommsPriv) != E_PRG_OK)
+            {
+                DBG_vPrintf(TRACE_UART, "Could not set FTDI into programming mode\n");
+            }
+            else
+            {
+                /* If we managed to reset the device correctly, 
+                * the bootloader will now be running at 1Mbaud for 100ms 
+                * - wait for it to return to normal speed */
+                vPRG_WaitMs(200);
+            }
         }
         
         // Speed up transfer of our short messages
-        if (!FT_SUCCESS(FT_SetLatencyTimer(psCommsPriv->hFTDIHandle, 2)))
+        if (!FT_SUCCESS(FTdll_SetLatencyTimer(psCommsPriv->hFTDIHandle, 2)))
         {
-        	printf("Error setting latency timer\n");
-            //DBG_vPrintf(TRACE_UART, "Error setting latency timer\n");
+            DBG_vPrintf(TRACE_UART, "Error setting latency timer\n");
         }
+        
         // Set up UART characteristics
-        if (!FT_SUCCESS(FT_SetDataCharacteristics(psCommsPriv->hFTDIHandle, FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE)))
+        if (!FT_SUCCESS(FTdll_SetDataCharacteristics(psCommsPriv->hFTDIHandle, FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE)))
         {
- 			printf("Error setting data characteristics\n");
-			//DBG_vPrintf(TRACE_UART, "Error setting data characteristics\n");
+            DBG_vPrintf(TRACE_UART, "Error setting data characteristics\n");
         }
+        
     }
     else
     {
-        _snprintf(acDevice, sizeof(acDevice), "\\\\.\\%s", psConnection->pcName);
+        COMMTIMEOUTS timeouts={0};
+        snprintf(acDevice, sizeof(acDevice), "\\\\.\\%s", psConnection->pcName);
         
-        //DBG_vPrintf(TRACE_UART, "Opening UART device %s\n", acDevice);
+        DBG_vPrintf(TRACE_UART, "Opening UART device %s\n", acDevice);
         
         psCommsPriv->hSerialHandle = CreateFile(acDevice,
             GENERIC_READ | GENERIC_WRITE,
@@ -331,7 +423,7 @@ teStatus ePRG_ConnectionUartOpen(tsPRG_Context *psContext, tsConnection *psConne
         
         if (psCommsPriv->hSerialHandle == INVALID_HANDLE_VALUE)
         {
-            return ePRG_SetStatus(psContext, E_PRG_ERROR, "opening device %s (%s)\n", psConnection->pcName, pcPRG_GetLastErrorMessage(psContext));
+            return ePRG_SetStatus(psContext, E_PRG_ERROR, "%s", pcPRG_GetLastErrorMessage(psContext));
         }
 
         psCommsPriv->dcbSerialParams.DCBlength = sizeof(DCB);
@@ -343,7 +435,7 @@ teStatus ePRG_ConnectionUartOpen(tsPRG_Context *psContext, tsConnection *psConne
         psCommsPriv->dcbSerialParams.ByteSize=8;
         psCommsPriv->dcbSerialParams.StopBits=ONESTOPBIT;
         psCommsPriv->dcbSerialParams.Parity=NOPARITY;
-
+                
         timeouts.ReadIntervalTimeout=50;
         timeouts.ReadTotalTimeoutConstant=50;
         timeouts.ReadTotalTimeoutMultiplier=10;
@@ -355,7 +447,7 @@ teStatus ePRG_ConnectionUartOpen(tsPRG_Context *psContext, tsConnection *psConne
         }
     }
 
-    //DBG_vPrintf(TRACE_UART, "Port opened\n");
+    DBG_vPrintf(TRACE_UART, "Port opened\n");
     
     psCommsPriv->sPriv.sConnection.eType = E_CONNECT_SERIAL;
     
@@ -391,13 +483,7 @@ teStatus ePRG_ConnectionUartClose(tsPRG_Context *psContext)
     
     if (psCommsPriv->hFTDIHandle)
     {
-        // Set normal mode
-        if (ePRG_FTDI_ModeRunning(psCommsPriv) != E_PRG_OK)
-        {
-            //DBG_vPrintf(TRACE_UART, "Could not set FTDI into running mode\n");
-        }
-        
-        FT_Close(psCommsPriv->hFTDIHandle);
+        FTdll_Close(psCommsPriv->hFTDIHandle);
         psCommsPriv->hFTDIHandle = NULL;            
     }
     else
@@ -411,6 +497,13 @@ teStatus ePRG_ConnectionUartClose(tsPRG_Context *psContext)
     if (--iOpenDevices == 0)
     {
         DeleteCriticalSection(&csFTDISection);
+        
+        if (hFtd2xxLibrary)
+        {
+            DBG_vPrintf(TRACE_UART, "Unloading ftd2xx library\n");
+            FreeLibrary(hFtd2xxLibrary);
+            hFtd2xxLibrary = NULL;
+        }
     }
     
     return ePRG_SetStatus(psContext, E_PRG_OK, "");
@@ -431,7 +524,8 @@ teStatus ePRG_ConnectionUartClose(tsPRG_Context *psContext)
 teStatus ePRG_ConnectionUartUpdate(tsPRG_Context *psContext, tsConnection *psConnection)
 {   
     tsCommsPrivate *psCommsPriv;
-
+    teStatus eStatus;
+    
     if(psContext == NULL)
     {
         return E_PRG_NULL_PARAMETER;
@@ -443,11 +537,18 @@ teStatus ePRG_ConnectionUartUpdate(tsPRG_Context *psContext, tsConnection *psCon
         return ePRG_SetStatus(psContext, E_PRG_INVALID_TRANSPORT, "");
     }
     
-    //DBG_vPrintf(TRACE_UART, "Changing UART baud rate to %d\n", psConnection->uDetails.sSerial.u32BaudRate);
+    DBG_vPrintf(TRACE_UART, "Changing UART baud rate to %d\n", psConnection->uDetails.sSerial.u32BaudRate);
 
+    eStatus = eUART_Flush(psContext);
+    
+    if (eStatus != E_PRG_OK)
+    {
+        return eStatus;
+    }
+    
     if (psCommsPriv->hFTDIHandle)
     {
-        if (!FT_SUCCESS(FT_SetBaudRate(psCommsPriv->hFTDIHandle, psConnection->uDetails.sSerial.u32BaudRate)))
+        if (!FT_SUCCESS(FTdll_SetBaudRate(psCommsPriv->hFTDIHandle, psConnection->uDetails.sSerial.u32BaudRate)))
         {
             return ePRG_SetStatus(psContext, E_PRG_ERROR, "error setting FTDI baudrate");
         }
@@ -491,12 +592,11 @@ teStatus eUART_Flush(tsPRG_Context *psContext)
         return ePRG_SetStatus(psContext, E_PRG_INVALID_TRANSPORT, "");
     }
     
-    //DBG_vPrintf(TRACE_UART, "Flushing UART\n");
+    DBG_vPrintf(TRACE_UART, "Flushing UART\n");
 
     if (psCommsPriv->hFTDIHandle)
     {
-        if (!FT_SUCCESS(FT_Purge(psCommsPriv->hFTDIHandle, FT_PURGE_RX | FT_PURGE_TX
-)))
+        if (!FT_SUCCESS(FTdll_Purge(psCommsPriv->hFTDIHandle, FT_PURGE_RX | FT_PURGE_TX)))
         {
             return ePRG_SetStatus(psContext, E_PRG_ERROR, "error purging FTDI buffers");
         }
@@ -540,15 +640,15 @@ teStatus eUART_Read(tsPRG_Context *psContext, int iTimeoutMicroseconds, int iBuf
         return ePRG_SetStatus(psContext, E_PRG_INVALID_TRANSPORT, "");
     }
     
-    //DBG_vPrintf(TRACE_UART, "Read %d bytes from UART (timeout %dus)\n", iBufferLen, iTimeoutMicroseconds);
+    DBG_vPrintf(TRACE_UART, "Read %d bytes from UART (timeout %dus)\n", iBufferLen, iTimeoutMicroseconds);
     
     if (psCommsPriv->hFTDIHandle)
     {
-        FT_SetTimeouts(psCommsPriv->hFTDIHandle,iTimeoutMicroseconds / 1000,0);
+        FTdll_SetTimeouts(psCommsPriv->hFTDIHandle,iTimeoutMicroseconds / 1000,0);
 
-        if (!FT_SUCCESS(FT_Read(psCommsPriv->hFTDIHandle, pu8Buffer, iBufferLen, &dwBytesRead)))
+        if (!FT_SUCCESS(FTdll_Read(psCommsPriv->hFTDIHandle, pu8Buffer, iBufferLen, &dwBytesRead)))
         {
-            //DBG_vPrintf(TRACE_UART, "Error reading\n");
+            DBG_vPrintf(TRACE_UART, "Error reading\n");
             return ePRG_SetStatus(psContext, E_PRG_ERROR_READING, "(%s)", pcPRG_GetLastErrorMessage(psContext));
         }
     }
@@ -566,11 +666,11 @@ teStatus eUART_Read(tsPRG_Context *psContext, int iTimeoutMicroseconds, int iBuf
         
         if(!ReadFile(psCommsPriv->hSerialHandle, pu8Buffer, iBufferLen, &dwBytesRead, NULL))
         {
-            //DBG_vPrintf(TRACE_UART, "Error reading (%d)\n", GetLastError());
+            DBG_vPrintf(TRACE_UART, "Error reading (%d)\n", GetLastError());
             return ePRG_SetStatus(psContext, E_PRG_ERROR_READING, "(%s)", pcPRG_GetLastErrorMessage(psContext));
         }
     }        
-    //DBG_vPrintf(TRACE_UART, "Read %d bytes\n", dwBytesRead);
+    DBG_vPrintf(TRACE_UART, "%d bytes read from port\n", dwBytesRead);
         
     if (dwBytesRead != iBufferLen)
     {
@@ -616,9 +716,9 @@ teStatus eUART_Write(tsPRG_Context *psContext, uint8_t *pu8Data, int iLength)
     {
         do
         {
-            //DBG_vPrintf(TRACE_UART, "Write %d bytes to port\n", iLength);
+            DBG_vPrintf(TRACE_UART, "Write %d bytes to port\n", iLength);
             
-            if (!FT_SUCCESS(FT_Write(psCommsPriv->hFTDIHandle, &pu8Data[iTotalBytesWritten], iLength - iTotalBytesWritten, &iBytesWritten)))
+            if (!FT_SUCCESS(FTdll_Write(psCommsPriv->hFTDIHandle, &pu8Data[iTotalBytesWritten], iLength - iTotalBytesWritten, &iBytesWritten)))
             {
                 return ePRG_SetStatus(psContext, E_PRG_ERROR_WRITING, "(%s)", pcPRG_GetLastErrorMessage(psContext));
             }
@@ -642,7 +742,7 @@ teStatus eUART_Write(tsPRG_Context *psContext, uint8_t *pu8Data, int iLength)
         
         do
         {
-            //DBG_vPrintf(TRACE_UART, "Write %d bytes to port\n", iLength);
+            DBG_vPrintf(TRACE_UART, "Write %d bytes to port\n", iLength);
             
             if(!WriteFile(psCommsPriv->hSerialHandle, &pu8Data[iTotalBytesWritten], iLength - iTotalBytesWritten, &iBytesWritten, NULL))
             {
@@ -665,45 +765,99 @@ teStatus eUART_Write(tsPRG_Context *psContext, uint8_t *pu8Data, int iLength)
 
 /****************************************************************************/
 /***        Local Functions                                               ***/
-/****************************************************************************/
-
+/****************************************************************************/    
+    
 FT_HANDLE hPRG_FTDI_GetHandle(tsCommsPrivate *psCommsPriv)
 {
     FT_HANDLE hFtdiHandle;
     
     DWORD dwNumDevs;
     
+    if (!hFtd2xxLibrary)
+    {
+        hFtd2xxLibrary = LoadLibrary("ftd2xx.dll");
+        if (hFtd2xxLibrary == NULL)
+        {
+            DBG_vPrintf(TRACE_UART, "Could not load ftd2xx library\n");
+            return NULL;
+        }
+        else
+        {
+            // Loaded the dll ok - lets grab pointers to the functions we need!
+            DBG_vPrintf(TRACE_UART, "Loaded ftd2xx library\n");
+           
+            if (!(*(FARPROC *)&FTdll_ListDevices = GetProcAddress(hFtd2xxLibrary, "FT_ListDevices")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_ListDevices: %p\n", FTdll_ListDevices);
+            
+            if (!(*(FARPROC *)&FTdll_Open = GetProcAddress(hFtd2xxLibrary, "FT_Open")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_Open: %p\n", FTdll_Open);
+            
+            if (!(*(FARPROC *)&FTdll_Close = GetProcAddress(hFtd2xxLibrary, "FT_Close")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_Close: %p\n", FTdll_Close);
+            
+            if (!(*(FARPROC *)&FTdll_ResetPort = GetProcAddress(hFtd2xxLibrary, "FT_ResetPort")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_ResetPort: %p\n", FTdll_ResetPort);
+            
+            if (!(*(FARPROC *)&FTdll_GetComPortNumber = GetProcAddress(hFtd2xxLibrary, "FT_GetComPortNumber")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_GetComPortNumber: %p\n", FTdll_GetComPortNumber);
+            
+            if (!(*(FARPROC *)&FTdll_Purge = GetProcAddress(hFtd2xxLibrary, "FT_Purge")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_Purge: %p\n", FTdll_Purge);
+            
+            if (!(*(FARPROC *)&FTdll_SetTimeouts = GetProcAddress(hFtd2xxLibrary, "FT_SetTimeouts")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_SetTimeouts: %p\n", FTdll_SetTimeouts);
+            
+            if (!(*(FARPROC *)&FTdll_SetBitMode = GetProcAddress(hFtd2xxLibrary, "FT_SetBitMode")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_SetBitMode: %p\n", FTdll_SetBitMode);
+            
+            if (!(*(FARPROC *)&FTdll_SetLatencyTimer = GetProcAddress(hFtd2xxLibrary, "FT_SetLatencyTimer")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_SetLatencyTimer: %p\n", FTdll_SetLatencyTimer);
+            
+            if (!(*(FARPROC *)&FTdll_SetBaudRate = GetProcAddress(hFtd2xxLibrary, "FT_SetBaudRate")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_SetBaudRate: %p\n", FTdll_SetBaudRate);
+            
+            if (!(*(FARPROC *)&FTdll_SetDataCharacteristics = GetProcAddress(hFtd2xxLibrary, "FT_SetDataCharacteristics")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_SetDataCharacteristics: %p\n",FTdll_SetDataCharacteristics);
+            
+            if (!(*(FARPROC *)&FTdll_Read = GetProcAddress(hFtd2xxLibrary, "FT_Read")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_Read: %p\n", FTdll_Read);
+            
+            if (!(*(FARPROC *)&FTdll_Write = GetProcAddress(hFtd2xxLibrary, "FT_Write")))    return NULL;
+            DBG_vPrintf(TRACE_UART, "FTdll_Write: %p\n",FTdll_Write);
+        }
+    }
+    
     // search for number of devices first
-    if (!FT_SUCCESS(FT_ListDevices(&dwNumDevs, NULL, FT_LIST_NUMBER_ONLY)))
+    if (!FT_SUCCESS(FTdll_ListDevices(&dwNumDevs, NULL, FT_LIST_NUMBER_ONLY)))
     {
         return NULL;
     }
     else
     {
         int i;
-        //DBG_vPrintf(TRACE_UART, "FTDI: %d devices\n", dwNumDevs);
+        DBG_vPrintf(TRACE_UART, "FTDI: %d devices\n", dwNumDevs);
               
         for (i = 0; i < dwNumDevs; i++)
         {
-            if (FT_SUCCESS(FT_Open(i, &hFtdiHandle)))
+            if (FT_SUCCESS(FTdll_Open(i, &hFtdiHandle)))
             {
                 /* Opened handle to device */
                 LONG lComPortNumber;
 
-                if (FT_SUCCESS(FT_GetComPortNumber(hFtdiHandle, &lComPortNumber)))
+                if (FT_SUCCESS(FTdll_GetComPortNumber(hFtdiHandle, &lComPortNumber)))
                 {
                     char acComName[8];
-                    _snprintf(acComName, 8, "COM%ld", lComPortNumber);
-                    //DBG_vPrintf(TRACE_UART, "COM port %s is an FTDI device\n", acComName);
+                    snprintf(acComName, 8, "COM%ld", lComPortNumber);
+                    DBG_vPrintf(TRACE_UART, "COM port %s is an FTDI device\n", acComName);
                     
                     if (strncmp(psCommsPriv->sPriv.sConnection.pcName, acComName, 8) == 0)
                     {
-                        //DBG_vPrintf(TRACE_UART, "Found FTDI device for our COM port\n");
+                        DBG_vPrintf(TRACE_UART, "Found FTDI device for our COM port\n");
                         return hFtdiHandle;
                     }
                 }
                 /* Not the one we are looking for */
-                FT_Close(hFtdiHandle);
+                FTdll_Close(hFtdiHandle);
             }
         }
     }
@@ -714,40 +868,41 @@ FT_HANDLE hPRG_FTDI_GetHandle(tsCommsPrivate *psCommsPriv)
 
 teStatus ePRG_FTDI_ModeProgramming(tsCommsPrivate *psCommsPriv)
 {
+
     const int aaiBitModes[5][2] = 
     {
-        { 0xC0, 0x20 },
-        { 0xC4, 0x20 },
-        { 0xCC, 0x20 },
-        { 0x00, 0x20 },
+        { 0xC0, 0x20 }, /* Drive reset and program low */
+        { 0xC4, 0x20 }, /* Drive reset high */
+        { 0xCC, 0x20 }, /* Drive program high */
+        { 0x0C, 0x20 }, /* Release reset and program */
         { 0x00, 0x00 }, /* Normal bit mode */
     };
     int i;
 
     if (!psCommsPriv->hFTDIHandle)
     {
-        //DBG_vPrintf(TRACE_UART, "Not an FTDI COM port\n");
+        DBG_vPrintf(TRACE_UART, "Not an FTDI COM port\n");
         return E_PRG_ERROR;
     }
     
-    if (!FT_SUCCESS(FT_Purge(psCommsPriv->hFTDIHandle, FT_PURGE_TX | FT_PURGE_RX)))
+    if (!FT_SUCCESS(FTdll_Purge(psCommsPriv->hFTDIHandle, FT_PURGE_TX | FT_PURGE_RX)))
     {
-        //DBG_vPrintf(TRACE_UART, "Error purging TX / RX buffers\n");
+        DBG_vPrintf(TRACE_UART, "Error purging TX / RX buffers\n");
         return E_PRG_ERROR;
     }
     
     for (i = 0; i < (sizeof(aaiBitModes) / sizeof(aaiBitModes[0])); i++)
     {
-        //DBG_vPrintf(TRACE_UART, "Setting bit mode 0x%02X, 0x%02X\n", aaiBitModes[i][0], aaiBitModes[i][1]);
-        if (!FT_SUCCESS(FT_SetBitMode(psCommsPriv->hFTDIHandle, aaiBitModes[i][0], aaiBitModes[i][1])))
+        DBG_vPrintf(TRACE_UART, "Setting bit mode 0x%02X, 0x%02X\n", aaiBitModes[i][0], aaiBitModes[i][1]);
+        if (!FT_SUCCESS(FTdll_SetBitMode(psCommsPriv->hFTDIHandle, aaiBitModes[i][0], aaiBitModes[i][1])))
         {
-            //DBG_vPrintf(TRACE_UART, "Error bitbanging device\n");
+            DBG_vPrintf(TRACE_UART, "Error bitbanging device\n");
             return E_PRG_ERROR;
         }
         vPRG_WaitMs(10);
     }
     
-    //DBG_vPrintf(TRACE_UART, "FTDI set into programming mode\n");
+    DBG_vPrintf(TRACE_UART, "FTDI set into programming mode\n");
     
     return E_PRG_OK;
 }
@@ -765,28 +920,28 @@ teStatus ePRG_FTDI_ModeRunning(tsCommsPrivate *psCommsPriv)
     
     if (!psCommsPriv->hFTDIHandle)
     {
-        //DBG_vPrintf(TRACE_UART, "Not an FTDI COM port\n");
+        DBG_vPrintf(TRACE_UART, "Not an FTDI COM port\n");
         return E_PRG_ERROR;
     }
     
-    if (!FT_SUCCESS(FT_Purge(psCommsPriv->hFTDIHandle, FT_PURGE_TX | FT_PURGE_RX)))
+    if (!FT_SUCCESS(FTdll_Purge(psCommsPriv->hFTDIHandle, FT_PURGE_TX | FT_PURGE_RX)))
     {
-        //DBG_vPrintf(TRACE_UART, "Error purging TX / RX buffers\n");
+        DBG_vPrintf(TRACE_UART, "Error purging TX / RX buffers\n");
         return E_PRG_ERROR;
     }
     
     for (i = 0; i < (sizeof(aaiBitModes) / sizeof(aaiBitModes[0])); i++)
     {
-        //DBG_vPrintf(TRACE_UART, "Setting bit mode 0x%02X, 0x%02X\n", aaiBitModes[i][0], aaiBitModes[i][1]);
-        if (!FT_SUCCESS(FT_SetBitMode(psCommsPriv->hFTDIHandle, aaiBitModes[i][0], aaiBitModes[i][1])))
+        DBG_vPrintf(TRACE_UART, "Setting bit mode 0x%02X, 0x%02X\n", aaiBitModes[i][0], aaiBitModes[i][1]);
+        if (!FT_SUCCESS(FTdll_SetBitMode(psCommsPriv->hFTDIHandle, aaiBitModes[i][0], aaiBitModes[i][1])))
         {
-            //DBG_vPrintf(TRACE_UART, "Error bitbanging device\n");
+            DBG_vPrintf(TRACE_UART, "Error bitbanging device\n");
             return E_PRG_ERROR;
         }
         vPRG_WaitMs(10);
     }
     
-    //DBG_vPrintf(TRACE_UART, "FTDI set into running mode\n");
+    DBG_vPrintf(TRACE_UART, "FTDI set into running mode\n");
     
     return E_PRG_OK;
 }

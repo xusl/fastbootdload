@@ -10,10 +10,12 @@ typedef unsigned int      uint32;      /* 32 bit unsigned */
 typedef unsigned int uint32_t;
 typedef unsigned short uint16_t;
 typedef unsigned char uint8_t;
-typedef _int64 uint64_t;
+//typedef _int64 uint64_t;
 
-#define VERSION
-
+#define VERSION_MAJOR   "0"
+#define VERSION_MINOR   "2"
+#define VERSION_SVN         "12"
+#define VERSION  "12"
 
 #define FALSE   0
 #define TRUE    1
@@ -26,6 +28,10 @@ typedef _int64 uint64_t;
 #endif /* LIBPROGRAMMER_BUILD */
 
 #else /* WIN32 */
+
+#define snprintf _snprintf
+//#define roundf round
+#define __builtin_popcount __popcnt
 
 #define LIBPROGRAMMER
 #define FREE_IF(x)  do {\

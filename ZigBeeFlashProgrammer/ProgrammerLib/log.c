@@ -48,7 +48,23 @@ const char * basename(const char * f_name) {
 	return f_name + i;
 }
 
-
+void dbg_vPrintfImpl(const char *pcFile, uint32_t u32Line, const char *pcFormat, ...)
+{
+    va_list argp;
+    va_start(argp, pcFormat);
+#if 0
+#ifdef DBG_VERBOSE
+    printf("%s:%d ", pcFile, u32Line);
+#endif /* DBG_VERBOSE */
+    vprintf(pcFormat, argp);
+    fflush(stdout);
+#endif
+    fprintf(gLogFp, "%s:%d ", pcFile, u32Line);
+    vfprintf(gLogFp, pcFormat, argp);
+    fflush(gLogFp);
+    va_end(argp);
+    return;
+}
 
 /*===========================================================================
 DESCRIPTION
@@ -75,7 +91,6 @@ void WriteLog
 	...
 )
 {
-#ifdef FEATURE_LOG_SYS
 #define MAX_BUF_LEN     (4096 * 8)
   int   nBuf;
   char  szBuffer[MAX_BUF_LEN] = {0};
@@ -100,7 +115,7 @@ void WriteLog
     return;
   }
   va_start(args, fmtstr);
-    
+
   GetLocalTime(&time);
   nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %6s %s\n",
                    time.wHour, time.wMinute,time.wSecond, msg, fmtstr);
@@ -108,21 +123,13 @@ void WriteLog
 #ifdef FEATURE_THREAD_SYNC
   g_Lock.Lock();
 #endif
-          vfprintf(gLogFp, szFormat, args);
+  vfprintf(gLogFp, szFormat, args);
   va_end(args);
   //ASSERT(nBuf >= 0);
-
-#ifdef FEATURE_LOG_FILE
-#ifdef FEATURE_THREAD_SYNC
-  g_Lock.Lock();
-#endif
 
 #ifdef FEATURE_THREAD_SYNC
   g_Lock.Unlock();
 #endif
-#endif //FEATURE_LOG_FILE
-
-#endif // FEATURE_LOG_SYS
 }
 
 
@@ -257,7 +264,7 @@ static void log_level_init(const char*  p)
 
 void StartLogging(char * filename,
 	const char* mask,
-	const char* tags) {    	
+	const char* tags) {
     if (gLogFp != NULL)
         return;
 

@@ -57,7 +57,7 @@ extern "C" {
 /***        Include files                                                 ***/
 /****************************************************************************/
 
-//#include <stdint.h>
+#include <stdint.h>
 #include "header.h"
 
 /****************************************************************************/
@@ -88,6 +88,8 @@ typedef enum
     E_PRG_INVALID_TRANSPORT,
     E_PRG_COMMS_FAILED,
     E_PRG_UNSUPPORTED_OPERATION,
+    E_PRG_FLASH_DEVICE_UNAVAILABLE,
+    E_PRG_CRP_SET,
 } teStatus;
 
 typedef enum
@@ -102,15 +104,9 @@ typedef struct
 {
     teConnectionType    eType;
     char *              pcName;
-	char *              portName;//
-    
+
     union
     {
-        struct
-        {
-			uint32_t    u32BaudRate;
-        } sNone;
-        
         struct
         {
             uint32_t    u32BaudRate;
@@ -126,6 +122,72 @@ typedef enum
     E_ERASE_EEPROM_ALL,
 } teEepromErase;
 
+typedef enum
+{
+    E_DC_JTAG_DEFAULT,                      /**< Use default option */
+    E_DC_JTAG_ENABLE,                       /**< JTAG access is enabled */
+    E_DC_JTAG_DISABLE_FLASH,                /**< JTAG access to Flash is disabled */
+    E_DC_JTAG_DISABLE_CPU,                  /**< JTAG access to CPU is disabled */
+    E_DC_JTAG_DISABLE,                      /**< JTAG access is disabled */
+} teJtagAccess;
+
+typedef enum
+{
+    E_DC_VBO_DEFAULT,                       /**< Use default option */
+    E_DC_VBO_195,                           /**< Brown out = 1.95V */
+    E_DC_VBO_200,                           /**< Brown out = 2.00V */
+    E_DC_VBO_210,                           /**< Brown out = 2.10V */
+    E_DC_VBO_220,                           /**< Brown out = 2.20V */
+    E_DC_VBO_230,                           /**< Brown out = 2.30V */
+    E_DC_VBO_240,                           /**< Brown out = 2.40V */
+    E_DC_VBO_270,                           /**< Brown out = 2.70V */
+    E_DC_VBO_300,                           /**< Brown out = 3.00V */
+} teBrownoutVoltage;
+
+typedef enum
+{
+    E_DC_CRP_DEFAULT,                       /**< Use default option */
+    E_DC_CRP_LEVEL0,                        /**< Code protect level 0 (none) */
+    E_DC_CRP_LEVEL1,                        /**< Code protect level 1 (UART bootloader flash read protection) */
+    E_DC_CRP_LEVEL2,                        /**< Code protect level 2 (UART bootloader access disabled) */
+} teCRPLevel;
+
+typedef enum
+{
+    E_DC_EXTERNAL_FLASH_ENCRYPTED_DEFAULT,  /**< Use default option */
+    E_DC_EXTERNAL_FLASH_ENCRYPTED_TRUE,     /**< External flash is encrypted */
+    E_DC_EXTERNAL_FLASH_ENCRYPTED_FALSE,    /**< External flash is not encrypted */
+} teExternalFlashEncrypted;
+
+typedef enum
+{
+    E_DC_EXTERNAL_FLASH_LOAD_DEFAULT,       /**< Use default option */
+    E_DC_EXTERNAL_FLASH_LOAD_DISABLE,       /**< Load from external flash is disabled */
+    E_DC_EXTERNAL_FLASH_LOAD_ENABLE,        /**< Load from external flash is enabled */
+} teExternalFlashLoad;
+
+/** Structure containing all available device settings.
+ *  Memsetting this to 0 will cause all settings to be default.
+ *  Each required setting should be set in the structure before passing it to \ref ePRG_DeviceConfigSet
+ */
+typedef struct
+{
+    /** Enable / disable JTAG access to device */
+    teJtagAccess eJtag;
+
+    /** Set device brown out voltage */
+    teBrownoutVoltage eVbo;
+
+    /** Set device code protection level in UART bootloader */
+    teCRPLevel eCRP;
+
+    /** Set whether external flash is encrypted */
+    teExternalFlashEncrypted eExternalFlashEncrypted;
+
+    /** Set whether bootloader will search external flash for a bootable image */
+    teExternalFlashLoad eExternalFlashLoad;
+} tsDeviceConfig;
+
 
 /** Abstracted firmware information common across bootloaders. */
 typedef struct
@@ -137,30 +199,56 @@ typedef struct
     uint32_t    u32BssSectionLength;            /**< Length (bytes) of .bss section */
     uint32_t    u32WakeUpEntryPoint;            /**< Address of wake up (warm start) entry point */
     uint32_t    u32ResetEntryPoint;             /**< Address of rest (cold start) entry point */
-    
+
     uint8_t*    pu8ImageData;                   /**< Pointer to loaded image data for Flash */
     uint32_t    u32ImageLength;                 /**< Length (bytes) of image for Flash */
-    
+
     uint32_t    u32MacAddressLocation;          /**< Offset in file of MAC address */
     uint8_t*    pu8TextData;                    /**< Pointer to loaded .text section for RAM */
+    
+    struct
+    {
+        unsigned        bRawImage : 1;          /**< Flag that the image is considered to be a raw binary file
+                                                  *  i.e. not a valid firmware image */
+    } sFlags;
 } tsFW_Info;
+
+
+/** Flash device information */
+typedef struct
+{
+    const char* pcFlashName;                    /**< Human readable name of the flash */
+    uint32_t    u32FlashSize;                   /**< Flash size (bytes) */
+    uint8_t     u8ManufacturerID;               /**< Flash manufacturer ID */
+    uint8_t     u8DeviceID;                     /**< Flash device ID */
+    uint8_t     u8ChipSelect;                   /**< Which SPI cheip select for this flash */
+} tsFlashDetails;
 
 
 /** Structure Contatining Imformation about connected device */
 typedef struct
 {
-    uint32_t            u32ChipId;              /**< 32 bit Chip ID */
-    uint32_t            u32SupportedFirmware;   /**< Required ROM version */
+    uint32_t            u32ChipId;                      /**< 32 bit Chip ID */
+    uint32_t            u32SupportedFirmware;           /**< Required ROM version */
+
+    const char*         pcChipName;                     /**< String representing chip name */
+
+    uint32_t            u32NumFlashes;                  /**< Number of flashes available */
+    tsFlashDetails*     asFlashes;                      /**< Array of available flashes */
+
+    uint32_t            u32RamSize;                     /**< Ram Size (bytes) */
+    uint32_t            u32EepromSize;                  /**< EEPROM size (bytes) */
+
+    uint32_t            u32BootloaderVersion;           /**< Bootloader version (JN516x series) */
+
+    uint8_t             au8MacAddress[8];               /**< MAC Address */
+
+    enum
+    {
+        E_CHIP_BIG_ENDIAN,                              /**< Chip has a big endian CPU */
+        E_CHIP_LITTLE_ENDIAN,                           /**< Chip has a little endian CPU */
+    } eEndianness;
     
-    const char*         pcChipName;             /**< String representing chip name */
-    
-    uint32_t            u32RamSize;             /**< Ram Size (bytes) */
-    uint32_t            u32FlashSize;           /**< Flash size (bytes) */
-    uint32_t            u32EepromSize;          /**< EEPROM size (bytes) */
-    
-    uint32_t            u32BootloaderVersion;   /**< Bootloader version (JN516x series) */
-    
-    uint8_t             au8MacAddress[8];       /**< MAC Address */
     uint8_t             boEEPpresent;                   /** EEPROM present flag */
 } tsChipDetails;
 
@@ -168,21 +256,19 @@ typedef struct
 /** Programmer context structure */
 typedef struct
 {
-    int                 iUartFD;
-    uint32_t            u32BaudRate;
-    
-    int                 iFirmwareFD;
-    uint32_t            u32FirmWareFileSize;
-    uint8_t *           pu8Firmware;
     tsFW_Info           sFirmwareInfo;          /**< Loaded firmware for the context */
     tsChipDetails       sChipDetails;           /**< Information about the connected device */
+    tsDeviceConfig      sDeviceConfig;          /**< Device configuration */
     void *              pvPrivate;              /**< Private context information */
-    uint8_t *           pu8FlashProgrammerExtensionStart;
-    uint32_t            u32FlashProgrammerExtensionLength;
-    uint32_t            u32BootloaderEntry;
-    uint32_t            u32FlashOffset;         /**< Offset within flash at which to load / dump an image. Default 0 (start) */
     
+    uint32_t            u32FlashOffset;         /**< Offset within flash at which to load / dump an image. Default 0 (start) */
     uint32_t            u32EepromOffset;        /**< Offset within eeprom at which to load / dump an image. Default 0 (start) */
+    
+    struct
+    {
+        unsigned        bAutoProgramReset : 1;  /**< If possible, automatically assert the program / reset lines. Default true. */
+    } sFlags;
+
 } tsPRG_Context;
 
 
@@ -214,7 +300,7 @@ typedef teStatus(*tcbFW_Confirm)(void *pvUser, const char *pcTitle, const char *
 /****************************************************************************/
 
 /** Version string for libprogrammer */
-LIBPROGRAMMER extern const char *  pcPRG_Version;
+extern const char * LIBPROGRAMMER pcPRG_Version;
 
 /****************************************************************************/
 /***        Local Variables                                               ***/
@@ -237,11 +323,11 @@ teStatus LIBPROGRAMMER ePRG_Destroy(tsPRG_Context *psContext);
 
 
 /** Get the status of the last operation with a given chip.
- *  If an operation fails, this will return a string describing the 
+ *  If an operation fails, this will return a string describing the
  *  error state. On success it will return the string "Success".
  *  \return String containing description of last operation status.
  */
-LIBPROGRAMMER char *  pcPRG_GetLastStatusMessage(tsPRG_Context *psContext);
+char *LIBPROGRAMMER pcPRG_GetLastStatusMessage(tsPRG_Context *psContext);
 
 
 /** Get a list of available connections for use by the programmer. Once the list has been used it should be destroyed using
@@ -306,29 +392,52 @@ teStatus LIBPROGRAMMER ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFil
 teStatus LIBPROGRAMMER ePRG_FwClose(tsPRG_Context *psContext);
 
 
-/** Get information from a firmware image. This takes a buffer of data 
+/** Get information from a firmware image. This takes a buffer of data
  *  representing the complete firmware image and extracts the required information
  *  from it.
  *  This populates psContext->sFirmwareInfo with the necessary data for programming this firmware.
  *  \param          psContext Pointer to programmer context
  *  \param          pu8Firmware Firmware file data buffer.
+ *  \param          u32Length Length of firmware data buffer
  *  \return E_PRG_OK on success
  */
-teStatus LIBPROGRAMMER ePRG_FwGetInfo(tsPRG_Context *psContext, uint8_t *pu8Firmware);
+teStatus LIBPROGRAMMER ePRG_FwGetInfo(tsPRG_Context *psContext, uint8_t *pu8Firmware, uint32_t u32Length);
 
 
 /** Get information from the connected device and populate psChipDetails with it.
- *  This populates psContext->sChipDetails with the necessary data for programming this firmware.
+ *  This populates psContext->sChipDetails and psContext->sDeviceConfig with the necessary data for programming this firmware.
  *  \param          psContext Pointer to programmer context
  *  \return E_PRG_OK on success
  */
 teStatus LIBPROGRAMMER ePRG_ChipGetDetails(tsPRG_Context *psContext);
 
 
+/** Add a flash device to the context. This is used internally to add discovered flash devices to the context.
+ *  It may be used by an application, for example to add a flash device that is connected to a non-standard chip select.
+ *  \param          psContext Pointer to programmer context
+ *  \param          pcName  Human readable name of the flash device
+ *  \param          u32FlashSize Size (in bytes) of the flash device
+ *  \param          u8ManufacturerID Manufacturer ID of the flash device.
+ *  \param          u8DeviceID Device ID of the flash device.
+ *  \param          u8ChipSelect The chip select that the flash is connected to
+ *  \return E_PRG_OK on success
+ */
+teStatus LIBPROGRAMMER ePRG_FlashAddDevice(tsPRG_Context *psContext, const char *pcName, const uint32_t u32FlashSize,
+                                           uint8_t u8ManufacturerID, const uint8_t u8DeviceID, const uint8_t u8ChipSelect);
+
+
+/** Select the target flash device for further flash operations.
+ *  \param          psContext Pointer to programmer context
+ *  \param          u32FlashDevice Index of the flash to select within the \ref asFlashes array of the \ref tsChipDetails structure.
+ *  \return E_PRG_OK on success, or E_PRG_FLASH_DEVICE_UNAVAILABLE if the device could not be selected.
+ */
+teStatus LIBPROGRAMMER ePRG_FlashSelectDevice(tsPRG_Context *psContext, uint32_t u32FlashDevice);
+
+
 /** Erase the flash of the selected device. This call will block until the request has completed.
  *  This function is called internally by \ref ePRG_FlashProgram so there is no need to call it as part of the programming process.
  *  During erasing the library will call cbProgress periodically to update the caller with progress.
- *  \param          sContext Pointer to programmer context
+ *  \param          psContext Pointer to programmer context
  *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
  *  \param          pvUser  Pointer to user data that is passed back to the application when cbProgress is called. May be NULL for no user data
  *  \return E_PRG_OK on success
@@ -338,7 +447,7 @@ teStatus LIBPROGRAMMER ePRG_FlashErase(tsPRG_Context *psContext, tcbFW_Progress 
 
 /** Reprogram the connected device flash with the given image. This call will block until the request has completed.
  *  During programming the library will call cbProgress periodically to update the caller with progress.
- *  \param          sContext Pointer to programmer context
+ *  \param          psContext Pointer to programmer context
  *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
  *  \param          cbConfirm Callback routine to confirm operation. May be NULL, in which case an operation requiring confirmation will fail.
  *  \param          pvUser  Pointer to user data that is passed back to the application when cbProgress is called. May be NULL for no user data
@@ -349,7 +458,7 @@ teStatus LIBPROGRAMMER ePRG_FlashProgram(tsPRG_Context *psContext, tcbFW_Progres
 
 /** Verify the connected device flash with the given image.
  *  During verification the library will call cbProgress periodically to update the caller with progress.
- *  \param          sContext Pointer to programmer context
+ *  \param          psContext Pointer to programmer context
  *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
  *  \param          pvUser  Pointer to user data that is passed back to the application when cbProgress is called. May be NULL for no user data
  *  \return E_PRG_OK on success
@@ -369,7 +478,7 @@ teStatus LIBPROGRAMMER ePRG_FlashDump(tsPRG_Context *psContext, char *pcDumpFile
 
 /** Load the connected device RAM with the given image and execute it.
  *  During loading the library will call cbProgress periodically to update the caller with progress.
- *  \param          sContext Pointer to programmer context
+ *  \param          psContext Pointer to programmer context
  *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
  *  \param          cbConfirm Callback routine to confirm operation. May be NULL, in which case an operation requiring confirmation will fail.
  *  \param          pvUser  Pointer to user data that is passed back to the application when cbProgress is called. May be NULL for no user data
@@ -380,7 +489,7 @@ teStatus LIBPROGRAMMER ePRG_MemoryLoadExecute(tsPRG_Context *psContext, tcbFW_Pr
 
 /** Erase the EEPROM of the connected device.
  *  During erasure the library will call cbProgress periodically to update the caller with progress.
- *  \param          sContext Pointer to programmer context
+ *  \param          psContext Pointer to programmer context
  *  \param          eErase  What type of erase to perfom on the EEPROM
  *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
  *  \return E_PRG_OK on success
@@ -410,7 +519,7 @@ teStatus LIBPROGRAMMER ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoad
 
 /** Write a new MAC address into the index sector of a connected JN516x device.
  *  During programming the library will call cbProgress periodically to update the caller with progress.
- *  \param          sContext Pointer to programmer context
+ *  \param          psContext Pointer to programmer context
  *  \param          au8MacAddress New MAC address to write into the device.
  *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
  *  \param          cbConfirm Callback routine to confirm operation. May not be NULL.
@@ -419,6 +528,63 @@ teStatus LIBPROGRAMMER ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoad
  */
 teStatus LIBPROGRAMMER ePRG_MACAddressSet(tsPRG_Context *psContext, uint8_t au8MacAddress[8], tcbFW_Progress cbProgress, tcbFW_Confirm cbConfirm, void *pvUser);
 
+
+/** Read AES key from the index sector of a connected JN516x device.
+ *  \param          psContext Pointer to programmer context
+ *  \param          au32Key Location to store AES key read from the device.
+ *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
+ *  \param          cbConfirm Callback routine to confirm operation. May be NULL.
+ *  \param          pvUser  Pointer to user data that is passed back to the application when cbProgress and cbConfirm are called. May be NULL for no user data
+ *  \return E_PRG_OK on success
+ */
+teStatus LIBPROGRAMMER ePRG_AesKeyGet(tsPRG_Context *psContext, uint32_t au32Key[4], tcbFW_Progress cbProgress, tcbFW_Confirm cbConfirm, void *pvUser);
+
+
+/** Write a new AES key into the index sector of a connected JN516x device.
+ *  During programming the library will call cbProgress periodically to update the caller with progress.
+ *  \param          psContext Pointer to programmer context
+ *  \param          au32Key New AES key to write into the device.
+ *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
+ *  \param          cbConfirm Callback routine to confirm operation. May not be NULL.
+ *  \param          pvUser  Pointer to user data that is passed back to the application when cbProgress and cbConfirm are called. May be NULL for no user data
+ *  \return E_PRG_OK on success
+ */
+teStatus LIBPROGRAMMER ePRG_AesKeySet(tsPRG_Context *psContext, uint32_t au32Key[4], tcbFW_Progress cbProgress, tcbFW_Confirm cbConfirm, void *pvUser);
+
+
+/** Read userdata from the index sector of a connected JN516x device.
+ *  \param          psContext Pointer to programmer context
+ *  \param          u32Index Which user word of data to read
+ *  \param          au32Data Location to store data read from the device.
+ *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
+ *  \param          cbConfirm Callback routine to confirm operation. May be NULL.
+ *  \param          pvUser  Pointer to user data that is passed back to the application when cbProgress and cbConfirm are called. May be NULL for no user data
+ *  \return E_PRG_OK on success
+ */
+teStatus LIBPROGRAMMER ePRG_UserDataGet(tsPRG_Context *psContext, uint32_t u32Index, uint32_t au32Data[4], tcbFW_Progress cbProgress, tcbFW_Confirm cbConfirm, void *pvUser);
+
+
+/** Write new userdata into the index sector of a connected JN516x device.
+ *  During programming the library will call cbProgress periodically to update the caller with progress.
+ *  \param          psContext Pointer to programmer context
+ *  \param          u32Index Which user word of data to write
+ *  \param          au32Data Data to write into the device.
+ *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
+ *  \param          cbConfirm Callback routine to confirm operation. May not be NULL.
+ *  \param          pvUser  Pointer to user data that is passed back to the application when cbProgress and cbConfirm are called. May be NULL for no user data
+ *  \return E_PRG_OK on success
+ */
+teStatus LIBPROGRAMMER ePRG_UserDataSet(tsPRG_Context *psContext, uint32_t u32Index, uint32_t au32Data[4], tcbFW_Progress cbProgress, tcbFW_Confirm cbConfirm, void *pvUser);
+
+/** Set device configuration
+ *  \param          psContext Pointer to programmer context
+ *  \param          psDeviceConfig Pointer to new device configuration to be written to device
+ *  \param          cbProgress Callback routine to update operation progress. May be NULL for no feedback.
+ *  \param          cbConfirm Callback routine to confirm operation. May not be NULL.
+ *  \param          pvUser  Pointer to user data that is passed back to the application when cbProgress and cbConfirm are called. May be NULL for no user data
+ *  \return E_PRG_OK on success
+ */
+teStatus LIBPROGRAMMER ePRG_DeviceConfigSet(tsPRG_Context *psContext, tsDeviceConfig *psDeviceConfig, tcbFW_Progress cbProgress, tcbFW_Confirm cbConfirm, void *pvUser);
 
 
 /****************************************************************************/

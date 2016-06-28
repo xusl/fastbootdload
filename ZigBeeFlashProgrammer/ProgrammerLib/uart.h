@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- * MODULE:             Jennic Module Programmer
+ * MODULE:             JN51xx Programmer
  *
  * COMPONENT:          Serial port handling
  *

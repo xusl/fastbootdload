@@ -51,28 +51,28 @@
 /****************************************************************************/
 
 #include <stdio.h>
-//#include <stdint.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
 //#include <unistd.h>
+#include "portable_endian.h"
 
 #ifdef POSIX
 #include <arpa/inet.h>
 #include <sys/mman.h>
 #elif defined WIN32
-#include <Winsock2.h>
+#include <winsock2.h>
 #endif
 
-#include "windows.h"
 #include "programmer.h"
 
 #include "programmer_private.h"
-#include "log.h"
+#include "dbg.h"
 
-unsigned char binary_FlashProgrammerExtension_JN5168_bin_start;
+
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
@@ -109,24 +109,6 @@ typedef struct
 
 typedef struct
 {
-    uint8_t     u8ConfigByte0;
-    uint8_t     u8ConfigByte1;
-    uint16_t    u16SpiScrambleIndex;
-    uint32_t    u32TextStartAddress;
-    uint32_t    u32TextLength;
-    uint32_t    u32ROMVersion;
-    uint32_t    u32Unused1;
-    uint32_t    u32BssStartAddress;
-    uint32_t    u32BssLength;
-    uint32_t    u32WakeUpEntryPoint;
-    uint32_t    u32ResetEntryPoint;
-    uint8_t     au8OadData[12];
-    uint8_t     u8TextDataStart;
-}tsBL_BinHeaderV1;
-
-
-typedef struct
-{
     uint32_t    u32ROMVersion;
     uint32_t    au32BootImageRecord[4];
     uint32_t    au32MacAddress[2];
@@ -136,7 +118,7 @@ typedef struct
     uint32_t    u32WakeUpEntryPoint;
     uint32_t    u32ResetEntryPoint;
     uint8_t     u8TextDataStart;
-}tsBL_BinHeaderV2;
+}  tsBL_BinHeaderV2;
 
 
 /****************************************************************************/
@@ -194,7 +176,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
         return ePRG_SetStatus(psContext, E_PRG_FAILED_TO_OPEN_FILE, "\"%s\" (%s)", pcFirmwareFile, pcPRG_GetLastErrorMessage(psContext));
     }
     
-    LOGD("opened FD %d", psFwPriv->iFirmwareFD);
+    DBG_vPrintf(TRACE_FIRMWARE, "opened FD %d\n", psFwPriv->iFirmwareFD);
     
     if (fstat(psFwPriv->iFirmwareFD, &sb) == -1)
     {
@@ -202,19 +184,20 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
     }
     
     psFwPriv->u32FileSize = (uint32_t)sb.st_size;
+    DBG_vPrintf(TRACE_FIRMWARE, "Opened file size %d\n", psFwPriv->u32FileSize);
     
     psContext->sFirmwareInfo.u32ImageLength = psFwPriv->u32FileSize;
     
     /* Copy-on-write, changes are not written to the underlying file. */
     psFwPriv->pu8Firmware = mmap(NULL, psFwPriv->u32FileSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, psFwPriv->iFirmwareFD, 0);
-    LOGD("mapped file at %p", psFwPriv->pu8Firmware);
+    DBG_vPrintf(TRACE_FIRMWARE, "mapped file at %p\n", psFwPriv->pu8Firmware);
     
     if (psFwPriv->pu8Firmware == MAP_FAILED)
     {
         return ePRG_SetStatus(psContext, E_PRG_ERROR, "(%s)", pcPRG_GetLastErrorMessage(psContext));
     }
     
-    return ePRG_FwGetInfo(psContext, psFwPriv->pu8Firmware);
+    return ePRG_FwGetInfo(psContext, psFwPriv->pu8Firmware, psContext->sFirmwareInfo.u32ImageLength);
 }
 
 
@@ -235,13 +218,13 @@ teStatus ePRG_FwClose(tsPRG_Context *psContext)
     {
         if (psFwPriv->pu8Firmware)
         {
-            LOGD("unmapping file at %p", psFwPriv->pu8Firmware);
+            DBG_vPrintf(TRACE_FIRMWARE, "unmapping file at %p\n", psFwPriv->pu8Firmware);
             munmap(psFwPriv->pu8Firmware, psFwPriv->u32FileSize);
         }
 
         if (psFwPriv->iFirmwareFD)
         {
-            LOGD("closing FD %d", psFwPriv->iFirmwareFD);
+            DBG_vPrintf(TRACE_FIRMWARE, "closing FD %d\n", psFwPriv->iFirmwareFD);
             close(psFwPriv->iFirmwareFD);
         }
         
@@ -264,11 +247,11 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
     }
     psPriv = (tsPRG_PrivateContext *)psContext->pvPrivate;
  
-    LOGD("Opening file name \"%s\"", pcFirmwareFile);
+    DBG_vPrintf(TRACE_FIRMWARE, "Opening file name \"%s\"\n", pcFirmwareFile);
     
     if (psPriv->pvFwPrivate)
     {
-        LOGD("Closing existing file");
+        DBG_vPrintf(TRACE_FIRMWARE, "Closing existing file\n");
         if (ePRG_FwClose(psContext) != E_PRG_OK)
         {
             return ePRG_SetStatus(psContext, E_PRG_ERROR, "closing existing file");
@@ -282,7 +265,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
     }
     psPriv->pvFwPrivate = psFwPriv;
 
-    LOGD("Opening file name \"%s\"", pcFirmwareFile);
+    DBG_vPrintf(TRACE_FIRMWARE, "Opening file name \"%s\"\n", pcFirmwareFile);
     
     psFwPriv->hFile = CreateFile(pcFirmwareFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (psFwPriv->hFile == INVALID_HANDLE_VALUE)
@@ -299,7 +282,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
     
     psContext->sFirmwareInfo.u32ImageLength = (uint32_t)psFwPriv->dwFileSize;
     
-    LOGD("Opened file size %d", psFwPriv->dwFileSize);
+    DBG_vPrintf(TRACE_FIRMWARE, "Opened file size %d\n", psFwPriv->dwFileSize);
     
     psFwPriv->hMapping = CreateFileMapping(psFwPriv->hFile, NULL, PAGE_READONLY, 0, 0, NULL);
     
@@ -315,7 +298,7 @@ teStatus ePRG_FwOpen(tsPRG_Context *psContext, char *pcFirmwareFile)
         return ePRG_SetStatus(psContext, E_PRG_ERROR, "(%s)", pcPRG_GetLastErrorMessage(psContext));
     }
 
-    return ePRG_FwGetInfo(psContext, psFwPriv->pu8Firmware);
+    return ePRG_FwGetInfo(psContext, psFwPriv->pu8Firmware, psContext->sFirmwareInfo.u32ImageLength);
 }
 
 
@@ -334,21 +317,21 @@ teStatus ePRG_FwClose(tsPRG_Context *psContext)
     
     if (psFwPriv)
     {
-        if (psFwPriv->pu8Firmware)
+        if (psFwPriv->hFile != INVALID_HANDLE_VALUE)
         {
-            LOGD("unmapping file at %p", psFwPriv->pu8Firmware);
-            UnmapViewOfFile(psFwPriv->pu8Firmware);
-        }
-        
-        if (psFwPriv->hMapping != INVALID_HANDLE_VALUE)
-        {
-            LOGD("Closing mapping handle");
-            CloseHandle(psFwPriv->hMapping);
-        }
+            if (psFwPriv->hMapping != INVALID_HANDLE_VALUE)
+            {
+                if (psFwPriv->pu8Firmware)
+                {
+                    DBG_vPrintf(TRACE_FIRMWARE, "unmapping file at %p\n", psFwPriv->pu8Firmware);
+                    UnmapViewOfFile(psFwPriv->pu8Firmware);
+                }
 
-        if (psFwPriv->hFile)
-        {
-            LOGD("Closing file handle");
+                DBG_vPrintf(TRACE_FIRMWARE, "Closing mapping handle\n");
+                CloseHandle(psFwPriv->hMapping);
+            }
+
+            DBG_vPrintf(TRACE_FIRMWARE, "Closing file handle\n");
             CloseHandle(psFwPriv->hFile);
         }
         
@@ -361,7 +344,7 @@ teStatus ePRG_FwClose(tsPRG_Context *psContext)
 #endif /* POSIX */
 
 
-teStatus ePRG_FwGetInfo(tsPRG_Context *psContext, uint8_t *pu8Firmware)
+teStatus ePRG_FwGetInfo(tsPRG_Context *psContext, uint8_t *pu8Firmware, uint32_t u32Length)
 {
     tsBL_BinHeaderV2 *psHeader;
     
@@ -370,10 +353,12 @@ teStatus ePRG_FwGetInfo(tsPRG_Context *psContext, uint8_t *pu8Firmware)
         return E_PRG_NULL_PARAMETER;
     }
     
-    LOGD("Getting info on file at 0x%p", pu8Firmware);
+    DBG_vPrintf(TRACE_FIRMWARE, "Getting info on file at 0x%p\n", pu8Firmware);
     
     psHeader = (tsBL_BinHeaderV2 *)pu8Firmware;
-	
+    
+    psContext->sFirmwareInfo.u32ImageLength = u32Length;
+    
     // JN5148-J01 onwards uses multiimage bootloader - check for it's magic number.   
     if ((ntohl(psHeader->au32BootImageRecord[0]) == 0x12345678) &&
         (ntohl(psHeader->au32BootImageRecord[1]) == 0x11223344) &&
@@ -391,40 +376,129 @@ teStatus ePRG_FwGetInfo(tsPRG_Context *psContext, uint8_t *pu8Firmware)
         
         /* Pointer to and length of image for flash */
         psContext->sFirmwareInfo.pu8ImageData                 = (uint8_t*)&(psHeader->au32BootImageRecord[0]);
+        psContext->sFirmwareInfo.u32ImageLength              -= sizeof(psHeader->u32ROMVersion);
+        DBG_vPrintf(TRACE_FIRMWARE, "Image length: %d\n", psContext->sFirmwareInfo.u32ImageLength);
         
         psContext->sFirmwareInfo.u32MacAddressLocation        = 0x10;
         
         /* Pointer to text section in image for RAM */
         psContext->sFirmwareInfo.pu8TextData                  = &(psHeader->u8TextDataStart);
 
-        LOGD("Header size:           %d", sizeof(tsBL_BinHeaderV2));
-        LOGD("u32ROMVersion:         0x%08x", psContext->sFirmwareInfo.u32ROMVersion);
-        LOGD("u32DataSectionInfo:    0x%08x", ntohl(psHeader->u32DataSectionInfo));
-        LOGD("u32TextSectionLength:  0x%08x", (((ntohl(psHeader->u32DataSectionInfo)) & 0x0000FFFF) * 4));
+        /* Sanity check the image data */
+        if (psContext->sFirmwareInfo.u32TextSectionLength > u32Length)
+        {
+            /* The text section appears to be larger than the file */
+            DBG_vPrintf(TRACE_FIRMWARE, "Text section is larger (%d bytes) than file (%d bytes)\n", 
+                        psContext->sFirmwareInfo.u32TextSectionLength, u32Length);
+            return ePRG_SetStatus(psContext, E_PRG_INVALID_FILE, ", text section is larger than file");;
+        }
+        
+        DBG_vPrintf(TRACE_FIRMWARE, "Header size:           %d\n", sizeof(tsBL_BinHeaderV2));
+        DBG_vPrintf(TRACE_FIRMWARE, "u32ROMVersion:         0x%08x\n", psContext->sFirmwareInfo.u32ROMVersion);
+        DBG_vPrintf(TRACE_FIRMWARE, "u32DataSectionInfo:    0x%08x\n", ntohl(psHeader->u32DataSectionInfo));
+        DBG_vPrintf(TRACE_FIRMWARE, "u32TextSectionLength:  0x%08x\n", psContext->sFirmwareInfo.u32TextSectionLength);
+        
+        psContext->sFirmwareInfo.sFlags.bRawImage             = 0;
     }
-    else
+    // little endian - check for it's magic number
+    else if ((le32toh(psHeader->au32BootImageRecord[0]) == 0x12345678) &&
+             (le32toh(psHeader->au32BootImageRecord[1]) == 0x11223344) &&
+             (le32toh(psHeader->au32BootImageRecord[2]) == 0x55667788))
     {
-        tsBL_BinHeaderV1 *psHeader              = (tsBL_BinHeaderV1 *)pu8Firmware;
+        psContext->sFirmwareInfo.u32ROMVersion                = le32toh(psHeader->u32ROMVersion);
 
-        psContext->sFirmwareInfo.u32ROMVersion                = ntohl(psHeader->u32ROMVersion);
-        
-        psContext->sFirmwareInfo.u32TextSectionLoadAddress    = ntohl(psHeader->u32TextStartAddress);
-        psContext->sFirmwareInfo.u32TextSectionLength         = ntohl(psHeader->u32TextLength);
-        psContext->sFirmwareInfo.u32BssSectionLoadAddress     = ntohl(psHeader->u32BssStartAddress);
-        psContext->sFirmwareInfo.u32BssSectionLength          = ntohl(psHeader->u32BssLength);
-        
-        psContext->sFirmwareInfo.u32ResetEntryPoint           = psHeader->u32ResetEntryPoint;
-        psContext->sFirmwareInfo.u32WakeUpEntryPoint          = psHeader->u32WakeUpEntryPoint;
-        
+        // writing u16's as u32 and LE platform means we have to flip the read back order compared to JN516x
+        psContext->sFirmwareInfo.u32TextSectionLoadAddress    = 0x20000000 + (((le32toh(psHeader->u32DataSectionInfo)) & 0x0000FFFF) * 4);
+        psContext->sFirmwareInfo.u32TextSectionLength         = (((le32toh(psHeader->u32DataSectionInfo)) >> 16) * 4);
+
+        // writing u16's as u32 and LE platform means we have to flip the read back order compared to JN516x
+        psContext->sFirmwareInfo.u32BssSectionLoadAddress     = 0x20000000 + (((le32toh(psHeader->u32BssSectionInfo)) & 0x0000FFFF) * 4);
+        psContext->sFirmwareInfo.u32BssSectionLength          = (((le32toh(psHeader->u32BssSectionInfo)) >> 16) * 4);
+
+        psContext->sFirmwareInfo.u32ResetEntryPoint           = le32toh(psHeader->u32ResetEntryPoint);
+        psContext->sFirmwareInfo.u32WakeUpEntryPoint          = le32toh(psHeader->u32WakeUpEntryPoint);
+
         /* Pointer to and length of image for flash */
-        psContext->sFirmwareInfo.pu8ImageData                 = &(psHeader->u8ConfigByte0);
-        //psContext->sFirmwareInfo.u32ImageLength               = sizeof(tsBL_BinHeaderV1) + psContext->sFirmwareInfo.u32TextSectionLength;
-        
-        psContext->sFirmwareInfo.u32MacAddressLocation        = 0x30;
-        
+        psContext->sFirmwareInfo.pu8ImageData                 = (uint8_t*)&(psHeader->au32BootImageRecord[0]);
+        psContext->sFirmwareInfo.u32ImageLength              -= sizeof(psHeader->u32ROMVersion);
+        DBG_vPrintf(TRACE_FIRMWARE, "Image length: %d\n", psContext->sFirmwareInfo.u32ImageLength);
+
+        psContext->sFirmwareInfo.u32MacAddressLocation        = 0x10;
+
         /* Pointer to text section in image for RAM */
         psContext->sFirmwareInfo.pu8TextData                  = &(psHeader->u8TextDataStart);
+
+        /* Sanity check the image data */
+        if (psContext->sFirmwareInfo.u32TextSectionLength > u32Length)
+        {
+            /* The text section appears to be larger than the file */
+            DBG_vPrintf(TRACE_FIRMWARE, "Text section is larger (%d bytes) than file (%d bytes)\n",
+                        psContext->sFirmwareInfo.u32TextSectionLength, u32Length);
+            return ePRG_SetStatus(psContext, E_PRG_INVALID_FILE, ", text section is larger than file");;
+        }
+
+        DBG_vPrintf(TRACE_FIRMWARE, "Header size:               %d\n", sizeof(tsBL_BinHeaderV2));
+        DBG_vPrintf(TRACE_FIRMWARE, "u32TextSectionLoadAddress: 0x%08x\n", psContext->sFirmwareInfo.u32TextSectionLoadAddress);
+        DBG_vPrintf(TRACE_FIRMWARE, "u32TextSectionLength:      0x%08x\n", psContext->sFirmwareInfo.u32TextSectionLength);
+        DBG_vPrintf(TRACE_FIRMWARE, "u32ResetEntryPoint:        0x%08x\n", psContext->sFirmwareInfo.u32ResetEntryPoint);
+
+        DBG_vPrintf(TRACE_FIRMWARE, "u32ROMVersion:             0x%08x\n", psContext->sFirmwareInfo.u32ROMVersion);
+        DBG_vPrintf(TRACE_FIRMWARE, "u32DataSectionInfo:        0x%08x\n", le32toh(psHeader->u32DataSectionInfo));
         
+        psContext->sFirmwareInfo.sFlags.bRawImage             = 0;
+    }
+    // little endian - check for it's magic number
+    else if ((le32toh(psHeader->au32BootImageRecord[0]) == 0x12345678) &&
+             (le32toh(psHeader->au32BootImageRecord[1]) == 0x22334455) &&
+             (le32toh(psHeader->au32BootImageRecord[2]) == 0x66778899))
+    {
+        psContext->sFirmwareInfo.u32ROMVersion                = le32toh(psHeader->u32ROMVersion);
+
+        // writing u16's as u32 and LE platform means we have to flip the read back order compared to JN516x
+        psContext->sFirmwareInfo.u32TextSectionLoadAddress    = 0x20000000 + (((le32toh(psHeader->u32DataSectionInfo)) & 0x0000FFFF) * 4);
+        psContext->sFirmwareInfo.u32TextSectionLength         = (((le32toh(psHeader->u32DataSectionInfo)) >> 16) * 4);
+
+        // writing u16's as u32 and LE platform means we have to flip the read back order compared to JN516x
+        psContext->sFirmwareInfo.u32BssSectionLoadAddress     = 0x20000000 + (((le32toh(psHeader->u32BssSectionInfo)) & 0x0000FFFF) * 4);
+        psContext->sFirmwareInfo.u32BssSectionLength          = (((le32toh(psHeader->u32BssSectionInfo)) >> 16) * 4);
+
+        psContext->sFirmwareInfo.u32ResetEntryPoint           = le32toh(psHeader->u32ResetEntryPoint);
+        psContext->sFirmwareInfo.u32WakeUpEntryPoint          = le32toh(psHeader->u32WakeUpEntryPoint);
+
+        /* Pointer to and length of image for flash */
+        psContext->sFirmwareInfo.pu8ImageData                 = pu8Firmware;
+        DBG_vPrintf(TRACE_FIRMWARE, "Image length: %d\n", psContext->sFirmwareInfo.u32ImageLength);
+
+        psContext->sFirmwareInfo.u32MacAddressLocation        = 0x14;
+
+        /* Pointer to text section in image for RAM */
+        psContext->sFirmwareInfo.pu8TextData                  = &(psHeader->u8TextDataStart);
+
+        /* Sanity check the image data */
+        if (psContext->sFirmwareInfo.u32TextSectionLength > u32Length)
+        {
+            /* The text section appears to be larger than the file */
+            DBG_vPrintf(TRACE_FIRMWARE, "Text section is larger (%d bytes) than file (%d bytes)\n",
+                        psContext->sFirmwareInfo.u32TextSectionLength, u32Length);
+            return ePRG_SetStatus(psContext, E_PRG_INVALID_FILE, ", text section is larger than file");;
+        }
+
+        DBG_vPrintf(TRACE_FIRMWARE, "Header size:               %d\n", sizeof(tsBL_BinHeaderV2));
+        DBG_vPrintf(TRACE_FIRMWARE, "u32TextSectionLoadAddress: 0x%08x\n", psContext->sFirmwareInfo.u32TextSectionLoadAddress);
+        DBG_vPrintf(TRACE_FIRMWARE, "u32TextSectionLength:      0x%08x\n", psContext->sFirmwareInfo.u32TextSectionLength);
+        DBG_vPrintf(TRACE_FIRMWARE, "u32ResetEntryPoint:        0x%08x\n", psContext->sFirmwareInfo.u32ResetEntryPoint);
+
+        DBG_vPrintf(TRACE_FIRMWARE, "u32ROMVersion:             0x%08x\n", psContext->sFirmwareInfo.u32ROMVersion);
+        DBG_vPrintf(TRACE_FIRMWARE, "u32DataSectionInfo:        0x%08x\n", le32toh(psHeader->u32DataSectionInfo));
+        
+        psContext->sFirmwareInfo.sFlags.bRawImage             = 0;
+    }
+    else // Not a valid image, assume we will program it raw.
+    {
+        /* Pointer to and length of image for flash */
+        psContext->sFirmwareInfo.pu8ImageData                 = pu8Firmware;
+        psContext->sFirmwareInfo.sFlags.bRawImage             = 1;
+        DBG_vPrintf(TRACE_FIRMWARE, "Firmware file not recognised as valid image - programming raw\n");
     }
     
     return ePRG_SetStatus(psContext, E_PRG_OK, "");

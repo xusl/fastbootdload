@@ -1,8 +1,8 @@
 /****************************************************************************
  *
- * MODULE:             JN51xx Programmer
+ * MODULE:             DeviceConfig.h
  *
- * COMPONENT:          Private library data
+ * COMPONENT:          $RCSfile: Firmware.c,v $
  *
  * VERSION:            $Name:  $
  *
@@ -46,62 +46,59 @@
  *
  ***************************************************************************/
 
-#ifndef  PROGRAMMER_PRIVATE_H_INCLUDED
-#define  PROGRAMMER_PRIVATE_H_INCLUDED
+#ifndef  DEVICECONFIG_H_INCLUDED 
+#define  DEVICECONFIG_H_INCLUDED 
 
 #if defined __cplusplus
 extern "C" {
 #endif
 
 /****************************************************************************/
-/***        Include Files                                                 ***/
+/***        Include files                                                 ***/
 /****************************************************************************/
+
+#include "programmer.h"
 
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
 
-#define PRG_MAX_STATUS_LENGTH 1024
-
 /****************************************************************************/
 /***        Type Definitions                                              ***/
 /****************************************************************************/
 
-typedef struct
-{
-    tsConnection    sConnection;
-    uint32_t        u32SelectedFlash;
-    char            acStatusMessage[PRG_MAX_STATUS_LENGTH];
-    char            acErrorMsgBuffer[PRG_MAX_STATUS_LENGTH];
-    void           *pvFwPrivate;
-    
-    uint8_t        *pu8FlashProgrammerExtensionStart;
-    uint32_t        u32FlashProgrammerExtensionLength;
+/****************************************************************************/
+/***        Local Function Prototypes                                     ***/
+/****************************************************************************/
 
-    uint32_t        u32BootloaderEntry;
-} tsPRG_PrivateContext;
+/****************************************************************************/
+/***        Exported Variables                                            ***/
+/****************************************************************************/
+
+/****************************************************************************/
+/***        Local Variables                                               ***/
+/****************************************************************************/
 
 /****************************************************************************/
 /***        Exported Functions                                            ***/
 /****************************************************************************/
 
-teStatus ePRG_SetStatus(tsPRG_Context *psContext, teStatus eStatus, const char *pcAdditionalInfoFmt, ...);
-void vPRG_WaitMs(uint32_t u32TimeoutMs);
-
-
-char *pcPRG_GetLastErrorMessage(tsPRG_Context *psContext);
-
+teStatus eDeviceConfigFromString(char *pcOptionString, tsDeviceConfig *psConfig);
+teStatus eDeviceConfigToString(char **ppcOptionString, tsDeviceConfig *psConfig);
 
 /****************************************************************************/
-/***        Exported Variables                                            ***/
+/***        Local Functions                                               ***/
 /****************************************************************************/
 
 #if defined __cplusplus
 }
 #endif
 
-#endif  /* PROGRAMMER_PRIVATE_H_INCLUDED */
+#endif  /* DEVICECONFIG_H_INCLUDED */
 
 /****************************************************************************/
 /***        END OF FILE                                                   ***/
 /****************************************************************************/
+
+
+

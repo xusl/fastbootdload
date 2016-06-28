@@ -14,6 +14,7 @@
 #include "LifeSensorFlashProgrammerDlg.h"
 #include "ChipID.h"
 #include "programmer.h"
+#include "DeviceConfig.h"
 #include "log.h"
 #include <initguid.h>
 #include <winioctl.h>
@@ -36,18 +37,17 @@ const char *Version = "1.0 (r" VERSION ")";
 
 //    int             iThreadNum;
 //    int             iThreadTotal;
+#define VERBOSITY_DEFAULT 1
 
 unsigned char MAC_ADDR[8] = {0x00, 0x00 ,0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 unsigned char MAC_UI[8] = {0x00, 0x00 ,0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-typedef struct
-{
+
+typedef struct {
     const char*     pcFirmwareFile;
+    const char*     pcDumpFlashFile;
     teEepromErase   eEepromErase;
     const char*     pcLoadEEPROMFile;
-
-    unsigned char*  pcMAC_Address;
-  //  uint64_t        u64MAC_Address;
-
+    uint8_t*        au8MacAddress;
     int             iInitialSpeed;
     int             iProgramSpeed;
     int             iVerify;
@@ -56,22 +56,52 @@ typedef struct
     HANDLE          hThread;
     LifeSensorFlashProgrammerDlg *hProgrammerDlg;
     int            bWriteMACAddress;
+
+    uint32_t        u32FlashOffset;
+    uint32_t        u32EepromOffset;
+
+    uint32_t        u32FlashIndex;
+    uint32_t        u32ConnectionNum;
+    teStatus        eStatus;
+    uint32_t*       pu32AesKeyGet;
+    uint32_t*       pu32AesKeySet;
+
+    uint32_t*       apu32UserDataGet[3];    /**< 3 lots of 128 bits of user data for loading from index sector */
+    uint32_t*       apu32UserDataSet[3];    /**< 3 lots of 128 bits of user data for programming into index sector */
+    tsDeviceConfig* psDeviceConfigGet;
+    tsDeviceConfig* psDeviceConfigSet;
 } tsProgramThreadArgs;
 
 static tsProgramThreadArgs sProgramThreadArgs = {
     "FLASH",
+    NULL,
     E_ERASE_EEPROM_NONE, //E_ERASE_EEPROM_ALL,//erase eeprom   //modify by xusl 06.24
     NULL,
-    NULL,  //pcMAC_Address
+    NULL,  //au8MacAddress
     38400,
     1000000,
     1,  //flash verify
     0,
-	E_CONNECT_SERIAL, //sConnection
+	{E_CONNECT_SERIAL}, //sConnection
 	NULL,
 	NULL,    //hProgrammerDlg
 	TRUE
 };
+
+#if 0
+sProgramThreadArgs.eStatus = E_PRG_OK;
+sProgramThreadArgs.pcFirmwareFile     = NULL;
+sProgramThreadArgs.eEepromErase       = E_ERASE_EEPROM_ALL;
+sProgramThreadArgs.iInitialSpeed      = 38400;
+    sProgramThreadArgs.iProgramSpeed      = 1000000;
+    sProgramThreadArgs.iVerify            = 0;
+    sProgramThreadArgs.iVerbosity         = VERBOSITY_DEFAULT;
+    sProgramThreadArgs.iForce             = 0;
+    sProgramThreadArgs.u32FlashIndex      = 0;
+     sProgramThreadArgs.psDeviceConfigGet = (tsDeviceConfig*)1;
+sProgramThreadArgs.pu32AesKeyGet = (uint32_t*)1;
+sProgramThreadArgs.apu32UserDataGet[0] = (uint32_t*)1;
+#endif
 
 static DWORD dwProgramThread(void* pvData);
 void AddProgrammedDevicesCount();
@@ -86,87 +116,6 @@ CRITICAL_SECTION gMacAddressSection;
 
 #define COLOR_RED 0x0000FF
 #define COLOR_BLUE 0xFF0000
-
-/** Import binary data from FlashProgrammerExtension_JN5168.bin */
-int _binary_FlashProgrammerExtension_JN5168_bin_start;
-int _binary_FlashProgrammerExtension_JN5168_bin_size;
-int _binary_FlashProgrammerExtension_JN5169_bin_start;
-int _binary_FlashProgrammerExtension_JN5169_bin_size;
-int _binary_FlashProgrammerExtension_JN5179_bin_start;
-int _binary_FlashProgrammerExtension_JN5179_bin_size;
-
-char * flashExtension = NULL;
-
-static int importExtension( char * file, int * start, int * size ) {
-    size_t bytestoread = 0;
-
-    FILE* fp = NULL;
-    int bytesread;
-    if ( ( fp = fopen(file,"r") ) <= 0 ) {
-        LOGE("open %s failed", file);
-        return 0;
-    }
-
-    fseek( fp, 0L, SEEK_END );
-    bytestoread =ftell(fp);
-    fseek( fp, 0L, SEEK_SET );
-
-    if ( ( flashExtension = (char *)malloc(bytestoread + 100 ) ) == NULL ) {
-        perror("malloc");
-        return 0;
-    }
-
-    char * pbuf = flashExtension;
-    while ( !feof(fp)) {
-        if ( ( bytesread = fread( pbuf, bytestoread, 1, fp) ) < 0 ) {
-            break;
-        }
-        //bytestoread -= bytesread;
-        pbuf += bytesread;
-        }
-    fclose(fp);
-        *start = (int)flashExtension;
-        *size  = bytestoread;
-        printf( "Loaded binary of %d bytes\n", *size );
-        return 1;
-
-}
-
-//#define IOT_EXTENSION_PATH "/usr/share/iot"
-#define IOT_EXTENSION_PATH "."
-static teStatus ePRG_ImportExtension(tsPRG_Context *psContext)
-{
-    int ret = 0;
-    switch (CHIP_ID_PART(psContext->sChipDetails.u32ChipId))
-    {
-        case (CHIP_ID_PART(CHIP_ID_JN5168)):
-            ret = importExtension( IOT_EXTENSION_PATH "/FlashProgrammerExtension_JN5168.bin",
-                &_binary_FlashProgrammerExtension_JN5168_bin_start,
-                &_binary_FlashProgrammerExtension_JN5168_bin_size );
-            psContext->pu8FlashProgrammerExtensionStart    = (uint8_t *)_binary_FlashProgrammerExtension_JN5168_bin_start;
-            psContext->u32FlashProgrammerExtensionLength   = (uint32_t)_binary_FlashProgrammerExtension_JN5168_bin_size;
-            break;
-        case (CHIP_ID_PART(CHIP_ID_JN5169)):
-            ret = importExtension( IOT_EXTENSION_PATH "/FlashProgrammerExtension_JN5169.bin",
-                &_binary_FlashProgrammerExtension_JN5169_bin_start,
-                &_binary_FlashProgrammerExtension_JN5169_bin_size );
-            psContext->pu8FlashProgrammerExtensionStart    = (uint8_t *)_binary_FlashProgrammerExtension_JN5169_bin_start;
-            psContext->u32FlashProgrammerExtensionLength   = (uint32_t)_binary_FlashProgrammerExtension_JN5169_bin_size;
-            break;
-        case (CHIP_ID_PART(CHIP_ID_JN5179)):
-            ret = importExtension( IOT_EXTENSION_PATH "/FlashProgrammerExtension_JN5179.bin",
-                &_binary_FlashProgrammerExtension_JN5179_bin_start,
-                &_binary_FlashProgrammerExtension_JN5179_bin_size );
-            psContext->pu8FlashProgrammerExtensionStart    = (uint8_t *)_binary_FlashProgrammerExtension_JN5179_bin_start;
-            psContext->u32FlashProgrammerExtensionLength   = (uint32_t)_binary_FlashProgrammerExtension_JN5179_bin_size;
-            break;
-    }
-    if ( ret ) {
-        return E_PRG_OK;
-    }
-
-    return E_PRG_ERROR;
-}
 
 /////////////////////////////////////////////////////////////////////////////
 // CAboutDlg dialog used for App About
@@ -399,7 +348,7 @@ teStatus HandleProgrammerError(tsProgramThreadArgs *psArgs , int error)
 }
 
 
-teStatus cbProgress(void *pvUser, const char *pcTitle, const char *pcText, int iNumSteps, int iProgress)
+teStatus cbUI_Progress(void *pvUser, const char *pcTitle, const char *pcText, int iNumSteps, int iProgress)
 {
     tsProgramThreadArgs *psArgs = (tsProgramThreadArgs *)pvUser;
 
@@ -418,7 +367,7 @@ teStatus cbProgress(void *pvUser, const char *pcTitle, const char *pcText, int i
     return E_PRG_OK;
 }
 
-teStatus cbConfirm(void *pvUser, const char *pcTitle, const char *pcText)
+teStatus cbUI_Confirm(void *pvUser, const char *pcTitle, const char *pcText)
 {
     CString msg = pcTitle;
     msg += "\n";
@@ -432,6 +381,52 @@ teStatus cbConfirm(void *pvUser, const char *pcTitle, const char *pcText)
 
     return E_PRG_ABORTED;
 }
+
+void vUI_UpdateStatus(tsProgramThreadArgs *psThreadArgs, const char *pcFmt, ...)
+{
+    va_list vl;
+
+  //  LOGE(pcFmt, vl);
+
+    va_start(vl, pcFmt);
+    va_end(vl);
+}
+
+void vUI_UpdateDeviceInfo(tsProgramThreadArgs *psThreadArgs, tsChipDetails *psChipDetails)
+{
+#if 0
+    tsFeedbackEvent *psEvent = malloc(sizeof(tsFeedbackEvent));
+
+    if (psEvent)
+    {
+        char acMacAddress[24];
+        sprintf(acMacAddress, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+                psChipDetails->au8MacAddress[0] & 0xFF, psChipDetails->au8MacAddress[1] & 0xFF,
+                psChipDetails->au8MacAddress[2] & 0xFF, psChipDetails->au8MacAddress[3] & 0xFF,
+                psChipDetails->au8MacAddress[4] & 0xFF, psChipDetails->au8MacAddress[5] & 0xFF,
+                psChipDetails->au8MacAddress[6] & 0xFF, psChipDetails->au8MacAddress[7] & 0xFF);
+
+        psEvent->eType                              = E_FB_DEVICEINFO;
+        psEvent->u32ConnectionNum                   = psThreadArgs->u32ConnectionNum;
+        psEvent->uData.sDeviceInfo.u32ChipId        = psChipDetails->u32ChipId;
+        psEvent->uData.sDeviceInfo.u32Bootloader    = psChipDetails->u32BootloaderVersion;
+        psEvent->uData.sDeviceInfo.pcChipName       = strdup(psChipDetails->pcChipName);
+        psEvent->uData.sDeviceInfo.pcMAC_Address    = strdup(acMacAddress);
+
+        if (eUtils_QueueQueue(&sFeedbackThreadData.sFeedbackQueue, psEvent) == E_UTILS_OK)
+        {
+            return;
+        }
+    }
+
+    fprintf(stderr, "Error queueing feedback\n");
+    free(psEvent->uData.sDeviceInfo.pcChipName);
+    free(psEvent->uData.sDeviceInfo.pcMAC_Address);
+    free(psEvent);
+#endif
+    return;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////
 void AddProgrammedDevicesCount() {
             EnterCriticalSection(&m_ProgrammerCountSection);
@@ -546,7 +541,7 @@ BOOL LifeSensorFlashProgrammerDlg::HandleComDevice(VOID) {
 
     for (i = 0; i < u32NumConnections; i++) {
         CRect rect;
-        rect.left = 30 + 150 * floor(float(i / 13));
+        rect.left = LONG(30 + 150 * floor(float(i / 13)));
         rect.bottom = 40 + (i % 13)*20;
         rect.top = rect.bottom - 20;
         rect.right = rect.left + 170;
@@ -602,9 +597,9 @@ DWORD LifeSensorFlashProgrammerDlg::ScheduleProgrammer() {
         }
 
         if(m_mac_en.GetCheck() == TRUE)
-            asThreads[i].pcMAC_Address = MAC_ADDR;
+            asThreads[i].au8MacAddress = MAC_ADDR;
         else
-            asThreads[i].pcMAC_Address = NULL;
+            asThreads[i].au8MacAddress = NULL;
 
         asThreads[i].bWriteMACAddress = m_mac_en.GetCheck();
 
@@ -642,6 +637,7 @@ static DWORD dwProgramThread(void *pvData)
     if (ePRG_Init(&sContext) != E_PRG_OK)
     {
 		error = COMPortNotRespond;
+        LOGE("Error initialising context");
         goto ERROR;
     }
 
@@ -649,60 +645,188 @@ static DWORD dwProgramThread(void *pvData)
     {
         case (E_CONNECT_SERIAL):
             psArgs->sConnection.uDetails.sSerial.u32BaudRate = psArgs->iInitialSpeed;
-			break;
+            break;
 
         default:
             break;
     }
 
-    if (ePRG_ConnectionOpen(&sContext, &psArgs->sConnection) != E_PRG_OK)
+    /* Set the offsets for flash/eeprom operations */
+    sContext.u32FlashOffset     = psArgs->u32FlashOffset;
+    sContext.u32EepromOffset    = psArgs->u32EepromOffset;
+
+    if ((psArgs->eStatus = ePRG_ConnectionOpen(&sContext, &psArgs->sConnection)) != E_PRG_OK)
     {
+        vUI_UpdateStatus(psArgs, "Error opening connection: %s", pcPRG_GetLastStatusMessage(&sContext));
 		error = COMPortNotRespond;
         ePRG_Destroy(&sContext);
         goto ERROR;
     }
 
-	if (ePRG_ChipGetDetails(&sContext) != E_PRG_OK)
+    /* Read module details at initial baud rate */
+    if ((psArgs->eStatus = ePRG_ChipGetDetails(&sContext)) != E_PRG_OK)
     {
+        vUI_UpdateStatus(psArgs, "Error: %s - check cabling and power", pcPRG_GetLastStatusMessage(&sContext));
 		error = COMPortNotRespond;
-    	goto done;
+    	goto ERROR;
 	}
+
+    vUI_UpdateDeviceInfo(psArgs, &sContext.sChipDetails);
+
     if (psArgs->iInitialSpeed != psArgs->iProgramSpeed)
     {
+        if (psArgs->iVerbosity > 2)
+        {
+            vUI_UpdateStatus(psArgs, "Setting baudrate: %d", psArgs->iProgramSpeed);
+        }
+
         psArgs->sConnection.uDetails.sSerial.u32BaudRate = psArgs->iProgramSpeed;
 
-        if (ePRG_ConnectionUpdate(&sContext, &psArgs->sConnection) != E_PRG_OK)
+        if ((psArgs->eStatus = ePRG_ConnectionUpdate(&sContext, &psArgs->sConnection)) != E_PRG_OK)
         {
-			error = COMPortNotRespond;
-            goto ERROR;
+            vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+    		goto ERROR;
         }
+    }
+
+    if (psArgs->u32FlashIndex)
+    {
+        /* Select non-default flash index */
+        if ((psArgs->eStatus = ePRG_FlashSelectDevice(&sContext, psArgs->u32FlashIndex)) != E_PRG_OK)
+        {
+            vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+            goto done;
+        }
+        vUI_UpdateStatus(psArgs, "Selected flash: %s", sContext.sChipDetails.asFlashes[psArgs->u32FlashIndex].pcFlashName);
+    }
+
+    if (psArgs->au8MacAddress)
+    {
+        /* Set new MAC Address - On 4x devices just set it in the app header. On 6x, write to flash index sector */
+        if ((psArgs->eStatus = ePRG_MACAddressSet(&sContext, psArgs->au8MacAddress, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+        {
+            vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+            goto done;
+        }
+        vUI_UpdateStatus(psArgs, "MAC address updated");
+    }
+
+    if (psArgs->pu32AesKeySet)
+    {
+        if ((psArgs->eStatus = ePRG_AesKeySet(&sContext, psArgs->pu32AesKeySet, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+        {
+            vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+            goto done;
+        }
+        vUI_UpdateStatus(psArgs, "AES Key updated");
+    }
+
+    if (psArgs->pu32AesKeyGet)
+    {
+        uint32_t au32AesKeyGet[4];
+        if ((psArgs->eStatus = ePRG_AesKeyGet(&sContext, au32AesKeyGet, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+        {
+            vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+            goto done;
+        }
+        vUI_UpdateStatus(psArgs, "AES Key: 0x%08X%08X%08X%08X",
+                         au32AesKeyGet[0], au32AesKeyGet[1], au32AesKeyGet[2], au32AesKeyGet[3]);
+    }
+
+    {
+        int i;
+        for (i = 0; i < 3; i++)
+        {
+            uint32_t au32UserDataGet[4];
+
+            if (psArgs->apu32UserDataSet[i])
+            {
+                if ((psArgs->eStatus = ePRG_UserDataSet(&sContext, i, psArgs->apu32UserDataSet[i], cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+                {
+                    vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+                    goto done;
+                }
+                vUI_UpdateStatus(psArgs, "User data word %d updated", i);
+            }
+
+            if (psArgs->apu32UserDataGet[i])
+            {
+                if ((psArgs->eStatus = ePRG_UserDataGet(&sContext, i, au32UserDataGet, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+                {
+                    vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+                    goto done;
+                }
+                vUI_UpdateStatus(psArgs, "User data word %d: 0x%08X%08X%08X%08X", i,
+                                 au32UserDataGet[0], au32UserDataGet[1], au32UserDataGet[2], au32UserDataGet[3]);
+            }
+        }
+    }
+
+    if (psArgs->psDeviceConfigSet)
+    {
+        vUI_UpdateStatus(psArgs, "Setting device configuration");
+
+        if ((psArgs->eStatus = ePRG_DeviceConfigSet(&sContext, psArgs->psDeviceConfigSet, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+        {
+            vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+            goto done;
+        }
+
+        if (psArgs->iVerbosity > 0)
+        {
+            char *pcBuffer = NULL;
+            if ((psArgs->eStatus = eDeviceConfigToString(&pcBuffer, &sContext.sDeviceConfig)) != E_PRG_OK)
+            {
+                goto done;
+            }
+            vUI_UpdateStatus(psArgs, "Device configuration set to: %s", pcBuffer);
+            free(pcBuffer);
+        }
+        else
+        {
+            vUI_UpdateStatus(psArgs, "Device configured successfully");
+        }
+    }
+
+    if (psArgs->psDeviceConfigGet)
+    {
+        /* Device config is always read by ePRG_ChipGetDetails */
+        char *pcBuffer = NULL;
+        if (eDeviceConfigToString(&pcBuffer, &sContext.sDeviceConfig) != E_PRG_OK)
+        {
+            goto done;
+        }
+        vUI_UpdateStatus(psArgs, "Device configuration: %s", pcBuffer);
+        free(pcBuffer);
     }
 
     if (psArgs->pcFirmwareFile)
     {
         /* Have file to program */
-		//if (ePRG_FwOpen(&sContext, "C:\\flashfile.bin") != E_PRG_OK)
         //if (ePRG_FwOpen(&sContext, (char *)psArgs->pcFirmwareFile) != E_PRG_OK)
 		if (ePRG_FwOpen(&sContext, FlashFilePath) != E_PRG_OK)
         {
-			error = FlashFileError;
+            vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
             goto done;
         }
 
-        if (ePRG_FlashProgram(&sContext, cbProgress, cbConfirm, psArgs) != E_PRG_OK)
+        vUI_UpdateStatus(psArgs, "Programming %s", sContext.sChipDetails.asFlashes[psArgs->u32FlashIndex].pcFlashName);
+        if ((psArgs->eStatus = ePRG_FlashProgram(&sContext, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
         {
-			error = FlashFileError;
+            vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
             goto done;
         }
+        vUI_UpdateStatus(psArgs, "Flash programmed successfully");
 
         if (psArgs->iVerify)
         {
-            printf("Verifying\n");
-            if (ePRG_FlashVerify(&sContext, cbProgress, psArgs) != E_PRG_OK)
+            vUI_UpdateStatus(psArgs, "Verifying %s", sContext.sChipDetails.asFlashes[psArgs->u32FlashIndex].pcFlashName);
+            if ((psArgs->eStatus = ePRG_FlashVerify(&sContext, cbUI_Progress, psArgs)) != E_PRG_OK)
             {
-				error = FlashVerificationError;
+                vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
                 goto done;
             }
+            vUI_UpdateStatus(psArgs, "Flash verified successfully");
         }
     }
 	else
@@ -711,23 +835,62 @@ static DWORD dwProgramThread(void *pvData)
         goto done;
 	}
 
-
-    if (psArgs->eEepromErase != E_ERASE_EEPROM_NONE)
+    if (psArgs->pcDumpFlashFile)
     {
-    if ( ePRG_ImportExtension(&sContext) != E_PRG_OK ) {
-			error = EepromEraseError;
-            goto ERROR;
-    }
-        if (ePRG_EepromErase(&sContext, psArgs->eEepromErase, cbProgress, psArgs) != E_PRG_OK)
+        const char *pcExt = NULL;
+        char acDumpFlashFile[1024] = "";
+
+        pcExt = strrchr(psArgs->pcDumpFlashFile, '.');
+        if (!pcExt)
         {
-			error = EepromEraseError;
-            goto ERROR;
+            vUI_UpdateStatus(psArgs, "Dump file has no extenstion (%s)", psArgs->pcDumpFlashFile);
+            goto done;
+        }
+        else
+        {
+            int iFileNameLength = pcExt - psArgs->pcDumpFlashFile;
+            memcpy(acDumpFlashFile, psArgs->pcDumpFlashFile, iFileNameLength);
+            sprintf(&acDumpFlashFile[iFileNameLength], "_%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X%s",
+                sContext.sChipDetails.au8MacAddress[0] & 0xFF, sContext.sChipDetails.au8MacAddress[1] & 0xFF,
+                sContext.sChipDetails.au8MacAddress[2] & 0xFF, sContext.sChipDetails.au8MacAddress[3] & 0xFF,
+                sContext.sChipDetails.au8MacAddress[4] & 0xFF, sContext.sChipDetails.au8MacAddress[5] & 0xFF,
+                sContext.sChipDetails.au8MacAddress[6] & 0xFF, sContext.sChipDetails.au8MacAddress[7] & 0xFF,
+                pcExt);
+
+            vUI_UpdateStatus(psArgs, "Dumping %s into file %s", sContext.sChipDetails.asFlashes[psArgs->u32FlashIndex].pcFlashName, acDumpFlashFile);
+
+            if ((psArgs->eStatus = ePRG_FlashDump(&sContext, acDumpFlashFile, cbUI_Progress, psArgs)) != E_PRG_OK)
+            {
+                vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+                goto done;
+            }
+            vUI_UpdateStatus(psArgs, "Flash dumped successfully");
         }
     }
 
-	if (psArgs->pcMAC_Address!= NULL)
+    if (psArgs->eEepromErase != E_ERASE_EEPROM_NONE)
     {
-        if (ePRG_MACAddressSet(&sContext, psArgs->pcMAC_Address, cbProgress,cbConfirm, psArgs) != E_PRG_OK)
+        if ((psArgs->eStatus = ePRG_EepromErase(&sContext, psArgs->eEepromErase, cbUI_Progress, psArgs)) != E_PRG_OK)
+        {
+            vUI_UpdateStatus(psArgs, "Error erasing EEPROM: %s", pcPRG_GetLastStatusMessage(&sContext));
+            goto done;
+        }
+        vUI_UpdateStatus(psArgs, "EEPROM erased successfully");
+    }
+
+    if (psArgs->pcLoadEEPROMFile)
+    {
+        if ((psArgs->eStatus = ePRG_EepromProgram(&sContext, (char*)psArgs->pcLoadEEPROMFile, cbUI_Progress, psArgs)) != E_PRG_OK)
+        {
+            vUI_UpdateStatus(psArgs, "Error loading EEPROM: %s", pcPRG_GetLastStatusMessage(&sContext));
+            goto done;
+        }
+        vUI_UpdateStatus(psArgs, "EEPROM loaded successfully");
+    }
+
+	if (psArgs->au8MacAddress!= NULL)
+    {
+        if (ePRG_MACAddressSet(&sContext, psArgs->au8MacAddress, cbUI_Progress,cbUI_Confirm, psArgs) != E_PRG_OK)
         {
 			error = MACprogrammingError;
             goto ERROR;
@@ -735,19 +898,19 @@ static DWORD dwProgramThread(void *pvData)
     }
 
 done:
-    //if (psArgs->iInitialSpeed != psArgs->iProgramSpeed)
+    if (psArgs->iInitialSpeed != psArgs->iProgramSpeed)
     {
-        if (psArgs->iVerbosity > 1)
+        if (psArgs->iVerbosity > 2)
         {
-            printf("Setting baudrate: %d\n", psArgs->iInitialSpeed);
+            vUI_UpdateStatus(psArgs, "Setting baudrate: %d", psArgs->iInitialSpeed);
         }
 
         psArgs->sConnection.uDetails.sSerial.u32BaudRate = psArgs->iInitialSpeed;
 
         if (ePRG_ConnectionUpdate(&sContext, &psArgs->sConnection) != E_PRG_OK)
         {
-        //  printf("Error: %s\n", pcPRG_GetLastStatusMessage(&sContext));
-        //  printf("Error setting baudrate - check cabling and power\n");
+            vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
+            vUI_UpdateStatus(psArgs, "Error setting baudrate - check cabling and power");
             ePRG_ConnectionClose(&sContext);
             ePRG_Destroy(&sContext);
 			goto ERROR;
