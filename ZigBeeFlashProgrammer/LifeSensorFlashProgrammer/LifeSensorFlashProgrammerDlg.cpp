@@ -106,7 +106,7 @@ sProgramThreadArgs.apu32UserDataGet[0] = (uint32_t*)1;
 static DWORD dwProgramThread(void* pvData);
 void AddProgrammedDevicesCount();
 
-char *FlashFilePath = "F:\\fastbootdload\\ZigBeeFlashProgrammer\\LifeSensorFlashProgrammer\\ZONE_JN5169_DR1199_CSW.bin";// NULL;
+char *FlashFilePath = "ZONE_JN5169_DR1199_CSW.bin";// NULL;
 tsConnection    *asConnections     = NULL;
 tsProgramThreadArgs *asThreads      = NULL;
 uint32_t        u32NumConnections   = 0;

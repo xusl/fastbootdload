@@ -60,6 +60,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <io.h>
+#include <stdio.h>
 
 
 #if defined WIN32
@@ -222,7 +224,7 @@ extern int _binary_FlashProgrammerExtension_JN5168_bin_end;
 #define FLASHPROGRAMMEREXTENSION_JN5168_BIN_START  ((uint8_t *)    &_binary_FlashProgrammerExtension_JN5168_bin_start)
 #define FLASHPROGRAMMEREXTENSION_JN5168_BIN_END    ((uint8_t *)    &_binary_FlashProgrammerExtension_JN5168_bin_end)
 #elif defined WIN32
-int binary_FlashProgrammerExtension_JN5168_bin_start = NULL;
+int binary_FlashProgrammerExtension_JN5168_bin_start = 0;
 int binary_FlashProgrammerExtension_JN5168_bin_end = NULL;
 #define FLASHPROGRAMMEREXTENSION_JN5168_BIN_START  ((uint8_t *)    &binary_FlashProgrammerExtension_JN5168_bin_start)
 #define FLASHPROGRAMMEREXTENSION_JN5168_BIN_END    ((uint8_t *)    &binary_FlashProgrammerExtension_JN5168_bin_end)
@@ -894,7 +896,7 @@ teStatus ePRG_FlashVerify(tsPRG_Context *psContext, tcbFW_Progress cbProgress, v
 
 teStatus LIBPROGRAMMER ePRG_FlashDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progress cbProgress, void *pvUser)
 {
-    FILE * iFd;
+    int iFd;
     int n;
     uint8_t u8ChunkSize = 128;
     tsPRG_PrivateContext *psPriv;
@@ -915,8 +917,9 @@ teStatus LIBPROGRAMMER ePRG_FlashDump(tsPRG_Context *psContext, char *pcDumpFile
     u32FlashSize = psContext->sChipDetails.asFlashes[psPriv->u32SelectedFlash].u32FlashSize;
 
     snprintf(acOperationText, sizeof(acOperationText), "Dumping %s", psContext->sChipDetails.asFlashes[psPriv->u32SelectedFlash].pcFlashName);
-//  iFd = open(pcDumpFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-  	iFd = fopen(pcDumpFile, "wb+");
+
+    iFd = open(pcDumpFile, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR);
+
     if (iFd < 0)
     {
         return ePRG_SetStatus(psContext, E_PRG_FAILED_TO_OPEN_FILE, "\"%s\" (%s)", pcDumpFile, pcPRG_GetLastErrorMessage(psContext));
@@ -929,7 +932,7 @@ teStatus LIBPROGRAMMER ePRG_FlashDump(tsPRG_Context *psContext, char *pcDumpFile
         teStatus eStatus;
 
         if (au8Buffer == NULL) {
-            fclose(iFd);
+            close(iFd);
             return ePRG_SetStatus(psContext, eStatus, "malloc failed!");
         }
         memset(au8Buffer, 0, sizeof(uint8_t) *u8ChunkSize);
@@ -942,15 +945,14 @@ teStatus LIBPROGRAMMER ePRG_FlashDump(tsPRG_Context *psContext, char *pcDumpFile
 
         if ((eStatus = eBL_FlashRead(psContext, n, u8ChunkSize, au8Buffer)) != E_PRG_OK)
         {
-            fclose(iFd);
+            close(iFd);
             free(au8Buffer);
             return ePRG_SetStatus(psContext, eStatus, "reading Flash at address 0x%08X", n);
         }
 
-        if (fwrite(au8Buffer,u8ChunkSize,1,iFd) < 0)
-//        if (write(iFd, au8Buffer, u8ChunkSize) < 0)
+        if (write(iFd, au8Buffer, u8ChunkSize) < 0)
         {
-            fclose(iFd);
+            close(iFd);
             free(au8Buffer);
             return ePRG_SetStatus(psContext, E_PRG_ERROR_WRITING, "file at address 0x%08X", n);
         }
@@ -959,7 +961,7 @@ teStatus LIBPROGRAMMER ePRG_FlashDump(tsPRG_Context *psContext, char *pcDumpFile
         {
             if (cbProgress(pvUser, acOperationText, "Dumping Flash", u32FlashSize, n) != E_PRG_OK)
             {
-                fclose(iFd);
+                close(iFd);
                 free(au8Buffer);
                 return ePRG_SetStatus(psContext, E_PRG_ABORTED, "");
             }
@@ -972,12 +974,12 @@ teStatus LIBPROGRAMMER ePRG_FlashDump(tsPRG_Context *psContext, char *pcDumpFile
     {
         if (cbProgress(pvUser, acOperationText, "Dumping Flash", u32FlashSize, u32FlashSize) != E_PRG_OK)
         {
-            fclose(iFd);
+            close(iFd);
             return ePRG_SetStatus(psContext, E_PRG_ABORTED, "");
         }
     }
 
-    fclose(iFd);
+    close(iFd);
     return ePRG_SetStatus(psContext, E_PRG_OK, "Flash dumped succesfully");
 }
 
@@ -1221,7 +1223,7 @@ teStatus ePRG_EepromErase(tsPRG_Context *psContext, teEepromErase eErase, tcbFW_
 teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progress cbProgress, void *pvUser)
 {
     uint8_t u8ChunkSize = 64;
-    FILE * iFd;
+    int iFd;
     uint32_t n;
     teStatus eStatus;
     tsChipDetails *psChipDetails;
@@ -1238,8 +1240,7 @@ teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progr
         return ePRG_SetStatus(psContext, E_PRG_UNSUPPORED_CHIP, "");
     }
 
-//  iFd = open(pcDumpFile, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR);
-	iFd = fopen(pcDumpFile, "wb+");
+    iFd = open(pcDumpFile, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR);
     if (iFd < 0)
     {
         return ePRG_SetStatus(psContext, E_PRG_FAILED_TO_OPEN_FILE, "\"%s\" (%s)", pcDumpFile, pcPRG_GetLastErrorMessage(psContext));
@@ -1262,7 +1263,7 @@ teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progr
         teStatus eStatus;
 
         if (au8Buffer == NULL) {
-            fclose(iFd);
+            close(iFd);
             return ePRG_SetStatus(psContext, eStatus, "malloc failed");
         }
 
@@ -1276,14 +1277,14 @@ teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progr
 
         if ((eStatus = eBL_EEPROMRead(psContext, n, u8ChunkSize, au8Buffer)) != E_PRG_OK)
         {
-            fclose(iFd);
+            close(iFd);
             FREE_IF(au8Buffer);
             return ePRG_SetStatus(psContext, eStatus, "reading EEPROM at address 0x%08X", n);
         }
 
-        if (fwrite(au8Buffer,u8ChunkSize,1,iFd) < 0)
+        if (write(iFd, au8Buffer, u8ChunkSize) < 0)
         {
-            fclose(iFd);
+            close(iFd);
             FREE_IF(au8Buffer);
             return ePRG_SetStatus(psContext, E_PRG_ERROR_WRITING, "file at address 0x%08X", n);
         }
@@ -1292,7 +1293,7 @@ teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progr
         {
             if (cbProgress(pvUser, "Dumping EEPROM", "Dumping EEPROM", psContext->sChipDetails.u32EepromSize, n) != E_PRG_OK)
             {
-                fclose(iFd);
+                close(iFd);
                 FREE_IF(au8Buffer);
                 return ePRG_SetStatus(psContext, E_PRG_ABORTED, "");
             }
@@ -1304,12 +1305,12 @@ teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progr
     {
         if (cbProgress(pvUser, "Dumping EEPROM", "Dumping EEPROM", psContext->sChipDetails.u32EepromSize, psContext->sChipDetails.u32EepromSize) != E_PRG_OK)
         {
-            fclose(iFd);
+            close(iFd);
             return ePRG_SetStatus(psContext, E_PRG_ABORTED, "");
         }
     }
 
-    fclose(iFd);
+    close(iFd);
 
     if(!BOOTLOADER_CAPABILITY_EEPROM_ACCESS(psChipDetails->u32BootloaderVersion))
     {
@@ -1328,7 +1329,7 @@ teStatus ePRG_EepromDump(tsPRG_Context *psContext, char *pcDumpFile, tcbFW_Progr
 teStatus ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoadFile, tcbFW_Progress cbProgress, void *pvUser)
 {
     uint8_t u8ChunkSize;
-    FILE * iFd;
+    int iFd;
     uint32_t n;
     teStatus eStatus;
     tsChipDetails *psChipDetails;
@@ -1345,7 +1346,7 @@ teStatus ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoadFile, tcbFW_Pr
         return ePRG_SetStatus(psContext, E_PRG_UNSUPPORED_CHIP, "");
     }
 
-    iFd = fopen(pcLoadFile, "rb+");
+    iFd = open(pcLoadFile, O_RDONLY | O_BINARY);
     if (iFd < 0)
     {
         return ePRG_SetStatus(psContext, E_PRG_FAILED_TO_OPEN_FILE, "\"%s\" (%s)", pcLoadFile, pcPRG_GetLastErrorMessage(psContext));
@@ -1387,7 +1388,7 @@ teStatus ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoadFile, tcbFW_Pr
         uint8_t au8Buffer[128];
         teStatus eStatus;
 
-            u8ChunkSize = fread(au8Buffer,128,1,iFd);
+        u8ChunkSize = read(iFd, au8Buffer, 128);
 
         if (u8ChunkSize <= 0)
         {
@@ -1405,7 +1406,7 @@ teStatus ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoadFile, tcbFW_Pr
 
         if ((eStatus = eBL_EEPROMWrite(psContext, psContext->u32EepromOffset + n, u8ChunkSize, au8Buffer)) != E_PRG_OK)
         {
-                fclose(iFd);
+            close(iFd);
             return ePRG_SetStatus(psContext, eStatus, "loading EEPROM at address 0x%08X", psContext->u32EepromOffset + n);
         }
 
@@ -1413,7 +1414,7 @@ teStatus ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoadFile, tcbFW_Pr
         {
             if (cbProgress(pvUser, "Loading EEPROM", "Loading EEPROM", psContext->sChipDetails.u32EepromSize, n) != E_PRG_OK)
             {
-                    fclose(iFd);
+                close(iFd);
                 return ePRG_SetStatus(psContext, E_PRG_ABORTED, "");
             }
         }
@@ -1423,12 +1424,12 @@ teStatus ePRG_EepromProgram(tsPRG_Context *psContext, char *pcLoadFile, tcbFW_Pr
     {
         if (cbProgress(pvUser, "Loading EEPROM", "Loading EEPROM", psContext->sChipDetails.u32EepromSize, psContext->sChipDetails.u32EepromSize) != E_PRG_OK)
         {
-                fclose(iFd);
+            close(iFd);
             return ePRG_SetStatus(psContext, E_PRG_ABORTED, "");
         }
     }
 
-        fclose(iFd);
+    close(iFd);
 
     if(!BOOTLOADER_CAPABILITY_EEPROM_ACCESS(psChipDetails->u32BootloaderVersion))
     {
@@ -1734,6 +1735,7 @@ static teStatus ePRG_DeviceConfigGet(tsPRG_Context *psContext)
         DBG_vPrintf(TRACE_PROGRAMMER, "IP2111 config (read from 0x%08X): 0x%08X 0x%08X 0x%08X 0x%08X\n",
                     JN516X_INDEX_SECTOR_IP2111_CONFIG_ADDRESS, au32Buffer[0], au32Buffer[1], au32Buffer[2], au32Buffer[3]);
 
+#if 0  //comment by shawn
         // Majority voting
         u32DeviceConfig = (au32Buffer[0] & au32Buffer[1]) | (au32Buffer[0] & au32Buffer[2]) | (au32Buffer[1] & au32Buffer[2]);
         if (__builtin_popcount(u32DeviceConfig & 0x0000000F) <= 2)
@@ -1745,6 +1747,7 @@ static teStatus ePRG_DeviceConfigGet(tsPRG_Context *psContext)
         {
             psDeviceConfig->eJtag = E_DC_JTAG_ENABLE;
         }
+#endif
 
         /* And now the customer settings word */
 

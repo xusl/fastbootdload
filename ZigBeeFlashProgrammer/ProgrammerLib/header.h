@@ -32,6 +32,10 @@ typedef unsigned char uint8_t;
 #define snprintf _snprintf
 //#define roundf round
 #define __builtin_popcount __popcnt
+#define open  _open
+#define close  _close
+#define S_IRUSR _S_IREAD
+#define S_IWUSR _S_IWRITE
 
 #define LIBPROGRAMMER
 #define FREE_IF(x)  do {\
