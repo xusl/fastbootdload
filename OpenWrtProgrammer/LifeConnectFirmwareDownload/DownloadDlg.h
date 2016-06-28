@@ -29,12 +29,17 @@ protected:
 	struct mg_server *server;
 	HANDLE Server_Listen_Thread;
 	HANDLE Send_Comand_Thread;
-	DWORD   Server_Listen_Thread_ID; 
-	DWORD   Send_Comand_Thread_ID; 
-	CString strFile ; 
+	DWORD   Server_Listen_Thread_ID;
+	DWORD   Send_Comand_Thread_ID;
+	CString strFile ;
 	void OnSend_Comand();
 	void OnSend_Resset_Comand();
 	void server_listen();
+  void UpdateMessage(CString msg);
+  void ClearMessage(void);
+  void HandleDownloadException(CString msg, SOCKET &sock, bool cleanWSA=TRUE);
+  void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
+  char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
 
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
@@ -46,7 +51,7 @@ protected:
 	afx_msg void OnBnClickedStart();
 	afx_msg void OnBnClickedStop();
 	DECLARE_MESSAGE_MAP()
-private:	
+private:
 	CString error_message;
 	int Progress_range;
 	bool server_state;

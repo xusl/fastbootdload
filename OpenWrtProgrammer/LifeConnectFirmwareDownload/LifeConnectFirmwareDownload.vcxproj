@@ -101,6 +101,7 @@
   <ItemGroup>
     <ClInclude Include="DownloadDlg.h" />
     <ClInclude Include="Download.h" />
+    <ClInclude Include="log.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
@@ -110,6 +111,7 @@
     <ClCompile Include="DownloadDlg.cpp" />
     <ClCompile Include="Download.cpp" />
     <ClCompile Include="GetIp.cpp" />
+    <ClCompile Include="log.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
