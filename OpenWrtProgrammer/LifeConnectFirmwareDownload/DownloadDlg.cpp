@@ -13,6 +13,8 @@
 #define new DEBUG_NEW
 #endif
 
+#define CONFIG_FILE_PATH         _T("Config.ini")
+#define WS_LABEL_DIR             TEXT(".\\Label\\")
 #define DOWNLOAD_SERVER_PORT     80
 #define DOWNLOAD_SERVER_IP       "172.19.42.1"
 
@@ -55,19 +57,31 @@ END_MESSAGE_MAP()
 
 // CDownloadDlg dialog
 
-
-
-
 CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CDownloadDlg::IDD, pParent)
 {
+    char path_buffer[MAX_PATH];
+	char drive[_MAX_DRIVE];
+	char dir[_MAX_DIR];
+
+//	GetCurrentDirectory(MAX_PATH, currdir);
+	GetModuleFileName(NULL, path_buffer, MAX_PATH);
+	_splitpath_s(path_buffer, drive, _MAX_DRIVE, dir, _MAX_DIR, 0, 0, 0, 0);
+	mModulePath.Format("%s%s", drive, dir);
+
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-	strFile = _T("");
+
 	server_state=false;
 	error_message="";
 	Progress_range=350;
 	is_downloading=false;
 	downloading_successfull=false;
+    mRomPath = "cus531-nand-jffs2";
+    StartLogging("lifeconnect-flash.log", "all", "all");
+}
+
+CDownloadDlg::~CDownloadDlg() {
+    StopLogging();
 }
 
 void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
@@ -75,6 +89,7 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 
 	DDX_Control(pDX, IDC_PROGRESS1, m_progMac2);
+    DDX_Control(pDX, IDC_CU, m_CUEdit);
 }
 
 BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
@@ -124,6 +139,24 @@ BOOL CDownloadDlg::OnInitDialog()
 	m_progMac2.SetBarColor(RGB(255,255,0));
 	m_progMac2.SetTextColor(RGB(0,0,0));
 	m_progMac2.SetStep(10);
+
+    CString config = mModulePath + CONFIG_FILE_PATH;
+	GetPrivateProfileString(_T("MISC"), _T("CURef"), _T(""), s_CommercialRef,14,config);
+	if(strlen(s_CommercialRef) < 14 && strlen(s_CommercialRef) > 10)
+	{
+        m_CUEdit.SetWindowText(s_CommercialRef);
+	}
+
+	GetPrivateProfileString(_T("MISC"), _T("PTS"), _T(""), s_PTS_new, 4, config);
+    s_PTS_new[3] = 0;
+
+	//GetPrivateProfileString(_T("MISC"), _T("SSIDPrefix"), _T(""), s_SSID_Prefix, 20, config);
+	//s_SSID_Prefix[strlen(s_SSID_Prefix)] = 0;
+
+
+	if(!PathFileExists(WS_LABEL_DIR)) {
+		CreateDirectory(WS_LABEL_DIR, NULL);
+	}
     GetDlgItem(ID_Start)->EnableWindow(TRUE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -146,10 +179,10 @@ void CDownloadDlg::server_listen()
         UpdateMessage(_T("Server Startup failed!"));
         return ;
     }
-    char const * content = BuildHttpServerResponse(strFile.GetString(), &length);
+    char const * content = BuildHttpServerResponse(mRomPath.GetString(), &length);
 
     if(content == NULL) {
-        UpdateMessage(_T("Open file failed!\n"));
+        UpdateMessage(_T("Open file failed!"));
         return ;
     }
 
@@ -325,27 +358,63 @@ HCURSOR CDownloadDlg::OnQueryDragIcon()
 
 void CDownloadDlg::OnBnClickedButtonBrowse()
 {
+    CFileDialog dlgFile(TRUE);
+    CString fileName;
+    const int c_cMaxFiles = 100;
+    const int c_cbBuffSize = (c_cMaxFiles * (MAX_PATH + 1)) + 1;
+    char *p = fileName.GetBuffer(c_cbBuffSize);
+    OPENFILENAME& ofn = dlgFile.GetOFN( );
+    ofn.Flags |= OFN_ALLOWMULTISELECT;
+    ofn.lpstrFilter = _T("Image Files (*.sam;*.uImage;*.jffs2)|*.sam;*.uImage;*.jffs2|") _T("All Files (*.*)|*.*||");
+    ofn.lpstrFile = p;
+    ofn.nMaxFile = c_cbBuffSize;
 
-	 /*CFileDialog    dlgFile(TRUE, NULL, NULL, OFN_HIDEREADONLY, _T("Describe Files (*.sam)|*.sam||"), NULL);
-	 if (dlgFile.DoModal())
-	 {
-		 strFile = dlgFile.GetPathName();
-	 }
-	 int len=strFile.GetLength()+10;
-	 memset(file_name,0,len);
+    if (dlgFile.DoModal())
+    {
+        mRomPath = dlgFile.GetPathName();
+    }
 
-	::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Browse,strFile);*/
-	strFile = "C:\\HDT_MUSICBOX\\Product\\firmware.sam";
-	if(!PathFileExists(strFile))
-	{
-		::MessageBox(NULL,_T("Can't find C:\\HDT_MUSICBOX\\Product\\firmware.sam!"),_T("Check Fireware file"),MB_OK);
-	}
+    fileName.ReleaseBuffer();
 
-	if(strFile!="" )
-	{
-		Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
-		GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
-	}
+    /*
+
+       char* pBufEnd = p + FILE_LIST_BUFFER_SIZE - 2;
+       char* start = p;
+       while( ( p < pBufEnd ) && ( *p ) )
+       p++;
+       if( p > start )
+       {
+       _tprintf(_T("Path to folder where files were selected:  %s\r\n\r\n"), start );
+       p++;
+
+       int fileCount = 1;
+       while( ( p < pBufEnd ) && ( *p ) )
+       {
+       start = p;
+       while( ( p < pBufEnd ) && ( *p ) )
+       p++;
+       if( p > start )
+       _tprintf(_T("%2d. %s\r\n"), fileCount, start );
+       p++;
+       fileCount++;
+       }
+       }
+       */
+
+
+    ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_BUTTON_Browse,mRomPath);
+
+    if(!PathFileExists(mRomPath))
+    {
+        ::MessageBox(NULL, mRomPath ,_T("Check Fireware file"),MB_OK);
+        return;
+    }
+
+    if(mRomPath!="" )
+    {
+        Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
+        GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
+    }
 
 }
 
@@ -355,13 +424,13 @@ void CDownloadDlg::OnBnClickedStart() {
     m_progMac2.SetBarColor(RGB(255,255,0));
     m_progMac2.SetWindowText(_T(" "));
     m_progMac2.Invalidate(FALSE);
-    if(strFile=="") {
+    if(mRomPath=="") {
         ::MessageBox(NULL,_T("Please select software!"),_T("select software"),MB_OK);
         return;
     }
     memset(s_CommercialRef, 0, 14);
-    CEdit *edit1=(CEdit*)GetDlgItem(IDC_CU);
-    edit1->GetWindowText(S_Commercial);
+//    CEdit *edit1=(CEdit*)GetDlgItem(IDC_CU);
+    m_CUEdit.GetWindowText(S_Commercial);
     if(S_Commercial.GetLength() > 20 || S_Commercial.GetLength() < 10)
     {
         ::MessageBox(NULL,_T("The commercial is invalid!"),_T("Input Commercial Ref"),MB_OK);
@@ -395,7 +464,7 @@ void CDownloadDlg::OnSend_Comand() {
     char MAC_label[20] = {0};
     SOCKET sockClient = INVALID_SOCKET;
 
-    if(strFile=="" ) {
+    if(mRomPath=="" ) {
         ::MessageBox(NULL,_T("Please select software!"),_T("select software"),MB_OK);
         return;
     }
@@ -413,7 +482,7 @@ void CDownloadDlg::OnSend_Comand() {
 
     GetIp Get_Ip;
     string Ip;
-    string Firmware_name=strFile.GetString();
+    string Firmware_name=mRomPath.GetString();
     int tmp=Firmware_name.find_last_of("\\");
     Firmware_name=Firmware_name.substr(tmp+1,Firmware_name.length());
 
@@ -422,13 +491,13 @@ void CDownloadDlg::OnSend_Comand() {
         if((Get_Ip.GetAdapter())&&(Get_Ip.IP()!="")&&(Get_Ip.IP()!="0.0.0.0")) {
             Ip=Get_Ip.IP();
             IsGetIp=true;
-            UpdateMessage(_T("Get Ip successfully!\n"));
+            UpdateMessage(_T("Get Ip successfully!"));
             break;
         }
         Sleep(2000);
     }
     if(IsGetIp==false) {
-        HandleDownloadException(_T("Get IP failed!\r\n"), sockClient);
+        HandleDownloadException(_T("Get IP failed!"), sockClient);
         return ;
     }
     string download_comand="update update -u \"http://"+Ip+"/"+Firmware_name+
@@ -476,7 +545,7 @@ void CDownloadDlg::OnSend_Comand() {
         m_progMac2.SetPos(i);
         //m_progMac2.Invalidate(FALSE);
         if((Send_result.find("[processCommand] Processing send"))!=-1) {
-            UpdateMessage(_T("send software successfully!\n"));
+            UpdateMessage(_T("send software successfully!"));
             downloading_successfull=true;
             /*m_progMac2.SetPos(Progress_range);
               m_progMac2.Invalidate(FALSE);
@@ -508,7 +577,7 @@ void CDownloadDlg::OnSend_Comand() {
         }
 
         if((Send_result.find("[ERROR]"))!=-1) {
-            UpdateMessage(_T("send software failed!\n"));
+            UpdateMessage(_T("send software failed!"));
             m_progMac2.SetBarColor(RGB(255,50,50));
             m_progMac2.Invalidate(FALSE);
             GetDlgItem(ID_Start)->EnableWindow(true);
@@ -551,28 +620,27 @@ void CDownloadDlg::UpdateMessage(CString errormsg){
         error_message = errormsg;
         msg = error_message;
     } else {
-    error_message += "\n";
+    error_message += "\r\n";
     error_message += errormsg;
     msg = error_message;
     }
+    LOGE("%s", errormsg.GetString());
 //    ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
     Line_edit->SetWindowText(msg);
 	Line_edit->SetSel(0,-1);
 	Line_edit->SetFocus();
 }
 
-void CDownloadDlg::OnClose()
-{
-	if(is_downloading==true||downloading_successfull==true)
-	{
+void CDownloadDlg::OnClose() {
+	if(is_downloading==true) {
 		::MessageBoxA(NULL,"Downloading... cannot close tool!","MBO1",MB_SYSTEMMODAL);
 		return;
 	}
-	if (::MessageBoxA(NULL,"Sure to exit?","Exit",MB_OKCANCEL|MB_ICONQUESTION|MB_SYSTEMMODAL ) != IDOK)
-	{
-		return;
-	}
+	//if (::MessageBoxA(NULL,"Sure to exit?","Exit",MB_OKCANCEL|MB_ICONQUESTION|MB_SYSTEMMODAL ) != IDOK)
+	//{
+	//	return;
+	//}
 	exitSocket = true;
-	Sleep(1000);
+	//Sleep(1000);
 	CDialogEx::OnClose();
 }

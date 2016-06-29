@@ -13,6 +13,7 @@ class CDownloadDlg : public CDialogEx
 // Construction
 public:
 	CDownloadDlg(CWnd* pParent = NULL);	// standard constructor
+	~CDownloadDlg();
 
 // Dialog Data
 	enum { IDD = IDD_LIFECONNECTFIRMWAREDOWNLOAD_DIALOG };
@@ -31,7 +32,8 @@ protected:
 	HANDLE Send_Comand_Thread;
 	DWORD   Server_Listen_Thread_ID;
 	DWORD   Send_Comand_Thread_ID;
-	CString strFile ;
+	CString mRomPath;
+  CString mModulePath;
 	void OnSend_Comand();
 	void OnSend_Resset_Comand();
 	void server_listen();
@@ -58,6 +60,7 @@ private:
 	bool is_downloading;
 	bool downloading_successfull;
 	CEdit* Line_edit;
+  CEdit m_CUEdit;
 	char s_CommercialRef[14];
 	char s_PTS_new[4];
 	char s_PCBNo[16];
