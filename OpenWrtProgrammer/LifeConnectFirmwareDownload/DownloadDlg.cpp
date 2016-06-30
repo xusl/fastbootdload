@@ -13,10 +13,6 @@
 #define new DEBUG_NEW
 #endif
 
-#define CONFIG_FILE_PATH         _T("Config.ini")
-#define WS_LABEL_DIR             TEXT(".\\Label\\")
-#define DOWNLOAD_SERVER_PORT     80
-#define DOWNLOAD_SERVER_IP       "172.19.42.1"
 
 // CAboutDlg dialog used for App About
 
@@ -58,7 +54,8 @@ END_MESSAGE_MAP()
 // CDownloadDlg dialog
 
 CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
-	: CDialogEx(CDownloadDlg::IDD, pParent)
+	: CDialogEx(CDownloadDlg::IDD, pParent),
+	mWSAInitialized(FALSE)
 {
     char path_buffer[MAX_PATH];
 	char drive[_MAX_DRIVE];
@@ -81,6 +78,11 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 }
 
 CDownloadDlg::~CDownloadDlg() {
+    if (mWSAInitialized) {
+        WSACleanup();
+        mWSAInitialized = FALSE;
+    }
+
     StopLogging();
 }
 
@@ -90,6 +92,7 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
 
 	DDX_Control(pDX, IDC_PROGRESS1, m_progMac2);
     DDX_Control(pDX, IDC_CU, m_CUEdit);
+    DDX_Control(pDX, IDC_FIRMWARE_IMAGE, m_RomPathStaticText);
 }
 
 BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
@@ -133,6 +136,19 @@ BOOL CDownloadDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
+
+    WSADATA wsaData;
+    // iResult = WSAStartup( MAKEWORD( 2, 2), &wsaData );
+    if ( WSAStartup(MAKEWORD(1, 1), &wsaData ) != 0 ) {
+        AfxMessageBox(IDP_SOCKETS_INIT_FAILED);
+    } else {
+    if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1) {
+        WSACleanup( );
+    } else {
+    mWSAInitialized = TRUE;
+    }
+    }
+
 	Line_edit=(CEdit*)GetDlgItem(IDC_Error_Message);
 	m_progMac2.SetRange(0,Progress_range);
 
@@ -153,11 +169,19 @@ BOOL CDownloadDlg::OnInitDialog()
 	//GetPrivateProfileString(_T("MISC"), _T("SSIDPrefix"), _T(""), s_SSID_Prefix, 20, config);
 	//s_SSID_Prefix[strlen(s_SSID_Prefix)] = 0;
 
+    GetPrivateProfileString(_T("MISC"), _T("NetworkSegment"), _T("192.168.1"),
+                        m_NetworkSegment, IPADDR_BUFFER_LEN,config);
+
+    LOGD("CU REF : %s", s_CommercialRef);
+    LOGD("PTS : %s", s_PTS_new);
+    LOGD("network segment : %s", m_NetworkSegment);
 
 	if(!PathFileExists(WS_LABEL_DIR)) {
 		CreateDirectory(WS_LABEL_DIR, NULL);
 	}
     GetDlgItem(ID_Start)->EnableWindow(TRUE);
+    m_RomPathStaticText.SetWindowText(mRomPath);
+
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 DWORD WINAPI CDownloadDlg::Thread_Server_Listen(LPVOID lpPARAM) {
@@ -165,20 +189,20 @@ DWORD WINAPI CDownloadDlg::Thread_Server_Listen(LPVOID lpPARAM) {
 	pThis->server_listen();
 	return 1;
 }
-void CDownloadDlg::server_listen()
+void CDownloadDlg::server_listen(u_short port)
 {
     SOCKET sockConn = INVALID_SOCKET;
     SOCKET sockSrv  = INVALID_SOCKET;
     CString msg;
-    size_t  length = 0;
+    size_t length = 0;
     __int64 iResult;
-    WSADATA wsaData;
-    iResult = WSAStartup( MAKEWORD( 2, 2), &wsaData );
-    if (iResult != NO_ERROR) {
-        server_state=false;
+
+    if (mWSAInitialized == FALSE) {
         UpdateMessage(_T("Server Startup failed!"));
         return ;
     }
+
+   server_state=false;
     char const * content = BuildHttpServerResponse(mRomPath.GetString(), &length);
 
     if(content == NULL) {
@@ -194,14 +218,14 @@ void CDownloadDlg::server_listen()
     SOCKADDR_IN addrSrv;
     addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
     addrSrv.sin_family = AF_INET;
-    addrSrv.sin_port = htons(DOWNLOAD_SERVER_PORT);
+    addrSrv.sin_port = htons(port);
     iResult = bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
     if (iResult == SOCKET_ERROR) {
-        msg.Format(_T("Bind socket failed!"), DOWNLOAD_SERVER_PORT);
+        msg.Format(_T("Bind socket port %d failed!"), port);
         HandleServerException(msg, sockConn, sockSrv, &content);
         return ;
     }
-    msg.Format(_T("bind socket success on port :%d"), DOWNLOAD_SERVER_PORT);
+    msg.Format(_T("bind socket success on port :%d"), port);
     UpdateMessage(msg);
     if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
         HandleServerException(_T("server listen failed!"), sockConn, sockSrv, &content);
@@ -210,13 +234,10 @@ void CDownloadDlg::server_listen()
 
     UpdateMessage(_T("Listening on socket..."));
     SOCKADDR_IN  addrClient;
-    exitSocket = false;
     while(true) {
         unsigned long on = 1;
         char recvBuf[101]={0};
-        if(exitSocket) {
-            break;
-        }
+
         int sin_size = sizeof(struct sockaddr_in);
         sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &sin_size);
         UpdateMessage(_T("Send softwre ..., please wait..."));
@@ -232,7 +253,7 @@ void CDownloadDlg::server_listen()
 
         if (iResult == SOCKET_ERROR) {
             HandleServerException(_T("Send software failed!"), sockConn, sockSrv, &content);
-            return ;
+            break;
         }
 
         do {
@@ -258,7 +279,6 @@ void CDownloadDlg::HandleServerException(CString msg, SOCKET sockConn, SOCKET so
         closesocket(sockConn);
     if (INVALID_SOCKET != sockSrv)
         closesocket(sockSrv);
-    WSACleanup();
 }
 
 char const* CDownloadDlg::BuildHttpServerResponse(const char *path, size_t  *contentLength) {
@@ -409,13 +429,6 @@ void CDownloadDlg::OnBnClickedButtonBrowse()
         ::MessageBox(NULL, mRomPath ,_T("Check Fireware file"),MB_OK);
         return;
     }
-
-    if(mRomPath!="" )
-    {
-        Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
-        GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
-    }
-
 }
 
 void CDownloadDlg::OnBnClickedStart() {
@@ -451,14 +464,62 @@ void CDownloadDlg::OnBnClickedStart() {
         Sleep(1000);
     }
     //Send_Comand_Thread= CreateThread(NULL,0,Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
+    if(mRomPath!="" )
+    {
+        Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
+        GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
+    }
+
+    for (int i = 2; i < 20; i++) {
+     CString ip_addr;
+     const char* pcIpAddr;
+    ip_addr.Format("192.168.1.%d", i);
+    pcIpAddr = ip_addr.GetString();
+    if(ping(pcIpAddr)) {
+        LOGD("ping %s succefully", pcIpAddr);
+    } else {
+     LOGD("ping %s failed.", pcIpAddr);
+    }
+    }
 }
 DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
-    pThis->OnSend_Comand();
+    CString cmd;
+    if (pThis->BuildUpdateCommand(pThis->mRomPath, cmd))
+        pThis->OnSend_Comand(DOWNLOAD_SERVER_IP, cmd.GetString());
     return 1;
 }
 
-void CDownloadDlg::OnSend_Comand() {
+BOOL CDownloadDlg::BuildUpdateCommand(CString file, CString &cmd) {
+    GetIp Get_Ip(m_NetworkSegment);
+    string Ip;
+    string Firmware_name=mRomPath.GetString();
+    int tmp=Firmware_name.find_last_of("\\");
+    Firmware_name=Firmware_name.substr(tmp+1,Firmware_name.length());
+    const char * filename = basename(mRomPath.GetString());
+
+    bool IsGetIp=false;
+    for(int i = 0; i< 10; i++) {
+        if(Get_Ip.GetHostIP(Ip)) {
+            IsGetIp=true;
+            UpdateMessage(_T("Get Ip successfully!"));
+            break;
+        }
+        Sleep(2000);
+    }
+    if(IsGetIp==false) {
+        UpdateMessage(_T("Get IP failed!"));
+        return FALSE;
+    }
+    string download_comand="update update -u \"http://"+Ip+"/"+Firmware_name+
+                            "/\" -f --no-cert-check --no-device-check\r\n\r\n";
+
+    cmd.Format("update update -u \"http://%s/%s/\" -f --no-cert-check --no-device-check\r\n\r\n",
+                                Ip.c_str(), Firmware_name);
+
+    return TRUE;
+}
+void CDownloadDlg::OnSend_Comand(const char * cmd, const char *ip_addr,  u_short port) {
     char s_SN[16]      = {0};
     char s_SSID[51]    = {0};
     char MAC_label[20] = {0};
@@ -470,46 +531,16 @@ void CDownloadDlg::OnSend_Comand() {
     }
     ClearMessage();
 
-    WSADATA wsaData;
-    if ( WSAStartup(MAKEWORD(1, 1), &wsaData ) != 0 ) {
-        HandleDownloadException(_T("WSAStartup failed"), sockClient, FALSE);
-        return ;
-    }
-    if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1) {
-        WSACleanup( );
+    if (mWSAInitialized == FALSE) {
+        UpdateMessage(_T("Server Startup failed!"));
         return ;
     }
 
-    GetIp Get_Ip;
-    string Ip;
-    string Firmware_name=mRomPath.GetString();
-    int tmp=Firmware_name.find_last_of("\\");
-    Firmware_name=Firmware_name.substr(tmp+1,Firmware_name.length());
-
-    bool IsGetIp=false;
-    for(int i = 0; i< 10; i++) {
-        if((Get_Ip.GetAdapter())&&(Get_Ip.IP()!="")&&(Get_Ip.IP()!="0.0.0.0")) {
-            Ip=Get_Ip.IP();
-            IsGetIp=true;
-            UpdateMessage(_T("Get Ip successfully!"));
-            break;
-        }
-        Sleep(2000);
-    }
-    if(IsGetIp==false) {
-        HandleDownloadException(_T("Get IP failed!"), sockClient);
-        return ;
-    }
-    string download_comand="update update -u \"http://"+Ip+"/"+Firmware_name+
-                            "/\" -f --no-cert-check --no-device-check\r\n\r\n";
-
-    const char * Str_download_comand=download_comand.c_str();
-    int Comand_length=strlen(Str_download_comand)+1;
     //CString cstr(download_comand.data());
     SOCKADDR_IN addrSrv;
-    addrSrv.sin_addr.S_un.S_addr = inet_addr(DOWNLOAD_SERVER_IP);
+    addrSrv.sin_addr.S_un.S_addr = inet_addr(ip_addr);
     addrSrv.sin_family = AF_INET;
-    addrSrv.sin_port = htons(23);
+    addrSrv.sin_port = htons(port);
     __int64 iResult;
     sockClient = socket(AF_INET, SOCK_STREAM, 0);
     //int timeout=50000;
@@ -525,7 +556,7 @@ void CDownloadDlg::OnSend_Comand() {
     char recvBuf[101] = {'\0'};
     recv(sockClient, recvBuf, 100, 0);
     //bool is_set_time_out=SetTimeOut(sockClient, 50000, true);
-    send(sockClient, Str_download_comand, Comand_length, 1);
+    send(sockClient, cmd, strlen(cmd)+1, 1);
 
     string Send_result;
     int i=0;
@@ -589,20 +620,17 @@ void CDownloadDlg::OnSend_Comand() {
     }while(bytes  > 0);
 
     closesocket(sockClient);
-    WSACleanup();
 }
 
-void CDownloadDlg::HandleDownloadException(CString msg, SOCKET &sock, bool cleanWSA) {
+void CDownloadDlg::HandleDownloadException(CString msg, SOCKET &sock) {
         UpdateMessage(msg);
         GetDlgItem(ID_Start)->EnableWindow(true);
         ::MessageBox(NULL, msg, _T("Download"),MB_OK);
         is_downloading=false;
         downloading_successfull=false;
-        if (cleanWSA) {
+
             if (sock != INVALID_SOCKET)
             closesocket(sock);
-            WSACleanup();
-        }
 }
 
 void CDownloadDlg::ClearMessage(void) {

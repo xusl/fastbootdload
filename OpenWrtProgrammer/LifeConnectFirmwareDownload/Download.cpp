@@ -39,19 +39,19 @@ CDownloadApp theApp;
 
 BOOL CDownloadApp::InitInstance()
 {
-	m_hMutex = ::CreateMutex(NULL, TRUE, _T("LIFECONNECTFWDL_Mutex"));    
-	if (GetLastError() == ERROR_ALREADY_EXISTS)                                        //程序已经运行    
-	{        
-		HWND   oldHWnd = NULL;        
-		oldHWnd = ::FindWindow(NULL, _T("HDT.exe"));                   //查找已经运行的程序     
-		if (oldHWnd)          
-		{               
-			::ShowWindow(oldHWnd, SW_SHOWNORMAL);                                        //激活显示找到的已运行的程序        
-			::SetForegroundWindow(oldHWnd);                                              //将已运行的程序设置为当前窗口      
-		}         
-		CloseHandle(m_hMutex);     
-		m_hMutex = NULL;        
-		return FALSE;    
+	m_hMutex = ::CreateMutex(NULL, TRUE, _T("LIFECONNECTFWDL_Mutex"));
+	if (GetLastError() == ERROR_ALREADY_EXISTS)                                        //程序已经运行
+	{
+		HWND   oldHWnd = NULL;
+		oldHWnd = ::FindWindow(NULL, _T("HDT.exe"));                   //查找已经运行的程序
+		if (oldHWnd)
+		{
+			::ShowWindow(oldHWnd, SW_SHOWNORMAL);                                        //激活显示找到的已运行的程序
+			::SetForegroundWindow(oldHWnd);                                              //将已运行的程序设置为当前窗口
+		}
+		CloseHandle(m_hMutex);
+		m_hMutex = NULL;
+		return FALSE;
 	}
 	// InitCommonControlsEx() is required on Windows XP if an application
 	// manifest specifies use of ComCtl32.dll version 6 or later to enable
@@ -65,6 +65,18 @@ BOOL CDownloadApp::InitInstance()
 
 	CWinApp::InitInstance();
 
+    /*
+    如果用MFC的CSocket类则需要调用AfxSocketInit()初始化，
+    一般都是放在App类的InitInstance()函数中，
+    而如果用纯SOCKET的API函数，
+    则需要调用WSAStartup()函数去初始化网络环境。
+
+    一般来说 ,在调用任何winsock api之前,必须调用wsastartup()进行初始化,最后调用WSACleanup()做清理工作。
+
+        MFC中的函数 AfxSocketInit() 包装了函数 WSAStartup(), 在支持WinSock的应用程序的初始化函数IninInstance()中调用AfxSocketInit()进行初始化, 程序则不必调用WSACleanUp().
+
+    AfxSocketTerm
+    */
 	if (!AfxSocketInit())
 	{
 		AfxMessageBox(IDP_SOCKETS_INIT_FAILED);

@@ -5,18 +5,32 @@
 #include <Iphlpapi.h>
 
 using namespace std;
-#pragma comment(lib,"Iphlpapi.lib") 
+
+#define IPADDR_BUFFER_LEN       16
+
+bool ping(const char *ip_addr);
 
 class GetIp
 {
 public:
-	GetIp(void);
-	~GetIp(void);
-	bool GetAdapter();
-    string IP()
-    {
-        return device_ip;
+    GetIp(string network="192.168.1");
+    ~GetIp(void);
+    bool GetAdapter();
+    bool GetHostIP(string& ip) {
+        int refresh = 1;
+        do {
+            if (!device_ip.empty() &&(device_ip !="")&&(device_ip !="0.0.0.0")) {
+                ip = device_ip;
+                return true;
+            }
+            if (refresh > 1) {
+                if(!GetAdapter())
+                    return false;
+            }
+        } while(refresh-- >= 0);
+        return false;
     }
 private:
-	string device_ip;
+    string segment;
+    string device_ip;
 };

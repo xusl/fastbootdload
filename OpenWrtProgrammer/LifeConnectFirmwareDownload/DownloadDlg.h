@@ -7,6 +7,13 @@
 #include "GetIp.h"
 #include "TextProgressCtrl.h"
 
+
+#define CONFIG_FILE_PATH         _T("Config.ini")
+#define WS_LABEL_DIR             TEXT(".\\Label\\")
+#define OPENWRT_UPDATE_PORT      23
+#define DOWNLOAD_SERVER_PORT     80
+#define DOWNLOAD_SERVER_IP       "172.19.42.1"
+
 // CDownloadDlg dialog
 class CDownloadDlg : public CDialogEx
 {
@@ -34,14 +41,15 @@ protected:
 	DWORD   Send_Comand_Thread_ID;
 	CString mRomPath;
   CString mModulePath;
-	void OnSend_Comand();
-	void OnSend_Resset_Comand();
-	void server_listen();
+  BOOL  mWSAInitialized;
+	void OnSend_Comand(const char * cmd, const char *ip_addr,  u_short port = OPENWRT_UPDATE_PORT);
+	void server_listen(u_short port =DOWNLOAD_SERVER_PORT);
   void UpdateMessage(CString msg);
   void ClearMessage(void);
-  void HandleDownloadException(CString msg, SOCKET &sock, bool cleanWSA=TRUE);
+  void HandleDownloadException(CString msg, SOCKET &sock);
   void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
   char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
+  BOOL BuildUpdateCommand(CString file, CString &cmd);
 
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
@@ -61,10 +69,12 @@ private:
 	bool downloading_successfull;
 	CEdit* Line_edit;
   CEdit m_CUEdit;
+  CStatic m_RomPathStaticText;
 	char s_CommercialRef[14];
 	char s_PTS_new[4];
 	char s_PCBNo[16];
 	char s_MMIFlag[2];
+  char m_NetworkSegment[IPADDR_BUFFER_LEN];
 	DWORD dwBeginTime;
 	char s_Trace[50];
 	bool exitSocket;
