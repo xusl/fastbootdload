@@ -8,7 +8,9 @@ using namespace std;
 
 #define IPADDR_BUFFER_LEN       16
 
-bool ping(const char *ip_addr);
+bool Ping(const char *ip_addr);
+
+int ResolveIpMac(const char *DestIpString, string & mac);
 
 class GetIp
 {
@@ -23,7 +25,7 @@ public:
                 ip = device_ip;
                 return true;
             }
-            if (refresh > 1) {
+            if (refresh >= 1) {
                 if(!GetAdapter())
                     return false;
             }

@@ -1,5 +1,6 @@
 #include "StdAfx.h"
 #include "GetIp.h"
+#include <stdio.h>
 #include "log.h"
 #include <Icmpapi.h>
 #pragma comment(lib,"Iphlpapi.lib")
@@ -55,8 +56,9 @@ bool GetIp::GetAdapter()
     }
     return false;
 }
+
 #define MAX_BUF_SIZE   300
-bool ping(const char *ip_addr) {
+bool Ping(const char *ip_addr) {
     HANDLE hIcmpFile = NULL;
     DWORD dwRetVal = 0;
     IPAddr ipaddr = INADDR_NONE;
@@ -110,4 +112,79 @@ bool ping(const char *ip_addr) {
     } else {
         return false;
     }
+}
+
+
+int ResolveIpMac(const char *DestIpString, string & mac)
+{
+    #define BUFFER_LEN  6
+    DWORD dwRetVal;
+    IPAddr DestIp = 0;
+    IPAddr SrcIp = 0;       /* default for src ip , means INADDR_ANY IPv4 address*/
+    ULONG MacAddr[2];       /* for 6-byte hardware addresses */
+    ULONG PhysAddrLen = 6;  /* default to length of six bytes */
+    CHAR  Buffer[BUFFER_LEN];
+
+    //char *DestIpString = NULL;
+    //char *SrcIpString = NULL;
+
+    BYTE *bPhysAddr;
+    unsigned int i;
+
+    if (DestIpString == NULL || DestIpString[0] == '\0') {
+        LOGE("invalid destination IP address.");
+        return 1;
+    }
+    mac.clear();
+
+    DestIp = inet_addr(DestIpString);
+
+    memset(&MacAddr, 0xff, sizeof (MacAddr));
+
+    LOGE("Sending ARP request for IP address: %s", DestIpString);
+
+    dwRetVal = SendARP(DestIp, SrcIp, &MacAddr, &PhysAddrLen);
+
+    if (dwRetVal == NO_ERROR) {
+        bPhysAddr = (BYTE *) & MacAddr;
+        if (PhysAddrLen) {
+            for (i = 0; i < (int) PhysAddrLen; i++) {
+                memset(Buffer, 0, BUFFER_LEN);
+                if (i == (PhysAddrLen - 1))
+                    _snprintf(Buffer, BUFFER_LEN, "%.2X", (int) bPhysAddr[i]);
+                else
+                    _snprintf(Buffer, BUFFER_LEN, "%.2X-", (int) bPhysAddr[i]);
+                mac += Buffer;
+            }
+            return 0;
+        } else {
+            LOGE("Warning: SendArp completed successfully, but returned length=0\n");
+        }
+    } else {
+        LOGE("Error: SendArp failed with error: %d", dwRetVal);
+        switch (dwRetVal) {
+        case ERROR_GEN_FAILURE:
+            LOGE(" (ERROR_GEN_FAILURE)");
+            break;
+        case ERROR_INVALID_PARAMETER:
+            LOGE(" (ERROR_INVALID_PARAMETER)");
+            break;
+        case ERROR_INVALID_USER_BUFFER:
+            LOGE(" (ERROR_INVALID_USER_BUFFER)");
+            break;
+        case ERROR_BAD_NET_NAME:
+            LOGE(" (ERROR_GEN_FAILURE)");
+            break;
+        case ERROR_BUFFER_OVERFLOW:
+            LOGE(" (ERROR_BUFFER_OVERFLOW)");
+            break;
+        case ERROR_NOT_FOUND:
+            LOGE(" (ERROR_NOT_FOUND)");
+            break;
+        default:
+            break;
+        }
+    }
+
+    return 1;
 }

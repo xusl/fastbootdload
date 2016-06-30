@@ -8,7 +8,8 @@
 #include "afxdialogex.h"
 #include "Utils.h"
 #include "log.h"
-
+#include <setupapi.h>
+#include <dbt.h>
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -55,7 +56,7 @@ END_MESSAGE_MAP()
 
 CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CDownloadDlg::IDD, pParent),
-	mWSAInitialized(FALSE)
+	mWSAInitialized(FALSE),mHostIPAddr("")
 {
     char path_buffer[MAX_PATH];
 	char drive[_MAX_DRIVE];
@@ -67,7 +68,8 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	mModulePath.Format("%s%s", drive, dir);
 
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-
+    m_pCoordinator = new DeviceCoordinator;
+    m_SyncSemaphore = CreateSemaphore(NULL, 1, 1, "ThreadSyncDevie");
 	server_state=false;
 	error_message="";
 	Progress_range=350;
@@ -84,6 +86,9 @@ CDownloadDlg::~CDownloadDlg() {
     }
 
     StopLogging();
+    m_pCoordinator->Reset();
+    delete m_pCoordinator;
+    CloseHandle(m_SyncSemaphore);
 }
 
 void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
@@ -99,9 +104,12 @@ BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_WM_CLOSE()
+	ON_WM_TIMER()
+	ON_WM_DEVICECHANGE()
 	ON_BN_CLICKED(IDC_BUTTON_Browse, &CDownloadDlg::OnBnClickedButtonBrowse)
 	ON_BN_CLICKED(ID_Start, &CDownloadDlg::OnBnClickedStart)
-	ON_WM_CLOSE()
+    ON_MESSAGE(UI_MESSAGE_WORKTHREADS, &CDownloadDlg::OnMessageArrive)
 END_MESSAGE_MAP()
 
 
@@ -181,9 +189,42 @@ BOOL CDownloadDlg::OnInitDialog()
 	}
     GetDlgItem(ID_Start)->EnableWindow(TRUE);
     m_RomPathStaticText.SetWindowText(mRomPath);
-
+    GetHostIpAddr();
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
+
+ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
+    CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
+    for(;;) {
+        pThis->SniffNetwork();
+
+    }
+    return 0;
+ }
+
+void CDownloadDlg::SniffNetwork() {
+    for (int i = 2; i < 20; i++) {
+        CString ip_addr;
+        const char* pcIpAddr;
+        string mac;
+        ip_addr.Format("%s.%d", m_NetworkSegment, i);
+        pcIpAddr = ip_addr.GetString();
+        if (pcIpAddr == mHostIPAddr)
+            continue;
+        if(Ping(pcIpAddr)) {
+            if (0 == ResolveIpMac(pcIpAddr, mac)) {
+            m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL);
+            LOGD("ping %s succefully, mac :%s", pcIpAddr, mac.c_str());
+            }
+        } else {
+            ResolveIpMac(pcIpAddr, mac);
+            LOGD("ping %s failed. mac :%s", pcIpAddr, mac.c_str());
+        }
+    }
+    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+    WaitForSingleObject(m_SyncSemaphore, 100000);//INFINITE);
+}
+
 DWORD WINAPI CDownloadDlg::Thread_Server_Listen(LPVOID lpPARAM) {
 	CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
 	pThis->server_listen();
@@ -420,12 +461,9 @@ void CDownloadDlg::OnBnClickedButtonBrowse()
        }
        }
        */
-
-
     ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_BUTTON_Browse,mRomPath);
 
-    if(!PathFileExists(mRomPath))
-    {
+    if(!PathFileExists(mRomPath)) {
         ::MessageBox(NULL, mRomPath ,_T("Check Fireware file"),MB_OK);
         return;
     }
@@ -441,16 +479,17 @@ void CDownloadDlg::OnBnClickedStart() {
         ::MessageBox(NULL,_T("Please select software!"),_T("select software"),MB_OK);
         return;
     }
+
+    ClearMessage();
+
     memset(s_CommercialRef, 0, 14);
-//    CEdit *edit1=(CEdit*)GetDlgItem(IDC_CU);
+    //    CEdit *edit1=(CEdit*)GetDlgItem(IDC_CU);
     m_CUEdit.GetWindowText(S_Commercial);
-    if(S_Commercial.GetLength() > 20 || S_Commercial.GetLength() < 10)
-    {
+    if(S_Commercial.GetLength() > 20 || S_Commercial.GetLength() < 10) {
         ::MessageBox(NULL,_T("The commercial is invalid!"),_T("Input Commercial Ref"),MB_OK);
         return;
     }
-    for(int i = 0; i < S_Commercial.GetLength();i++)
-    {
+    for(int i = 0; i < S_Commercial.GetLength();i++) {
         s_CommercialRef[i] = S_Commercial[i];
     }
     GetDlgItem(ID_Start)->EnableWindow(false);
@@ -458,49 +497,48 @@ void CDownloadDlg::OnBnClickedStart() {
     ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message,error_message);
     is_downloading=false;
     downloading_successfull=false;
-    //	WIFI_NAME_Thread= CreateThread(NULL,0,Thread_Check_Wifi,this,0,&WIFI_NAME_Thread_ID);
-    //while(is_downloading == false)
-    {
-        Sleep(1000);
-    }
-    //Send_Comand_Thread= CreateThread(NULL,0,Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
-    if(mRomPath!="" )
-    {
-        Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
-        GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
-    }
-
-    for (int i = 2; i < 20; i++) {
-     CString ip_addr;
-     const char* pcIpAddr;
-    ip_addr.Format("192.168.1.%d", i);
-    pcIpAddr = ip_addr.GetString();
-    if(ping(pcIpAddr)) {
-        LOGD("ping %s succefully", pcIpAddr);
-    } else {
-     LOGD("ping %s failed.", pcIpAddr);
-    }
-    }
+    m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
+    Schedule();
+//    Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
+    GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
 }
+
+
+void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
+    KillTimer(nIDEvent);
+    Schedule();
+}
+
 DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
     CString cmd;
-    if (pThis->BuildUpdateCommand(pThis->mRomPath, cmd))
-        pThis->OnSend_Comand(DOWNLOAD_SERVER_IP, cmd.GetString());
+    //if (pThis->BuildUpdateCommand(pThis->mRomPath, cmd)) {
+        SOCKET sock = pThis->CreateSocket(DOWNLOAD_SERVER_IP);
+        if ( sock != INVALID_SOCKET) {
+        //pThis->OnSend_Comand(sock, cmd.GetString());
+        pThis->OnSend_Comand(sock, "send_data 254 0 0 7 0 1 0");
+        pThis->OnSend_Comand(sock, "reboot send_data 254 0 0 5 0 0 0");
+        closesocket(sock);
+        pThis->ReleaseThreadSyncSemaphore();
+        }
+    //}
     return 1;
 }
 
-BOOL CDownloadDlg::BuildUpdateCommand(CString file, CString &cmd) {
-    GetIp Get_Ip(m_NetworkSegment);
-    string Ip;
-    string Firmware_name=mRomPath.GetString();
-    int tmp=Firmware_name.find_last_of("\\");
-    Firmware_name=Firmware_name.substr(tmp+1,Firmware_name.length());
-    const char * filename = basename(mRomPath.GetString());
+void CDownloadDlg::ReleaseThreadSyncSemaphore() {
+    ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
+}
+DWORD CDownloadDlg::Schedule() {
+    //Send_Comand_Thread= CreateThread(NULL,0,Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
+    return 0;
+}
 
+void CDownloadDlg::GetHostIpAddr() {
+    GetIp Get_Ip(m_NetworkSegment);
     bool IsGetIp=false;
-    for(int i = 0; i< 10; i++) {
-        if(Get_Ip.GetHostIP(Ip)) {
+    mHostIPAddr.clear();
+    for(int i = 0; i< 3; i++) {
+        if(Get_Ip.GetHostIP(mHostIPAddr)) {
             IsGetIp=true;
             UpdateMessage(_T("Get Ip successfully!"));
             break;
@@ -509,31 +547,39 @@ BOOL CDownloadDlg::BuildUpdateCommand(CString file, CString &cmd) {
     }
     if(IsGetIp==false) {
         UpdateMessage(_T("Get IP failed!"));
+    }
+}
+
+BOOL CDownloadDlg::BuildUpdateCommand(CString file, CString &cmd) {
+    string Firmware_name=file.GetString();
+    int tmp=Firmware_name.find_last_of("\\");
+    Firmware_name=Firmware_name.substr(tmp+1,Firmware_name.length());
+    const char * filename = basename(file.GetString());
+
+    if(file =="" ) {
+        ::MessageBox(NULL,_T("Please select software!"),_T("select software"),MB_OK);
         return FALSE;
     }
-    string download_comand="update update -u \"http://"+Ip+"/"+Firmware_name+
+
+    if(mHostIPAddr.empty()) {
+        UpdateMessage(_T("Get IP failed!"));
+        return FALSE;
+    }
+
+    string download_comand="update update -u \"http://"+mHostIPAddr+"/"+Firmware_name+
                             "/\" -f --no-cert-check --no-device-check\r\n\r\n";
 
     cmd.Format("update update -u \"http://%s/%s/\" -f --no-cert-check --no-device-check\r\n\r\n",
-                                Ip.c_str(), Firmware_name);
+                                mHostIPAddr.c_str(), Firmware_name);
 
     return TRUE;
 }
-void CDownloadDlg::OnSend_Comand(const char * cmd, const char *ip_addr,  u_short port) {
-    char s_SN[16]      = {0};
-    char s_SSID[51]    = {0};
-    char MAC_label[20] = {0};
+
+SOCKET CDownloadDlg::CreateSocket(const char *ip_addr,  u_short port) {
     SOCKET sockClient = INVALID_SOCKET;
-
-    if(mRomPath=="" ) {
-        ::MessageBox(NULL,_T("Please select software!"),_T("select software"),MB_OK);
-        return;
-    }
-    ClearMessage();
-
     if (mWSAInitialized == FALSE) {
         UpdateMessage(_T("Server Startup failed!"));
-        return ;
+        return sockClient;
     }
 
     //CString cstr(download_comand.data());
@@ -550,9 +596,22 @@ void CDownloadDlg::OnSend_Comand(const char * cmd, const char *ip_addr,  u_short
     Sleep(2000);
     iResult = connect(sockClient, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
     if(iResult==SOCKET_ERROR) {
+        closesocket(sockClient);
         HandleDownloadException(_T("Connect device failed!"), sockClient);
-        return ;
+        sockClient = INVALID_SOCKET;
     }
+    return sockClient;
+}
+
+void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
+    char s_SN[16]      = {0};
+    char s_SSID[51]    = {0};
+    char MAC_label[20] = {0};
+
+    if (sockClient == INVALID_SOCKET) {
+        return;
+    }
+
     char recvBuf[101] = {'\0'};
     recv(sockClient, recvBuf, 100, 0);
     //bool is_set_time_out=SetTimeOut(sockClient, 50000, true);
@@ -614,23 +673,26 @@ void CDownloadDlg::OnSend_Comand(const char * cmd, const char *ip_addr,  u_short
             GetDlgItem(ID_Start)->EnableWindow(true);
             downloading_successfull=false;
             is_downloading=false;
-            ::MessageBox(NULL,_T("Download failed!, Please remove the device and then try it again!"),_T("Download"),MB_OK);
+            ::MessageBox(NULL,_T("Download failed!"),_T("Download"),MB_OK);
             break;
         }
-    }while(bytes  > 0);
-
-    closesocket(sockClient);
+    } while(bytes > 0);
 }
 
 void CDownloadDlg::HandleDownloadException(CString msg, SOCKET &sock) {
-        UpdateMessage(msg);
-        GetDlgItem(ID_Start)->EnableWindow(true);
-        ::MessageBox(NULL, msg, _T("Download"),MB_OK);
-        is_downloading=false;
-        downloading_successfull=false;
+    UpdateMessage(msg);
+    GetDlgItem(ID_Start)->EnableWindow(true);
+    ::MessageBox(NULL, msg, _T("Download"),MB_OK);
+    is_downloading=false;
+    downloading_successfull=false;
 
-            if (sock != INVALID_SOCKET)
-            closesocket(sock);
+    if (sock != INVALID_SOCKET)
+        closesocket(sock);
+}
+
+
+LRESULT CDownloadDlg::OnMessageArrive(WPARAM wParam, LPARAM lParam) {
+    return 0;
 }
 
 void CDownloadDlg::ClearMessage(void) {
@@ -668,7 +730,46 @@ void CDownloadDlg::OnClose() {
 	//{
 	//	return;
 	//}
-	exitSocket = true;
 	//Sleep(1000);
 	CDialogEx::OnClose();
+    //ExitThread(m_NetworkSnifferThreadID);
+    TerminateThread(m_NetworkSnifferThreadHandle, 1);
+}
+
+BOOL CDownloadDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
+{
+    if (dwData == 0)
+    {
+        //LOGD("OnDeviceChange, dwData == 0 .EventType: 0x%x", nEventType);
+        return FALSE;
+    }
+
+    DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
+    PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
+
+    //DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x", nEventType, phdr->dbch_devicetype);
+
+    if (nEventType == DBT_DEVICEARRIVAL) {
+        switch( phdr->dbch_devicetype ) {
+        case DBT_DEVTYP_DEVNODE:
+            LOGW("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
+            break;
+
+        case DBT_DEVTYP_PORT:
+            {
+                LOGI("device arrive, DBT_DEVTYP_PORT");
+                break;
+            }
+        }
+    } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
+        switch (phdr->dbch_devicetype) {
+        case DBT_DEVTYP_PORT:
+            {
+                LOGI("device removed, DBT_DEVTYP_PORT");
+                break;
+            }
+        }
+    }
+
+    return TRUE;
 }
