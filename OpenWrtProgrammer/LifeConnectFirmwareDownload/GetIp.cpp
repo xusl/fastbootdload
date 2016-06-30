@@ -92,7 +92,7 @@ bool Ping(const char *ip_addr) {
                             NULL,
                             ReplyBuffer,
                             ReplySize,
-                            5000 );
+                            2000);
     IcmpCloseHandle(hIcmpFile);
 
     if( dwRetVal > 0 ) {
@@ -141,7 +141,7 @@ int ResolveIpMac(const char *DestIpString, string & mac)
 
     memset(&MacAddr, 0xff, sizeof (MacAddr));
 
-    LOGE("Sending ARP request for IP address: %s", DestIpString);
+    //LOGE("Sending ARP request for IP address: %s", DestIpString);
 
     dwRetVal = SendARP(DestIp, SrcIp, &MacAddr, &PhysAddrLen);
 
@@ -161,29 +161,30 @@ int ResolveIpMac(const char *DestIpString, string & mac)
             LOGE("Warning: SendArp completed successfully, but returned length=0\n");
         }
     } else {
-        LOGE("Error: SendArp failed with error: %d", dwRetVal);
+        const char * errstr = "";
         switch (dwRetVal) {
         case ERROR_GEN_FAILURE:
-            LOGE(" (ERROR_GEN_FAILURE)");
+            errstr = _T(" (ERROR_GEN_FAILURE)");
             break;
         case ERROR_INVALID_PARAMETER:
-            LOGE(" (ERROR_INVALID_PARAMETER)");
+            errstr = _T(" (ERROR_INVALID_PARAMETER)");
             break;
         case ERROR_INVALID_USER_BUFFER:
-            LOGE(" (ERROR_INVALID_USER_BUFFER)");
+            errstr = _T(" (ERROR_INVALID_USER_BUFFER)");
             break;
         case ERROR_BAD_NET_NAME:
-            LOGE(" (ERROR_GEN_FAILURE)");
+            errstr = _T(" (ERROR_GEN_FAILURE)");
             break;
         case ERROR_BUFFER_OVERFLOW:
-            LOGE(" (ERROR_BUFFER_OVERFLOW)");
+            errstr = _T(" (ERROR_BUFFER_OVERFLOW)");
             break;
         case ERROR_NOT_FOUND:
-            LOGE(" (ERROR_NOT_FOUND)");
+            errstr = _T(" (ERROR_NOT_FOUND)");
             break;
         default:
             break;
         }
+        LOGE("Error: SendArp failed with error: %d(%s)", dwRetVal, errstr);
     }
 
     return 1;

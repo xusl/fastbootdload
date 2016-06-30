@@ -144,17 +144,16 @@ BOOL CDownloadDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
-
     WSADATA wsaData;
     // iResult = WSAStartup( MAKEWORD( 2, 2), &wsaData );
     if ( WSAStartup(MAKEWORD(1, 1), &wsaData ) != 0 ) {
         AfxMessageBox(IDP_SOCKETS_INIT_FAILED);
     } else {
-    if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1) {
-        WSACleanup( );
-    } else {
-    mWSAInitialized = TRUE;
-    }
+        if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1) {
+            WSACleanup( );
+        } else {
+            mWSAInitialized = TRUE;
+        }
     }
 
 	Line_edit=(CEdit*)GetDlgItem(IDC_Error_Message);
@@ -203,7 +202,7 @@ BOOL CDownloadDlg::OnInitDialog()
  }
 
 void CDownloadDlg::SniffNetwork() {
-    for (int i = 2; i < 20; i++) {
+    for (int i = 1; i < 4; i++) {
         CString ip_addr;
         const char* pcIpAddr;
         string mac;
@@ -498,7 +497,7 @@ void CDownloadDlg::OnBnClickedStart() {
     is_downloading=false;
     downloading_successfull=false;
     m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
-    Schedule();
+    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
 //    Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
 }
@@ -513,23 +512,42 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
     CString cmd;
     //if (pThis->BuildUpdateCommand(pThis->mRomPath, cmd)) {
-        SOCKET sock = pThis->CreateSocket(DOWNLOAD_SERVER_IP);
-        if ( sock != INVALID_SOCKET) {
+    DeviceCoordinator * dc = pThis->GetDeviceCoodinator();
+    if (dc == NULL) {
+        LOGE("Can not get available DeviceCoordinator");
+        return 1;
+    }
+    CDevLabel *dev = dc->GetValidDevice();
+    if (dev == NULL) {
+        LOGE("There is none device in the network.");
+        return 2;
+    }
+
+    SOCKET sock = pThis->CreateSocket(dev->GetIpAddr().c_str());
+    if ( sock != INVALID_SOCKET) {
         //pThis->OnSend_Comand(sock, cmd.GetString());
         pThis->OnSend_Comand(sock, "send_data 254 0 0 7 0 1 0");
         pThis->OnSend_Comand(sock, "reboot send_data 254 0 0 5 0 0 0");
         closesocket(sock);
-        pThis->ReleaseThreadSyncSemaphore();
-        }
+        dc->RemoveDevice(dev);
+    }
     //}
-    return 1;
+    return 0;
 }
 
 void CDownloadDlg::ReleaseThreadSyncSemaphore() {
     ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
 }
 DWORD CDownloadDlg::Schedule() {
-    //Send_Comand_Thread= CreateThread(NULL,0,Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
+    if (!m_pCoordinator->IsEmpty()) {
+    Send_Comand_Thread= CreateThread(NULL,0,
+        Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
+   // WaitForSingleObject(Send_Comand_Thread, INFINITE);
+    }
+    //ReleaseThreadSyncSemaphore();
+    ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
+
+    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     return 0;
 }
 
@@ -588,16 +606,17 @@ SOCKET CDownloadDlg::CreateSocket(const char *ip_addr,  u_short port) {
     addrSrv.sin_family = AF_INET;
     addrSrv.sin_port = htons(port);
     __int64 iResult;
-    sockClient = socket(AF_INET, SOCK_STREAM, 0);
+    sockClient = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     //int timeout=50000;
     //iResult=setsockopt(sockClient,SOL_SOCKET,SO_RCVTIMEO,(const char*)&timeout,sizeof(int));
     //if(SOCKET_ERROR==iResult)
     //return ;
-    Sleep(2000);
+
     iResult = connect(sockClient, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
     if(iResult==SOCKET_ERROR) {
         closesocket(sockClient);
-        HandleDownloadException(_T("Connect device failed!"), sockClient);
+       // HandleDownloadException(_T("Connect device failed!"), sockClient);
+       LOGE("Connect device %s failed!", ip_addr);
         sockClient = INVALID_SOCKET;
     }
     return sockClient;

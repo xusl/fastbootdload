@@ -12,7 +12,7 @@
 #define CONFIG_FILE_PATH         _T("Config.ini")
 #define WS_LABEL_DIR             TEXT(".\\Label\\")
 //TCP port 23 is reserved for Telnet client and server communication.
-#define TELNET_PORT      23
+#define TELNET_PORT      IPPORT_TELNET
 #define DOWNLOAD_SERVER_PORT     80
 #define DOWNLOAD_SERVER_IP       "172.19.42.1"
 
@@ -29,7 +29,7 @@ enum
   TIMER_EVT_ALL
 };
 
-#define TIMER_ELAPSE   (2 * 1000)
+#define TIMER_ELAPSE   (8 * 1000)
 
 
 // CDownloadDlg dialog
@@ -76,6 +76,7 @@ protected:
   char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
   BOOL BuildUpdateCommand(CString file, CString &cmd);
   DWORD Schedule();
+  DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;};
   void ReleaseThreadSyncSemaphore();
 
 	// Generated message map functions

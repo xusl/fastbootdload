@@ -47,6 +47,7 @@ CDevLabel *DeviceCoordinator::GetValidDevice() {
         CDevLabel *item = *it;
         if (item->IsCommandSent())
             continue;
+        item->SetCommandSent(true);
         return item;
     }
     return NULL;

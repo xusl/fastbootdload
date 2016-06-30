@@ -108,6 +108,7 @@ void WriteLog
 #endif
   vfprintf(gLogFp, szFormat, args);
   va_end(args);
+  fflush(gLogFp);
   //ASSERT(nBuf >= 0);
 
 #ifdef FEATURE_THREAD_SYNC
