@@ -831,11 +831,15 @@ FT_HANDLE hPRG_FTDI_GetHandle(tsCommsPrivate *psCommsPriv)
     else
     {
         int i;
+        FT_STATUS status;
         DBG_vPrintf(TRACE_UART, "FTDI: %d devices\n", dwNumDevs);
 
         for (i = 0; i < dwNumDevs; i++)
         {
-            if (FT_SUCCESS(FTdll_Open(i, &hFtdiHandle)))
+          int j = 0;
+          for(j = 0; j < 2; j++) {
+            status = FTdll_Open(i, &hFtdiHandle);
+            if (FT_SUCCESS(status))
             {
                 /* Opened handle to device */
                 LONG lComPortNumber;
@@ -854,7 +858,11 @@ FT_HANDLE hPRG_FTDI_GetHandle(tsCommsPrivate *psCommsPriv)
                 }
                 /* Not the one we are looking for */
                 FTdll_Close(hFtdiHandle);
+            } else {
+              DBG_vPrintf(TRACE_UART, "CAUTION::::FT_Open failed, return %d\n", status);
+              Sleep(2000);
             }
+          }
         }
     }
 
