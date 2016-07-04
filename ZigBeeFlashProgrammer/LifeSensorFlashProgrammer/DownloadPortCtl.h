@@ -21,7 +21,7 @@ public:
 	void SetProgress(int iPercent);
 	void UpdateStatus(CString strInfo, COLORREF color=COLOR_BLUE);
 	void Init(const char * port);
-  BOOL IsInit();
+  BOOL IsDownload(const char *devicename);
   BOOL AttachDevice(const char *devicename, BOOL fixmap=TRUE);
   BOOL StartDownload();
   BOOL FinishDownload();

@@ -76,6 +76,7 @@ public:
   DWORD ScheduleProgrammer();
   void SetMacByte(CEdit &edit, unsigned char * pValue);
   BOOL CreateDownloadPortDialogs();
+  void UpdateTimer();
 // Dialog Data
 	//{{AFX_DATA(LifeSensorFlashProgrammerDlg)
 	enum { IDD = IDD_FLASHPROGRAMMER_DIALOG };
@@ -95,7 +96,7 @@ public:
 	CProgressCtrl	m_Progress;
 	CComboBox	m_BaudRate;
 	CButton	m_Erase;
-
+  CButton	m_StartProgram;
 
 	//}}AFX_DATA
 

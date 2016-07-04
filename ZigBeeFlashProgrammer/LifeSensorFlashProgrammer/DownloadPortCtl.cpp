@@ -40,8 +40,8 @@ BOOL DownloadPortCtl::OnInitDialog()
   //m_Brush.CreateSolidBrush(RGB(0,0,0));
   //GetDlgItem(IDC_DL_INFO)->SetWindowText(_T("Yy......"));
 	m_Program.SetForeColor(COLOR_BLUE);
-	m_Program.SetTextFont(120,"Arial");
-	m_Program.SetTextFont(120,"Verdana");
+	m_Program.SetTextFont(80,"Arial");
+	//m_Program.SetTextFont(80,"Verdana");
   return TRUE;
 }
 
@@ -87,8 +87,10 @@ BOOL DownloadPortCtl::AttachDevice(const char *devicename, BOOL fixmap) {
     return mID == devicename;
 }
 
-BOOL DownloadPortCtl::IsInit() {
-    return !mID.IsEmpty();
+BOOL DownloadPortCtl::IsDownload(const char *devicename) {
+    if(devicename == NULL || mID.IsEmpty())
+        return FALSE;
+     return mIsDownload && mID == devicename;
 }
 
 BEGIN_MESSAGE_MAP(DownloadPortCtl, CDialog)

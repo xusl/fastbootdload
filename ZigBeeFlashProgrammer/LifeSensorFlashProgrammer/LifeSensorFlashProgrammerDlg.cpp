@@ -172,6 +172,7 @@ void LifeSensorFlashProgrammerDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_PROGRESS, m_Progress);
 	DDX_Control(pDX, IDC_BAUDRATE, m_BaudRate);
 	DDX_Control(pDX, IDC_ERASE, m_Erase);
+    DDX_Control(pDX, IDC_START_PROGRAM, m_StartProgram);
 	//}}AFX_DATA_MAP
 }
 
@@ -184,7 +185,7 @@ BEGIN_MESSAGE_MAP(LifeSensorFlashProgrammerDlg, CDialog)
     ON_WM_TIMER()
 	ON_WM_CLOSE()
     ON_MESSAGE(UI_MESSAGE_PROGRAMMER, &LifeSensorFlashProgrammerDlg::OnProgrammerMessage)
-	ON_BN_CLICKED(IDC_PROGRAM, OnProgram)
+	ON_BN_CLICKED(IDC_START_PROGRAM, OnProgram)
 	ON_BN_CLICKED(IDC_OPEN, OnOpen)
 	ON_BN_CLICKED(IDC_COMLIST, OnComlist)
 	ON_BN_CLICKED(IDC_MAC_EN, OnMacEn)
@@ -310,23 +311,25 @@ HCURSOR LifeSensorFlashProgrammerDlg::OnQueryDragIcon()
 	return (HCURSOR) m_hIcon;
 }
 
-teStatus HandleProgrammerError(tsProgramThreadArgs *psArgs , int error)
+teStatus HandleProgrammerError(DownloadPortCtl *pDownloadPortCtl , int error)
 {
     PrgMsg* info = new PrgMsg;
 
+    tsProgramThreadArgs *psArgs = pDownloadPortCtl->GetProgramArgs();
   info->eType = PRG_MSG_ERROR;
   info->sVal = "";
   info->iVal = error;
   psArgs->hProgrammerDlg->PostMessage(UI_MESSAGE_PROGRAMMER,
                           (WPARAM)info,
-                          (LPARAM)psArgs);
+                          (LPARAM)pDownloadPortCtl);
     return E_PRG_OK;
 }
 
 
 teStatus cbUI_Progress(void *pvUser, const char *pcTitle, const char *pcText, int iNumSteps, int iProgress)
 {
-    tsProgramThreadArgs *psArgs = (tsProgramThreadArgs *)pvUser;
+    DownloadPortCtl *pDownloadPortCtl = (DownloadPortCtl *)pvUser;
+    tsProgramThreadArgs *psArgs = pDownloadPortCtl->GetProgramArgs();
 
     PrgMsg* info = new PrgMsg;
 
@@ -335,7 +338,7 @@ teStatus cbUI_Progress(void *pvUser, const char *pcTitle, const char *pcText, in
   info->iVal = 0;
   psArgs->hProgrammerDlg->PostMessage(UI_MESSAGE_PROGRAMMER,
                           (WPARAM)info,
-                          (LPARAM)psArgs);
+                          (LPARAM)pDownloadPortCtl);
 
     if (psArgs->iVerbosity > 0) {
         LOGD("%15s: %s: %3d%%\n", psArgs->sConnection.pcName, pcText, (iProgress * 100) / iNumSteps);
@@ -518,27 +521,31 @@ BOOL LifeSensorFlashProgrammerDlg::HandleComDevice(VOID) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 DWORD LifeSensorFlashProgrammerDlg::ScheduleProgrammer() {
-    bool haveThread;
     LOGD("Programmer Version: %s (libprogrammer version %s)", Version, pcPRG_Version);
 
     //NumOfDevicesProgrammed = 0;
-//    m_Program.SetForeColor(COLOR_BLUE);
- //   m_Program.SetText("Start Programming ...");
-
-    for (unsigned int j = 0; j < MAX_PORTS_ONCE; j++) {
-
     for (unsigned int i = 0; i < u32NumConnections; i++)
     {
-        //m_Progress.SetPos((i*100)/u32NumConnections);
+        BOOL downloading = FALSE;
+        for (unsigned int j = 0; j < MAX_PORTS_ONCE; j++) {
+            if(m_DownloadPort[j]->IsDownload(_T(asConnections[i].pcName))) {
+                downloading = TRUE;
+                break;
+            }
+        }
+        if(downloading)
+            continue;
 
+        for (unsigned int j = 0; j < MAX_PORTS_ONCE; j++) {
+        //m_Progress.SetPos((i*100)/u32NumConnections);
         if(!m_DownloadPort[j]->AttachDevice(_T(asConnections[i].pcName))) {
-            break;
+            continue;
         }
         tsProgramThreadArgs *args = m_DownloadPort[j]->GetProgramArgs();
 
         memcpy(args, &sProgramThreadArgs, sizeof(tsProgramThreadArgs));
 
-        args->sConnection = asConnections[i];
+        memcpy(&args->sConnection, &asConnections[i], sizeof(args->sConnection));
         args->hProgrammerDlg = this;
 
         for(int k=0;k<8;k++)
@@ -554,12 +561,14 @@ DWORD LifeSensorFlashProgrammerDlg::ScheduleProgrammer() {
         args->bWriteMACAddress = m_mac_en.GetCheck();
 
         //thread_begin:
+        m_DownloadPort[j]->UpdateStatus("Start Programming ...");
         args->hThread = CreateThread(NULL, 0, (unsigned long (__stdcall *)(void *))dwProgramThread, m_DownloadPort[j], 0, NULL);
         if (!args->hThread)
         {
             LOGE("Error starting thread for device %s", args->sConnection.pcName);
-            continue;
+            //continue;
         }
+        break;
 
         //WaitForSingleObject(asThreads[i].hThread, INFINITE);
 
@@ -578,12 +587,22 @@ void LifeSensorFlashProgrammerDlg::OnTimer(UINT_PTR nIDEvent) {
     KillTimer(nIDEvent);
     ScheduleProgrammer();
 }
+void LifeSensorFlashProgrammerDlg::UpdateTimer() {
+    EnterCriticalSection(&m_ProgrammerCountSection);
+
+    KillTimer(TIMER_EVT_SCHEDULE);
+    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+
+    LeaveCriticalSection(&m_ProgrammerCountSection);
+}
 
 static DWORD dwProgramThread(void *pvData) {
     tsPRG_Context   sContext;
     DownloadPortCtl * pDownloadPortCtl = (DownloadPortCtl *) pvData;
     tsProgramThreadArgs *psArgs = pDownloadPortCtl->GetProgramArgs();
     int error = 0;
+
+    pDownloadPortCtl->StartDownload();
 
     if (ePRG_Init(&sContext) != E_PRG_OK)
     {
@@ -654,7 +673,7 @@ static DWORD dwProgramThread(void *pvData) {
     if (psArgs->au8MacAddress)
     {
         /* Set new MAC Address - On 4x devices just set it in the app header. On 6x, write to flash index sector */
-        if ((psArgs->eStatus = ePRG_MACAddressSet(&sContext, psArgs->au8MacAddress, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+        if ((psArgs->eStatus = ePRG_MACAddressSet(&sContext, psArgs->au8MacAddress, cbUI_Progress, cbUI_Confirm, pDownloadPortCtl)) != E_PRG_OK)
         {
             vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
             goto done;
@@ -664,7 +683,7 @@ static DWORD dwProgramThread(void *pvData) {
 
     if (psArgs->pu32AesKeySet)
     {
-        if ((psArgs->eStatus = ePRG_AesKeySet(&sContext, psArgs->pu32AesKeySet, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+        if ((psArgs->eStatus = ePRG_AesKeySet(&sContext, psArgs->pu32AesKeySet, cbUI_Progress, cbUI_Confirm, pDownloadPortCtl)) != E_PRG_OK)
         {
             vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
             goto done;
@@ -675,7 +694,7 @@ static DWORD dwProgramThread(void *pvData) {
     if (psArgs->pu32AesKeyGet)
     {
         uint32_t au32AesKeyGet[4];
-        if ((psArgs->eStatus = ePRG_AesKeyGet(&sContext, au32AesKeyGet, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+        if ((psArgs->eStatus = ePRG_AesKeyGet(&sContext, au32AesKeyGet, cbUI_Progress, cbUI_Confirm, pDownloadPortCtl)) != E_PRG_OK)
         {
             vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
             goto done;
@@ -692,7 +711,7 @@ static DWORD dwProgramThread(void *pvData) {
 
             if (psArgs->apu32UserDataSet[i])
             {
-                if ((psArgs->eStatus = ePRG_UserDataSet(&sContext, i, psArgs->apu32UserDataSet[i], cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+                if ((psArgs->eStatus = ePRG_UserDataSet(&sContext, i, psArgs->apu32UserDataSet[i], cbUI_Progress, cbUI_Confirm, pDownloadPortCtl)) != E_PRG_OK)
                 {
                     vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
                     goto done;
@@ -702,7 +721,7 @@ static DWORD dwProgramThread(void *pvData) {
 
             if (psArgs->apu32UserDataGet[i])
             {
-                if ((psArgs->eStatus = ePRG_UserDataGet(&sContext, i, au32UserDataGet, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+                if ((psArgs->eStatus = ePRG_UserDataGet(&sContext, i, au32UserDataGet, cbUI_Progress, cbUI_Confirm, pDownloadPortCtl)) != E_PRG_OK)
                 {
                     vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
                     goto done;
@@ -717,7 +736,7 @@ static DWORD dwProgramThread(void *pvData) {
     {
         vUI_UpdateStatus(psArgs, "Setting device configuration");
 
-        if ((psArgs->eStatus = ePRG_DeviceConfigSet(&sContext, psArgs->psDeviceConfigSet, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+        if ((psArgs->eStatus = ePRG_DeviceConfigSet(&sContext, psArgs->psDeviceConfigSet, cbUI_Progress, cbUI_Confirm, pDownloadPortCtl)) != E_PRG_OK)
         {
             vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
             goto done;
@@ -762,7 +781,7 @@ static DWORD dwProgramThread(void *pvData) {
         }
 
         vUI_UpdateStatus(psArgs, "Programming %s", sContext.sChipDetails.asFlashes[psArgs->u32FlashIndex].pcFlashName);
-        if ((psArgs->eStatus = ePRG_FlashProgram(&sContext, cbUI_Progress, cbUI_Confirm, psArgs)) != E_PRG_OK)
+        if ((psArgs->eStatus = ePRG_FlashProgram(&sContext, cbUI_Progress, cbUI_Confirm, pDownloadPortCtl)) != E_PRG_OK)
         {
             vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
             goto done;
@@ -772,7 +791,7 @@ static DWORD dwProgramThread(void *pvData) {
         if (psArgs->iVerify)
         {
             vUI_UpdateStatus(psArgs, "Verifying %s", sContext.sChipDetails.asFlashes[psArgs->u32FlashIndex].pcFlashName);
-            if ((psArgs->eStatus = ePRG_FlashVerify(&sContext, cbUI_Progress, psArgs)) != E_PRG_OK)
+            if ((psArgs->eStatus = ePRG_FlashVerify(&sContext, cbUI_Progress, pDownloadPortCtl)) != E_PRG_OK)
             {
                 vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
                 goto done;
@@ -885,19 +904,21 @@ done:
         info->eType = PRG_MSG_RESULT;
         info->sVal = "";
         info->iVal = error;
+        psArgs->hProgrammerDlg->UpdateTimer();
         psArgs->hProgrammerDlg->PostMessage(UI_MESSAGE_PROGRAMMER,
                                             (WPARAM)info,
-                                            (LPARAM)psArgs);
+                                            (LPARAM)pDownloadPortCtl);
     } else {
-        HandleProgrammerError(psArgs, error);
+        HandleProgrammerError(pDownloadPortCtl, error);
     }
 
 ERROR:
     if (error != 0){
-        HandleProgrammerError(psArgs, error);
+        HandleProgrammerError(pDownloadPortCtl, error);
     }
 
     psArgs->hThread = NULL;
+    pDownloadPortCtl->FinishDownload();
     return error;
 }
 
@@ -1144,7 +1165,7 @@ void LifeSensorFlashProgrammerDlg::OnMacEn()
 BOOL LifeSensorFlashProgrammerDlg::CreateDownloadPortDialogs()
 {
     int i, j;
-    const int bx = 10, by = 10, pw = 280, ph = 160;
+    const int bx = 6, by = 10, pw = 300, ph = 160;
     int x, y;
     const int ROWS = 2;
 #if 0
@@ -1180,8 +1201,8 @@ BOOL LifeSensorFlashProgrammerDlg::CreateDownloadPortDialogs()
         }
         m_DownloadPort[j] = new DownloadPortCtl;
         m_DownloadPort[j]->Create(IDD_DOWNLOADPORT, this);
-        x = bx + LONG(floor(float(j / ROWS))) * (18 + pw);
-        y = by + (j % ROWS) * (8+ph);
+        x = bx + LONG(floor(float(j / ROWS))) * (3 + pw);
+        y = by + (j % ROWS) * (3+ph);
         m_DownloadPort[j]->SetWindowPos(0, x, y, pw, ph, SWP_SHOWWINDOW);
     }
     Invalidate();
