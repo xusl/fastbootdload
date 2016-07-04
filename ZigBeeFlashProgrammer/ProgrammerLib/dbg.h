@@ -51,6 +51,11 @@
 /***        Include Files                                                 ***/
 /****************************************************************************/
 #define DBG_VERBOSE
+#define DBG_ENABLE
+#define DEBUG_FIRMWARE
+//#define DEBUG_BOOTLOADER
+#define DEBUG_PROGRAMMER
+#define DEBUG_UART
 
 #if defined __cplusplus
 extern "C" {
@@ -160,9 +165,15 @@ typedef  int bool_t;
  * case they may cause side effects
  * (may still need work to make this portable to non GCC compilers) */
 #ifdef DBG_VERBOSE
-#define DBG_vPrintf                                                \
-        dbg_vSetFileLine(__FILE__, __LINE__);                      \
-        dbg_vPrintfImpl2
+//#define DBG_vPrintf                                                \
+//        dbg_vSetFileLine(__FILE__, __LINE__);                      \
+//        dbg_vPrintfImpl2
+
+#define DBG_vPrintf(STREAM, FORMAT, ...)                        \
+    do {                                                            \
+        if (STREAM)                           \
+        dbg_vPrintfImpl(__FILE__, __LINE__, FORMAT, __VA_ARGS__);    \
+    } while(0)
 #else
 #define DBG_vPrintf                                                \
         dbg_vSetFileLine("",0);                                    \

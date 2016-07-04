@@ -50,6 +50,8 @@ const char * basename(const char * f_name) {
 
 void dbg_vPrintfImpl(const char *pcFile, uint32_t u32Line, const char *pcFormat, ...)
 {
+    static int show_tag = 1;
+    int fmt_len;
     va_list argp;
     va_start(argp, pcFormat);
 #if 0
@@ -59,9 +61,19 @@ void dbg_vPrintfImpl(const char *pcFile, uint32_t u32Line, const char *pcFormat,
     vprintf(pcFormat, argp);
     fflush(stdout);
 #endif
-    fprintf(gLogFp, "%s:%d ", pcFile, u32Line);
-    vfprintf(gLogFp, pcFormat, argp);
-    fflush(gLogFp);
+    if (pcFormat != NULL) {
+        SYSTEMTIME time;
+        GetLocalTime(&time);
+        if (show_tag) {
+        fprintf(gLogFp,"%02hd:%02hd:%02hd %6s ",
+                   time.wHour, time.wMinute,time.wSecond, "DBG");
+        fprintf(gLogFp, "%s:%d ", basename(pcFile), u32Line);
+        }
+        vfprintf(gLogFp, pcFormat, argp);
+        fflush(gLogFp);
+        fmt_len = strlen(pcFormat);
+        show_tag = fmt_len >= 1 && pcFormat[fmt_len - 1] == '\n';
+    }
     va_end(argp);
     return;
 }

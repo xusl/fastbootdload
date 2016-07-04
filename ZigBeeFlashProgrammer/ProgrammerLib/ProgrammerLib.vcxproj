@@ -96,6 +96,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChipID.h" />
+    <ClInclude Include="dbg.h" />
     <ClInclude Include="ftd2xx.h" />
     <ClInclude Include="header.h" />
     <ClInclude Include="JN51xx_BootLoader.h" />

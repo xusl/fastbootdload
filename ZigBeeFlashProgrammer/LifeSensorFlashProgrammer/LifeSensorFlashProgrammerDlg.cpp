@@ -485,6 +485,7 @@ BOOL LifeSensorFlashProgrammerDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwD
 }
 
 BOOL LifeSensorFlashProgrammerDlg::HandleComDevice(VOID) {
+#if 0
     vector<CDevLabel> devicePath;
     //GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
     GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_FTDIBUS, devicePath, false);
@@ -500,7 +501,7 @@ BOOL LifeSensorFlashProgrammerDlg::HandleComDevice(VOID) {
             success = TRUE;
     }
     devicePath.clear();
-
+#endif
     tsPRG_Context       sContext;
     unsigned int         i;
     uint32_t             orgin_connection = u32NumConnections;

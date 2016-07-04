@@ -323,7 +323,7 @@ static teStatus ePRG_ImportExtension()
         ret = importExtension( IOT_EXTENSION_PATH "/FlashProgrammerExtension_JN5179.bin",
                               &binary_FlashProgrammerExtension_JN5179_bin_start,
                               &binary_FlashProgrammerExtension_JN5179_bin_end );
-
+return ret;
 }
 
 
