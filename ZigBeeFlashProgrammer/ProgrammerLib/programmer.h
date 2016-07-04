@@ -25,9 +25,9 @@
  * This software is owned by NXP B.V. and/or its supplier and is protected
  * under applicable copyright laws. All rights are reserved. We grant You,
  * and any third parties, a license to use this software solely and
- * exclusively on NXP products [NXP Microcontrollers such as JN5148, JN5142, JN5139]. 
+ * exclusively on NXP products [NXP Microcontrollers such as JN5148, JN5142, JN5139].
  * You, and any third parties must reproduce the copyright and warranty notice
- * and any other legend of ownership on each copy or partial copy of the 
+ * and any other legend of ownership on each copy or partial copy of the
  * software.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
@@ -46,8 +46,8 @@
  *
  ***************************************************************************/
 
-#ifndef  PROGRAMMER_H_INCLUDED 
-#define  PROGRAMMER_H_INCLUDED 
+#ifndef  PROGRAMMER_H_INCLUDED
+#define  PROGRAMMER_H_INCLUDED
 
 #if defined __cplusplus
 extern "C" {
@@ -72,6 +72,8 @@ extern "C" {
 
 typedef enum
 {
+    E_PRG_INIT,
+    E_PRG_WORKING,
     E_PRG_OK,
     E_PRG_ERROR,
     E_PRG_OUT_OF_MEMORY,
@@ -205,7 +207,7 @@ typedef struct
 
     uint32_t    u32MacAddressLocation;          /**< Offset in file of MAC address */
     uint8_t*    pu8TextData;                    /**< Pointer to loaded .text section for RAM */
-    
+
     struct
     {
         unsigned        bRawImage : 1;          /**< Flag that the image is considered to be a raw binary file
@@ -248,7 +250,7 @@ typedef struct
         E_CHIP_BIG_ENDIAN,                              /**< Chip has a big endian CPU */
         E_CHIP_LITTLE_ENDIAN,                           /**< Chip has a little endian CPU */
     } eEndianness;
-    
+
     uint8_t             boEEPpresent;                   /** EEPROM present flag */
 } tsChipDetails;
 
@@ -260,10 +262,10 @@ typedef struct
     tsChipDetails       sChipDetails;           /**< Information about the connected device */
     tsDeviceConfig      sDeviceConfig;          /**< Device configuration */
     void *              pvPrivate;              /**< Private context information */
-    
+
     uint32_t            u32FlashOffset;         /**< Offset within flash at which to load / dump an image. Default 0 (start) */
     uint32_t            u32EepromOffset;        /**< Offset within eeprom at which to load / dump an image. Default 0 (start) */
-    
+
     struct
     {
         unsigned        bAutoProgramReset : 1;  /**< If possible, automatically assert the program / reset lines. Default true. */

@@ -67,6 +67,39 @@ END
 IDR_MAINFRAME           ICON                    "res\\animal.ico"
 IDI_ICON_ANIMAL         ICON                    "res\\icon1.ico"
 IDI_ICON_HAND           ICON                    "res\\hand.ICO"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_DOWNLOADPORT DIALOGEX 0, 0, 161, 87
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CENTER | WS_CHILD
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    PUSHBUTTON      "Program",IDC_PROGRAM,16,22,128,31
+    GROUPBOX        "Static",IDC_DOWNLOADPORT_GROUP,7,7,147,73
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_DOWNLOADPORT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 154
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 80
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
 #endif    // Chinese (Simplified, PRC) resources
 /////////////////////////////////////////////////////////////////////////////
 
@@ -105,7 +138,6 @@ BEGIN
     CONTROL         "Erase EEPROM",IDC_ERASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,110,199,67,10
     CONTROL         "FLASH verify",IDC_VERIFY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,176,200,62,10
     COMBOBOX        IDC_BAUDRATE,53,199,51,70,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
-    PUSHBUTTON      "Program",IDC_PROGRAM,240,220,203,48
     GROUPBOX        "",IDC_STATIC,7,184,443,91
     PUSHBUTTON      "Open File",IDC_OPEN,19,246,201,17
     PUSHBUTTON      "COM",IDC_COMLIST,20,195,26,19
@@ -119,6 +151,33 @@ BEGIN
     EDITTEXT        IDC_MAC2,414,198,13,13,ES_UPPERCASE | ES_AUTOHSCROLL
     EDITTEXT        IDC_MAC1,430,198,13,13,ES_UPPERCASE | ES_AUTOHSCROLL
 END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 228
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 48
+    END
+
+    IDD_FLASHPROGRAMMER_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 450
+        TOPMARGIN, 3
+        BOTTOMMARGIN, 275
+    END
+END
+#endif    // APSTUDIO_INVOKED
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -157,33 +216,6 @@ BEGIN
         VALUE "Translation", 0x409, 1200
     END
 END
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
-// DESIGNINFO
-//
-
-#ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO
-BEGIN
-    IDD_ABOUTBOX, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 228
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 48
-    END
-
-    IDD_FLASHPROGRAMMER_DIALOG, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 450
-        TOPMARGIN, 3
-        BOTTOMMARGIN, 275
-    END
-END
-#endif    // APSTUDIO_INVOKED
 
 
 /////////////////////////////////////////////////////////////////////////////

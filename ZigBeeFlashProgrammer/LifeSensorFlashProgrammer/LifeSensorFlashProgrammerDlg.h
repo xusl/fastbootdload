@@ -10,6 +10,7 @@
 
 #include "device.h"
 #include "MyButton.h"
+#include "DownloadPortCtl.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // LifeSensorFlashProgrammerDlg dialog
@@ -63,16 +64,18 @@ typedef struct _PrgMsg_
 
 
 
-#define MAX 100
+#define MAX_PORTS_ONCE 6
 
 class LifeSensorFlashProgrammerDlg : public CDialog
 {
 // Construction
 public:
 	LifeSensorFlashProgrammerDlg(CWnd* pParent = NULL);	// standard constructor
+  ~LifeSensorFlashProgrammerDlg();
   BOOL HandleComDevice(VOID);
   DWORD ScheduleProgrammer();
   void SetMacByte(CEdit &edit, unsigned char * pValue);
+  BOOL CreateDownloadPortDialogs();
 // Dialog Data
 	//{{AFX_DATA(LifeSensorFlashProgrammerDlg)
 	enum { IDD = IDD_FLASHPROGRAMMER_DIALOG };
@@ -86,7 +89,6 @@ public:
 	CEdit	m_mac2;
 	CEdit	m_mac1;
 	CButton	m_mac_en;
-	CMyButton	m_Program;
 	CButton	m_Comlist;
 	CButton	m_Open;
 	CButton	m_Verify;
@@ -106,9 +108,9 @@ public:
 // Implementation
 protected:
 	HICON m_hIcon;
-	CButton *p_CheckBox[MAX];
+  DownloadPortCtl *m_DownloadPort[MAX_PORTS_ONCE];
 	CString m_FilePath;
-    DeviceCoordinator mDevCoordinator;
+  DeviceCoordinator mDevCoordinator;
 	// Generated message map functions
 	//{{AFX_MSG(LifeSensorFlashProgrammerDlg)
 	virtual BOOL OnInitDialog();

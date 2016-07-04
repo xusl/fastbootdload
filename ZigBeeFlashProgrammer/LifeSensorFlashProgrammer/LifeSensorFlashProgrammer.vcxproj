@@ -109,6 +109,7 @@
   <ItemGroup>
     <ClCompile Include="device.cpp" />
     <ClCompile Include="DeviceConfig.cpp" />
+    <ClCompile Include="DownloadPortCtl.cpp" />
     <ClCompile Include="LifeSensorFlashProgrammer.cpp" />
     <ClCompile Include="LifeSensorFlashProgrammerDlg.cpp" />
     <ClCompile Include="MyButton.cpp" />
@@ -125,9 +126,11 @@
   <ItemGroup>
     <ClInclude Include="device.h" />
     <ClInclude Include="DeviceConfig.h" />
+    <ClInclude Include="DownloadPortCtl.h" />
     <ClInclude Include="LifeSensorFlashProgrammer.h" />
     <ClInclude Include="LifeSensorFlashProgrammerDlg.h" />
     <ClInclude Include="MyButton.h" />
+    <ClInclude Include="ProgramThread.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="StdAfx.h" />
   </ItemGroup>

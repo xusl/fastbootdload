@@ -20,6 +20,7 @@
 #include <winioctl.h>
 #include <devguid.h>
 #include "usbiodef.h"
+#include "ProgramThread.h"
 
 //#define __STDC__ TRUE
 #define vDelay(a) usleep(a * 1000)
@@ -35,42 +36,11 @@ static char THIS_FILE[] = __FILE__;
 const char *Version = "1.0 (r" VERSION ")";
 #endif
 
-//    int             iThreadNum;
-//    int             iThreadTotal;
 #define VERBOSITY_DEFAULT 1
 
 unsigned char MAC_ADDR[8] = {0x00, 0x00 ,0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 unsigned char MAC_UI[8] = {0x00, 0x00 ,0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-typedef struct {
-    const char*     pcFirmwareFile;
-    const char*     pcDumpFlashFile;
-    teEepromErase   eEepromErase;
-    const char*     pcLoadEEPROMFile;
-    uint8_t*        au8MacAddress;
-    int             iInitialSpeed;
-    int             iProgramSpeed;
-    int             iVerify;
-    int             iVerbosity;
-    tsConnection    sConnection;
-    HANDLE          hThread;
-    LifeSensorFlashProgrammerDlg *hProgrammerDlg;
-    int            bWriteMACAddress;
-
-    uint32_t        u32FlashOffset;
-    uint32_t        u32EepromOffset;
-
-    uint32_t        u32FlashIndex;
-    uint32_t        u32ConnectionNum;
-    teStatus        eStatus;
-    uint32_t*       pu32AesKeyGet;
-    uint32_t*       pu32AesKeySet;
-
-    uint32_t*       apu32UserDataGet[3];    /**< 3 lots of 128 bits of user data for loading from index sector */
-    uint32_t*       apu32UserDataSet[3];    /**< 3 lots of 128 bits of user data for programming into index sector */
-    tsDeviceConfig* psDeviceConfigGet;
-    tsDeviceConfig* psDeviceConfigSet;
-} tsProgramThreadArgs;
 
 static tsProgramThreadArgs sProgramThreadArgs = {
     "FLASH",
@@ -88,34 +58,32 @@ static tsProgramThreadArgs sProgramThreadArgs = {
 	TRUE
 };
 
-#if 0
-sProgramThreadArgs.eStatus = E_PRG_OK;
-sProgramThreadArgs.pcFirmwareFile     = NULL;
-sProgramThreadArgs.eEepromErase       = E_ERASE_EEPROM_ALL;
-sProgramThreadArgs.iInitialSpeed      = 38400;
+void SetDefaultProgramArgs() {
+    sProgramThreadArgs.eStatus = E_PRG_INIT;
+    sProgramThreadArgs.pcFirmwareFile     = NULL;
+    sProgramThreadArgs.eEepromErase       = E_ERASE_EEPROM_ALL;
+    sProgramThreadArgs.iInitialSpeed      = 38400;
     sProgramThreadArgs.iProgramSpeed      = 1000000;
     sProgramThreadArgs.iVerify            = 0;
     sProgramThreadArgs.iVerbosity         = VERBOSITY_DEFAULT;
-    sProgramThreadArgs.iForce             = 0;
+    //    sProgramThreadArgs.iForce             = 0;
     sProgramThreadArgs.u32FlashIndex      = 0;
-     sProgramThreadArgs.psDeviceConfigGet = (tsDeviceConfig*)1;
-sProgramThreadArgs.pu32AesKeyGet = (uint32_t*)1;
-sProgramThreadArgs.apu32UserDataGet[0] = (uint32_t*)1;
-#endif
+    sProgramThreadArgs.psDeviceConfigGet = (tsDeviceConfig*)1;
+    sProgramThreadArgs.pu32AesKeyGet = (uint32_t*)1;
+    sProgramThreadArgs.apu32UserDataGet[0] = (uint32_t*)1;
+}
 
 static DWORD dwProgramThread(void* pvData);
 void AddProgrammedDevicesCount();
 
 char *FlashFilePath = "ZONE_JN5169_DR1199_CSW.bin";// NULL;
 tsConnection    *asConnections     = NULL;
-tsProgramThreadArgs *asThreads      = NULL;
+//tsProgramThreadArgs *asThreads      = NULL;
 uint32_t        u32NumConnections   = 0;
 uint32_t        NumOfDevicesProgrammed = 0;
 CRITICAL_SECTION m_ProgrammerCountSection;
 CRITICAL_SECTION gMacAddressSection;
 
-#define COLOR_RED 0x0000FF
-#define COLOR_BLUE 0xFF0000
 
 /////////////////////////////////////////////////////////////////////////////
 // CAboutDlg dialog used for App About
@@ -171,8 +139,19 @@ LifeSensorFlashProgrammerDlg::LifeSensorFlashProgrammerDlg(CWnd* pParent /*=NULL
 	//}}AFX_DATA_INIT
 	// Note that LoadIcon does not require a subsequent DestroyIcon in Win32
 	m_hIcon = AfxGetApp()->LoadIcon(IDI_ICON_ANIMAL);
+    for (int i = 0; i < MAX_PORTS_ONCE; i++) {
+        m_DownloadPort[i] = NULL;
+    }
 }
 
+LifeSensorFlashProgrammerDlg::~LifeSensorFlashProgrammerDlg() {
+    for (int i = 0; i < MAX_PORTS_ONCE; i++) {
+        if (m_DownloadPort[i] != NULL) {
+           delete m_DownloadPort[i];
+           m_DownloadPort[i] = NULL;
+        }
+  }
+}
 void LifeSensorFlashProgrammerDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
@@ -187,7 +166,6 @@ void LifeSensorFlashProgrammerDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_MAC2, m_mac2);
 	DDX_Control(pDX, IDC_MAC1, m_mac1);
 	DDX_Control(pDX, IDC_MAC_EN, m_mac_en);
-	DDX_Control(pDX, IDC_PROGRAM, m_Program);
 	DDX_Control(pDX, IDC_COMLIST, m_Comlist);
 	DDX_Control(pDX, IDC_OPEN, m_Open);
 	DDX_Control(pDX, IDC_VERIFY, m_Verify);
@@ -267,10 +245,6 @@ BOOL LifeSensorFlashProgrammerDlg::OnInitDialog()
 	//Get COM Ports
 	HandleComDevice();
 
-	m_Program.SetForeColor(COLOR_BLUE);
-	m_Program.SetTextFont(120,"Arial");
-	m_Program.SetTextFont(120,"Verdana");
-
     if (FlashFilePath != NULL)
     m_Open.SetWindowText(basename(FlashFilePath));
 
@@ -282,6 +256,8 @@ BOOL LifeSensorFlashProgrammerDlg::OnInitDialog()
 	m_mac6.LimitText(2);
 	m_mac7.LimitText(2);
 	m_mac8.LimitText(2);
+    CreateDownloadPortDialogs();
+
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -503,11 +479,7 @@ BOOL LifeSensorFlashProgrammerDlg::HandleComDevice(VOID) {
     devicePath.clear();
 #endif
     tsPRG_Context       sContext;
-    unsigned int         i;
     uint32_t             orgin_connection = u32NumConnections;
-
-    for (i = 0; i < u32NumConnections; i++)
-        delete p_CheckBox[i];
 
     if (ePRG_Init(&sContext) != E_PRG_OK)
     {
@@ -524,36 +496,8 @@ BOOL LifeSensorFlashProgrammerDlg::HandleComDevice(VOID) {
     tsConnection *asNewConnection = (tsConnection *)realloc(asConnections, sizeof(tsConnection) * (u32NumConnections + 1));
     asConnections = asNewConnection;
 
-    CFont  * f = new CFont;
-    f -> CreateFont(18,  //  nHeight
-                    0 ,  //  nWidth
-                    0 ,  //  nEscapement
-                    0 ,  //  nOrientation
-                    FW_BOLD,  //  nWeight
-                    TRUE,  //  bItalic
-                    FALSE,  //  bUnderline
-                    0 ,  //  cStrikeOut
-                    ANSI_CHARSET,  //  nCharSet
-                    OUT_DEFAULT_PRECIS,  //  nOutPrecision
-                    CLIP_DEFAULT_PRECIS,  //  nClipPrecision
-                    DEFAULT_QUALITY,  //  nQuality
-                    DEFAULT_PITCH  |  FF_SWISS,  //  nPitchAndFamily
-                    _T("MS Sans Serif" ));  //  lpszFac
 
-    for (i = 0; i < u32NumConnections; i++) {
-        CRect rect;
-        rect.left = LONG(30 + 150 * floor(float(i / 13)));
-        rect.bottom = 40 + (i % 13)*20;
-        rect.top = rect.bottom - 20;
-        rect.right = rect.left + 170;
-
-        p_CheckBox[i] = new CButton();
-        p_CheckBox[i]->Create(_T(asConnections[i].pcName),
-                              WS_TABSTOP | WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                              rect, this, 1100 + i );
-        p_CheckBox[i]->SetCheck(TRUE);
-    }
-
+#if 0
     if(asThreads == NULL)
         asThreads = (tsProgramThreadArgs *)malloc(sizeof(tsProgramThreadArgs) * u32NumConnections);
     else
@@ -567,8 +511,9 @@ BOOL LifeSensorFlashProgrammerDlg::HandleComDevice(VOID) {
     }
     if (orgin_connection < u32NumConnections)
         memset(asThreads + orgin_connection, 0, sizeof(tsProgramThreadArgs) * (u32NumConnections - orgin_connection));
+#endif
 
-    return success;
+    return TRUE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -577,20 +522,24 @@ DWORD LifeSensorFlashProgrammerDlg::ScheduleProgrammer() {
     LOGD("Programmer Version: %s (libprogrammer version %s)", Version, pcPRG_Version);
 
     //NumOfDevicesProgrammed = 0;
-    m_Program.SetForeColor(COLOR_BLUE);
-    m_Program.SetText("Start Programming ...");
+//    m_Program.SetForeColor(COLOR_BLUE);
+ //   m_Program.SetText("Start Programming ...");
+
+    for (unsigned int j = 0; j < MAX_PORTS_ONCE; j++) {
 
     for (unsigned int i = 0; i < u32NumConnections; i++)
     {
         //m_Progress.SetPos((i*100)/u32NumConnections);
 
-        if(!p_CheckBox[i]->GetCheck() || asThreads[i].hThread != NULL)
-            continue;
+        if(!m_DownloadPort[j]->AttachDevice(_T(asConnections[i].pcName))) {
+            break;
+        }
+        tsProgramThreadArgs *args = m_DownloadPort[j]->GetProgramArgs();
 
-        memcpy(&asThreads[i], &sProgramThreadArgs, sizeof(tsProgramThreadArgs));
+        memcpy(args, &sProgramThreadArgs, sizeof(tsProgramThreadArgs));
 
-        asThreads[i].sConnection = asConnections[i];
-        asThreads[i].hProgrammerDlg = this;
+        args->sConnection = asConnections[i];
+        args->hProgrammerDlg = this;
 
         for(int k=0;k<8;k++)
         {
@@ -598,17 +547,17 @@ DWORD LifeSensorFlashProgrammerDlg::ScheduleProgrammer() {
         }
 
         if(m_mac_en.GetCheck() == TRUE)
-            asThreads[i].au8MacAddress = MAC_ADDR;
+            args->au8MacAddress = MAC_ADDR;
         else
-            asThreads[i].au8MacAddress = NULL;
+            args->au8MacAddress = NULL;
 
-        asThreads[i].bWriteMACAddress = m_mac_en.GetCheck();
+        args->bWriteMACAddress = m_mac_en.GetCheck();
 
         //thread_begin:
-        asThreads[i].hThread = CreateThread(NULL, 0, (unsigned long (__stdcall *)(void *))dwProgramThread, &asThreads[i], 0, NULL);
-        if (!asThreads[i].hThread)
+        args->hThread = CreateThread(NULL, 0, (unsigned long (__stdcall *)(void *))dwProgramThread, m_DownloadPort[j], 0, NULL);
+        if (!args->hThread)
         {
-            LOGE("Error starting thread for device %s", asThreads[i].sConnection.pcName);
+            LOGE("Error starting thread for device %s", args->sConnection.pcName);
             continue;
         }
 
@@ -616,6 +565,7 @@ DWORD LifeSensorFlashProgrammerDlg::ScheduleProgrammer() {
 
         //unsigned long dwExitCode;
         //GetExitCodeThread(asThreads[i].hThread, &dwExitCode);
+    }
     }
     //printf("Number of Devices Programmed : %d\n",NumOfDevicesProgrammed);
 
@@ -629,27 +579,27 @@ void LifeSensorFlashProgrammerDlg::OnTimer(UINT_PTR nIDEvent) {
     ScheduleProgrammer();
 }
 
-static DWORD dwProgramThread(void *pvData)
-{
+static DWORD dwProgramThread(void *pvData) {
     tsPRG_Context   sContext;
-    tsProgramThreadArgs *psArgs = (tsProgramThreadArgs*)pvData;
-	int error = 0;
+    DownloadPortCtl * pDownloadPortCtl = (DownloadPortCtl *) pvData;
+    tsProgramThreadArgs *psArgs = pDownloadPortCtl->GetProgramArgs();
+    int error = 0;
 
     if (ePRG_Init(&sContext) != E_PRG_OK)
     {
-		error = COMPortNotRespond;
+        error = COMPortNotRespond;
         LOGE("Error initialising context");
         goto ERROR;
     }
 
     switch (psArgs->sConnection.eType)
     {
-        case (E_CONNECT_SERIAL):
-            psArgs->sConnection.uDetails.sSerial.u32BaudRate = psArgs->iInitialSpeed;
-            break;
+    case (E_CONNECT_SERIAL):
+        psArgs->sConnection.uDetails.sSerial.u32BaudRate = psArgs->iInitialSpeed;
+        break;
 
-        default:
-            break;
+    default:
+        break;
     }
 
     /* Set the offsets for flash/eeprom operations */
@@ -659,7 +609,7 @@ static DWORD dwProgramThread(void *pvData)
     if ((psArgs->eStatus = ePRG_ConnectionOpen(&sContext, &psArgs->sConnection)) != E_PRG_OK)
     {
         vUI_UpdateStatus(psArgs, "Error opening connection: %s", pcPRG_GetLastStatusMessage(&sContext));
-		error = COMPortNotRespond;
+        error = COMPortNotRespond;
         ePRG_Destroy(&sContext);
         goto ERROR;
     }
@@ -668,9 +618,9 @@ static DWORD dwProgramThread(void *pvData)
     if ((psArgs->eStatus = ePRG_ChipGetDetails(&sContext)) != E_PRG_OK)
     {
         vUI_UpdateStatus(psArgs, "Error: %s - check cabling and power", pcPRG_GetLastStatusMessage(&sContext));
-		error = COMPortNotRespond;
-    	goto ERROR;
-	}
+        error = COMPortNotRespond;
+        goto ERROR;
+    }
 
     vUI_UpdateDeviceInfo(psArgs, &sContext.sChipDetails);
 
@@ -686,7 +636,7 @@ static DWORD dwProgramThread(void *pvData)
         if ((psArgs->eStatus = ePRG_ConnectionUpdate(&sContext, &psArgs->sConnection)) != E_PRG_OK)
         {
             vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
-    		goto ERROR;
+            goto ERROR;
         }
     }
 
@@ -805,7 +755,7 @@ static DWORD dwProgramThread(void *pvData)
     {
         /* Have file to program */
         //if (ePRG_FwOpen(&sContext, (char *)psArgs->pcFirmwareFile) != E_PRG_OK)
-		if (ePRG_FwOpen(&sContext, FlashFilePath) != E_PRG_OK)
+        if (ePRG_FwOpen(&sContext, FlashFilePath) != E_PRG_OK)
         {
             vUI_UpdateStatus(psArgs, "Error: %s", pcPRG_GetLastStatusMessage(&sContext));
             goto done;
@@ -830,11 +780,11 @@ static DWORD dwProgramThread(void *pvData)
             vUI_UpdateStatus(psArgs, "Flash verified successfully");
         }
     }
-	else
-	{
-		error = FlashFileNotFound;
+    else
+    {
+        error = FlashFileNotFound;
         goto done;
-	}
+    }
 
     if (psArgs->pcDumpFlashFile)
     {
@@ -852,11 +802,11 @@ static DWORD dwProgramThread(void *pvData)
             int iFileNameLength = pcExt - psArgs->pcDumpFlashFile;
             memcpy(acDumpFlashFile, psArgs->pcDumpFlashFile, iFileNameLength);
             sprintf(&acDumpFlashFile[iFileNameLength], "_%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X%s",
-                sContext.sChipDetails.au8MacAddress[0] & 0xFF, sContext.sChipDetails.au8MacAddress[1] & 0xFF,
-                sContext.sChipDetails.au8MacAddress[2] & 0xFF, sContext.sChipDetails.au8MacAddress[3] & 0xFF,
-                sContext.sChipDetails.au8MacAddress[4] & 0xFF, sContext.sChipDetails.au8MacAddress[5] & 0xFF,
-                sContext.sChipDetails.au8MacAddress[6] & 0xFF, sContext.sChipDetails.au8MacAddress[7] & 0xFF,
-                pcExt);
+                    sContext.sChipDetails.au8MacAddress[0] & 0xFF, sContext.sChipDetails.au8MacAddress[1] & 0xFF,
+                    sContext.sChipDetails.au8MacAddress[2] & 0xFF, sContext.sChipDetails.au8MacAddress[3] & 0xFF,
+                    sContext.sChipDetails.au8MacAddress[4] & 0xFF, sContext.sChipDetails.au8MacAddress[5] & 0xFF,
+                    sContext.sChipDetails.au8MacAddress[6] & 0xFF, sContext.sChipDetails.au8MacAddress[7] & 0xFF,
+                    pcExt);
 
             vUI_UpdateStatus(psArgs, "Dumping %s into file %s", sContext.sChipDetails.asFlashes[psArgs->u32FlashIndex].pcFlashName, acDumpFlashFile);
 
@@ -889,11 +839,11 @@ static DWORD dwProgramThread(void *pvData)
         vUI_UpdateStatus(psArgs, "EEPROM loaded successfully");
     }
 
-	if (psArgs->au8MacAddress!= NULL)
+    if (psArgs->au8MacAddress!= NULL)
     {
         if (ePRG_MACAddressSet(&sContext, psArgs->au8MacAddress, cbUI_Progress,cbUI_Confirm, psArgs) != E_PRG_OK)
         {
-			error = MACprogrammingError;
+            error = MACprogrammingError;
             goto ERROR;
         }
     }
@@ -914,7 +864,7 @@ done:
             vUI_UpdateStatus(psArgs, "Error setting baudrate - check cabling and power");
             ePRG_ConnectionClose(&sContext);
             ePRG_Destroy(&sContext);
-			goto ERROR;
+            goto ERROR;
         }
     }
 
@@ -930,40 +880,46 @@ done:
 
     if (error == 0) {
         AddProgrammedDevicesCount();
-          PrgMsg* info = new PrgMsg;
+        PrgMsg* info = new PrgMsg;
 
-  info->eType = PRG_MSG_RESULT;
-  info->sVal = "";
-  info->iVal = error;
-  psArgs->hProgrammerDlg->PostMessage(UI_MESSAGE_PROGRAMMER,
-                          (WPARAM)info,
-                          (LPARAM)psArgs);
+        info->eType = PRG_MSG_RESULT;
+        info->sVal = "";
+        info->iVal = error;
+        psArgs->hProgrammerDlg->PostMessage(UI_MESSAGE_PROGRAMMER,
+                                            (WPARAM)info,
+                                            (LPARAM)psArgs);
     } else {
-    HandleProgrammerError(psArgs, error);
+        HandleProgrammerError(psArgs, error);
     }
 
 ERROR:
     if (error != 0){
-    HandleProgrammerError(psArgs, error);
+        HandleProgrammerError(psArgs, error);
     }
 
     psArgs->hThread = NULL;
-	return error;
+    return error;
 }
 
 LRESULT LifeSensorFlashProgrammerDlg::OnProgrammerMessage(WPARAM wParam, LPARAM lParam) {
     PrgMsg* info = (PrgMsg*)wParam;
-    tsProgramThreadArgs * data = (tsProgramThreadArgs*)lParam;
-
+    DownloadPortCtl * downloadPortCtl= (DownloadPortCtl*)lParam;
+    tsProgramThreadArgs *args;
+    if (info == NULL || downloadPortCtl == NULL) {
+    LOGE("Bad parameter, null pointer");
+        return 1;
+        }
+    args = downloadPortCtl->GetProgramArgs();
+    if (args == NULL) {
+    LOGE("Can not get invalid tsProgramThreadArgs");
+        return 2;
+    }
     CString temp;
     switch(info->eType) {
     case PRG_MSG_RESULT:
             temp.Format("Programming : %d ... ", NumOfDevicesProgrammed);
-            m_Program.SetForeColor(COLOR_BLUE);
-            m_Program.SetText(temp);
-            LOGD("------   %s  : Programed OK  --------", data->sConnection.pcName);
-
-
+            downloadPortCtl->UpdateStatus(temp);
+            LOGD("------   %s  : Programed OK  --------", args->sConnection.pcName);
         //advance MAC address
         if(m_mac_en.GetCheck() == TRUE)
         {
@@ -998,7 +954,7 @@ LRESULT LifeSensorFlashProgrammerDlg::OnProgrammerMessage(WPARAM wParam, LPARAM 
     case PRG_MSG_ERROR:
         {
             temp.Empty();
-            temp.Format("%s : ", data->sConnection.pcName);
+            temp.Format("%s : ", args->sConnection.pcName);
             switch(info->iVal)
             {
             case FlashFileNotFound :
@@ -1022,16 +978,14 @@ LRESULT LifeSensorFlashProgrammerDlg::OnProgrammerMessage(WPARAM wParam, LPARAM 
             default :
                 break;
             }
-            m_Program.SetForeColor(COLOR_RED);
-            m_Program.SetText(temp);
+            downloadPortCtl->UpdateStatus(temp);
             UpdateData(FALSE);
            // p_CheckBox[i]->SetCheck(FALSE);
         }
         break;
 
     case PRG_MSG_PROMPT:
-            m_Program.SetForeColor(COLOR_BLUE);
-            m_Program.SetText(info->sVal);
+            downloadPortCtl->UpdateStatus(info->sVal);
         break;
     }
     return 0;
@@ -1074,22 +1028,21 @@ void LifeSensorFlashProgrammerDlg::OnProgram()
 {
 	// TODO: Add your control notification handler code here
 	// Get the devicec need to be programmed
-	unsigned int i;
 	CString temp;
 
 	if(FlashFilePath == NULL)
 	{
-		m_Program.SetForeColor(COLOR_RED);
-		m_Program.SetText("ERR: No flash file");
+//		m_Program.SetForeColor(COLOR_RED);
+//		m_Program.SetText("ERR: No flash file");
         return;
 	}
 
-	m_Program.EnableWindow(FALSE);
+//	m_Program.EnableWindow(FALSE);
 	m_Comlist.EnableWindow(FALSE);
 	m_Open.EnableWindow(FALSE);
 
-	for(i = 0; i< u32NumConnections ; i++)
-		p_CheckBox[i]->EnableWindow(FALSE);
+	//for(i = 0; i< u32NumConnections ; i++)
+	//	p_CheckBox[i]->EnableWindow(FALSE);
 	//m_Progress.SetPos(0);
 
     //get MAC ADDR
@@ -1111,10 +1064,10 @@ void LifeSensorFlashProgrammerDlg::OnProgram()
 
 	m_Comlist.EnableWindow(TRUE);
 	m_Open.EnableWindow(TRUE);
-	m_Program.EnableWindow(TRUE);
+//	m_Program.EnableWindow(TRUE);
 
-	for(i = 0; i< u32NumConnections ; i++)
-		p_CheckBox[i]->EnableWindow(TRUE);
+	//for(i = 0; i< u32NumConnections ; i++)
+	//	p_CheckBox[i]->EnableWindow(TRUE);
 
 }
 
@@ -1122,13 +1075,13 @@ void LifeSensorFlashProgrammerDlg::OnClose()
 {
 	// TODO: Add your message handler code here and/or call default
 
-	for (int i = 0; i < u32NumConnections; i++) {
-        delete p_CheckBox[i];
+	//for (int i = 0; i < u32NumConnections; i++) {
+    //    delete p_CheckBox[i];
      //   asThreads[i].hThread->PostThreadMessage( WM_QUIT, NULL, NULL );
-	}
+	//}
 	CDialog::OnClose();
 	free(asConnections);
-	free(asThreads);
+	//free(asThreads);
     DeleteCriticalSection(&m_ProgrammerCountSection);
     DeleteCriticalSection(&gMacAddressSection);
 }
@@ -1151,9 +1104,6 @@ void LifeSensorFlashProgrammerDlg::OnOpen()
 		 m_Open.SetWindowText(dlg.GetFileName());
 		 m_Progress.SetPos(0);
 		 UpdateData(FALSE);
-
-		 m_Program.SetForeColor(COLOR_BLUE);
-		 m_Program.SetText("Program");
      }
 }
 
@@ -1161,8 +1111,6 @@ void LifeSensorFlashProgrammerDlg::OnComlist()
 {
 	m_Progress.SetPos(0);
     HandleComDevice();
-	m_Program.SetForeColor(COLOR_BLUE);
-	m_Program.SetText("Program");
 }
 
 void LifeSensorFlashProgrammerDlg::OnMacEn()
@@ -1193,3 +1141,50 @@ void LifeSensorFlashProgrammerDlg::OnMacEn()
     }
 }
 
+BOOL LifeSensorFlashProgrammerDlg::CreateDownloadPortDialogs()
+{
+    int i, j;
+    const int bx = 10, by = 10, pw = 280, ph = 160;
+    int x, y;
+    const int ROWS = 2;
+#if 0
+    CFont  * f = new CFont;
+    f -> CreateFont(18,  //  nHeight
+                    0 ,  //  nWidth
+                    0 ,  //  nEscapement
+                    0 ,  //  nOrientation
+                    FW_BOLD,  //  nWeight
+                    TRUE,  //  bItalic
+                    FALSE,  //  bUnderline
+                    0 ,  //  cStrikeOut
+                    ANSI_CHARSET,  //  nCharSet
+                    OUT_DEFAULT_PRECIS,  //  nOutPrecision
+                    CLIP_DEFAULT_PRECIS,  //  nClipPrecision
+                    DEFAULT_QUALITY,  //  nQuality
+                    DEFAULT_PITCH  |  FF_SWISS,  //  nPitchAndFamily
+                    _T("MS Sans Serif" ));  //  lpszFac
+    CRect rect;
+    rect.left = LONG(30 + 150 * floor(float(i / COLUMNS)));
+    rect.bottom = 40 + (i % COLUMNS)*20;
+    rect.top = rect.bottom - 100;
+    rect.right = rect.left + 170;
+    p_CheckBox[i] = new CButton();
+    p_CheckBox[i]->Create(_T(asConnections[i].pcName),
+                           WS_TABSTOP | WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                           rect, this, 1100 + i );
+    p_CheckBox[i]->SetCheck(TRUE);
+#endif
+    for (j = 0; j < MAX_PORTS_ONCE; j++) {
+        if (m_DownloadPort[j] != NULL) {
+            continue;
+        }
+        m_DownloadPort[j] = new DownloadPortCtl;
+        m_DownloadPort[j]->Create(IDD_DOWNLOADPORT, this);
+        x = bx + LONG(floor(float(j / ROWS))) * (18 + pw);
+        y = by + (j % ROWS) * (8+ph);
+        m_DownloadPort[j]->SetWindowPos(0, x, y, pw, ph, SWP_SHOWWINDOW);
+    }
+    Invalidate();
+
+    return true;
+}
