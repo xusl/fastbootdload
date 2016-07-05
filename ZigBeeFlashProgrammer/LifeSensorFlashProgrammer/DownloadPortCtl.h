@@ -47,5 +47,6 @@ public:
   BOOL mIsDownload;
 	CMyButton	m_Program;
   tsProgramThreadArgs *m_progamArgs;
+  DWORD  mTickOfDone;
   //CBrush m_Brush;
 };

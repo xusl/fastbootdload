@@ -16,11 +16,15 @@ when        who        what
 #include <stdio.h>
 #include <process.h>//for getpid()
 #include <windows.h>
-//#define FEATURE_THREAD_SYNC
+#define FEATURE_THREAD_SYNC
 //-----------------------------------------------------------------------------
 #ifdef FEATURE_THREAD_SYNC
+#ifdef __cplusplus
 #include <afxmt.h>
 CCriticalSection g_Lock;
+#else
+CRITICAL_SECTION g_Lock;
+#endif
 #endif
 static unsigned int     mask = 0;
 static unsigned int     adb_trace_mask = 0;
@@ -48,6 +52,25 @@ const char * basename(const char * f_name) {
 	return f_name + i;
 }
 
+static void Unlock() {
+#ifdef FEATURE_THREAD_SYNC
+#ifdef __cplusplus
+      g_Lock.Unlock();
+#else
+      LeaveCriticalSection(&g_Lock);
+#endif
+#endif
+}
+
+static void Lock() {
+#ifdef FEATURE_THREAD_SYNC
+#ifdef __cplusplus
+      g_Lock.Lock();
+#else
+      EnterCriticalSection(&g_Lock);
+#endif
+#endif
+}
 void dbg_vPrintfImpl(const char *pcFile, uint32_t u32Line, const char *pcFormat, ...)
 {
     static int show_tag = 1;
@@ -64,6 +87,7 @@ void dbg_vPrintfImpl(const char *pcFile, uint32_t u32Line, const char *pcFormat,
     if (pcFormat != NULL) {
         SYSTEMTIME time;
         GetLocalTime(&time);
+        Lock();
         if (show_tag) {
         fprintf(gLogFp,"%02hd:%02hd:%02hd %6s ",
                    time.wHour, time.wMinute,time.wSecond, "DBG");
@@ -71,6 +95,8 @@ void dbg_vPrintfImpl(const char *pcFile, uint32_t u32Line, const char *pcFormat,
         }
         vfprintf(gLogFp, pcFormat, argp);
         fflush(gLogFp);
+        Unlock();
+
         fmt_len = strlen(pcFormat);
         show_tag = fmt_len >= 1 && pcFormat[fmt_len - 1] == '\n';
     }
@@ -126,24 +152,19 @@ void WriteLog
   {
     return;
   }
+  Lock();
   va_start(args, fmtstr);
-
   GetLocalTime(&time);
+
   nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %6s %s\n",
                    time.wHour, time.wMinute,time.wSecond, msg, fmtstr);
 
-#ifdef FEATURE_THREAD_SYNC
-  g_Lock.Lock();
-#endif
   vfprintf(gLogFp, szFormat, args);
+
   va_end(args);
+  Unlock();
   //ASSERT(nBuf >= 0);
-
-#ifdef FEATURE_THREAD_SYNC
-  g_Lock.Unlock();
-#endif
 }
-
 
 /* read a comma/space/colum/semi-column separated list of tags
  * from the ADB_TRACE environment variable and build the trace
@@ -280,10 +301,16 @@ void StartLogging(char * filename,
     if (gLogFp != NULL)
         return;
 
-    log_tags_init(tags);
+#ifdef FEATURE_THREAD_SYNC
+#ifndef __cplusplus
+      InitializeCriticalSection(&g_Lock);
+#endif
+#endif
+
+  log_tags_init(tags);
 	log_level_init(mask);
 
-    gLogFp = fopen( filename, "a" );
+  gLogFp = fopen( filename, "a" );
 	LOGI("=================== Start logging =================");
 }
 
@@ -323,9 +350,16 @@ SIDE EFFECTS
 
 void StopLogging(void)
 {
-    if (gLogFp != NULL)
+    if (gLogFp != NULL) {
         fclose(gLogFp);
         gLogFp = NULL;
+
+#ifdef FEATURE_THREAD_SYNC
+#ifndef __cplusplus
+        DeleteCriticalSection(&g_Lock);
+#endif
+#endif
+    }
 }
 
 

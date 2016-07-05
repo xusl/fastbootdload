@@ -13,7 +13,8 @@ IMPLEMENT_DYNAMIC(DownloadPortCtl, CDialog)
 DownloadPortCtl::DownloadPortCtl(CWnd* pParent /*=NULL*/)
 	: CDialog(DownloadPortCtl::IDD, pParent),
     mIsDownload(FALSE),
-    m_progamArgs(NULL)
+    m_progamArgs(NULL),
+    mTickOfDone(0)
 {
 	mID.Empty();
     m_progamArgs = (tsProgramThreadArgs *)malloc(sizeof(tsProgramThreadArgs));
@@ -167,5 +168,6 @@ BOOL DownloadPortCtl::StartDownload() {
 
 BOOL DownloadPortCtl::FinishDownload() {
     mIsDownload = FALSE;
+    mTickOfDone = GetTickCount();
     return TRUE;
 }
