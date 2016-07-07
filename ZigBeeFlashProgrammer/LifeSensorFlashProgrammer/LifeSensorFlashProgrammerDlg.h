@@ -45,6 +45,7 @@ typedef enum
   PRG_MSG_PROMPT = 1,
   PRG_MSG_ERROR = 2,
   PRG_MSG_RESULT = 3,
+  PRG_MSG_CHIPDETAIL = 4
 }PRG_MSG_TYPE;
 
 typedef struct _PrgMsg_
@@ -93,10 +94,11 @@ public:
 	CButton	m_Comlist;
 	CButton	m_Open;
 	CButton	m_Verify;
-	CProgressCtrl	m_Progress;
+	//CProgressCtrl	m_Progress;
 	CComboBox	m_BaudRate;
 	CButton	m_Erase;
   CButton	m_StartProgram;
+  CStatic  m_ProgrammerCount;
 
 	//}}AFX_DATA
 

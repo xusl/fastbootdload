@@ -83,7 +83,7 @@ uint32_t        u32NumConnections   = 0;
 uint32_t        NumOfDevicesProgrammed = 0;
 CRITICAL_SECTION m_ProgrammerCountSection;
 CRITICAL_SECTION gMacAddressSection;
-
+map<uint32_t, bool, greater<uint32_t>> mProgramRecords;
 
 /////////////////////////////////////////////////////////////////////////////
 // CAboutDlg dialog used for App About
@@ -169,10 +169,10 @@ void LifeSensorFlashProgrammerDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_COMLIST, m_Comlist);
 	DDX_Control(pDX, IDC_OPEN, m_Open);
 	DDX_Control(pDX, IDC_VERIFY, m_Verify);
-	DDX_Control(pDX, IDC_PROGRESS, m_Progress);
 	DDX_Control(pDX, IDC_BAUDRATE, m_BaudRate);
 	DDX_Control(pDX, IDC_ERASE, m_Erase);
     DDX_Control(pDX, IDC_START_PROGRAM, m_StartProgram);
+    DDX_Control(pDX, IDC_PROGRAMMER_COUNTER, m_ProgrammerCount);
 	//}}AFX_DATA_MAP
 }
 
@@ -239,7 +239,15 @@ BOOL LifeSensorFlashProgrammerDlg::OnInitDialog()
 	m_Verify.SetCheck(TRUE);
 	m_Verify.EnableWindow(FALSE);
 
-	m_Progress.SetRange(0,100);
+//	m_Progress.SetRange(0,100);
+
+    CFont* ptf=m_ProgrammerCount.GetFont();
+    LOGFONT lf;
+    ptf->GetLogFont(&lf);
+    lf.lfHeight = 20;
+    CFont font;
+    font.CreateFontIndirect(&lf);
+    m_ProgrammerCount.SetFont(&font);
 
     m_mac_en.EnableWindow(TRUE);
 
@@ -334,7 +342,8 @@ teStatus cbUI_Progress(void *pvUser, const char *pcTitle, const char *pcText, in
     PrgMsg* info = new PrgMsg;
 
   info->eType = PRG_MSG_PROMPT;
-  info->sVal.Format("%15s: %s: %3d%%", psArgs->sConnection.pcName, pcText, (iProgress * 100) / iNumSteps);
+  //info->sVal.Format("%15s: %s: %3d%%", psArgs->sConnection.pcName, pcText, (iProgress * 100) / iNumSteps);
+  info->sVal.Format("%s: %3d%%", pcText, (iProgress * 100) / iNumSteps);
   info->iVal = 0;
   psArgs->hProgrammerDlg->PostMessage(UI_MESSAGE_PROGRAMMER,
                           (WPARAM)info,
@@ -363,56 +372,71 @@ teStatus cbUI_Confirm(void *pvUser, const char *pcTitle, const char *pcText)
 
 void vUI_UpdateStatus(tsProgramThreadArgs *psThreadArgs, const char *pcFmt, ...)
 {
+    char buffer[512] = {0};
+
     va_list vl;
 
-  //  LOGE(pcFmt, vl);
-
     va_start(vl, pcFmt);
+    vsnprintf(buffer, sizeof(buffer), pcFmt, vl);
+      LOGE("%s", buffer);
+
+if (psThreadArgs->hPortCtl != NULL && psThreadArgs->hProgrammerDlg != NULL) {
+        PrgMsg* info = new PrgMsg;
+        info->eType = PRG_MSG_PROMPT;
+        info->sVal = buffer;
+        info->iVal = 0;
+
+        psThreadArgs->hProgrammerDlg->PostMessage(UI_MESSAGE_PROGRAMMER,
+                                            (WPARAM)info,
+                                            (LPARAM)psThreadArgs->hPortCtl);
+}
+
     va_end(vl);
 }
 
 void vUI_UpdateDeviceInfo(tsProgramThreadArgs *psThreadArgs, tsChipDetails *psChipDetails)
 {
-#if 0
-    tsFeedbackEvent *psEvent = malloc(sizeof(tsFeedbackEvent));
-
-    if (psEvent)
-    {
-        char acMacAddress[24];
+if (psThreadArgs->hPortCtl == NULL || psThreadArgs->hProgrammerDlg == NULL || psChipDetails == NULL) {
+    return;
+}
+        PrgMsg* info = new PrgMsg;
+ char acMacAddress[24];
         sprintf(acMacAddress, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
                 psChipDetails->au8MacAddress[0] & 0xFF, psChipDetails->au8MacAddress[1] & 0xFF,
                 psChipDetails->au8MacAddress[2] & 0xFF, psChipDetails->au8MacAddress[3] & 0xFF,
                 psChipDetails->au8MacAddress[4] & 0xFF, psChipDetails->au8MacAddress[5] & 0xFF,
                 psChipDetails->au8MacAddress[6] & 0xFF, psChipDetails->au8MacAddress[7] & 0xFF);
 
-        psEvent->eType                              = E_FB_DEVICEINFO;
-        psEvent->u32ConnectionNum                   = psThreadArgs->u32ConnectionNum;
-        psEvent->uData.sDeviceInfo.u32ChipId        = psChipDetails->u32ChipId;
-        psEvent->uData.sDeviceInfo.u32Bootloader    = psChipDetails->u32BootloaderVersion;
-        psEvent->uData.sDeviceInfo.pcChipName       = strdup(psChipDetails->pcChipName);
-        psEvent->uData.sDeviceInfo.pcMAC_Address    = strdup(acMacAddress);
 
-        if (eUtils_QueueQueue(&sFeedbackThreadData.sFeedbackQueue, psEvent) == E_UTILS_OK)
-        {
-            return;
-        }
-    }
 
-    fprintf(stderr, "Error queueing feedback\n");
-    free(psEvent->uData.sDeviceInfo.pcChipName);
-    free(psEvent->uData.sDeviceInfo.pcMAC_Address);
-    free(psEvent);
-#endif
+        info->eType = PRG_MSG_CHIPDETAIL;
+        info->sVal.Format("Mac: %s\n Bootloader Version:%d\n Chip Id:%d", acMacAddress, psChipDetails->u32BootloaderVersion,psChipDetails->u32ChipId);;
+        info->iVal = 0;
+
+        psThreadArgs->hProgrammerDlg->PostMessage(UI_MESSAGE_PROGRAMMER,
+                                            (WPARAM)info,
+                                            (LPARAM)psThreadArgs->hPortCtl);
     return;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
-void AddProgrammedDevicesCount() {
-            EnterCriticalSection(&m_ProgrammerCountSection);
-            NumOfDevicesProgrammed ++;
-            LeaveCriticalSection(&m_ProgrammerCountSection);
+void AddProgrammedDevicesCount(uint32_t chipId) {
+    EnterCriticalSection(&m_ProgrammerCountSection);
+    NumOfDevicesProgrammed ++;
+    mProgramRecords.insert(pair<uint32_t, bool>(chipId, true));
+    LeaveCriticalSection(&m_ProgrammerCountSection);
 }
 
+BOOL CheckChipProgrammed(uint32_t chipId) {
+    BOOL result = FALSE;
+    EnterCriticalSection(&m_ProgrammerCountSection);
+    map <uint32_t, bool, greater<uint32_t>>::iterator it = mProgramRecords.find(chipId);
+    if ( it != mProgramRecords.end() && mProgramRecords[chipId]) {
+      result = TRUE;
+    }
+    LeaveCriticalSection(&m_ProgrammerCountSection);
+    return result;
+}
 void IncreaseMACAddr(unsigned char * mac)
 {
     for (signed int i = 7; i >= 0; i--) {
@@ -542,11 +566,10 @@ DWORD LifeSensorFlashProgrammerDlg::ScheduleProgrammer() {
             continue;
         }
         tsProgramThreadArgs *args = m_DownloadPort[j]->GetProgramArgs();
-
         memcpy(args, &sProgramThreadArgs, sizeof(tsProgramThreadArgs));
-
         memcpy(&args->sConnection, &asConnections[i], sizeof(args->sConnection));
         args->hProgrammerDlg = this;
+        args->hPortCtl = m_DownloadPort[j];
 
         for(int k=0;k<8;k++)
         {
@@ -642,6 +665,11 @@ static DWORD dwProgramThread(void *pvData) {
     }
 
     vUI_UpdateDeviceInfo(psArgs, &sContext.sChipDetails);
+
+    if (CheckChipProgrammed(sContext.sChipDetails.u32ChipId)) {
+        vUI_UpdateStatus(psArgs, "Chip is already Programmed, remove it!");
+        goto ERROR;
+    }
 
     if (psArgs->iInitialSpeed != psArgs->iProgramSpeed)
     {
@@ -891,14 +919,9 @@ done:
     {
         goto ERROR;
     }
-    ePRG_FwClose(&sContext);
-    if (ePRG_Destroy(&sContext) != E_PRG_OK)
-    {
-        goto ERROR;
-    }
 
     if (error == 0) {
-        AddProgrammedDevicesCount();
+        AddProgrammedDevicesCount(sContext.sChipDetails.u32ChipId);
         PrgMsg* info = new PrgMsg;
 
         info->eType = PRG_MSG_RESULT;
@@ -913,6 +936,7 @@ done:
     }
 
 ERROR:
+    ePRG_Destroy(&sContext);
     if (error != 0){
         HandleProgrammerError(pDownloadPortCtl, error);
     }
@@ -938,8 +962,8 @@ LRESULT LifeSensorFlashProgrammerDlg::OnProgrammerMessage(WPARAM wParam, LPARAM 
     CString temp;
     switch(info->eType) {
     case PRG_MSG_RESULT:
-            temp.Format("Programming : %d ... ", NumOfDevicesProgrammed);
-            downloadPortCtl->UpdateStatus(temp);
+            temp.Format("Programming : %d ", NumOfDevicesProgrammed);
+            m_ProgrammerCount.SetWindowText(temp);
             LOGD("------   %s  : Programed OK  --------", args->sConnection.pcName);
         //advance MAC address
         if(m_mac_en.GetCheck() == TRUE)
@@ -1006,9 +1030,14 @@ LRESULT LifeSensorFlashProgrammerDlg::OnProgrammerMessage(WPARAM wParam, LPARAM 
         break;
 
     case PRG_MSG_PROMPT:
-            downloadPortCtl->UpdateStatus(info->sVal);
+        downloadPortCtl->UpdateStatus(info->sVal);
+        break;
+
+    case PRG_MSG_CHIPDETAIL:
+        downloadPortCtl->SetChipDetail(info->sVal);
         break;
     }
+    delete info;
     return 0;
 }
 
@@ -1123,14 +1152,14 @@ void LifeSensorFlashProgrammerDlg::OnOpen()
 		 FlashFilePath = m_FilePath.GetBuffer(m_FilePath.GetLength());
 
 		 m_Open.SetWindowText(dlg.GetFileName());
-		 m_Progress.SetPos(0);
+//		 m_Progress.SetPos(0);
 		 UpdateData(FALSE);
      }
 }
 
 void LifeSensorFlashProgrammerDlg::OnComlist()
 {
-	m_Progress.SetPos(0);
+//	m_Progress.SetPos(0);
     HandleComDevice();
 }
 
@@ -1165,7 +1194,7 @@ void LifeSensorFlashProgrammerDlg::OnMacEn()
 BOOL LifeSensorFlashProgrammerDlg::CreateDownloadPortDialogs()
 {
     int i, j;
-    const int bx = 6, by = 10, pw = 300, ph = 160;
+    const int bx = 6, by = 10, pw = 300, ph = 180;
     int x, y;
     const int ROWS = 2;
 #if 0

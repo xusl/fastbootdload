@@ -110,6 +110,7 @@ typedef struct
 #endif
 
 class LifeSensorFlashProgrammerDlg;
+class DownloadPortCtl;
 typedef struct {
     const char*     pcFirmwareFile;
     const char*     pcDumpFlashFile;
@@ -138,6 +139,7 @@ typedef struct {
     uint32_t*       apu32UserDataSet[3];    /**< 3 lots of 128 bits of user data for programming into index sector */
     tsDeviceConfig* psDeviceConfigGet;
     tsDeviceConfig* psDeviceConfigSet;
+    DownloadPortCtl *hPortCtl;
 } tsProgramThreadArgs;
 
 

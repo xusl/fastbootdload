@@ -25,6 +25,7 @@ public:
   BOOL AttachDevice(const char *devicename, BOOL fixmap=TRUE);
   BOOL StartDownload();
   BOOL FinishDownload();
+  void SetChipDetail(CString detail);
   void SetTitle(CString strInfo);
   void Reset(void);
   tsProgramThreadArgs * GetProgramArgs() { return m_progamArgs;};
@@ -46,6 +47,7 @@ public:
 	CString mID;
   BOOL mIsDownload;
 	CMyButton	m_Program;
+  CStatic  m_ChipDetail;
   tsProgramThreadArgs *m_progamArgs;
   DWORD  mTickOfDone;
   //CBrush m_Brush;

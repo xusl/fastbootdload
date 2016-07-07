@@ -33,6 +33,7 @@ void DownloadPortCtl::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
     DDX_Control(pDX, IDC_PROGRAM, m_Program);
+    DDX_Control(pDX, IDC_CHIP_DETAIL, m_ChipDetail);
 }
 
 BOOL DownloadPortCtl::OnInitDialog()
@@ -50,6 +51,10 @@ void DownloadPortCtl::UpdateStatus(CString strInfo, COLORREF color)
 {
 	 m_Program.SetForeColor(color);
 	 m_Program.SetText(strInfo);
+}
+
+void DownloadPortCtl::SetChipDetail(CString detail) {
+    m_ChipDetail.SetWindowText(detail);
 }
 
 void DownloadPortCtl::SetTitle(CString strInfo)
