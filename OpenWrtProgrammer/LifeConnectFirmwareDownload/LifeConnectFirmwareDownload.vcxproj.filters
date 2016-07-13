@@ -48,6 +48,9 @@
     <ClInclude Include="device.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="telnet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DownloadDlg.cpp">
@@ -72,6 +75,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="telnet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

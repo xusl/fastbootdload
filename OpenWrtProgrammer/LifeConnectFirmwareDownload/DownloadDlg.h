@@ -29,7 +29,7 @@ enum
   TIMER_EVT_ALL
 };
 
-#define TIMER_ELAPSE   (8 * 1000)
+#define TIMER_ELAPSE   (3 * 1000)
 
 
 // CDownloadDlg dialog

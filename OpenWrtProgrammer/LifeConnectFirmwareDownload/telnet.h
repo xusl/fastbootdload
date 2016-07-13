@@ -2,7 +2,7 @@
 #define __TELNET_H
 
 #define USE_WINSOCK
-
+//#define HAVE_POLL_FINE
 typedef enum {
   CURLE_OK = 0,
   CURLE_UNSUPPORTED_PROTOCOL,    /* 1 */
@@ -145,7 +145,8 @@ typedef enum
 #define BUFSIZE CURL_MAX_WRITE_SIZE
 
 #define SUBBUFSIZE 512
-
+//#define EINTR       WSAEINTR
+#define error_not_EINTR (error != EINTR)
 
 #ifdef USE_WINSOCK
 #define SOCKERRNO         ((int)WSAGetLastError())
@@ -170,18 +171,14 @@ typedef enum
 #define CURL_EMPTY       0
 #define CURL_OPPOSITE    1
 
+/*
 struct timeval {
  long tv_sec;
  long tv_usec;
 };
+*/
 
-#define poll(x,y,z) WSAPoll((x),(y),(z))
-#define POLLIN      0x01
-#define POLLPRI     0x02
-#define POLLOUT     0x04
-#define POLLERR     0x08
-#define POLLHUP     0x10
-#define POLLNVAL    0x20
+//#define poll(x,y,z) WSAPoll((x),(y),(z))
 
 #ifndef POLLRDNORM
 #define POLLRDNORM POLLIN
@@ -201,12 +198,6 @@ typedef SOCKET curl_socket_t;
 #define CURL_SOCKET_BAD INVALID_SOCKET
 #define VALID_SOCK(x) 1
 #define VERIFY_SOCK(x) Curl_nop_stmt
-struct pollfd
-{
-    curl_socket_t fd;
-    short   events;
-    short   revents;
-};
 
 /* Define to the type of arg 1 for recv. */
 #define RECV_TYPE_ARG1 SOCKET
@@ -356,8 +347,21 @@ struct pollfd
 #define EREMOTE          WSAEREMOTE
 #endif
 
+#if defined(_WIN64)
+#define ssize_t __int64
+#else
+#define ssize_t int
+#endif
+/* linked-list structure for the CURLOPT_QUOTE option (and other) */
+struct curl_slist {
+  char *data;
+  struct curl_slist *next;
+};
+
 class telnet {
 protected:
+  bool verbose;
+  curl_socket_t sockfd;
   int please_negotiate;
   int already_negotiated;
   int us[256];
@@ -377,35 +381,36 @@ protected:
   TelnetReceive telrcv_state;
 
   public:
-     telnet(struct connectdata *conn, bool *done);
+     telnet(curl_socket_t sock);
      ~telnet();
-     void negotiate(struct connectdata *);
-     void send_negotiation(struct connectdata *, int cmd, int option);
-     void set_local_option(struct connectdata *, int cmd, int option);
-     void rec_do(struct connectdata *conn, int option);
-     void rec_dont(struct connectdata *conn, int option);
-     void set_remote_option(struct connectdata *, int cmd, int option);
-     void rec_will(struct connectdata *conn, int option);
-     void rec_wont(struct connectdata *conn, int option);
+     int setup();
+     void negotiate();
+     void send_negotiation( int cmd, int option);
+     void set_local_option( int cmd, int option);
+     void rec_do( int option);
+     void rec_dont( int option);
+     void set_remote_option( int cmd, int option);
+     void rec_will( int option);
+     void rec_wont( int option);
 
-     void printsub(struct SessionHandle *data,
-                     int direction, unsigned char *pointer,
-                     size_t length);
-     CURLcode check_telnet_options(struct connectdata *conn);
-     void suboption(struct connectdata *);
-    CURLcode telrcv(struct connectdata *conn,
-                    const unsigned char *inbuf, /* Data received from socket */
+     void printsub(int direction, unsigned char *pointer,   size_t length);
+     void printoption(const char *direction, int cmd, int option);
+     CURLcode check_telnet_options();
+     void suboption();
+    CURLcode telrcv(const unsigned char *inbuf, /* Data received from socket */
                     ssize_t count);              /* Number of bytes received */
-      CURLcode send_telnet_data(struct connectdata *conn,
-                                       char *buffer, ssize_t nread);
+      CURLcode send_telnet_data(char *buffer, ssize_t nread);
 };
 
 int Curl_poll(struct pollfd ufds[], unsigned int nfds, int timeout_ms);
-CURLcode Curl_write(struct connectdata *conn,
-                    curl_socket_t sockfd,
+CURLcode Curl_write(curl_socket_t sockfd,
                     const void *mem,
                     size_t len,
                     ssize_t *written);
+CURLcode Curl_read( curl_socket_t sockfd,     /* read from this socket */
+                   char *buf,                /* store read data here */
+                   size_t sizerequested,     /* max amount to read */
+                   ssize_t *n);               /* amount bytes read */
 int Curl_raw_equal(const char *first, const char *second);
 struct timeval curlx_tvnow(void);
 
@@ -426,17 +431,14 @@ double curlx_tvdiff_secs(struct timeval t1, struct timeval t2);
 
 long Curl_tvlong(struct timeval t1);
 
+int Curl_wait_ms(int timeout_ms);
+
 /* These two defines below exist to provide the older API for library
    internals only. */
 #define Curl_tvnow() curlx_tvnow()
 #define Curl_tvdiff(x,y) curlx_tvdiff(x,y)
 #define Curl_tvdiff_secs(x,y) curlx_tvdiff_secs(x,y)
 
-/* linked-list structure for the CURLOPT_QUOTE option (and other) */
-struct curl_slist {
-  char *data;
-  struct curl_slist *next;
-};
 
 /*
  * NAME curl_slist_append()
@@ -446,7 +448,7 @@ struct curl_slist {
  * Appends a string to a linked list. If no list exists, it will be created
  * first. Returns the new list, after appending.
  */
-CURL_EXTERN struct curl_slist *curl_slist_append(struct curl_slist *,
+struct curl_slist *curl_slist_append(struct curl_slist *,
                                                  const char *);
 
 /*
@@ -456,6 +458,8 @@ CURL_EXTERN struct curl_slist *curl_slist_append(struct curl_slist *,
  *
  * free a previously built curl_slist.
  */
-CURL_EXTERN void curl_slist_free_all(struct curl_slist *);
+void curl_slist_free_all(struct curl_slist *);
 
+#define Curl_safefree(ptr) \
+  do {if((ptr)) {free((ptr)); (ptr) = NULL;}} WHILE_FALSE
 #endif

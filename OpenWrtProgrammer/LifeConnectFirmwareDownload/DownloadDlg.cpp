@@ -10,6 +10,7 @@
 #include "log.h"
 #include <setupapi.h>
 #include <dbt.h>
+#include "telnet.h"
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -143,11 +144,15 @@ BOOL CDownloadDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
     WSADATA wsaData;
+    WORD  wVersionRequested = MAKEWORD(2, 0);
     // iResult = WSAStartup( MAKEWORD( 2, 2), &wsaData );
-    if ( WSAStartup(MAKEWORD(1, 1), &wsaData ) != 0 ) {
+    if ( WSAStartup(wVersionRequested, &wsaData ) != 0 ) {
         AfxMessageBox(IDP_SOCKETS_INIT_FAILED);
     } else {
-        if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1) {
+        //if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1) {
+        if (LOBYTE(wsaData.wVersion) != LOBYTE(wVersionRequested) ||
+            HIBYTE(wsaData.wVersion) != HIBYTE(wVersionRequested)) {
+            LOGE("WSAStartup error, version not match");
             WSACleanup( );
         } else {
             mWSAInitialized = TRUE;
@@ -219,7 +224,7 @@ void CDownloadDlg::SniffNetwork() {
         }
     }
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
-    WaitForSingleObject(m_SyncSemaphore, 100000);//INFINITE);
+    WaitForSingleObject(m_SyncSemaphore, 10000);//INFINITE);
 }
 
 void CDownloadDlg::ReleaseThreadSyncSemaphore() {
@@ -539,9 +544,14 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 
     SOCKET sock = pThis->CreateSocket(dev->GetIpAddr().c_str());
     if ( sock != INVALID_SOCKET) {
+        telnet tn(sock);
+        tn.setup();
+        tn.send_telnet_data("hello\r\n", sizeof("hello\r\n"));
+
+        tn.setup();
         //pThis->OnSend_Comand(sock, cmd.GetString());
-        pThis->OnSend_Comand(sock, "send_data 254 0 0 7 0 1 0");
-        pThis->OnSend_Comand(sock, "reboot send_data 254 0 0 5 0 0 0");
+      //  pThis->OnSend_Comand(sock, "send_data 254 0 0 7 0 1 0");
+      //  pThis->OnSend_Comand(sock, "reboot send_data 254 0 0 5 0 0 0");
         closesocket(sock);
         dc->RemoveDevice(dev);
     }
