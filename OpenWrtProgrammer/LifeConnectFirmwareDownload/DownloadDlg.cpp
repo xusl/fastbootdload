@@ -15,8 +15,6 @@
 #endif
 
 
-// CAboutDlg dialog used for App About
-
 
 static void gmt_time_string(char *buf, size_t buf_len, time_t *t)
  {
@@ -202,7 +200,7 @@ BOOL CDownloadDlg::OnInitDialog()
  }
 
 void CDownloadDlg::SniffNetwork() {
-    for (int i = 1; i < 4; i++) {
+    for (int i = 10; i < 11; i++) {
         CString ip_addr;
         const char* pcIpAddr;
         string mac;
@@ -220,8 +218,24 @@ void CDownloadDlg::SniffNetwork() {
             LOGD("ping %s failed. mac :%s", pcIpAddr, mac.c_str());
         }
     }
-    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+    //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     WaitForSingleObject(m_SyncSemaphore, 100000);//INFINITE);
+}
+
+void CDownloadDlg::ReleaseThreadSyncSemaphore() {
+    ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
+}
+DWORD CDownloadDlg::Schedule() {
+    if (!m_pCoordinator->IsEmpty()) {
+    Send_Comand_Thread= CreateThread(NULL,0,
+        Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
+   // WaitForSingleObject(Send_Comand_Thread, INFINITE);
+    }
+    //ReleaseThreadSyncSemaphore();
+    ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
+
+    //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+    return 0;
 }
 
 DWORD WINAPI CDownloadDlg::Thread_Server_Listen(LPVOID lpPARAM) {
@@ -535,21 +549,7 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
     return 0;
 }
 
-void CDownloadDlg::ReleaseThreadSyncSemaphore() {
-    ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
-}
-DWORD CDownloadDlg::Schedule() {
-    if (!m_pCoordinator->IsEmpty()) {
-    Send_Comand_Thread= CreateThread(NULL,0,
-        Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
-   // WaitForSingleObject(Send_Comand_Thread, INFINITE);
-    }
-    //ReleaseThreadSyncSemaphore();
-    ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
 
-    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
-    return 0;
-}
 
 void CDownloadDlg::GetHostIpAddr() {
     GetIp Get_Ip(m_NetworkSegment);
@@ -626,23 +626,24 @@ void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
     char s_SN[16]      = {0};
     char s_SSID[51]    = {0};
     char MAC_label[20] = {0};
+    char recvBuf[101] = {'\0'};
+    string Send_result;
+    int i=0;
+    int bytes = 0;
 
     if (sockClient == INVALID_SOCKET) {
         return;
     }
 
-    char recvBuf[101] = {'\0'};
-    recv(sockClient, recvBuf, 100, 0);
+    //recv(sockClient, recvBuf, 100, 0);
     //bool is_set_time_out=SetTimeOut(sockClient, 50000, true);
-    send(sockClient, cmd, strlen(cmd)+1, 1);
-
-    string Send_result;
-    int i=0;
-    int bytes = 0;
+    bytes = send(sockClient, cmd, strlen(cmd)+1, 1);
+    LOGE("Send %d bytes", bytes);
 
     do {
         memset(recvBuf, '\0', 101);
         bytes = recv(sockClient, recvBuf, 100, 0);
+        LOGE("Receive %d bytes", bytes);
         if(strstr(recvBuf,"root@Qualcomm")!=NULL) {
             if(strstr(recvBuf,"Writing data")!=NULL) {
                 UpdateMessage(recvBuf);
@@ -651,6 +652,7 @@ void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
 
         i++;
         Send_result+=recvBuf;
+        LOGE("%s", recvBuf);
         m_progMac2.SetPos(i);
         //m_progMac2.Invalidate(FALSE);
         if((Send_result.find("[processCommand] Processing send"))!=-1) {
