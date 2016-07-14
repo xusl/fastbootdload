@@ -1,6 +1,6 @@
 #ifndef __TELNET_H
 #define __TELNET_H
-
+#include "string.h"
 #define USE_WINSOCK
 //#define HAVE_POLL_FINE
 typedef enum {
@@ -365,6 +365,7 @@ protected:
   curl_socket_t sockfd;
   int please_negotiate;
   int already_negotiated;
+  int telnet_cmd_negotiate;
   int us[256];
   int usq[256];
   int us_preferred[256];
@@ -384,7 +385,7 @@ protected:
   public:
      telnet(curl_socket_t sock);
      ~telnet();
-     int setup();
+     int receive_telnet_data(char *buffer, ssize_t len);
      void negotiate();
      void send_negotiation( int cmd, int option);
      void set_local_option( int cmd, int option);

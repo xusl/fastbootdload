@@ -673,11 +673,9 @@ CURLcode telnet::telrcv(const unsigned char *inbuf, /* Data received from socket
                 ssize_t count)              /* Number of bytes received */
 {
   unsigned char c;
-  CURLcode result;
+  CURLcode result = CURLE_UNSUPPORTED_PROTOCOL;
   int in = 0;
   int startwrite=-1;
-  //struct SessionHandle *data = conn->data;
-  //struct TELNET *tn = (struct TELNET *)data->state.proto.telnet;
   telnet* tn = this;
 #if 0
 #define startskipping()                                       \
@@ -712,6 +710,7 @@ CURLcode telnet::telrcv(const unsigned char *inbuf, /* Data received from socket
 
     case CURL_TS_DATA:
       if(c == CURL_IAC) {
+        result = CURLE_OK;
         tn->telrcv_state = CURL_TS_IAC;
         startskipping();
         break;
@@ -832,7 +831,7 @@ CURLcode telnet::telrcv(const unsigned char *inbuf, /* Data received from socket
     ++in;
   }
   bufferflush();
-  return CURLE_OK;
+  return result;
 }
 /* Escape and send a telnet data block */
 /* TODO: write large chunks of data instead of one byte at a time */
@@ -877,7 +876,7 @@ CURLcode telnet::send_telnet_data(char *buffer, ssize_t len)
           rc = Curl_write(sockfd, outbuf+total_written,
                           out_count-total_written, &bytes_written);
           total_written += bytes_written;
-
+#if 0
 while(true) {
     /* read data from network */
     code = Curl_read(sockfd, inbuf, BUFSIZE - 1, &nread);
@@ -899,6 +898,7 @@ while(true) {
       break;
     }
     }
+#endif
 #endif
 
     /* handle partial write */
@@ -938,54 +938,68 @@ telnet::telnet(curl_socket_t sock) {
 
   already_negotiated = 0;
   please_negotiate = 0;
+  telnet_cmd_negotiate = 0;
   telnet_vars = NULL;
+
+
+  int TimeOut=6000;//设置接收超时6秒
+  setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
+  //SOCKET_ERROR
 }
 
-int telnet::setup() {
- CURLcode code;
+int telnet::receive_telnet_data(char *buffer, ssize_t len) {
+  CURLcode code;
   ssize_t nread;
-  struct timeval now;
-  bool keepon = TRUE;
   char buf[BUFSIZE] = {0};
 
-while(keepon) {
+  memset(buffer, 0, len);
+
+while(TRUE) {
     /* read data from network */
-    LOGD("Print timestamp 1");
+    LOGD("Print timestamp ");
+    memset(buf, 0, sizeof buf);
     code = Curl_read(sockfd, buf, BUFSIZE - 1, &nread);
-    LOGD("read %d bytes, '%s'", nread, buf);
+    LOGD("read %d bytes", nread);
     /* read would've blocked. Loop again */
     if(code == CURLE_AGAIN)
       continue;//break;
     /* returned not-zero, this an error */
     else if(code) {
-      //keepon = FALSE;
       break;
     }
     /* returned zero but actually received 0 or less here,
        the server closed the connection and we bail out */
     else if(nread <= 0) {
-      //keepon = FALSE;
       break;
     }
 
-    LOGD("Print timestamp 3");
-    code = telrcv((unsigned char *)buf, nread);
-    LOGD("Print timestamp 4 , status %d", telrcv_state);
-    if(code) {
-      //keepon = FALSE;
-      break;
+    if (telnet_cmd_negotiate){
+      LOGD("read:: %s", buf);
+    if (len <=0 || nread > len)
+        LOGD("THERE Are not enough data to copy");
+    if (len > 0) {
+        int rl = CURLMIN(nread, len);
+        strncpy(buffer, buf, rl);
+        len -= rl;
+        buffer += rl;
+    }
+    } else {
+        code = telrcv((unsigned char *)buf, nread);
+        LOGD("telrcv_state %d. return %d", telrcv_state, code);
+        if(code) {
+          LOGD("read:: %s", buf);
+          telnet_cmd_negotiate = 1;
+          break;
+        }
     }
 
     /* Negotiate if the peer has started negotiating,
        otherwise don't. We don't want to speak telnet with
        non-telnet servers, like POP or SMTP. */
     if(please_negotiate && !already_negotiated) {
-      LOGD("Print timestamp 5");
       negotiate();
-      LOGD("Print timestamp 6");
       already_negotiated = 1;
     }
-   // keepon = FALSE;
     }
     return code;
 }

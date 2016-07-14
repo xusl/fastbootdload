@@ -547,10 +547,15 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
     SOCKET sock = pThis->CreateSocket(dev->GetIpAddr().c_str());
     if ( sock != INVALID_SOCKET) {
         telnet tn(sock);
-        tn.setup();
-        tn.send_telnet_data("zen\r\n", strlen("zen\r\n"));
-        //tn.setup();
-        tn.send_telnet_data("zen\r\n", strlen("zen\r\n"));
+        char buf[BUFSIZE];
+        tn.receive_telnet_data(buf, BUFSIZE);
+        tn.send_telnet_data("zen\r\n", strlen("zen\r\n")); //send user name
+        tn.receive_telnet_data(buf, BUFSIZE);
+        tn.send_telnet_data("zen\r\n", strlen("zen\r\n")); //send password
+        tn.receive_telnet_data(buf, BUFSIZE);
+
+        tn.send_telnet_data("ls /\r\n", strlen("ls /\r\n"));
+        tn.receive_telnet_data(buf, BUFSIZE);
         //pThis->OnSend_Comand(sock, cmd.GetString());
       //  pThis->OnSend_Comand(sock, "send_data 254 0 0 7 0 1 0");
       //  pThis->OnSend_Comand(sock, "reboot send_data 254 0 0 5 0 0 0");
