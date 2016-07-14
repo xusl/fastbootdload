@@ -941,6 +941,10 @@ telnet::telnet(curl_socket_t sock) {
   telnet_cmd_negotiate = 0;
   telnet_vars = NULL;
 
+  //vt100, vt52, ansi, or vtnt
+  strncpy(subopt_ttype, "vt100", 31);
+  subopt_ttype[31] = 0; /* String termination */
+  us_preferred[CURL_TELOPT_TTYPE] = CURL_YES;
 
   int TimeOut=6000;//设置接收超时6秒
   setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
