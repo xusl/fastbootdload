@@ -156,6 +156,7 @@ typedef enum
 #define SET_SOCKERRNO(x)  (errno = (x))
 #endif
 
+#define ERRNO        ((int)GetLastError())
 
 /* Some convenience macros to get the larger/smaller value out of two given.
    We prefix with CURL to prevent name collisions. */
@@ -412,6 +413,9 @@ CURLcode Curl_read( curl_socket_t sockfd,     /* read from this socket */
                    size_t sizerequested,     /* max amount to read */
                    ssize_t *n);               /* amount bytes read */
 int Curl_raw_equal(const char *first, const char *second);
+
+const char *Curl_strerror( int err);
+
 struct timeval curlx_tvnow(void);
 
 /*

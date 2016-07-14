@@ -515,8 +515,10 @@ void CDownloadDlg::OnBnClickedStart() {
     ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message,error_message);
     is_downloading=false;
     downloading_successfull=false;
-    m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
-    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+ //   m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
+ //    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+ m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
+ Schedule();
 //    Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
 }
@@ -546,9 +548,9 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
     if ( sock != INVALID_SOCKET) {
         telnet tn(sock);
         tn.setup();
-        tn.send_telnet_data("hello\r\n", sizeof("hello\r\n"));
-
-        tn.setup();
+        tn.send_telnet_data("zen\r\n", strlen("zen\r\n"));
+        //tn.setup();
+        tn.send_telnet_data("zen\r\n", strlen("zen\r\n"));
         //pThis->OnSend_Comand(sock, cmd.GetString());
       //  pThis->OnSend_Comand(sock, "send_data 254 0 0 7 0 1 0");
       //  pThis->OnSend_Comand(sock, "reboot send_data 254 0 0 5 0 0 0");

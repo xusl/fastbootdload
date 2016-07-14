@@ -100,8 +100,8 @@ void WriteLog
   va_start(args, fmtstr);
 
   GetLocalTime(&time);
-  nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %6s %s\n",
-                   time.wHour, time.wMinute,time.wSecond, msg, fmtstr);
+  nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %3d %6s %s\n",
+                   time.wHour, time.wMinute,time.wSecond, time.wMilliseconds, msg, fmtstr);
 
 #ifdef FEATURE_THREAD_SYNC
   g_Lock.Lock();
