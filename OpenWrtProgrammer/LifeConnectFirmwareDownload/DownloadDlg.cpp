@@ -549,16 +549,25 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
         telnet tn(sock);
         char buf[BUFSIZE];
         tn.receive_telnet_data(buf, BUFSIZE);
-        tn.send_telnet_data("zen\r\n", strlen("zen\r\n")); //send user name
+
+#ifdef TEST
+        tn.send_telnet_data("zen\n", strlen("zen\n")); //send user name
         tn.receive_telnet_data(buf, BUFSIZE);
-        tn.send_telnet_data("zen\r\n", strlen("zen\r\n")); //send password
+        tn.send_telnet_data("zen\n", strlen("zen\n")); //send password
         tn.receive_telnet_data(buf, BUFSIZE);
 
-        tn.send_telnet_data("ls /\r\n", strlen("ls /\r\n"));
+        tn.send_telnet_data("ls /\n", strlen("ls /\n"));//send command 'ls /\r\n'
         tn.receive_telnet_data(buf, BUFSIZE);
-        //pThis->OnSend_Comand(sock, cmd.GetString());
-      //  pThis->OnSend_Comand(sock, "send_data 254 0 0 7 0 1 0");
-      //  pThis->OnSend_Comand(sock, "reboot send_data 254 0 0 5 0 0 0");
+        tn.send_telnet_data("echo hello world\n", strlen("echo hello world\n"));//send command 'ls /\r\n'
+        tn.receive_telnet_data(buf, BUFSIZE);
+#endif
+#define COMMAN_UPDATE "send_data 254 0 0 7 0 1 0\n"
+#define COMMAN_REBOOT "reboot send_data 254 0 0 5 0 0 0\n"
+        tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
+        tn.receive_telnet_data(buf, BUFSIZE);
+        tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
+        tn.receive_telnet_data(buf, BUFSIZE);
+
         closesocket(sock);
         dc->RemoveDevice(dev);
     }
