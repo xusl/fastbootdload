@@ -946,7 +946,7 @@ telnet::telnet(curl_socket_t sock) {
   //subopt_ttype[31] = 0; /* String termination */
   //us_preferred[CURL_TELOPT_TTYPE] = CURL_YES;
 
-  int TimeOut=6000;//设置接收超时6秒
+  int TimeOut=5000;//设置接收超时6秒
   setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
   //SOCKET_ERROR
 }

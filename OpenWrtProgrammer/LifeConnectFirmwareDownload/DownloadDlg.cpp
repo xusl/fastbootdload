@@ -205,7 +205,7 @@ BOOL CDownloadDlg::OnInitDialog()
  }
 
 void CDownloadDlg::SniffNetwork() {
-    for (int i = 10; i < 11; i++) {
+    for (int i = 1; i < 9; i++) {
         CString ip_addr;
         const char* pcIpAddr;
         string mac;
@@ -223,7 +223,7 @@ void CDownloadDlg::SniffNetwork() {
             LOGD("ping %s failed. mac :%s", pcIpAddr, mac.c_str());
         }
     }
-    //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     WaitForSingleObject(m_SyncSemaphore, 10000);//INFINITE);
 }
 
@@ -515,10 +515,11 @@ void CDownloadDlg::OnBnClickedStart() {
     ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message,error_message);
     is_downloading=false;
     downloading_successfull=false;
- //   m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
- //    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
- m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
- Schedule();
+    //m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
+    //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+//    m_pCoordinator->AddDevice(CDevLabel(string("FC:4D:D4:D2:BA:84"), string("192.168.1.10")) , NULL);
+    m_pCoordinator->AddDevice(CDevLabel(string("AE:81:AE:5F:F9:3E"), string("192.168.1.1")) , NULL);
+    Schedule();
 //    Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
 }
@@ -528,6 +529,8 @@ void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
     KillTimer(nIDEvent);
     Schedule();
 }
+
+
 
 DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
@@ -560,14 +563,49 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
         tn.receive_telnet_data(buf, BUFSIZE);
         tn.send_telnet_data("echo hello world\n", strlen("echo hello world\n"));//send command 'ls /\r\n'
         tn.receive_telnet_data(buf, BUFSIZE);
-#endif
+#else
 #define COMMAN_UPDATE "send_data 254 0 0 7 0 1 0\n"
 #define COMMAN_REBOOT "reboot send_data 254 0 0 5 0 0 0\n"
-        tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
+	unsigned char red[100] = "send_data 254 0 2 3 0 1 0\n";
+	unsigned char blue[100] = "send_data 254 0 2 3 0 2 0\n";
+	char *ledon = "send_data 254 0 2 3 0 3 0\n";
+	char *offled = "send_data 254 0 2 3 0 0 0\n";
+	char *keytest = "send_data 254 0 2 4 1 6 0\n";
+	char *factmood = "send_data 254 0 0 6 0 1 0\n";
+	char *wifitest = "send_data 254 0 3 0 1 0 0\n";
+	char *wifitest1 = "wpa_cli -i wlan0 scan_result";
+	char *readtrace = "send_data 254 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0";
+	char *writetrace = "send_data 254 0 0 0 0 1 2 3 4 5 6 7 8 9 1 2 3 4 5 6 1";
+
+        //tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
+        //tn.receive_telnet_data(buf, BUFSIZE);
+        //tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
+        //tn.receive_telnet_data(buf, BUFSIZE);
         tn.receive_telnet_data(buf, BUFSIZE);
-        tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
+        tn.send_telnet_data(ledon, strlen(ledon));
+        tn.receive_telnet_data(buf, BUFSIZE);
+        pThis->UpdateMessage(buf);
+
+        tn.send_telnet_data(keytest, strlen(keytest));
+        pThis->UpdateMessage("Please PRESS key in 6 seconds");
+        tn.receive_telnet_data(buf, BUFSIZE);
+        pThis->UpdateMessage(buf);
+
+        tn.send_telnet_data(wifitest, strlen(wifitest));
         tn.receive_telnet_data(buf, BUFSIZE);
 
+        pThis->UpdateMessage(buf);
+        for (int i = 0; i <= 6; i++) {
+        tn.receive_telnet_data(buf, BUFSIZE);
+
+        if (strlen(buf) > 0) {
+        pThis->UpdateMessage(buf);
+        break;
+        }
+        }
+        pThis->UpdateMessage("Finish");
+
+#endif
         closesocket(sock);
         dc->RemoveDevice(dev);
     }

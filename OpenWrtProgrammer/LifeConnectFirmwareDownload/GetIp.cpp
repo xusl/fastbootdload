@@ -153,7 +153,7 @@ int ResolveIpMac(const char *DestIpString, string & mac)
                 if (i == (PhysAddrLen - 1))
                     _snprintf(Buffer, BUFFER_LEN, "%.2X", (int) bPhysAddr[i]);
                 else
-                    _snprintf(Buffer, BUFFER_LEN, "%.2X-", (int) bPhysAddr[i]);
+                    _snprintf(Buffer, BUFFER_LEN, "%.2X:", (int) bPhysAddr[i]);
                 mac += Buffer;
             }
             return 0;
