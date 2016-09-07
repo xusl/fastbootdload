@@ -386,6 +386,7 @@ protected:
      telnet(curl_socket_t sock);
      ~telnet();
      int receive_telnet_data(char *buffer, ssize_t len);
+	 int receive_telnet_cmd(char *buffer, ssize_t len);
      void negotiate();
      void send_negotiation( int cmd, int option);
      void set_local_option( int cmd, int option);

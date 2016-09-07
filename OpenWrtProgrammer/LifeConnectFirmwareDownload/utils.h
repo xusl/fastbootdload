@@ -99,8 +99,15 @@ int GenReport(int i_Slot, char *p_ErrorCode, int i_second);
 int PortToPortNum(int Port, int &PortNum);
 int GaliSNfromWIFI(char *TargetCam, char *SourceCam);
 int GetCaliBit(char *InData, int InDataLen);
-int GenSAV(char *s_IMEI, char *s_CommRef, char *s_PCBASerial, char *s_PTS, char *s_PTM, char *s_HandsetIndRef,
-				char *s_OrderName, int i_OrderQty, char *s_BenchName, DWORD dwTimeDiff, int i_Result, char *s_MAC, 
-				char *s_SSID, char *s_WIFIpassword, char *s_MAC2, char *s_SSID2);
+int GenSAV_NEW(char *s_IMEI, char *s_PCBASerial, char *s_PTS, char *s_PTM, char *s_HandsetIndRef,
+				char *s_BenchName, DWORD dwTimeDiff, int i_Result, char *s_MAC, 
+				char *s_SSID, char *s_WIFIpassword, char *s_MAC2, char *s_SSID2,char *s_memo);
 int PTSTxtFileFind(char *lpPath, char *FileName);
+int GetBDAddr(char *p_BDAddr);
+int ValidCompanyID(char *p_CompanyID);
+int ValidBDAddr(char *p_BDAddr);
+int RefreshBDAddr(void);
+int LoadFactoryBDRange(void);
+int GetWIFIfromDatabase(int i_Slot, char *s_PCBNO, char s_WIFI[]);
+int GetBDAddrFromFile(char *p_BDAddr);
 #endif //__UTILS_H__

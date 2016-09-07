@@ -98,12 +98,13 @@ private:
 	bool server_state;
 	bool is_downloading;
 	bool downloading_successfull;
+	bool b_download;
 	CEdit* Line_edit;
   CEdit m_CUEdit;
-  CStatic m_RomPathStaticText;
-	char s_CommercialRef[14];
+  CEdit m_ORDEREdit;
+  CStatic m_RomPathStaticText;	
 	char s_PTS_new[4];
-	char s_PCBNo[16];
+	//char s_PCBNo[16];
 	char s_MMIFlag[2];
   char m_NetworkSegment[IPADDR_BUFFER_LEN];
 	DWORD dwBeginTime;

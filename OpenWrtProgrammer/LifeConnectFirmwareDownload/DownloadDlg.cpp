@@ -15,7 +15,13 @@
 #define new DEBUG_NEW
 #endif
 
-
+char	s_NAPUAP[10][7];
+char 	s_Order[21];
+int iGetIMEIFromDatabase;
+char s_CommercialRef[21];
+char s_PTS[4];
+bool b_checkTrace;
+string mac_old;
 
 static void gmt_time_string(char *buf, size_t buf_len, time_t *t)
  {
@@ -60,6 +66,8 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
     char path_buffer[MAX_PATH];
 	char drive[_MAX_DRIVE];
 	char dir[_MAX_DIR];
+	char filename[MAX_PATH] = {0};
+	SYSTEMTIME time;
 
 //	GetCurrentDirectory(MAX_PATH, currdir);
 	GetModuleFileName(NULL, path_buffer, MAX_PATH);
@@ -74,6 +82,7 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	Progress_range=350;
 	is_downloading=false;
 	downloading_successfull=false;
+	b_download=false;	
     mRomPath = "cus531-nand-jffs2";
     StartLogging("lifeconnect-flash.log", "all", "all");
 }
@@ -96,6 +105,7 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
 
 	DDX_Control(pDX, IDC_PROGRESS1, m_progMac2);
     DDX_Control(pDX, IDC_CU, m_CUEdit);
+	DDX_Control(pDX, IDC_ORDER, m_ORDEREdit);
     DDX_Control(pDX, IDC_FIRMWARE_IMAGE, m_RomPathStaticText);
 }
 
@@ -166,13 +176,22 @@ BOOL CDownloadDlg::OnInitDialog()
 	m_progMac2.SetTextColor(RGB(0,0,0));
 	m_progMac2.SetStep(10);
 
-    CString config = mModulePath + CONFIG_FILE_PATH;
-	GetPrivateProfileString(_T("MISC"), _T("CURef"), _T(""), s_CommercialRef,14,config);
-	if(strlen(s_CommercialRef) < 14 && strlen(s_CommercialRef) > 10)
+    CString config = mModulePath + _T("Product\\") + CONFIG_FILE_PATH;
+	GetPrivateProfileString(_T("MISC"), _T("CURef"), _T(""), s_CommercialRef,20,config);
+	if(strlen(s_CommercialRef) < 20 && strlen(s_CommercialRef) > 10)
 	{
         m_CUEdit.SetWindowText(s_CommercialRef);
 	}
-
+	GetPrivateProfileString(_T("MISC"), _T("Order"), _T(""), s_Order,20,config);
+	if(strlen(s_Order) < 20 && strlen(s_Order) > 3)
+	{
+        m_ORDEREdit.SetWindowText(s_Order);
+	}	
+	GetPrivateProfileString(_T("MISC"), _T("PTS"), _T(""), s_PTS,3,config);
+	if(strlen(s_PTS) != 3)
+	{
+        strcpy(s_PTS,"");
+	}
 	GetPrivateProfileString(_T("MISC"), _T("PTS"), _T(""), s_PTS_new, 4, config);
     s_PTS_new[3] = 0;
 
@@ -185,6 +204,40 @@ BOOL CDownloadDlg::OnInitDialog()
     LOGD("CU REF : %s", s_CommercialRef);
     LOGD("PTS : %s", s_PTS_new);
     LOGD("network segment : %s", m_NetworkSegment);
+
+	int i=-1;
+	i = GetPrivateProfileInt("CheckTrace", "CHECKTRACE", 0, "C:\\HDT_LIFECONNECT\\DLoadCfg.ini");
+	if(i == 1)
+	{
+		b_checkTrace = true;
+	}
+	else
+	{
+		b_checkTrace = false;
+	}	
+	i=-1;
+	i = GetPrivateProfileInt("MISC", "getIMEIFromDatabase", 0, "D:\\HDT\\HDT.ini");
+	if(i==1||i == 0)
+	{
+		iGetIMEIFromDatabase = i;
+	}
+	else
+	{
+		iGetIMEIFromDatabase = 0;
+	}
+
+	if(iGetIMEIFromDatabase == 1)
+	{
+		GetPrivateProfileString("BTWifi", "CompanyID", "", s_NAPUAP[0], 7, "D:\\HDT\\HDT.ini");
+	}
+	else
+	{
+		if(LoadFactoryBDRange())
+		{
+			AfxMessageBox("Get WIFI file fail!");
+			return false;
+		}
+	}
 
 	if(!PathFileExists(WS_LABEL_DIR)) {
 		CreateDirectory(WS_LABEL_DIR, NULL);
@@ -205,7 +258,8 @@ BOOL CDownloadDlg::OnInitDialog()
  }
 
 void CDownloadDlg::SniffNetwork() {
-    for (int i = 1; i < 9; i++) {
+	CString msg;
+    for (int i = 1; i < 2; i++) {
         CString ip_addr;
         const char* pcIpAddr;
         string mac;
@@ -216,7 +270,19 @@ void CDownloadDlg::SniffNetwork() {
         if(Ping(pcIpAddr)) {
             if (0 == ResolveIpMac(pcIpAddr, mac)) {
             m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL);
+				if(mac != mac_old)
+				{
+					mac_old = mac;
+					b_download = false;	
+					m_progMac2.SetPos(0);
+				    m_progMac2.SetBarColor(RGB(255,255,0));
+				    m_progMac2.SetWindowText(_T(" "));
+				    m_progMac2.Invalidate(FALSE);
             LOGD("ping %s succefully, mac :%s", pcIpAddr, mac.c_str());
+					msg.Format(_T("ping %s succefully, mac :%s"), pcIpAddr, mac.c_str());
+    				UpdateMessage(msg);
+				}
+				break;
             }
         } else {
             ResolveIpMac(pcIpAddr, mac);
@@ -479,8 +545,8 @@ void CDownloadDlg::OnBnClickedButtonBrowse()
        }
        }
        */
-    ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_BUTTON_Browse,mRomPath);
-
+    //::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_BUTTON_Browse,mRomPath);
+	::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_FIRMWARE_IMAGE,mRomPath);
     if(!PathFileExists(mRomPath)) {
         ::MessageBox(NULL, mRomPath ,_T("Check Fireware file"),MB_OK);
         return;
@@ -489,6 +555,7 @@ void CDownloadDlg::OnBnClickedButtonBrowse()
 
 void CDownloadDlg::OnBnClickedStart() {
     CString S_Commercial;
+	CString S_OrderLocal;
     m_progMac2.SetPos(0);
     m_progMac2.SetBarColor(RGB(255,255,0));
     m_progMac2.SetWindowText(_T(" "));
@@ -500,7 +567,8 @@ void CDownloadDlg::OnBnClickedStart() {
 
     ClearMessage();
 
-    memset(s_CommercialRef, 0, 14);
+    memset(s_CommercialRef, 0, 21);
+	memset(s_Order, 0, 21);
     //    CEdit *edit1=(CEdit*)GetDlgItem(IDC_CU);
     m_CUEdit.GetWindowText(S_Commercial);
     if(S_Commercial.GetLength() > 20 || S_Commercial.GetLength() < 10) {
@@ -510,16 +578,25 @@ void CDownloadDlg::OnBnClickedStart() {
     for(int i = 0; i < S_Commercial.GetLength();i++) {
         s_CommercialRef[i] = S_Commercial[i];
     }
+	m_ORDEREdit.GetWindowText(S_OrderLocal);
+    if(S_OrderLocal.GetLength() > 20 || S_OrderLocal.GetLength() < 3) {
+        ::MessageBox(NULL,_T("The Order is invalid!"),_T("Input Order"),MB_OK);
+        return;
+    }
+    for(int i = 0; i < S_OrderLocal.GetLength();i++) 
+	{
+        s_Order[i] = S_OrderLocal[i];
+    }
     GetDlgItem(ID_Start)->EnableWindow(false);
     error_message=_T("Search Datacard..., please wait...\r\n");
     ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message,error_message);
     is_downloading=false;
     downloading_successfull=false;
-    //m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
+	b_download = false;
+    m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
-//    m_pCoordinator->AddDevice(CDevLabel(string("FC:4D:D4:D2:BA:84"), string("192.168.1.10")) , NULL);
-    m_pCoordinator->AddDevice(CDevLabel(string("AE:81:AE:5F:F9:3E"), string("192.168.1.1")) , NULL);
-    Schedule();
+ //m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
+ //Schedule();
 //    Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
 }
@@ -535,6 +612,17 @@ void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
 DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
     CString cmd;
+	int i_ret,i,j,k;
+	char s_trace[17]={0};
+	char s_PCBNo[16]={0};
+	char s_OldWIFINo[13]={0},s_WIFIWrite[7]={0},s_NewWIFINo[13] = {0};
+	unsigned char s_WIFIREAD[7]={0};
+	char s_FmtStr[5] ;
+	int i_TempInt;
+	char s_InetCmd[SUBBUFSIZE]={0};
+	char s_SN[16]={0};
+	char s_memo[301]={0};
+	CString msg;
     //if (pThis->BuildUpdateCommand(pThis->mRomPath, cmd)) {
     DeviceCoordinator * dc = pThis->GetDeviceCoodinator();
     if (dc == NULL) {
@@ -551,7 +639,8 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
     if ( sock != INVALID_SOCKET) {
         telnet tn(sock);
         char buf[BUFSIZE];
-        tn.receive_telnet_data(buf, BUFSIZE);
+		Sleep(5000);
+        tn.receive_telnet_data(buf, BUFSIZE);		
 
 #ifdef TEST
         tn.send_telnet_data("zen\n", strlen("zen\n")); //send user name
@@ -563,7 +652,9 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
         tn.receive_telnet_data(buf, BUFSIZE);
         tn.send_telnet_data("echo hello world\n", strlen("echo hello world\n"));//send command 'ls /\r\n'
         tn.receive_telnet_data(buf, BUFSIZE);
-#else
+        closesocket(sock);
+        dc->RemoveDevice(dev);
+#elif defined(MMI)
 #define COMMAN_UPDATE "send_data 254 0 0 7 0 1 0\n"
 #define COMMAN_REBOOT "reboot send_data 254 0 0 5 0 0 0\n"
 	unsigned char red[100] = "send_data 254 0 2 3 0 1 0\n";
@@ -605,12 +696,162 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
         }
         pThis->UpdateMessage("Finish");
 
-#endif
         closesocket(sock);
         dc->RemoveDevice(dev);
+#else //HDT
+#define COMMAN_GETTRACE "send_data 254 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n"
+#define COMMAN_GETMAC "send_data 254 0 3 1 1 0 0 0 0 0 0\n"
+#define COMMAN_UPDATE "send_data 254 0 0 7 0 1 0\n"
+#define COMMAN_REBOOT "reboot send_data 254 0 0 5 0 0 0\n"
+		i_ret = tn.send_telnet_data(COMMAN_GETTRACE, strlen(COMMAN_GETTRACE));
+		Sleep(1000);
+		i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
+		if(i_ret)
+		{
+			msg.Format(_T("Read traceability fail!"));
+			goto ERROR;
+		}
+		else
+		{
+			j = 0;
+			for(i =67; j < 16; j++)
+			{
+				s_trace[j] = atoi(buf+i);
+				while(buf[i] != 0x20 && buf[i] != '#')
+				{
+					i++;
+				}
+				if(buf[i] == '#')
+				{
+					break;
+				}
+				i++;
+			}
+			strncpy(s_PCBNo,s_trace,15);
+			if(b_checkTrace)
+			{
+				if(s_trace[15] != '1')
+				{
+					msg.Format(_T("Check traceability fail!"));
+					goto ERROR;
+				}
+			}
+		}
+		i_ret = tn.send_telnet_data(COMMAN_GETMAC, strlen(COMMAN_GETMAC));
+		Sleep(1000);
+		i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
+		if(i_ret)
+		{
+			msg.Format(_T("Read WIFI MAC fail!"));
+			goto ERROR;
+		}
+		else
+		{
+			j = 0;
+			for(i =0x2f; j < 6; j++)
+			{
+				s_WIFIREAD[j] = atoi(buf+i);
+				while(buf[i] != 0x20 && buf[i] != '#')
+				{
+					i++;
+				}
+				if(buf[i] == '#')
+				{
+					break;
+				}
+				i++;
+			}
+			//strncpy(s_PCBNo,s_trace,15);
+		}
+		for(i=0;i<6;i++)
+		{
+			sprintf(s_FmtStr, "%02X", s_WIFIREAD[i]);
+	       	s_OldWIFINo[i*2]=s_FmtStr[0];
+			toupper(s_OldWIFINo[i*2]);
+			s_OldWIFINo[i*2+1]=s_FmtStr[1];
+			toupper(s_OldWIFINo[i*2+1]);
+	    }	   
+		s_OldWIFINo[6*2]=0;
+		if(strncmp(s_OldWIFINo,"000000",6) == 0 || strncmp(s_OldWIFINo,s_NAPUAP[0],6)!=0)
+		{
+			if(iGetIMEIFromDatabase == 1)
+				i_ret = GetWIFIfromDatabase(0,s_PCBNo,s_NewWIFINo);
+			else
+				i_ret = GetBDAddr(s_NewWIFINo);
+			if(i_ret)
+			{
+				closesocket(sock);
+		        dc->RemoveDevice(dev);
+				msg.Format(_T("Get WIFI MAC fail!"));
+				goto ERROR;
+			}
+			strcpy(s_InetCmd,"send_data 254 0 3 1 0");
+			for(i=0;i<6;i++)
+			{
+				if(!isxdigit(s_NewWIFINo[2*i]))
+				{
+					msg.Format(_T("Get WIFI MAC is invalid!"));
+					goto ERROR;
+				}
+				s_FmtStr[0]=s_NewWIFINo[2*i];
+				if(!isxdigit(s_NewWIFINo[2*i+1]))
+				{
+					msg.Format(_T("Get WIFI MAC is invalid!"));
+					goto ERROR;
+				}
+				s_FmtStr[1]=s_NewWIFINo[2*i+1];
+				s_FmtStr[2] = 0;
+				sscanf(s_FmtStr, "%x", &i_TempInt);
+				sprintf(s_FmtStr,"%d",i_TempInt);
+				strcat(s_InetCmd," ");
+				strcat(s_InetCmd,s_FmtStr);				
+			}
+			strcat(s_InetCmd,"\n");
+			i_ret = tn.send_telnet_data(s_InetCmd, strlen(s_InetCmd));//send command 'ls /\r\n'
+        	i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);			
+		}
+		else
+		{
+			strcpy(s_NewWIFINo,s_OldWIFINo);
+		}
+		GaliSNfromWIFI(s_SN,s_NewWIFINo);
+		
+        //i_ret = tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
+        //i_ret = tn.receive_telnet_data(buf, BUFSIZE);
+        //i_ret = tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
+        //i_ret = tn.receive_telnet_data(buf, BUFSIZE);
+		i_ret = GenSAV_NEW(s_SN, s_PCBNo, s_PTS, "", "",
+				"", 0, 0, s_NewWIFINo,"", "", "", "",s_memo);
+		if(i_ret)
+		{
+			msg.Format(_T("Generate SAV fail!err message:%s"),s_memo);
+			goto ERROR;
+		}
+			
+        closesocket(sock);
+		dc->Reset();
+        //dc->RemoveDevice(dev);
+		pThis->m_progMac2.SetPos(pThis->Progress_range);
+		pThis->m_progMac2.SetBarColor(RGB(0,255,0));
+		pThis->m_progMac2.SetWindowText(_T("Download successfully!"));
+		pThis->m_progMac2.Invalidate(FALSE);
+		//pThis->GetDlgItem(ID_Start)->EnableWindow(true);
+		pThis->b_download = true;	
+#endif
     }
     //}
     return 0;
+ERROR:
+	closesocket(sock);
+    //dc->RemoveDevice(dev);
+	dc->Reset();
+	pThis->m_progMac2.SetPos(pThis->Progress_range);
+	pThis->m_progMac2.SetBarColor(RGB(255,50,50));
+	pThis->m_progMac2.SetWindowText(msg);
+	pThis->m_progMac2.Invalidate(FALSE);
+	//pThis->GetDlgItem(ID_Start)->EnableWindow(true);
+	pThis->b_download = true;
+	return 2;
 }
 
 
@@ -783,7 +1024,7 @@ LRESULT CDownloadDlg::OnMessageArrive(WPARAM wParam, LPARAM lParam) {
 void CDownloadDlg::ClearMessage(void) {
     error_message.Empty();// = "";
     UpdateMessage(error_message);
-    GetDlgItem(ID_Start)->EnableWindow(false);
+    //GetDlgItem(ID_Start)->EnableWindow(false);
 }
 
 void CDownloadDlg::UpdateMessage(CString errormsg){
@@ -800,7 +1041,7 @@ void CDownloadDlg::UpdateMessage(CString errormsg){
     msg = error_message;
     }
     LOGE("%s", errormsg.GetString());
-//    ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
+    ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
     Line_edit->SetWindowText(msg);
 	Line_edit->SetSel(0,-1);
 	Line_edit->SetFocus();
