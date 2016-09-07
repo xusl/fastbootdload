@@ -92,6 +92,11 @@ char * trim(char *str);
 void AddSpaceToString(char *s_String, int i_Len);
 void AddStarToString(char *s_String, int i_Len);
 
+// Function LastErrorText
+// A wrapper for FormatMessage : retrieve the message text for a system-defined error 
+char *LastErrorText (void);
+
+
 //v3.9.0
 int InitReportFile(char s_CommRefStr[], char HDTPATH[]);
 int ValidFolderExists(char *p_FileName);
