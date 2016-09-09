@@ -9,6 +9,9 @@
 
 #include <StdAfx.h>
 #include "utils.h"
+#include "threading.h"
+
+struct S_ThreadMonitoring tftpThreadMonitor;// [TH_NUMBER];
 
 // number of permanent worker threads
 #define TFTP_PERMANENTTHREADS 2
@@ -29,21 +32,120 @@
 #include "settings.h"
 #include "threading.h"
 #include "tftpd_functions.h"
+#include "log.h"
 
 // First item -> structure belongs to the module and is shared by all threads
 struct LL_TftpInfo *pTftpFirst;
 static int gSendFullStat=FALSE;		// full report should be sent
 
 
+// bind the thread socket
+SOCKET BindServiceSocket (const char *name, int family, int type, const char *service, int def_port, int rfc_port, const char *sz_if)
+{
+    SOCKET             sListenSocket = INVALID_SOCKET;
+    int                Rc;
+    ADDRINFO           Hints, *res;
+    char               szServ[NI_MAXSERV];
+
+    memset (& Hints, 0, sizeof Hints);
+    if ( sSettings.bIPv4  &&  ! sSettings.bIPv6 && (family==AF_INET6 || family==AF_UNSPEC) )
+        Hints.ai_family = AF_INET;    // force IPv4
+    else if (sSettings.bIPv6  &&  ! sSettings.bIPv4  && (family==AF_INET || family==AF_UNSPEC) )
+        Hints.ai_family = AF_INET6;  // force IPv6
+    else     Hints.ai_family = family;    // use IPv4 or IPv6, whichever
 
 
-// statistics requested by console 
+    Hints.ai_socktype = type;
+    Hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
+    wsprintf (szServ, "%d", def_port);
+    Rc = getaddrinfo (sz_if!=NULL && sz_if[0]!=0 ? sz_if : NULL,
+                      def_port==rfc_port ? service : szServ,
+                      &Hints, &res);
+    if (Rc!=0)
+    {
+        LOGE ("Error : Can't create socket\nError %d (%s)", GetLastError(), LastErrorText() );
+        return sListenSocket;
+    }
+    // bind it to the port we passed in to getaddrinfo():
+
+    sListenSocket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (sListenSocket == INVALID_SOCKET)
+    {
+        LOGE ("Error : Can't create socket\nError %d (%s)", GetLastError(), LastErrorText() );
+        return sListenSocket;
+    }
+
+    // share bindings for UDP sockets
+    if (type==SOCK_DGRAM)
+    {int True=1;
+        Rc = setsockopt (sListenSocket, SOL_SOCKET, SO_REUSEADDR, (char *) & True, sizeof True);
+        if (Rc==0 )
+            LOGW ( "Port %d may be reused\n" ,
+                  ( (struct sockaddr_in *) res->ai_addr)->sin_port);
+        else
+            LOGW ( "setsockopt error\n");
+    }
+
+    // if family is AF_UNSPEC, allow both IPv6 and IPv4 by disabling IPV6_ONLY (necessary since Vista)
+    // http://msdn.microsoft.com/en-us/library/windows/desktop/bb513665(v=vs.85).aspx
+    // does not work under XP
+    if (family == AF_UNSPEC)
+    {int False=0;
+        Rc = setsockopt(sListenSocket, IPPROTO_IPV6, IPV6_V6ONLY, (char*)& False, sizeof False );
+    }
+
+
+    // bind the socket to the active interface
+    Rc = bind(sListenSocket, res->ai_addr, res->ai_addrlen);
+
+    if (Rc == INVALID_SOCKET)
+    {char szAddr[MAXLEN_IPv6]="unknown", szServ[NI_MAXSERV]="unknown";
+        int KeepLastError = GetLastError();
+        // retrieve localhost and port
+        getnameinfo (  res->ai_addr, res->ai_addrlen,
+                     szAddr, sizeof szAddr,
+                     szServ, sizeof szServ,
+                     NI_NUMERICHOST | AI_NUMERICSERV );
+        SetLastError (KeepLastError); // getnameinfo has reset LastError !
+        // 3 causes : access violation, socket already bound, bind on an adress
+        switch (GetLastError ())
+        {
+        case WSAEADDRNOTAVAIL :   // 10049
+            LOGE ("Error %d\n%s\n\n"
+                  "Tftpd32 tried to bind the %s port\n"
+                  "to the interface %s\nwhich is not available for this host\n"
+                  "Either remove the %s service or suppress %s interface assignation",
+                  GetLastError (), LastErrorText (),
+                  name, sz_if, name, sz_if);
+            break;
+        case WSAEINVAL :
+        case WSAEADDRINUSE :
+            LOGE ("Error %d\n%s\n\n"
+                  "Tftpd32 can not bind the %s port\n"
+                  "an application is already listening on this port",
+                  GetLastError (), LastErrorText (),
+                  name );
+            break;
+        default :
+            LOGE ("Bind error %d\n%s",
+                  GetLastError (), LastErrorText () );
+            break;
+        } // switch error type
+        closesocket (sListenSocket);
+        LOGW ("bind port to %s port %s failed\n", szAddr, szServ);
+
+    }
+    freeaddrinfo (res);
+    return   Rc == INVALID_SOCKET ? Rc : sListenSocket;
+} // BindServiceSocket
+
+// statistics requested by console
 // do not answer immediately since we are in console thread
 // and pTftp data may change
 void ConsoleTftpGetStatistics (void)
 {
-	gSendFullStat = TRUE;
-} // 
+    gSendFullStat = TRUE;
+} //
 
 
 
@@ -51,139 +153,135 @@ void ConsoleTftpGetStatistics (void)
 // TFTP daemon --> Runs at main level
 ////////////////////////////////////////////////////////////
 
-
-
 static SOCKET TftpBindLocalInterface (void)
 {
-SOCKET             sListenSocket = INVALID_SOCKET;
-int                Rc;
-ADDRINFO           Hints, *res;
-char               szServ[NI_MAXSERV];
-char               szIPv4 [MAXLEN_IPv6];
+    SOCKET             sListenSocket = INVALID_SOCKET;
+    int                Rc;
+    ADDRINFO           Hints, *res;
+    char               szServ[NI_MAXSERV];
+    char               szIPv4 [MAXLEN_IPv6];
 
-   memset (& Hints, 0, sizeof Hints);
-   if ( sSettings.bIPv4  &&  ! sSettings.bIPv6  )
-			Hints.ai_family = AF_INET;    // force IPv4 
-   else if (sSettings.bIPv6  &&  ! sSettings.bIPv4   )
-			Hints.ai_family = AF_INET6;  // force IPv6
-   else     Hints.ai_family = AF_UNSPEC;    // use IPv4 or IPv6, whichever
+    memset(&Hints, 0, sizeof Hints);
+    if ( sSettings.bIPv4 && ! sSettings.bIPv6 )
+        Hints.ai_family = AF_INET;    // force IPv4
+    else if (sSettings.bIPv6  &&  ! sSettings.bIPv4 )
+        Hints.ai_family = AF_INET6;  // force IPv6
+    else     Hints.ai_family = AF_UNSPEC;    // use IPv4 or IPv6, whichever
 
+    Hints.ai_socktype = SOCK_DGRAM;
+    Hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
+    wsprintf (szServ, "%d", sSettings.Port==0 ? TFTP_DEFPORT : sSettings.Port );
+    // retrieve IPv4 address assigned to a physical Interface
+    if (sSettings.bTftpOnPhysicalIf)
+    {
+        Rc = GetIPv4Address (sSettings.szTftpLocalIP, szIPv4);
+        if (Rc!=0)  return sListenSocket;
+        Rc = getaddrinfo ( szIPv4,
+                          sSettings.Port == 69 ? "tftp" : szServ,
+                          &Hints, &res);
+        if (Rc!=0)  return sListenSocket;
+    }
+    else
+    {
+        Rc = getaddrinfo ( isdigit (sSettings.szTftpLocalIP[0]) ? sSettings.szTftpLocalIP : NULL,
+                          sSettings.Port == 69 ? "tftp" : szServ,
+                          &Hints, &res);
+        if (Rc!=0)
+        {
+            if (GetLastError() == WSAHOST_NOT_FOUND)
+            {
+                LOGE ("Error %d\n%s\n\n"
+                      "Tftpd32 tried to bind the %s port\n"
+                      "to the interface %s\nwhich is not available for this host\n"
+                      "Either remove the %s service or suppress %s interface assignation",
+                      GetLastError (), LastErrorText (),
+                      "tftp", sSettings.szTftpLocalIP, "tftp", sSettings.szTftpLocalIP);
+            }
+            else
+            {
+                LOGE ("Error : Can't create socket\nError %d (%s)", GetLastError(), LastErrorText() );
+            }
+            return sListenSocket;
+        }
+    }
+    // bind it to the port we passed in to getaddrinfo():
 
-   Hints.ai_socktype = SOCK_DGRAM;
-   Hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
-   wsprintf (szServ, "%d", sSettings.Port==0 ? TFTP_DEFPORT : sSettings.Port );
-   // retrieve IPv4 address assigned to a physical Interface
-   if (sSettings.bTftpOnPhysicalIf)
-   {
-	   Rc = GetIPv4Address (sSettings.szTftpLocalIP, szIPv4);
-	   if (Rc!=0)  return sListenSocket;
-   	   Rc = getaddrinfo ( szIPv4, 
-						    sSettings.Port == 69 ? "tftp" : szServ, 
-			               &Hints, &res);
-	   if (Rc!=0)  return sListenSocket;
-   }
-   else
-   {
-       Rc = getaddrinfo ( isdigit (sSettings.szTftpLocalIP[0]) ? sSettings.szTftpLocalIP : NULL, 
-		    			  sSettings.Port == 69 ? "tftp" : szServ, 
-			             &Hints, &res);
-		if (Rc!=0)
-		{
-			if (GetLastError() == WSAHOST_NOT_FOUND)
-			{
-	  		    LOGE ("Error %d\n%s\n\n"
-					   "Tftpd32 tried to bind the %s port\n"
-					   "to the interface %s\nwhich is not available for this host\n"
-					   "Either remove the %s service or suppress %s interface assignation",
- 					    GetLastError (), LastErrorText (),
-						"tftp", sSettings.szTftpLocalIP, "tftp", sSettings.szTftpLocalIP); 
-			}
-			else
-			{
-				LOGE ("Error : Can't create socket\nError %d (%s)", GetLastError(), LastErrorText() );
-			}
-			return sListenSocket;
-		}
-   }
-	// bind it to the port we passed in to getaddrinfo():
+    sListenSocket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (sListenSocket == INVALID_SOCKET)
+    {
+        LOGE ("Error : Can't create socket\nError %d (%s)", GetLastError(), LastErrorText() );
+        freeaddrinfo (res);
+        return sListenSocket;
+    }
 
-	sListenSocket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	if (sListenSocket == INVALID_SOCKET)
-	{
-			LOGE ("Error : Can't create socket\nError %d (%s)", GetLastError(), LastErrorText() );
-			freeaddrinfo (res);
-			return sListenSocket;
-	}
-
-
-   	// REUSEADDR option in order to allow thread to open 69 port
-	if (sSettings.bPortOption==0)
-	{int True=1;
-		Rc = setsockopt (sListenSocket, SOL_SOCKET, SO_REUSEADDR, (char *) & True, sizeof True);
+    // REUSEADDR option in order to allow thread to open 69 port
+    if (sSettings.bPortOption==0)
+    {
+        int True=1;
+        Rc = setsockopt (sListenSocket, SOL_SOCKET, SO_REUSEADDR, (char *) & True, sizeof True);
         if (Rc==0 )
-		LOGW ("Port %d may be reused" , sSettings.Port);
+            LOGW ("Port %d may be reused" , sSettings.Port);
         else
-        LOGW("setsockopt error");
-	}
+            LOGW("setsockopt error");
+    }
 
-	// if family is AF_UNSPEC, allow both IPv6 and IPv4 by disabling IPV6_ONLY (necessary since Vista)
-	// http://msdn.microsoft.com/en-us/library/windows/desktop/bb513665(v=vs.85).aspx
-	if (sSettings.bIPv4 && sSettings.bIPv6)
-	{int False=0;
-	   Rc = setsockopt(sListenSocket, IPPROTO_IPV6, IPV6_V6ONLY, (char*)& False, sizeof False );
-	   // do not check Rc, since XP does not support this settings -> error
-	}
+    // if family is AF_UNSPEC, allow both IPv6 and IPv4 by disabling IPV6_ONLY (necessary since Vista)
+    // http://msdn.microsoft.com/en-us/library/windows/desktop/bb513665(v=vs.85).aspx
+    if (sSettings.bIPv4 && sSettings.bIPv6)
+    {
+        int False=0;
+        Rc = setsockopt(sListenSocket, IPPROTO_IPV6, IPV6_V6ONLY, (char*)& False, sizeof False );
+        // do not check Rc, since XP does not support this settings -> error
+    }
 
+    // bind the socket to the active interface
+    Rc = bind(sListenSocket, res->ai_addr, res->ai_addrlen);
 
-   // bind the socket to the active interface
-   Rc = bind(sListenSocket, res->ai_addr, res->ai_addrlen);
-
-   if (Rc == INVALID_SOCKET)
-   {char szAddr[MAXLEN_IPv6]="unknown", szServ[NI_MAXSERV]="unknown";
-    int KeepLastError = GetLastError();
-      // retrieve localhost and port
-		getnameinfo (  res->ai_addr, res->ai_addrlen, 
-		               szAddr, sizeof szAddr, 
-				       szServ, sizeof szServ,
-				       NI_NUMERICHOST | AI_NUMERICSERV );
-		SetLastError (KeepLastError); // getnameinfo has reset LastError !
-	   // 3 causes : access violation, socket already bound, bind on an adress 
-	   switch (GetLastError ())
-	   {
-			case WSAEADDRNOTAVAIL :   // 10049
-	  		    LOGE ("Error %d\n%s\n\n"
-					   "Tftpd32 tried to bind the %s port\n"
-					   "to the interface %s\nwhich is not available for this host\n"
-					   "Either remove the %s service or suppress %s interface assignation",
- 					    GetLastError (), LastErrorText (),
-						"tftp", sSettings.szTftpLocalIP, "tftp", sSettings.szTftpLocalIP); 
-				break;
-			case WSAEINVAL :
-			case WSAEADDRINUSE :
-	  		    LOGE ("Error %d\n%s\n\n"
-					   "Tftpd32 can not bind the %s port\n"
-					   "an application is already listening on this port",
- 					    GetLastError (), LastErrorText (),
-						"tftp" );
-				break;
-			default :
-				LOGE ("Bind error %d\n%s",
- 					    GetLastError (), LastErrorText () );
-				break;
-	   } // switch error type
-       closesocket (sListenSocket);
-	   LOGE ("bind port to %s port %s failed\n", szAddr, szServ);
-   }
-   freeaddrinfo (res);
-return   Rc == INVALID_SOCKET ? Rc : sListenSocket;
-
+    if (Rc == INVALID_SOCKET)
+    {
+        char szAddr[MAXLEN_IPv6]="unknown", szServ[NI_MAXSERV]="unknown";
+        int KeepLastError = GetLastError();
+        // retrieve localhost and port
+        getnameinfo(res->ai_addr, res->ai_addrlen,
+                    szAddr, sizeof szAddr,
+                    szServ, sizeof szServ,
+                    NI_NUMERICHOST | AI_NUMERICSERV );
+        SetLastError(KeepLastError); // getnameinfo has reset LastError !
+        // 3 causes : access violation, socket already bound, bind on an adress
+        switch (GetLastError ())
+        {
+        case WSAEADDRNOTAVAIL :   // 10049
+            LOGE ("Error %d\n%s\n\n"
+                  "Tftpd32 tried to bind the %s port\n"
+                  "to the interface %s\nwhich is not available for this host\n"
+                  "Either remove the %s service or suppress %s interface assignation",
+                  GetLastError (), LastErrorText (),
+                  "tftp", sSettings.szTftpLocalIP, "tftp", sSettings.szTftpLocalIP);
+            break;
+        case WSAEINVAL :
+        case WSAEADDRINUSE :
+            LOGE ("Error %d\n%s\n\n"
+                  "Tftpd32 can not bind the %s port\n"
+                  "an application is already listening on this port",
+                  GetLastError (), LastErrorText (),
+                  "tftp" );
+            break;
+        default :
+            LOGE ("Bind error %d\n%s", GetLastError (), LastErrorText () );
+            break;
+        } // switch error type
+        closesocket (sListenSocket);
+        LOGE ("bind port to %s port %s failed\n", szAddr, szServ);
+    }
+    freeaddrinfo (res);
+    return Rc == INVALID_SOCKET ? Rc : sListenSocket;
 } // TftpBindLocalInterface
 
 
 static void PopulateTftpdStruct (struct LL_TftpInfo *pTftp)
 {
-struct LL_TftpInfo *pTmp;
-static DWORD TransferId=467;    // unique identifiant
+    struct LL_TftpInfo *pTmp;
+    static DWORD TransferId=467;    // unique identifiant
 
     // init or reinit struct
     pTftp->s.dwTimeout = sSettings.Timeout;
@@ -191,21 +289,21 @@ static DWORD TransferId=467;    // unique identifiant
     pTftp->r.skt = INVALID_SOCKET;
     pTftp->r.hFile = INVALID_HANDLE_VALUE;
     pTftp->c.bMCast = FALSE;    // may be updated later
-	pTftp->c.nOAckPort = 0;		// use classical port for OAck
+    pTftp->c.nOAckPort = 0;		// use classical port for OAck
     pTftp->tm.dwTransferId = TransferId++;
 
     // init statistics
     memset (& pTftp->st, 0, sizeof pTftp->st);
     time (& pTftp->st.StartTime);
     pTftp->st.dLastUpdate = pTftp->st.StartTime;
-	pTftp->st.ret_code = TFTP_TRF_RUNNING;
+    pTftp->st.ret_code = TFTP_TRF_RUNNING;
     // count the transfers (base 0)
     for ( pTftp->st.dwTransfert=0, pTmp = pTftpFirst->next ;
-          pTmp!=NULL ;
-          pTmp = pTmp->next, pTftp->st.dwTransfert++ ) ;
+         pTmp!=NULL ;
+         pTmp = pTmp->next, pTftp->st.dwTransfert++ ) ;
     LOGW ("Transfert #%d", pTftp->st.dwTransfert);
 
-   // init MD5 structure
+    // init MD5 structure
     pTftp->m.bInit = sSettings.bMD5;
 
     // clear buffers
@@ -215,17 +313,17 @@ static DWORD TransferId=467;    // unique identifiant
 // Suppress structure item
 static struct LL_TftpInfo *TftpdDestroyThreadItem (struct LL_TftpInfo *pTftp)
 {
-struct LL_TftpInfo *pTmp=pTftp;
+    struct LL_TftpInfo *pTmp=pTftp;
 
     LOGD ("thread %d has exited", pTftp->tm.dwThreadHandle);
 
-LOGD ("removing thread %d (%p/%p/%p)\n", pTftp->tm.dwThreadHandleId, pTftp, pTftpFirst, pTftpFirst->next);
+    LOGD ("removing thread %d (%p/%p/%p)\n", pTftp->tm.dwThreadHandleId, pTftp, pTftpFirst, pTftpFirst->next);
     // do not cancel permanent Thread
     if (! pTftp->tm.bPermanentThread )
     {
         if (pTftp!=pTftpFirst)
         {
-              // search for the previous struct
+            // search for the previous struct
             for (pTmp=pTftpFirst ; pTmp->next!=NULL && pTmp->next!=pTftp ; pTmp=pTmp->next);
             pTmp->next = pTftp->next;   // detach the struct from list
         }
@@ -235,7 +333,7 @@ LOGD ("removing thread %d (%p/%p/%p)\n", pTftp->tm.dwThreadHandleId, pTftp, pTft
         free (pTftp);
     }
 
-return pTmp;	// pointer on previous item
+    return pTmp;	// pointer on previous item
 } // TftpdDestroyThreadItem
 
 
@@ -246,65 +344,65 @@ return pTmp;	// pointer on previous item
 // --------------------------------------------------------
 static int TftpMainFilter (SOCKADDR_STORAGE *from, int from_len, char *data, int len)
 {
-static char LastMsg[PKTSIZE];
-static int  LastMsgSize;
-static time_t LastDate;
-static SOCKADDR_STORAGE LastFrom;
+    static char LastMsg[PKTSIZE];
+    static int  LastMsgSize;
+    static time_t LastDate;
+    static SOCKADDR_STORAGE LastFrom;
 
-	if (len > PKTSIZE) return TRUE;	// packet should really be dropped
-	// test only duplicated packets
-	if (    len==LastMsgSize  
-		&&  memcmp (data, LastMsg, len)==0
-		&&  memcmp (from, & LastFrom, from_len) == 0
-		&&  time (NULL) == LastDate )
-	{char szAddr[MAXLEN_IPv6]="", szServ[NI_MAXSERV]="";
-	 int Rc;
-		Rc = getnameinfo ( (LPSOCKADDR) from, sizeof from, 
-		                    szAddr, sizeof szAddr, 
-				            szServ, sizeof szServ,
-				            NI_NUMERICHOST | NI_NUMERICSERV );
-		 
-		LOGD ("Warning : received duplicated request from %s:%s", szAddr, szServ);
-		Sleep (250);	// time for the first TFTP thread to start
-		return FALSE;	// accept message nevertheless
-	}
-	// save last frame
+    if (len > PKTSIZE) return TRUE;	// packet should really be dropped
+    // test only duplicated packets
+    if (    len==LastMsgSize
+        &&  memcmp (data, LastMsg, len)==0
+        &&  memcmp (from, & LastFrom, from_len) == 0
+        &&  time (NULL) == LastDate )
+    {char szAddr[MAXLEN_IPv6]="", szServ[NI_MAXSERV]="";
+        int Rc;
+        Rc = getnameinfo ( (LPSOCKADDR) from, sizeof from,
+                          szAddr, sizeof szAddr,
+                          szServ, sizeof szServ,
+                          NI_NUMERICHOST | NI_NUMERICSERV );
 
-	LastMsgSize = len;
-	memcpy (LastMsg, data, len);
-	LastFrom = *from;
-	time (&LastDate);
-	return FALSE; // packet is OK
+        LOGD ("Warning : received duplicated request from %s:%s", szAddr, szServ);
+        Sleep (250);	// time for the first TFTP thread to start
+        return FALSE;	// accept message nevertheless
+    }
+    // save last frame
+
+    LastMsgSize = len;
+    memcpy (LastMsg, data, len);
+    LastFrom = *from;
+    time (&LastDate);
+    return FALSE; // packet is OK
 } // TftpMainFilter
 
 
-// activate a new thread and pass control to it 
+// activate a new thread and pass control to it
 static int TftpdChooseNewThread (SOCKET sListenerSocket)
 {
-struct LL_TftpInfo *pTftp, *pTmp;
-int             fromlen;
-int             bNewThread;
-int             Rc;
-int             nThread=0;
+    struct LL_TftpInfo *pTftp, *pTmp;
+    int             fromlen;
+    int             bNewThread;
+    int             Rc;
+    int             nThread=0;
 
-    for (  pTmp = pTftpFirst ;  pTmp!=NULL ;  pTmp = pTmp->next)   
-		nThread++;
-	// if max thread reach read datagram and quit
+    for (  pTmp = pTftpFirst ;  pTmp!=NULL ;  pTmp = pTmp->next)
+        nThread++;
+    // if max thread reach read datagram and quit
     if (nThread >= sSettings.dwMaxTftpTransfers)
     {char dummy_buf [PKTSIZE];
-     SOCKADDR_STORAGE    from;
+        SOCKADDR_STORAGE    from;
         fromlen = sizeof from;
         // Read the connect datagram to empty queue
         Rc = recvfrom (sListenerSocket, dummy_buf, sizeof dummy_buf, 0,
                        (struct sockaddr *) & from, & fromlen);
-        if (Rc>0) 
-		{char szAddr[MAXLEN_IPv6];
-		     getnameinfo ( (LPSOCKADDR) & from, sizeof from, 
-		                    szAddr, sizeof szAddr, 
-				            NULL, 0,
-				            NI_NUMERICHOST );
-               LOGD ("max number of threads reached, connection from %s dropped", szAddr );
-		}
+        if (Rc>0)
+        {char szAddr[MAXLEN_IPv6];
+            getnameinfo ( (LPSOCKADDR) & from, sizeof from,
+                         szAddr, sizeof szAddr,
+                         NULL, 0,
+                         NI_NUMERICHOST );
+            LOGD ("max number of threads reached, connection from %s dropped", szAddr );
+        }
         return -1;
     }
 
@@ -329,7 +427,7 @@ int             nThread=0;
     // Read the connect datagram (since this use a "global socket" port 69 its done here)
     fromlen = sizeof pTftp->b.cnx_frame;
     Rc = recvfrom (sListenerSocket, pTftp->b.cnx_frame, sizeof pTftp->b.cnx_frame, 0,
-               (struct sockaddr *)&pTftp->b.from, &fromlen);
+                   (struct sockaddr *)&pTftp->b.from, &fromlen);
     if (Rc < 0)
     {
         // the Tftp structure has been created --> suppress it
@@ -342,46 +440,46 @@ int             nThread=0;
             free (pTftp);
         }
     }
-	// should the message be silently dropped
+    // should the message be silently dropped
     else if (TftpMainFilter (& pTftp->b.from, sizeof pTftp->b.from, pTftp->b.cnx_frame, Rc))
-	{char szAddr[MAXLEN_IPv6];
-		getnameinfo ( (LPSOCKADDR) & pTftp->b.from, sizeof pTftp->b.from,  
-		               szAddr, sizeof szAddr, 
-				       NULL, 0,
-				       NI_NUMERICHOST | AI_NUMERICSERV );
+    {char szAddr[MAXLEN_IPv6];
+        getnameinfo ( (LPSOCKADDR) & pTftp->b.from, sizeof pTftp->b.from,
+                     szAddr, sizeof szAddr,
+                     NULL, 0,
+                     NI_NUMERICHOST | AI_NUMERICSERV );
         // If this is an IPv4-mapped IPv6 address; drop the leading part of the address string so we're left with the familiar IPv4 format.
-		// Hack copied from the Apache source code
-		if ( pTftp->b.from.ss_family == AF_INET6 
-			 && IN6_IS_ADDR_V4MAPPED ( & (* (struct sockaddr_in6 *) & pTftp->b.from ).sin6_addr ) )
+        // Hack copied from the Apache source code
+        if ( pTftp->b.from.ss_family == AF_INET6
+            && IN6_IS_ADDR_V4MAPPED ( & (* (struct sockaddr_in6 *) & pTftp->b.from ).sin6_addr ) )
         {
-			memmove (szAddr, szAddr + sizeof ("::ffff:") - 1, strlen (szAddr + sizeof ("::ffff:") -1) +1 );        
-		}
+            memmove (szAddr, szAddr + sizeof ("::ffff:") - 1, strlen (szAddr + sizeof ("::ffff:") -1) +1 );
+        }
         LOGW("Warning : Unaccepted request received from %s", szAddr);
         // the Tftp structure has been created --> suppress it
-		if (! pTftp->tm.bPermanentThread )
+        if (! pTftp->tm.bPermanentThread )
         {
             // search for the last thread struct
             for ( pTmp=pTftpFirst ;  pTmp->next!=pTftp ; pTmp=pTmp->next );
             pTmp->next = pTftp->next ; // remove pTftp from linked list
             free (pTftp);
         }
-	}
-	else	// message is accepted
+    }
+    else	// message is accepted
     {char szAddr[MAXLEN_IPv6], szServ[NI_MAXSERV];
-		getnameinfo ( (LPSOCKADDR) & pTftp->b.from, sizeof pTftp->b.from, 
-		               szAddr, sizeof szAddr, 
-				       szServ, sizeof szServ,
-				       NI_NUMERICHOST | AI_NUMERICSERV );
+        getnameinfo ( (LPSOCKADDR) & pTftp->b.from, sizeof pTftp->b.from,
+                     szAddr, sizeof szAddr,
+                     szServ, sizeof szServ,
+                     NI_NUMERICHOST | AI_NUMERICSERV );
         // If this is an IPv4-mapped IPv6 address; drop the leading part of the address string so we're left with the familiar IPv4 format.
-		if ( pTftp->b.from.ss_family == AF_INET6 
-			 && IN6_IS_ADDR_V4MAPPED ( & (* (struct sockaddr_in6 *) & pTftp->b.from ).sin6_addr ) )
+        if ( pTftp->b.from.ss_family == AF_INET6
+            && IN6_IS_ADDR_V4MAPPED ( & (* (struct sockaddr_in6 *) & pTftp->b.from ).sin6_addr ) )
         {
-			memmove (szAddr, szAddr + sizeof ("::ffff:") - 1, strlen (szAddr + sizeof ("::ffff:") -1) +1 );        
-		}
+            memmove (szAddr, szAddr + sizeof ("::ffff:") - 1, strlen (szAddr + sizeof ("::ffff:") -1) +1 );
+        }
         LOGD ("Connection received from %s on port %s", szAddr, szServ);
 #if (defined DEBUG || defined DEB_TEST)
         BinDump (pTftp->b.cnx_frame, Rc, "Connect:");
-#endif		
+#endif
 
         // mark thread as started (will not be reused)
         pTftp->tm.bActive=TRUE ;
@@ -397,62 +495,62 @@ int             nThread=0;
                                                      pTftp,
                                                      0,
                                                      & pTftp->tm.dwThreadHandleId);
-LOGD ("Thread %d transfer %d started (records %p/%p)\n", pTftp->tm.dwThreadHandleId, pTftp->tm.dwTransferId, pTftpFirst, pTftp);
+            LOGD ("Thread %d transfer %d started (records %p/%p)\n", pTftp->tm.dwThreadHandleId, pTftp->tm.dwTransferId, pTftpFirst, pTftp);
             LOGD("thread %d started", pTftp->tm.dwThreadHandle);
 
         }
         else                 // Start the thread
         {
-    LOGD ("waking up thread %d for transfer %d\n",
-                   pTftp->tm.dwThreadHandleId,
-                   pTftp->tm.dwTransferId );
+            LOGD ("waking up thread %d for transfer %d\n",
+                  pTftp->tm.dwThreadHandleId,
+                  pTftp->tm.dwTransferId );
             if (pTftp->tm.hEvent!=NULL)       SetEvent (pTftp->tm.hEvent);
         }
-       // Put the multicast hook which adds the new client if the same mcast transfer
-       // is already in progress
+        // Put the multicast hook which adds the new client if the same mcast transfer
+        // is already in progress
 
     } // recv ok --> thread has been started
 
-return TRUE;
+    return TRUE;
 } // TftpdStartNewThread
 
 
 static void SendStatsToGui (BOOL bFullStats)
 {
-//static struct S_TftpTrfStat sMsg;
-struct LL_TftpInfo         *pTftp;
-int                         Ark;
+    //static struct S_TftpTrfStat sMsg;
+    struct LL_TftpInfo         *pTftp;
+    int                         Ark;
 
-   // if full report should be sent, one message per transfer is generates
-   if (bFullStats)
-   {
-      for ( pTftp=pTftpFirst ;  pTftp!=NULL ; pTftp=pTftp->next )
-	  {
-		  if (pTftp->tm.bActive) ReportNewTrf (pTftp);   // from tftp_thread !
-	  }
-   }
-   #if 0
-   else
-   {
-	   for ( Ark=0,  pTftp=pTftpFirst ;  Ark<SizeOfTab(sMsg.t)  &&  pTftp!=NULL ; pTftp=pTftp->next )
-	   {
-		  if (pTftp->tm.bActive )
-		  {
-			  sMsg.t[Ark].dwTransferId = pTftp->tm.dwTransferId;
-			  sMsg.t[Ark].stat = pTftp->st;
-			  Ark++ ;
-		  }
-	   }
-	   sMsg.nbTrf = Ark;
-	   time (& sMsg.dNow);
-	   //if (Ark>0)
-			SendMsgRequest (  C_TFTP_TRF_STAT, 
-							& sMsg , 
-							  sMsg.nbTrf * sizeof (sMsg.t[0]) + offsetof (struct S_TftpTrfStat, t[0]),
-							  TRUE,		// block thread until msg sent
-							  FALSE );		// if no GUI return
-   }
-   #endif
+    // if full report should be sent, one message per transfer is generates
+    if (bFullStats)
+    {
+        for ( pTftp=pTftpFirst ;  pTftp!=NULL ; pTftp=pTftp->next )
+        {
+            if (pTftp->tm.bActive) ReportNewTrf (pTftp);   // from tftp_thread !
+        }
+    }
+#if 0
+    else
+    {
+        for ( Ark=0,  pTftp=pTftpFirst ;  Ark<SizeOfTab(sMsg.t)  &&  pTftp!=NULL ; pTftp=pTftp->next )
+        {
+            if (pTftp->tm.bActive )
+            {
+                sMsg.t[Ark].dwTransferId = pTftp->tm.dwTransferId;
+                sMsg.t[Ark].stat = pTftp->st;
+                Ark++ ;
+            }
+        }
+        sMsg.nbTrf = Ark;
+        time (& sMsg.dNow);
+        //if (Ark>0)
+        SendMsgRequest (  C_TFTP_TRF_STAT,
+                        & sMsg ,
+                        sMsg.nbTrf * sizeof (sMsg.t[0]) + offsetof (struct S_TftpTrfStat, t[0]),
+                        TRUE,		// block thread until msg sent
+                        FALSE );		// if no GUI return
+    }
+#endif
 } // SendStatsToGui
 
 
@@ -462,8 +560,8 @@ int                         Ark;
 
 static int CreatePermanentThreads (void)
 {
-int Ark;
-struct LL_TftpInfo *pTftp;
+    int Ark;
+    struct LL_TftpInfo *pTftp;
 
 
     // inits socket
@@ -487,14 +585,14 @@ struct LL_TftpInfo *pTftp;
         pTftp->r.hFile=INVALID_HANDLE_VALUE ;
     }
 
-return TRUE;
+    return TRUE;
 }  // CreatePermanentThreads
 
 
 static int TftpdCleanup (SOCKET sListenerSocket)
 {
-struct LL_TftpInfo *pTftp, *pTmp;
-   // suspend all threads
+    struct LL_TftpInfo *pTftp, *pTmp;
+    // suspend all threads
     for (pTftp=pTftpFirst ; pTftp!=NULL ; pTftp=pTftp->next )
         if (pTftp->tm.dwThreadHandle!=NULL) SuspendThread (pTftp->tm.dwThreadHandle);
 
@@ -511,24 +609,24 @@ struct LL_TftpInfo *pTftp, *pTmp;
         free (pTftp);
     }
     Sleep (100);
-   // kill the threads
+    // kill the threads
     for (pTftp=pTftpFirst ; pTftp!=NULL ; pTftp=pTftp->next )
         if (pTftp->tm.dwThreadHandle!=NULL) TerminateThread (pTftp->tm.dwThreadHandle, 0);
 
-     // close main socket
-     closesocket (sListenerSocket);
-return TRUE;
+    // close main socket
+    closesocket (sListenerSocket);
+    return TRUE;
 } // TftpdCleanup
 
 
 // a watch dog which reset the socket event if data are available
 static int ResetSockEvent (SOCKET s, HANDLE hEv)
 {
-u_long dwData;
-int Rc;
-   Rc = ioctlsocket ( s ,  FIONREAD, & dwData);
-   if (dwData==0) ResetEvent (hEv);
-return Rc;   
+    u_long dwData;
+    int Rc;
+    Rc = ioctlsocket ( s ,  FIONREAD, & dwData);
+    if (dwData==0) ResetEvent (hEv);
+    return Rc;
 }
 
 
@@ -537,134 +635,210 @@ return Rc;
 // ---------------------------------------------------------------
 void TftpdMain (void *param)
 {
-int Rc;
-int parse;
-HANDLE hSocketEvent = INVALID_HANDLE_VALUE;
-struct LL_TftpInfo *pTftp;
-// events : either socket event or wake up by another thread
-enum { E_TFTP_SOCK=0, E_TFTP_WAKE, E_TFTP_EV_NB };
-HANDLE tObjects [E_TFTP_EV_NB];
+    int Rc;
+    int parse;
+    HANDLE hSocketEvent = INVALID_HANDLE_VALUE;
+    struct LL_TftpInfo *pTftp;
+    // events : either socket event or wake up by another thread
+    enum { E_TFTP_SOCK=0, E_TFTP_WAKE, E_TFTP_EV_NB };
+    HANDLE tObjects [E_TFTP_EV_NB];
 
     // creates socket and starts permanent threads
-        if (pTftpFirst==NULL)  CreatePermanentThreads ();
+    if (pTftpFirst==NULL)  CreatePermanentThreads ();
 
+    tftpThreadMonitor.bInit = TRUE;  // inits OK
 
-	 tThreads [TH_TFTP].bInit = TRUE;  // inits OK
-
-	// Socket was not opened at the start since we have to use interface 
+    // Socket was not opened at the start since we have to use interface
     // once an address as been assigned
-	while ( tThreads[TH_TFTP].gRunning  )
-	{
-		// if socket as not been created before
-		if (tThreads[TH_TFTP].skt == INVALID_SOCKET)
-		{
-		   tThreads[TH_TFTP].skt = TftpBindLocalInterface ();
-		} // open the socket
-	   if (tThreads[TH_TFTP].skt == INVALID_SOCKET)
-	   {
-		   break;
-	   }
+    while ( tftpThreadMonitor.gRunning )
+    {
+        // if socket as not been created before
+        if (tftpThreadMonitor.skt == INVALID_SOCKET)
+        {
+            tftpThreadMonitor.skt = TftpBindLocalInterface ();
+        } // open the socket
+        if (tftpThreadMonitor.skt == INVALID_SOCKET)
+        {
+            break;
+        }
 
-	    // create event for the incoming Socket
-		hSocketEvent = WSACreateEvent();
-		Rc = WSAEventSelect (tThreads[TH_TFTP].skt, hSocketEvent, FD_READ);
-		Rc = GetLastError ();
+        // create event for the incoming Socket
+        hSocketEvent = WSACreateEvent();
+        Rc = WSAEventSelect (tftpThreadMonitor.skt, hSocketEvent, FD_READ);
+        Rc = GetLastError ();
+#if 0
+        tObjects[E_TFTP_SOCK] = hSocketEvent;
+        tObjects[E_TFTP_WAKE] = tftpThreadMonitor.hEv;
 
-		tObjects[E_TFTP_SOCK] = hSocketEvent;
-		tObjects[E_TFTP_WAKE] = tThreads[TH_TFTP].hEv;
+        // stop only when TFTP is stopped and all threads have returned
 
-		// stop only when TFTP is stopped and all threads have returned
-
-		// waits for either incoming connection or thread event
-		Rc = WaitForMultipleObjects ( E_TFTP_EV_NB,
-										tObjects,
-										FALSE,
-										sSettings.dwRefreshInterval );
-#ifdef RT                                      
-if (Rc!=WAIT_TIMEOUT) LogToMonitor ( "exit wait, object %d\n", Rc);
+        // waits for either incoming connection or thread event
+        Rc = WaitForMultipleObjects ( E_TFTP_EV_NB,
+                                     tObjects,
+                                     FALSE,
+                                     sSettings.dwRefreshInterval );
 #endif
-		if (! tThreads[TH_TFTP].gRunning ) break;
+        Rc = WaitForSingleObject(hSocketEvent, sSettings.dwRefreshInterval);
+        if (! tftpThreadMonitor.gRunning ) break;
 
-		switch (Rc)
-		{
-			case E_TFTP_WAKE :   // a thread has exited
-									// update table
-				do
-				{
-					parse=FALSE;
-					for ( pTftp=pTftpFirst ; pTftp!=NULL ; pTftp=pTftp->next ) 
-					{
-						if  (! pTftp->tm.bPermanentThread && ! pTftp->tm.bActive )
-						{
-if (pTftp==NULL) { LOGE ("NULL POINTER pTftpFirst:%p\n", pTftpFirst); Sleep (5000); break; }
-							CloseHandle (pTftp->tm.dwThreadHandle);
-							pTftp = TftpdDestroyThreadItem (pTftp);
-							parse = TRUE;
-							break;
-						} // thread no more active
-					}
-				} // parse all threads (due to race conditions, we can have only one event)
-				while (parse);
-				break;
+        switch (Rc)
+        {
+            // we have received a message on the port 69
+        case WAIT_OBJECT_0:    // Socket Msg
+            WSAEventSelect (tftpThreadMonitor.skt, 0, 0);
+            TftpdChooseNewThread (tftpThreadMonitor.skt);
+            ResetEvent( hSocketEvent );
+            WSAEventSelect (tftpThreadMonitor.skt, hSocketEvent, FD_READ);
+            // ResetSockEvent (sListenerSocket, hSocketEvent);
+            break;
 
-			// we have received a message on the port 69
-			case E_TFTP_SOCK :    // Socket Msg
-				WSAEventSelect (tThreads[TH_TFTP].skt, 0, 0);
-				TftpdChooseNewThread (tThreads[TH_TFTP].skt);
-				ResetEvent( hSocketEvent );
-				WSAEventSelect (tThreads[TH_TFTP].skt, hSocketEvent, FD_READ);
-				// ResetSockEvent (sListenerSocket, hSocketEvent);
-				break;
+        case  WAIT_TIMEOUT :
+            SendStatsToGui(gSendFullStat); // full stat flag may be set by console
+            gSendFullStat = FALSE;         // reset full stat flag
+            // ResetSockEvent (sListenerSocket, hSocketEvent);
+            break;
+        case -1 :
+            LOGE("WaitForMultipleObjects error %d", LastErrorText());
+            break;
+        }   // switch
 
-			case  WAIT_TIMEOUT :
-				SendStatsToGui(gSendFullStat); // full stat flag may be set by console
-				gSendFullStat = FALSE;         // reset full stat flag
-				// ResetSockEvent (sListenerSocket, hSocketEvent);
-				break;
-			case -1 :
-				LOGE("WaitForMultipleObjects error %d", GetLastError());
-				break;
-		}   // switch
-
-
-		CloseHandle(hSocketEvent);
-
+        CloseHandle(hSocketEvent);
     } // endless loop
-
-
 
     // TftpdCleanup (sListenerSocket, hSemaphore);
 
-	// Should the main thread kill other threads ?
-	if ( tThreads[TH_TFTP].bSoftReset )
-				LOGE ("do NOT signal worker threads\n");
-	else
-	{
-		LOGE ("signalling worker threads\n");
-			/////////////////////////////////
-			// wait for end of worker threads
-			for (pTftp=pTftpFirst ; pTftp!=NULL  ; pTftp=pTftp->next)
-			{
-				if (pTftp->tm.bActive)                nak (pTftp, ECANCELLED);
-				else if (pTftp->tm.bPermanentThread)  SetEvent (pTftp->tm.hEvent);
-			}
-		LOGE ("waiting for worker threads\n");
+    // Should the main thread kill other threads ?
+    if ( tftpThreadMonitor.bSoftReset )
+        LOGE ("do NOT signal worker threads\n");
+    else
+    {
+        LOGE ("signalling worker threads\n");
+        /////////////////////////////////
+        // wait for end of worker threads
+        for (pTftp=pTftpFirst ; pTftp!=NULL  ; pTftp=pTftp->next)
+        {
+            if (pTftp->tm.bActive)                nak (pTftp, ECANCELLED);
+            else if (pTftp->tm.bPermanentThread)  SetEvent (pTftp->tm.hEvent);
+        }
+        LOGE ("waiting for worker threads\n");
 
-			while ( pTftpFirst != NULL )
-			{
-				WaitForSingleObject (pTftpFirst->tm.dwThreadHandle, 10000);
-				LOGE ("End of thread %d\n", pTftpFirst->tm.dwThreadHandleId);
-				pTftpFirst->tm.bPermanentThread = FALSE;
-				TftpdDestroyThreadItem (pTftpFirst);
-			}
-	} // Terminate sub threads
+        while ( pTftpFirst != NULL )
+        {
+            WaitForSingleObject (pTftpFirst->tm.dwThreadHandle, 10000);
+            LOGE ("End of thread %d\n", pTftpFirst->tm.dwThreadHandleId);
+            pTftpFirst->tm.bPermanentThread = FALSE;
+            TftpdDestroyThreadItem (pTftpFirst);
+        }
+    } // Terminate sub threads
 
-	Rc = closesocket (tThreads[TH_TFTP].skt); 
-	tThreads[TH_TFTP].skt=INVALID_SOCKET;
+    Rc = closesocket (tftpThreadMonitor.skt);
+    tftpThreadMonitor.skt=INVALID_SOCKET;
     WSACloseEvent (hSocketEvent);
 
-LOGE ("main TFTP thread ends here\n");
-_endthread ();
+    LOGE ("main TFTP thread ends here\n");
+    _endthread ();
 } // Tftpd main thread
 
+#define TFTP_PORT     69
 
+static void FreeThreadResources ()
+{
+    if (tftpThreadMonitor.skt != INVALID_SOCKET)
+        closesocket (tftpThreadMonitor.skt);
+    if (tftpThreadMonitor.hEv != INVALID_HANDLE_VALUE)
+        CloseHandle (tftpThreadMonitor.hEv);
+    tftpThreadMonitor.skt = INVALID_SOCKET;
+    tftpThreadMonitor.hEv = INVALID_HANDLE_VALUE;
+    tftpThreadMonitor.bSoftReset = FALSE;
+}
+int StartTftpdThread ()
+{
+    if (tftpThreadMonitor.gRunning)  return 0;
+    // first open socket
+    if ( 0 >= SOCK_STREAM )
+    {
+        tftpThreadMonitor.gRunning  = FALSE;
+        tftpThreadMonitor.skt = BindServiceSocket ("TFTP",
+                                                   AF_UNSPEC,
+                                                   0,
+                                                   "tftp",
+                                                   sSettings.Port,
+                                                   TFTP_PORT,
+                                                   sSettings.szTftpLocalIP );
+        // on error try next thread
+        if ( tftpThreadMonitor.skt  == INVALID_SOCKET ) return FALSE;
+    }
+    else tftpThreadMonitor.skt = INVALID_SOCKET ;
+
+    // Create the wake up event
+    tftpThreadMonitor.hEv  = CreateEvent ( NULL, true, FALSE, NULL );
+    if ( tftpThreadMonitor.hEv == INVALID_HANDLE_VALUE )
+    {
+        FreeThreadResources ();
+        return FALSE;
+    }
+
+    else tftpThreadMonitor.hEv = INVALID_HANDLE_VALUE ;
+
+    tftpThreadMonitor.bSoftReset = FALSE;
+
+    // now start the thread
+    tftpThreadMonitor.tTh  = (HANDLE) _beginthread ( TftpdMain,
+                                                    1024,
+                                                    NULL );
+    if (tftpThreadMonitor.tTh == INVALID_HANDLE_VALUE)
+    {
+        FreeThreadResources ();
+        return FALSE;
+    }
+    else
+    {
+        // all resources have been allocated --> status OK
+        tftpThreadMonitor.gRunning  = TRUE;
+
+#if 0
+        struct S_Chg_Service chgmsg;
+        // change display : ie add its tab in the GUI
+        chgmsg.service = tThreadsConfig [Ark].serv_mask;
+        chgmsg.status = SERVICE_RUNNING;
+        SendMsgRequest (   C_CHG_SERVICE,
+                        & chgmsg,
+                        sizeof chgmsg,
+                        FALSE,	  	    // don't block thread until msg sent
+                        FALSE );		// if no GUI return
+        // tell the gui a new service is running
+#endif
+    } // service correctly started
+    //if (Ark>TH_SCHEDULER)   SetEvent ( tThreads[TH_SCHEDULER].hEv );
+    return TRUE;
+} // StartSingleWorkerThread
+
+
+void StartTftpd32Services (void *param)
+{
+#if 0
+    char sz[_MAX_PATH];
+
+    // read log level (env var TFTP_LOG)
+    if (GetEnvironmentVariable (TFTP_LOG, sz, sizeof sz)!=0)
+        sSettings.LogLvl = atoi (sz);
+    else  sSettings.LogLvl = TFTPD32_DEF_LOG_LEVEL;
+
+    // Get the path in order to find the help file
+    if (GetEnvironmentVariable (TFTP_INI, sz, sizeof sz)!=0)
+        SetIniFileName (sz, szTftpd32IniFile);
+    else  SetIniFileName (INI_FILE, szTftpd32IniFile);
+
+    // Read settings (tftpd32.ini)
+    Tftpd32ReadSettings ();
+    //	DHCPReadConfig ();
+#endif
+    // starts worker threads
+    StartTftpdThread ();
+    LOGD("Worker threads started\n");
+} // StartTftpd32Services
+
+void StopTftpd32Services (void)
+{
+    FreeThreadResources ();
+}

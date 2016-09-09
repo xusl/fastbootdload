@@ -100,7 +100,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="device.h" />
-    <ClInclude Include="dialog_common.h" />
     <ClInclude Include="dialog_socket.h" />
     <ClInclude Include="DownloadDlg.h" />
     <ClInclude Include="Download.h" />
@@ -121,7 +120,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.cpp" />
-    <ClCompile Include="dialog_common.cpp" />
     <ClCompile Include="DownloadDlg.cpp" />
     <ClCompile Include="Download.cpp" />
     <ClCompile Include="GetIp.cpp" />

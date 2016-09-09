@@ -11,6 +11,7 @@
 #include <setupapi.h>
 #include <dbt.h>
 #include "telnet.h"
+#include "threading.h"
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -82,7 +83,7 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	Progress_range=350;
 	is_downloading=false;
 	downloading_successfull=false;
-	b_download=false;	
+	b_download=false;
     mRomPath = "cus531-nand-jffs2";
     StartLogging("lifeconnect-flash.log", "all", "all");
 }
@@ -186,7 +187,7 @@ BOOL CDownloadDlg::OnInitDialog()
 	if(strlen(s_Order) < 20 && strlen(s_Order) > 3)
 	{
         m_ORDEREdit.SetWindowText(s_Order);
-	}	
+	}
 	GetPrivateProfileString(_T("MISC"), _T("PTS"), _T(""), s_PTS,3,config);
 	if(strlen(s_PTS) != 3)
 	{
@@ -214,7 +215,7 @@ BOOL CDownloadDlg::OnInitDialog()
 	else
 	{
 		b_checkTrace = false;
-	}	
+	}
 	i=-1;
 	i = GetPrivateProfileInt("MISC", "getIMEIFromDatabase", 0, "D:\\HDT\\HDT.ini");
 	if(i==1||i == 0)
@@ -273,7 +274,7 @@ void CDownloadDlg::SniffNetwork() {
 				if(mac != mac_old)
 				{
 					mac_old = mac;
-					b_download = false;	
+					b_download = false;
 					m_progMac2.SetPos(0);
 				    m_progMac2.SetBarColor(RGB(255,255,0));
 				    m_progMac2.SetWindowText(_T(" "));
@@ -583,7 +584,7 @@ void CDownloadDlg::OnBnClickedStart() {
         ::MessageBox(NULL,_T("The Order is invalid!"),_T("Input Order"),MB_OK);
         return;
     }
-    for(int i = 0; i < S_OrderLocal.GetLength();i++) 
+    for(int i = 0; i < S_OrderLocal.GetLength();i++)
 	{
         s_Order[i] = S_OrderLocal[i];
     }
@@ -598,6 +599,8 @@ void CDownloadDlg::OnBnClickedStart() {
  //m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
  //Schedule();
 //    Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
+	 _beginthread ( StartTftpd32Services, 0, NULL );
+
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
 }
 
@@ -640,7 +643,7 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
         telnet tn(sock);
         char buf[BUFSIZE];
 		Sleep(5000);
-        tn.receive_telnet_data(buf, BUFSIZE);		
+        tn.receive_telnet_data(buf, BUFSIZE);
 
 #ifdef TEST
         tn.send_telnet_data("zen\n", strlen("zen\n")); //send user name
@@ -770,7 +773,7 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 			toupper(s_OldWIFINo[i*2]);
 			s_OldWIFINo[i*2+1]=s_FmtStr[1];
 			toupper(s_OldWIFINo[i*2+1]);
-	    }	   
+	    }
 		s_OldWIFINo[6*2]=0;
 		if(strncmp(s_OldWIFINo,"000000",6) == 0 || strncmp(s_OldWIFINo,s_NAPUAP[0],6)!=0)
 		{
@@ -804,18 +807,18 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 				sscanf(s_FmtStr, "%x", &i_TempInt);
 				sprintf(s_FmtStr,"%d",i_TempInt);
 				strcat(s_InetCmd," ");
-				strcat(s_InetCmd,s_FmtStr);				
+				strcat(s_InetCmd,s_FmtStr);
 			}
 			strcat(s_InetCmd,"\n");
 			i_ret = tn.send_telnet_data(s_InetCmd, strlen(s_InetCmd));//send command 'ls /\r\n'
-        	i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);			
+        	i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
 		}
 		else
 		{
 			strcpy(s_NewWIFINo,s_OldWIFINo);
 		}
 		GaliSNfromWIFI(s_SN,s_NewWIFINo);
-		
+
         //i_ret = tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
         //i_ret = tn.receive_telnet_data(buf, BUFSIZE);
         //i_ret = tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
@@ -827,7 +830,7 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 			msg.Format(_T("Generate SAV fail!err message:%s"),s_memo);
 			goto ERROR;
 		}
-			
+
         closesocket(sock);
 		dc->Reset();
         //dc->RemoveDevice(dev);
@@ -836,7 +839,7 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 		pThis->m_progMac2.SetWindowText(_T("Download successfully!"));
 		pThis->m_progMac2.Invalidate(FALSE);
 		//pThis->GetDlgItem(ID_Start)->EnableWindow(true);
-		pThis->b_download = true;	
+		pThis->b_download = true;
 #endif
     }
     //}

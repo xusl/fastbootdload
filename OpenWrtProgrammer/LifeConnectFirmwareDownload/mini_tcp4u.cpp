@@ -17,7 +17,17 @@
 
 #include "tcp4u.h"
 #include "log.h"
-
+int SendMsg (SOCKET s, int type, const void *data, int size)
+{
+int Rc=1;
+unsigned short full_size = htons (size + sizeof type);
+    if (data==NULL)  size=0;
+    // send length of message
+    Rc = send (s, (char *) & full_size, sizeof full_size, 0);
+    Rc = send (s, (char *) & type, sizeof type, 0);
+    if (size>0) Rc = TcpSend (s, (LPCSTR)data, size, 0);
+return Rc;
+} // SendMsg
 
 
 // free resources for TcpGetListenSocket

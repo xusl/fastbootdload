@@ -29,7 +29,6 @@
 #include "utils.h"
 
 
-struct S_ThreadMonitoring tThreads [TH_NUMBER];
 enum e_TftpMode { TFTP_BINARY, TFTP_NETASCII, TFTP_MAIL };
 enum e_TftpCnxDecod {  CNX_OACKTOSENT_RRQ = 1000,
                        CNX_OACKTOSENT_WRQ,
@@ -180,7 +179,7 @@ int  nLength;
     lstrcpy (szExtName, sSettings.szWorkingDirectory);
     nLength = lstrlen(szExtName);
     if (nLength>0   &&   szExtName[nLength-1] != '\\')  szExtName [nLength++] = '\\';
-	// virtual root has already been processed 
+	// virtual root has already been processed
 	lstrcpy (szExtName + nLength, szShortName);
 return szExtName;
 } // TftpExtendFileName
@@ -586,10 +585,10 @@ int Rc;
         LOGD ("send OACK %d bytes", pTftp->c.dwBytes);
 		// should OACk be sent on a specifi port (option udpport) ?
 		if (pTftp->c.nOAckPort != 0)
- 		     Rc = UdpSend (  pTftp->c.nOAckPort, 
-							(struct sockaddr *) & pTftp->b.from, sizeof pTftp->b.from, 
+ 		     Rc = UdpSend (  pTftp->c.nOAckPort,
+							(struct sockaddr *) & pTftp->b.from, sizeof pTftp->b.from,
 							pTftp->b.ackbuf, pTftp->c.dwBytes);
-		else // use file transfer socket 
+		else // use file transfer socket
 			 Rc = send (pTftp->r.skt, pTftp->b.ackbuf, pTftp->c.dwBytes , 0);
         if (Rc<0   || (unsigned) Rc != pTftp->c.dwBytes )
         {
@@ -640,7 +639,7 @@ int ReportNewTrf (const struct LL_TftpInfo *pTftp)
 {
 //struct S_TftpTrfNew gui_msg;
 struct tftphdr *tp;
-int Rc;
+int Rc = 0;
 
 LOGD("starting transfer %d\n", pTftp->tm.dwTransferId);
      tp = (struct tftphdr *)pTftp->b.cnx_frame;
@@ -651,15 +650,15 @@ LOGD("starting transfer %d\n", pTftp->tm.dwTransferId);
     gui_msg.opcode       = ntohs (tp->th_opcode);
     gui_msg.stat         = pTftp->st;
     gui_msg.from_addr    = pTftp->b.from;
-    lstrcpy (gui_msg.szFile, tp->th_stuff); 
-    Rc = SendMsgRequest (   C_TFTP_TRF_NEW, 
-		                  & gui_msg, 
-						    sizeof gui_msg, 
+    lstrcpy (gui_msg.szFile, tp->th_stuff);
+    Rc = SendMsgRequest (   C_TFTP_TRF_NEW,
+		                  & gui_msg,
+						    sizeof gui_msg,
 						    TRUE,		// block thread until msg sent
 					        FALSE );		// if no GUI return
 #endif
-return Rc;    
-} // ReportNewTrf 
+return Rc;
+} // ReportNewTrf
 
 static int ReportEndTrf (const struct LL_TftpInfo *pTftp)
 {
@@ -669,11 +668,11 @@ struct S_TftpTrfEnd gui_msg;
 LOGD ("end of transfer %d\n", pTftp->tm.dwTransferId);
     gui_msg.dwTransferId  = pTftp->tm.dwTransferId;
 	gui_msg.stat          = pTftp->st;
-    Rc = SendMsgRequest (  C_TFTP_TRF_END, 
-						  (void *) & gui_msg, 
-						   sizeof gui_msg, 
+    Rc = SendMsgRequest (  C_TFTP_TRF_END,
+						  (void *) & gui_msg,
+						   sizeof gui_msg,
 						   TRUE,		// block thread until msg sent
-					       FALSE );		// if no GUI return	
+					       FALSE );		// if no GUI return
 #endif
 return Rc;
 } // ReportEndTrf
@@ -817,7 +816,7 @@ struct tftphdr *tp;
         }   // nothing received
     } // for loop
     while (      ( pTftp->c.nLastToSend<=pTftp->c.nLastBlockOfFile	 // not eof or eof but not acked
-						|| (! sSettings.bIgnoreLastBlockAck && pTftp->c.nRetries!=0) ) 
+						|| (! sSettings.bIgnoreLastBlockAck && pTftp->c.nRetries!=0) )
               &&  pTftp->c.nRetries<TFTP_MAXRETRIES                 // same block sent N times (dog guard)
               &&  pTftp->c.nTimeOut<sSettings.Retransmit ) ;        // N timeout without answer
 
@@ -831,7 +830,7 @@ struct tftphdr *tp;
     }
     else if ( pTftp->c.nTimeOut >= sSettings.Retransmit  &&  pTftp->c.nLastToSend>pTftp->c.nLastBlockOfFile )
 	{
-		LOGE("WARNING : Last block #%d not acked for file <%s>", 
+		LOGE("WARNING : Last block #%d not acked for file <%s>",
               (unsigned short) pTftp->c.nCount, ((struct tftphdr *) pTftp->b.cnx_frame)->th_stuff  );
 		pTftp->st.dwTotalTimeOut += pTftp->c.nTimeOut;
 	}
@@ -984,6 +983,7 @@ return TRUE;
 // The beginning of the thread
 // ie. the beginning of a transfer
 ////////////////////////////////////////////////////////////
+extern struct S_ThreadMonitoring tftpThreadMonitor;
 DWORD WINAPI StartTftpTransfer (LPVOID pThreadArgs)
 {
 struct LL_TftpInfo *pTftp = (struct LL_TftpInfo *) pThreadArgs;
@@ -994,12 +994,12 @@ BOOL             bSuccess;
    do
    {
 
-     if (pTftp->tm.bPermanentThread)   
+     if (pTftp->tm.bPermanentThread)
      {
          Rc = WaitForSingleObject(pTftp->tm.hEvent,INFINITE);
          LOGD ("permanent thread signalled %d (%d)\n", Rc, GetLastError());
      }
-     if ( ! tThreads [TH_TFTP].gRunning ) break;
+     if ( ! tftpThreadMonitor.gRunning ) break;
 
      //////////////////////////////////
      // Read the Request and prepare socket for Reply
@@ -1077,7 +1077,7 @@ BOOL             bSuccess;
 
         LOGD ("return from thread\n");
 		 pTftp->st.ret_code =  bSuccess ? TFTP_TRF_SUCCESS :  TFTP_TRF_ERROR;
-         if ( tThreads [TH_TFTP].gRunning )  ReportEndTrf (pTftp);
+         if ( tftpThreadMonitor.gRunning )  ReportEndTrf (pTftp);
 
      } // no error in init
 
@@ -1091,12 +1091,12 @@ BOOL             bSuccess;
         if (pTftp->tm.bPermanentThread)  { pTftp->tm.bActive = FALSE;   }
         //Sleep (5000);
     }  // loop if this is thread is permanent
-    while (   pTftp->tm.bPermanentThread  &&  tThreads[TH_TFTP].gRunning  ) ;
+    while (   pTftp->tm.bPermanentThread  &&  tftpThreadMonitor.gRunning  ) ;
 
 LOGD ("worker thread leaving %d\n", GetCurrentThreadId () );
 
   pTftp->tm.bActive = FALSE;
-  SetEvent ( tThreads[TH_TFTP].hEv ); 
+  SetEvent ( tftpThreadMonitor.hEv );
   Sleep (1000);
  _endthread ();
 return 0;

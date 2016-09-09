@@ -31,6 +31,7 @@
 #define TCP4U_DONTWAIT      ((unsigned) -1)
 
 
+int SendMsg (SOCKET s, int type, const void *data, int size);
 
 
 SOCKET TcpGetListenSocket (int family, LPCSTR szService, unsigned short *pPort);

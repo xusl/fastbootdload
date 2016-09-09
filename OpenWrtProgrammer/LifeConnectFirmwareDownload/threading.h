@@ -12,19 +12,6 @@
 //#include "async_log.h"
 #include "log.h"
 
-// Starts one thread per service (Tftpd, Sntpd, dhcpd)
-// Order is the same than tThreadsConfig array 
-// pseudo service should be first
-enum e_Threads { TH_CONSOLE, 
-                 TH_ASYNCSAVEKEY, 
-				 TH_SCHEDULER,
-				 TH_DHCP, 
-				 TH_TFTP, 
-				 TH_SNTP, 
-				 TH_DNS,
-				 TH_SYSLOG, 
-				 TH_NUMBER };
-
 // Events created for main threads
 struct S_ThreadMonitoring
 {
@@ -35,7 +22,7 @@ struct S_ThreadMonitoring
 	int     bSoftReset;  // Thread will be reset
 	BOOL    bInit;		 // inits are terminated
 }  ;
-extern struct S_ThreadMonitoring tThreads [TH_NUMBER];
+
 
 struct S_RestartTable
 {
@@ -45,23 +32,8 @@ struct S_RestartTable
 };
 
 
-// threads started by StartAllThreads
-void TftpdConsole (void *param);
-void ListenDhcpMessage (void *param);
-void TftpdMain (void *param);
-void SntpdProc (void *param);
-void SyslogProc (void *param);
-void AsyncSaveKeyBckgProc (void *param);
-void Scheduler (void *param);
-void ListenDNSMessage (void * param);
-
-
-// Threads management : birth, life and death
-int  StartAllWorkerThreads (void);
-int  StartMultiWorkerThreads (BOOL bSoft);
-int  WakeUpThread (int Idx);
-void TerminateWorkerThreads (BOOL bSoft);
-int GetRunningThreads (void);
+void StartTftpd32Services (void *);
+void StopTftpd32Services (void);
 
 // Access to console
 int SendMsgRequest (int type,				// msg type
