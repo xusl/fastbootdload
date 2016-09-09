@@ -51,25 +51,13 @@
     <ClInclude Include="telnet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="tftp_struct.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Tftp.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tftpd_functions.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="scandir.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="settings.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="dialog_socket.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tcp4u.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="global.h">
@@ -110,19 +98,7 @@
     <ClCompile Include="tftpd_util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="scandir.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="settings.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="mini_tcp4u.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="tcp4u_exchg.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="udp4u.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="tftpd_main.cpp">
@@ -135,9 +111,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="tftp_dbg.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ip_thread.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

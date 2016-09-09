@@ -8,7 +8,6 @@
 //////////////////////////////////////////////////////
 #include <stdafx.h>
 #include "Tftp.h"
-#include "tftp_struct.h"
 #include "log.h"
 
 struct LL_TftpInfo *DoDebugSendBlock (struct LL_TftpInfo *pTftp)

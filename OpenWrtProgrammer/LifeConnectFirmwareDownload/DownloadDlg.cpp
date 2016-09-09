@@ -11,7 +11,7 @@
 #include <setupapi.h>
 #include <dbt.h>
 #include "telnet.h"
-#include "threading.h"
+#include "tftp.h"
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif

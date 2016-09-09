@@ -9,7 +9,7 @@
 
 #include <StdAfx.h>
 #include "utils.h"
-#include "threading.h"
+#include "tftp.h"
 
 struct S_ThreadMonitoring tftpThreadMonitor;// [TH_NUMBER];
 
@@ -28,126 +28,72 @@ struct S_ThreadMonitoring tftpThreadMonitor;// [TH_NUMBER];
 #include <process.h>
 #include <stdio.h>
 #include "Tftp.h"
-#include "tftp_struct.h"
 #include "settings.h"
-#include "threading.h"
-#include "tftpd_functions.h"
 #include "log.h"
 
 // First item -> structure belongs to the module and is shared by all threads
 struct LL_TftpInfo *pTftpFirst;
-static int gSendFullStat=FALSE;		// full report should be sent
+
+int GetIPv4Address (const char *szIf, char *szIP);
 
 
-// bind the thread socket
-SOCKET BindServiceSocket (const char *name, int family, int type, const char *service, int def_port, int rfc_port, const char *sz_if)
+// -----------------------
+// Retrieve IPv4 assigned to an interface
+// -----------------------
+int GetIPv4Address (const char *szIf, char *szIP)
 {
-    SOCKET             sListenSocket = INVALID_SOCKET;
-    int                Rc;
-    ADDRINFO           Hints, *res;
-    char               szServ[NI_MAXSERV];
+ULONG outBufLen;
+IP_ADAPTER_ADDRESSES       *pAddresses=NULL, *pCurrAddresses;
+IP_ADAPTER_UNICAST_ADDRESS *pUnicast;
+int Rc;
+char szBuf [MAX_ADAPTER_DESCRIPTION_LENGTH+4];
 
-    memset (& Hints, 0, sizeof Hints);
-    if ( sSettings.bIPv4  &&  ! sSettings.bIPv6 && (family==AF_INET6 || family==AF_UNSPEC) )
-        Hints.ai_family = AF_INET;    // force IPv4
-    else if (sSettings.bIPv6  &&  ! sSettings.bIPv4  && (family==AF_INET || family==AF_UNSPEC) )
-        Hints.ai_family = AF_INET6;  // force IPv6
-    else     Hints.ai_family = family;    // use IPv4 or IPv6, whichever
+	szIP[0]=0;
+    outBufLen = sizeof (IP_ADAPTER_ADDRESSES);
+    pAddresses = (IP_ADAPTER_ADDRESSES *) malloc (outBufLen);
 
+    // Make an initial call to GetAdaptersAddresses to get the
+    // size needed into the outBufLen variable
+    if (GetAdaptersAddresses (AF_INET,
+							  GAA_FLAG_INCLUDE_PREFIX,
+							  NULL,
+							  pAddresses,
+							 & outBufLen) == ERROR_BUFFER_OVERFLOW)
+	 {
+           free(pAddresses);
+           pAddresses = (IP_ADAPTER_ADDRESSES *) malloc (outBufLen);
+     }
 
-    Hints.ai_socktype = type;
-    Hints.ai_flags = AI_PASSIVE;     // fill in my IP for me
-    wsprintf (szServ, "%d", def_port);
-    Rc = getaddrinfo (sz_if!=NULL && sz_if[0]!=0 ? sz_if : NULL,
-                      def_port==rfc_port ? service : szServ,
-                      &Hints, &res);
-    if (Rc!=0)
-    {
-        LOGE ("Error : Can't create socket\nError %d (%s)", GetLastError(), LastErrorText() );
-        return sListenSocket;
+    if (pAddresses == NULL) {
+        return -1;
     }
-    // bind it to the port we passed in to getaddrinfo():
-
-    sListenSocket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (sListenSocket == INVALID_SOCKET)
-    {
-        LOGE ("Error : Can't create socket\nError %d (%s)", GetLastError(), LastErrorText() );
-        return sListenSocket;
-    }
-
-    // share bindings for UDP sockets
-    if (type==SOCK_DGRAM)
-    {int True=1;
-        Rc = setsockopt (sListenSocket, SOL_SOCKET, SO_REUSEADDR, (char *) & True, sizeof True);
-        if (Rc==0 )
-            LOGW ( "Port %d may be reused\n" ,
-                  ( (struct sockaddr_in *) res->ai_addr)->sin_port);
-        else
-            LOGW ( "setsockopt error\n");
-    }
-
-    // if family is AF_UNSPEC, allow both IPv6 and IPv4 by disabling IPV6_ONLY (necessary since Vista)
-    // http://msdn.microsoft.com/en-us/library/windows/desktop/bb513665(v=vs.85).aspx
-    // does not work under XP
-    if (family == AF_UNSPEC)
-    {int False=0;
-        Rc = setsockopt(sListenSocket, IPPROTO_IPV6, IPV6_V6ONLY, (char*)& False, sizeof False );
-    }
-
-
-    // bind the socket to the active interface
-    Rc = bind(sListenSocket, res->ai_addr, res->ai_addrlen);
-
-    if (Rc == INVALID_SOCKET)
-    {char szAddr[MAXLEN_IPv6]="unknown", szServ[NI_MAXSERV]="unknown";
-        int KeepLastError = GetLastError();
-        // retrieve localhost and port
-        getnameinfo (  res->ai_addr, res->ai_addrlen,
-                     szAddr, sizeof szAddr,
-                     szServ, sizeof szServ,
-                     NI_NUMERICHOST | AI_NUMERICSERV );
-        SetLastError (KeepLastError); // getnameinfo has reset LastError !
-        // 3 causes : access violation, socket already bound, bind on an adress
-        switch (GetLastError ())
-        {
-        case WSAEADDRNOTAVAIL :   // 10049
-            LOGE ("Error %d\n%s\n\n"
-                  "Tftpd32 tried to bind the %s port\n"
-                  "to the interface %s\nwhich is not available for this host\n"
-                  "Either remove the %s service or suppress %s interface assignation",
-                  GetLastError (), LastErrorText (),
-                  name, sz_if, name, sz_if);
-            break;
-        case WSAEINVAL :
-        case WSAEADDRINUSE :
-            LOGE ("Error %d\n%s\n\n"
-                  "Tftpd32 can not bind the %s port\n"
-                  "an application is already listening on this port",
-                  GetLastError (), LastErrorText (),
-                  name );
-            break;
-        default :
-            LOGE ("Bind error %d\n%s",
-                  GetLastError (), LastErrorText () );
-            break;
-        } // switch error type
-        closesocket (sListenSocket);
-        LOGW ("bind port to %s port %s failed\n", szAddr, szServ);
-
-    }
-    freeaddrinfo (res);
-    return   Rc == INVALID_SOCKET ? Rc : sListenSocket;
-} // BindServiceSocket
-
-// statistics requested by console
-// do not answer immediately since we are in console thread
-// and pTftp data may change
-void ConsoleTftpGetStatistics (void)
-{
-    gSendFullStat = TRUE;
-} //
-
-
+    // Make a second call to GetAdapters Addresses to get the
+    // actual data we want
+	Rc = GetAdaptersAddresses (sSettings.bIPv6 ? AF_UNSPEC : AF_INET,
+							   GAA_FLAG_INCLUDE_PREFIX,
+							   NULL,
+							   pAddresses,
+							 & outBufLen);
+    if (Rc == NO_ERROR)
+	{
+		for ( pCurrAddresses = pAddresses ; pCurrAddresses ; pCurrAddresses=pCurrAddresses->Next )
+		{
+			wsprintf (szBuf, "%ls", pCurrAddresses->Description);
+			if (
+				   lstrcmp (szBuf, sSettings.szTftpLocalIP) == 0
+				&& pCurrAddresses->FirstUnicastAddress !=0
+				)
+			{SOCKADDR *sAddr = pCurrAddresses->FirstUnicastAddress->Address.lpSockaddr;
+				lstrcpy ( szIP,
+						  inet_ntoa (  ((struct sockaddr_in *) sAddr)->sin_addr ) );
+				free (pAddresses);
+				return 0;
+			}
+		}
+	}
+	free (pAddresses);
+return -1;
+} // GetIPv4Address
 
 ////////////////////////////////////////////////////////////
 // TFTP daemon --> Runs at main level
@@ -693,10 +639,9 @@ void TftpdMain (void *param)
             break;
 
         case  WAIT_TIMEOUT :
-            SendStatsToGui(gSendFullStat); // full stat flag may be set by console
-            gSendFullStat = FALSE;         // reset full stat flag
             // ResetSockEvent (sListenerSocket, hSocketEvent);
             break;
+
         case -1 :
             LOGE("WaitForMultipleObjects error %d", LastErrorText());
             break;
@@ -753,22 +698,9 @@ static void FreeThreadResources ()
 }
 int StartTftpdThread ()
 {
-    if (tftpThreadMonitor.gRunning)  return 0;
-    // first open socket
-    if ( 0 >= SOCK_STREAM )
-    {
-        tftpThreadMonitor.gRunning  = FALSE;
-        tftpThreadMonitor.skt = BindServiceSocket ("TFTP",
-                                                   AF_UNSPEC,
-                                                   0,
-                                                   "tftp",
-                                                   sSettings.Port,
-                                                   TFTP_PORT,
-                                                   sSettings.szTftpLocalIP );
-        // on error try next thread
-        if ( tftpThreadMonitor.skt  == INVALID_SOCKET ) return FALSE;
-    }
-    else tftpThreadMonitor.skt = INVALID_SOCKET ;
+    if (tftpThreadMonitor.gRunning)
+        return 0;
+    tftpThreadMonitor.skt = INVALID_SOCKET ;
 
     // Create the wake up event
     tftpThreadMonitor.hEv  = CreateEvent ( NULL, true, FALSE, NULL );
@@ -778,10 +710,7 @@ int StartTftpdThread ()
         return FALSE;
     }
 
-    else tftpThreadMonitor.hEv = INVALID_HANDLE_VALUE ;
-
     tftpThreadMonitor.bSoftReset = FALSE;
-
     // now start the thread
     tftpThreadMonitor.tTh  = (HANDLE) _beginthread ( TftpdMain,
                                                     1024,
@@ -796,18 +725,6 @@ int StartTftpdThread ()
         // all resources have been allocated --> status OK
         tftpThreadMonitor.gRunning  = TRUE;
 
-#if 0
-        struct S_Chg_Service chgmsg;
-        // change display : ie add its tab in the GUI
-        chgmsg.service = tThreadsConfig [Ark].serv_mask;
-        chgmsg.status = SERVICE_RUNNING;
-        SendMsgRequest (   C_CHG_SERVICE,
-                        & chgmsg,
-                        sizeof chgmsg,
-                        FALSE,	  	    // don't block thread until msg sent
-                        FALSE );		// if no GUI return
-        // tell the gui a new service is running
-#endif
     } // service correctly started
     //if (Ark>TH_SCHEDULER)   SetEvent ( tThreads[TH_SCHEDULER].hEv );
     return TRUE;

@@ -16,18 +16,17 @@
 // #define DEB_TEST
 
 #include <StdAfx.h>
-//#include "headers.h"
+//#include <windows.h>
+// #include <winsock2.h>
+#include <ws2tcpip.h>
+#include <time.h>
 #include <sys/stat.h>
 #include "settings.h"
 #include <process.h>
 #include <stdio.h>
 #include "Tftp.h"
-#include "tftp_struct.h"
-#include "threading.h"
-#include "tftpd_functions.h"
-#include "tcp4u.h"
 #include "utils.h"
-
+#include "log.h"
 
 enum e_TftpMode { TFTP_BINARY, TFTP_NETASCII, TFTP_MAIL };
 enum e_TftpCnxDecod {  CNX_OACKTOSENT_RRQ = 1000,
@@ -47,6 +46,47 @@ struct LL_TftpInfo *DoDebugSendBlock (struct LL_TftpInfo *pTftp);
 struct LL_TftpInfo *DoDebugRcvAck (struct LL_TftpInfo *pTftp);
 struct LL_TftpInfo *DoDebugRcvData (struct LL_TftpInfo *pTftp);
 struct LL_TftpInfo *DoDebugSendAck (struct LL_TftpInfo *pTftp);
+
+int UdpSend (int nFromPort, struct sockaddr *sa_to, int sa_len, const char *data, int len);
+
+
+
+// send data using Udp
+int UdpSend (int nFromPort, struct sockaddr *sa_to, int sa_len, const char *data, int len)
+{
+SOCKET              s;
+SOCKADDR_STORAGE    sa_from;
+int                 Rc;
+int                 True=1;
+char                szServ[NI_MAXSERV];
+ADDRINFO            Hints, *res;
+
+   // populate sa_from
+   memset (&sa_from, 0, sizeof sa_from);
+	   Hints.ai_family = sa_to->sa_family;
+	   Hints.ai_flags = NI_NUMERICSERV;
+	   Hints.ai_socktype = SOCK_DGRAM;
+	   Hints.ai_protocol = IPPROTO_UDP;
+       wsprintf (szServ, "%d", nFromPort);
+       Rc = getaddrinfo (NULL, szServ, & Hints, & res);
+
+	   s = socket (res->ai_family, res->ai_socktype, res->ai_protocol);
+      if (s == INVALID_SOCKET)  return ERROR_INVALID_HANDLE;
+     // REUSEADDR option in order to allow thread to open 69 port
+      Rc = setsockopt (s, SOL_SOCKET, SO_REUSEADDR, (char *) & True, sizeof True);
+//      LOGD (Rc==0 ? "UdpSend: Port %d may be reused" : "setsockopt error", nFromPort);
+
+	  Rc = bind (s, res->ai_addr, res->ai_addrlen);
+	  freeaddrinfo(res);
+
+      LOGD ("UdpSend bind returns %d (error %d)", Rc, GetLastError ());
+      if (Rc<0) { closesocket (s); return Rc; }
+
+      Rc = sendto (s, data, len, 0, sa_to, sa_len);
+      LOGD ("sendto returns %d", Rc);
+      closesocket (s);
+return Rc;
+} // UdpSend
 
 
 /////////////////////////////////////////////////////////
@@ -319,11 +359,6 @@ int   Ark;
 int   Rc;
 BOOL  bOptionsAccepted = FALSE;
 char  szExtendedName [2 * _MAX_PATH];
-
-#if (defined DEB_TEST || defined DEBUG)
-  sSettings.LogLvl = 10;
-#endif
-
 
   // map the datagram on a Tftp structure
   tp = (struct tftphdr *)pTftp->b.cnx_frame;
