@@ -100,7 +100,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="device.h" />
-    <ClInclude Include="dialog_socket.h" />
     <ClInclude Include="DownloadDlg.h" />
     <ClInclude Include="Download.h" />
     <ClInclude Include="global.h" />

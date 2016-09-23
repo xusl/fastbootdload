@@ -16,12 +16,7 @@
 #define DOWNLOAD_SERVER_PORT     80
 #define DOWNLOAD_SERVER_IP       "172.19.42.1"
 
-enum
-{
-	// UI Messages
-	UI_MESSAGE_BASE = (WM_USER + 1000),
-	UI_MESSAGE_WORKTHREADS,
-};
+
 
 enum
 {
@@ -79,9 +74,14 @@ protected:
   DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;};
   void ReleaseThreadSyncSemaphore();
 
+  int GuiTFTPNew (const struct S_TftpTrfNew *pTrf);
+  int GuiTFTPEnd (struct S_TftpTrfEnd *pTrf);
+  int GuiTFTPStat (struct subStats *pTrf, time_t dNow);
+  int Gui_TftpReporting (const struct S_TftpGui *pTftpGuiFirst);
+
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
-  LRESULT OnMessageArrive(WPARAM wParam, LPARAM lParam);
+  LRESULT OnMessageTftpInfo(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnClose();
 	afx_msg void OnPaint();
@@ -102,7 +102,7 @@ private:
 	CEdit* Line_edit;
   CEdit m_CUEdit;
   CEdit m_ORDEREdit;
-  CStatic m_RomPathStaticText;	
+  CStatic m_RomPathStaticText;
 	char s_PTS_new[4];
 	//char s_PCBNo[16];
 	char s_MMIFlag[2];

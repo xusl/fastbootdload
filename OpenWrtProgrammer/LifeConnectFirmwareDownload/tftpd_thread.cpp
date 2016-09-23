@@ -672,43 +672,33 @@ int nBlock;
 // ReportNewTrf can be called from tftp_main.
 int ReportNewTrf (const struct LL_TftpInfo *pTftp)
 {
-//struct S_TftpTrfNew gui_msg;
+struct S_TftpTrfNew gui_msg;
 struct tftphdr *tp;
 int Rc = 0;
 
-LOGD("starting transfer %d\n", pTftp->tm.dwTransferId);
+LOGD("starting transfer %d", pTftp->tm.dwTransferId);
      tp = (struct tftphdr *)pTftp->b.cnx_frame;
 
-    #if 0
     // Creates msg for the GUI
     gui_msg.dwTransferId = pTftp->tm.dwTransferId;
     gui_msg.opcode       = ntohs (tp->th_opcode);
     gui_msg.stat         = pTftp->st;
     gui_msg.from_addr    = pTftp->b.from;
     lstrcpy (gui_msg.szFile, tp->th_stuff);
-    Rc = SendMsgRequest (   C_TFTP_TRF_NEW,
-		                  & gui_msg,
-						    sizeof gui_msg,
-						    TRUE,		// block thread until msg sent
-					        FALSE );		// if no GUI return
-#endif
+    Rc = SendMsgRequest (C_TFTP_TRF_NEW, & gui_msg);
+
 return Rc;
 } // ReportNewTrf
 
 static int ReportEndTrf (const struct LL_TftpInfo *pTftp)
 {
 int  Rc = 0;
-#if 0
 struct S_TftpTrfEnd gui_msg;
-LOGD ("end of transfer %d\n", pTftp->tm.dwTransferId);
+LOGD ("end of transfer %d", pTftp->tm.dwTransferId);
     gui_msg.dwTransferId  = pTftp->tm.dwTransferId;
 	gui_msg.stat          = pTftp->st;
-    Rc = SendMsgRequest (  C_TFTP_TRF_END,
-						  (void *) & gui_msg,
-						   sizeof gui_msg,
-						   TRUE,		// block thread until msg sent
-					       FALSE );		// if no GUI return
-#endif
+    Rc = SendMsgRequest (C_TFTP_TRF_END, (void *) & gui_msg);
+
 return Rc;
 } // ReportEndTrf
 

@@ -24,7 +24,6 @@ struct S_ThreadMonitoring tftpThreadMonitor;// [TH_NUMBER];
 
 // #define DEB_TEST
 
-//#include "headers.h"
 #include <process.h>
 #include <stdio.h>
 #include "Tftp.h"
@@ -33,6 +32,15 @@ struct S_ThreadMonitoring tftpThreadMonitor;// [TH_NUMBER];
 
 // First item -> structure belongs to the module and is shared by all threads
 struct LL_TftpInfo *pTftpFirst;
+static int gSendFullStat=FALSE;		// full report should be sent
+HWND    gWndHandle = NULL;
+// statistics requested by console
+// do not answer immediately since we are in console thread
+// and pTftp data may change
+void SetTftpGetStatistics (void)
+{
+	gSendFullStat = TRUE;
+} //
 
 int GetIPv4Address (const char *szIf, char *szIP);
 
@@ -254,6 +262,7 @@ static void PopulateTftpdStruct (struct LL_TftpInfo *pTftp)
 
     // clear buffers
     memset (& pTftp->b, 0, sizeof pTftp->b);
+    pTftp->dlgHwnd = gWndHandle;
 } // PopulateTftpdStruct
 
 // Suppress structure item
@@ -463,7 +472,7 @@ static int TftpdChooseNewThread (SOCKET sListenerSocket)
 
 static void SendStatsToGui (BOOL bFullStats)
 {
-    //static struct S_TftpTrfStat sMsg;
+    static struct S_TftpTrfStat sMsg;
     struct LL_TftpInfo         *pTftp;
     int                         Ark;
 
@@ -475,7 +484,6 @@ static void SendStatsToGui (BOOL bFullStats)
             if (pTftp->tm.bActive) ReportNewTrf (pTftp);   // from tftp_thread !
         }
     }
-#if 0
     else
     {
         for ( Ark=0,  pTftp=pTftpFirst ;  Ark<SizeOfTab(sMsg.t)  &&  pTftp!=NULL ; pTftp=pTftp->next )
@@ -490,15 +498,16 @@ static void SendStatsToGui (BOOL bFullStats)
         sMsg.nbTrf = Ark;
         time (& sMsg.dNow);
         //if (Ark>0)
-        SendMsgRequest (  C_TFTP_TRF_STAT,
-                        & sMsg ,
-                        sMsg.nbTrf * sizeof (sMsg.t[0]) + offsetof (struct S_TftpTrfStat, t[0]),
-                        TRUE,		// block thread until msg sent
-                        FALSE );		// if no GUI return
+        SendMsgRequest (C_TFTP_TRF_STAT, &sMsg);
+//                        sMsg.nbTrf * sizeof (sMsg.t[0]) + offsetof (struct S_TftpTrfStat, t[0]));
     }
-#endif
 } // SendStatsToGui
 
+int SendMsgRequest (int type,				// msg type
+					const void *msg_stuff)	// data
+					 {
+	return SendMessage(gWndHandle, UI_MESSAGE_TFTPINFO, type, (LPARAM)msg_stuff);
+}
 
 ////////////////////////////////////////////////////////////
 // Init TFTP daemon
@@ -639,6 +648,8 @@ void TftpdMain (void *param)
             break;
 
         case  WAIT_TIMEOUT :
+			SendStatsToGui(gSendFullStat); // full stat flag may be set by console
+			gSendFullStat = FALSE;         // reset full stat flag
             // ResetSockEvent (sListenerSocket, hSocketEvent);
             break;
 
@@ -750,6 +761,7 @@ void StartTftpd32Services (void *param)
     Tftpd32ReadSettings ();
     //	DHCPReadConfig ();
 #endif
+    gWndHandle = (HWND ) param;
     // starts worker threads
     StartTftpdThread ();
     LOGD("Worker threads started\n");

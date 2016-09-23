@@ -12,9 +12,38 @@
 #include <dbt.h>
 #include "telnet.h"
 #include "tftp.h"
+#include "settings.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+enum E_fields { FD_PEER, FD_FILE, FD_START, FD_PROGRESS, FD_BYTES, FD_TOTAL, FD_TIMEOUT };
+
+// a transfer terminated but still displayed
+#define ZOMBIE_STATUS ' '
+
+struct S_TftpGui
+{
+    // identifier
+    DWORD   dwTransferId;
+    // items to be displayed
+    char   *filename;
+    SOCKADDR_STORAGE stg_addr;
+    int    opcode;
+    // stats
+    struct S_Trf_Statistics stat;
+    // GUI resources
+    //HWND    hGaugeWnd;
+    // next
+    struct S_TftpGui *next;
+};
+
+static struct S_TftpGui *pTftpGuiFirst=NULL;
+const struct S_TftpGui *Gui_GetFirstGuiItem (void) { return pTftpGuiFirst; }
+
+int Gui_TftpReporting (HWND hListV, const struct S_TftpGui *pTftpGuiFirst);
+
 
 char	s_NAPUAP[10][7];
 char 	s_Order[21];
@@ -119,7 +148,7 @@ BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
 	ON_WM_DEVICECHANGE()
 	ON_BN_CLICKED(IDC_BUTTON_Browse, &CDownloadDlg::OnBnClickedButtonBrowse)
 	ON_BN_CLICKED(ID_Start, &CDownloadDlg::OnBnClickedStart)
-    ON_MESSAGE(UI_MESSAGE_WORKTHREADS, &CDownloadDlg::OnMessageArrive)
+    ON_MESSAGE(UI_MESSAGE_TFTPINFO, &CDownloadDlg::OnMessageTftpInfo)
 END_MESSAGE_MAP()
 
 
@@ -169,6 +198,17 @@ BOOL CDownloadDlg::OnInitDialog()
             mWSAInitialized = TRUE;
         }
     }
+
+    CListCtrl* listView = (CListCtrl*)GetDlgItem (IDC_LV_TFTP);
+
+    listView->InsertColumn(FD_PEER,     _T("Peer"), LVCFMT_LEFT, 130);
+    listView->InsertColumn(FD_FILE,     _T("File"), LVCFMT_LEFT, 180);
+    listView->InsertColumn(FD_START,    _T("Start"), LVCFMT_LEFT, 80);
+    listView->InsertColumn(FD_PROGRESS, _T("Progress"), LVCFMT_LEFT, 60);
+    listView->InsertColumn(FD_BYTES,    _T("Bytes"), LVCFMT_LEFT, 100);
+    listView->InsertColumn(FD_TOTAL,    _T("Total"), LVCFMT_LEFT, 100);
+    listView->InsertColumn(FD_TIMEOUT,  _T("Timeout"), LVCFMT_LEFT, 80);
+
 
 	Line_edit=(CEdit*)GetDlgItem(IDC_Error_Message);
 	m_progMac2.SetRange(0,Progress_range);
@@ -599,7 +639,7 @@ void CDownloadDlg::OnBnClickedStart() {
  //m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
  //Schedule();
 //    Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
-	 _beginthread ( StartTftpd32Services, 0, NULL );
+	 _beginthread ( StartTftpd32Services, 0, (void *)GetSafeHwnd());
 
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
 }
@@ -1019,10 +1059,322 @@ void CDownloadDlg::HandleDownloadException(CString msg, SOCKET &sock) {
         closesocket(sock);
 }
 
+// Create a pTftpGui structure and fill it with the msg
+int CDownloadDlg::GuiTFTPNew (const struct S_TftpTrfNew *pTrf)
+{
+    struct S_TftpGui *pTftpGui;
+    pTftpGui = (struct S_TftpGui *)calloc (1, sizeof *pTftpGui);
+    pTftpGui->dwTransferId = pTrf->dwTransferId;
+    pTftpGui->stat = pTrf->stat;
+#ifdef MSVC
+    pTftpGui->filename = _strdup (pTrf->szFile);
+#else
+    pTftpGui->filename = strdup (pTrf->szFile);
+#endif
+    pTftpGui->opcode = pTrf->opcode;
+    pTftpGui->stg_addr = pTrf->from_addr;
 
-LRESULT CDownloadDlg::OnMessageArrive(WPARAM wParam, LPARAM lParam) {
+    pTftpGui->next = pTftpGuiFirst;
+    // places the leaf at the head of the structure
+    pTftpGuiFirst = pTftpGui;
+
+//GetDlgItem (IDC_LV_TFTP)->m_hWnd,
+    Gui_TftpReporting (pTftpGuiFirst);
+
+
+    struct subStats stat;
+    stat.stat =pTrf->stat;
+    stat.dwTransferId = pTrf->dwTransferId;
+    time_t dNow;
+    time(&dNow);
+    GuiTFTPStat(&stat, dNow);
+
+    return 0;
+} // GuiNewTrf
+
+// terminates a transfer
+int CDownloadDlg::GuiTFTPEnd (struct S_TftpTrfEnd *pTrf)
+{
+    struct S_TftpGui *pTftpGui, *pTftpPrev;
+
+    struct subStats stat;
+    stat.stat =pTrf->stat;
+    stat.dwTransferId = pTrf->dwTransferId;
+    time_t dNow;
+    time(&dNow);
+    GuiTFTPStat(&stat, dNow);
+
+    // search mathing internal structure and get previous member
+    for ( pTftpPrev=NULL, pTftpGui=pTftpGuiFirst ;
+         pTftpGui != NULL && pTftpGui->dwTransferId != pTrf->dwTransferId ;
+         pTftpGui = pTftpGui->next )
+        pTftpPrev = pTftpGui;
+
+    // in the service, the GUI may have missed the begining of the transfer
+    if (pTftpGui==NULL)  return 0;
+
+    // detach leaf
+    if (pTftpPrev != NULL)  pTftpPrev->next = pTftpGui->next ;
+    else                    pTftpGuiFirst   = pTftpGui->next ;
+
+    // now we can play with the leaf : it belongs no more to the linked list
+    // update stat
+    pTftpGui->stat = pTrf->stat;
+    //GetDlgItem (IDC_LV_TFTP)->m_hWnd,
+    Gui_TftpReporting (pTftpGuiFirst);
+
+    // free allocation
+    free (pTftpGui->filename);
+    free (pTftpGui);
+    LOGD ("GUI: transfer destroyed\n");
+
+    // recall TftpReporting : it will notice the process //GetDlgItem (hMainWnd, IDC_LV_TFTP),
+    Gui_TftpReporting (pTftpGuiFirst);
+    return 0;
+} // GuiTFTPEnd
+
+
+int CDownloadDlg::GuiTFTPStat (struct subStats *pTrf, time_t dNow)
+{
+    struct S_TftpGui *pTftpGui;
+    // search mathing internal structure
+    for ( pTftpGui=pTftpGuiFirst ;
+         pTftpGui!=NULL && pTftpGui->dwTransferId != pTrf->dwTransferId ;
+         pTftpGui = pTftpGui->next );
+    if (pTftpGui == NULL) return -1;
+    assert ( pTftpGui != NULL ) ;
+    pTftpGui->stat = pTrf->stat;
+
+    time (& pTftpGui->stat.dLastUpdate) ;
+
+    HWND hGWnd;
+    char szTitle [_MAX_PATH+sizeof " from 255.255.255.255 "];
+
+    // do not update gauge window if last update has been done in the current second
+    // NB: another feature is to avoid division by 0
+    if (pTftpGui->stat.dLastUpdate == dNow)  return -1;
+
+    // update progress bar
+//    hGWnd = GetDlgItem (hMainWnd, IDC_TRF_PROGRESS);
+//    if (pTftpGui->stat.dwTransferSize>100)
+//        SendMessage (hGWnd, PBM_SETPOS,
+//                     pTftpGui->stat.dwTotalBytes/(pTftpGui->stat.dwTransferSize/100),
+//                     0);
+
+    ((CProgressCtrl *)GetDlgItem(IDC_TRF_PROGRESS))->SetPos(pTftpGui->stat.dwTotalBytes/(pTftpGui->stat.dwTransferSize/100));
+
+    // Update stat text
+    wsprintf (szTitle, "%d Bytes %s \t %d Bytes/sec",
+              pTftpGui->stat.dwTotalBytes,
+              (pTftpGui->opcode == TFTP_RRQ) ? "sent" : "rcvd",
+              pTftpGui->stat.dwTotalBytes / (dNow-pTftpGui->stat.StartTime) );
+
+ //   SetWindowText (GetDlgItem (hMainWnd, IDC_FILE_STATS), szTitle);
+    GetDlgItem(IDC_FILE_STATS)->SetWindowText(szTitle);
+    GetDlgItem(IDC_FILE_SIZE)->SetWindowText(pTftpGui->filename);
+//    ::Invalidate( hMainWnd );
+//    ::UpdateWindow( hMainWnd );
+    return 0;
+} // GuiTFTPStat
+
+LRESULT CDownloadDlg::OnMessageTftpInfo(WPARAM wParam, LPARAM lParam) {
+    switch(wParam) {
+    case C_TFTP_TRF_STAT:
+        {
+            struct S_TftpTrfStat *trf_stat = (struct S_TftpTrfStat *)lParam;
+            for (int Ark=0 ; Ark<trf_stat->nbTrf ; Ark++)
+                GuiTFTPStat (& trf_stat->t[Ark], trf_stat->dNow);
+            Gui_TftpReporting ( pTftpGuiFirst);
+        }
+    //GetSafeHwnd(), m_hWnd
+        //            UpdateMessage(_T("TFTP start"));
+        break;
+    case C_TFTP_TRF_END:
+        {
+                GuiTFTPEnd ((struct S_TftpTrfEnd *)lParam);
+    }
+//        UpdateMessage(_T("TFTP end"));
+        break;
+    case C_TFTP_TRF_NEW:
+        GuiTFTPNew ((struct S_TftpTrfNew *)lParam);
+        //            UpdateMessage(_T("TFTP new"));
+        break;
+    default:
+        break;
+    }
+//    Invalidate();
     return 0;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
+// Reporting into LV_LOG list View
+//
+////////////////////////////////////////////////////////////////////////////////////////
+static int AddNewTftpItem (CListCtrl* listView, const struct S_TftpGui *pTftpGui, int Pos)
+{
+    LVITEM      LvItem;
+    char        szTxt [512] = {0}, szAddr[MAXLEN_IPv6]={0}, szServ[NI_MAXSERV] ={0};
+    int         itemPos;
+    struct tm   ltime;
+    char		cDel;
+
+    //LvItem.mask = LVIF_TEXT | LVIF_PARAM | LVIF_STATE;
+    LvItem.mask = LVIF_PARAM | LVIF_STATE;
+    LvItem.state = 0;
+    LvItem.stateMask = 0;
+    LvItem.iItem = Pos;      // numéro de l'item
+    LvItem.lParam = (LPARAM) pTftpGui->dwTransferId;    // for Right-Click actions
+    LvItem.iSubItem = 0;     // index dans la ligne
+    // LvItem.pszText = "";
+    //itemPos = ListView_InsertItem (hListV, & LvItem);
+    itemPos = listView->InsertItem(&LvItem);
+
+    getnameinfo ( (LPSOCKADDR) & pTftpGui->stg_addr, sizeof (pTftpGui->stg_addr),
+                 szAddr, sizeof szAddr,
+                 szServ, sizeof szServ,
+                 NI_NUMERICHOST | AI_NUMERICSERV );
+
+    wsprintf (szTxt, "%s:%s", szAddr, szServ);
+    LOGE ("CREATING item <%s>\n", szTxt);
+    //ListView_SetItemText (hListV, itemPos, FD_PEER, szTxt);
+    listView->SetItemText (itemPos, FD_PEER, szTxt);
+#ifdef _MSC_VER
+    localtime_s (&ltime, & pTftpGui->stat.StartTime);
+#else
+    memcpy (& ltime, localtime (& pTftpGui->stat.StartTime), sizeof ltime);
+#endif
+
+    wsprintf (szTxt, "%02d:%02d:%02d", ltime.tm_hour, ltime.tm_min, ltime.tm_sec);
+    //ListView_SetItemText (hListV, itemPos, FD_START, szTxt);
+    listView->SetItemText (itemPos, FD_START, szTxt);
+    cDel = pTftpGui->opcode == TFTP_RRQ ? '<' : '>';
+    wsprintf (szTxt, "%c%s%c", cDel,pTftpGui->filename, cDel );
+
+    //ListView_SetItemText (hListV, itemPos, FD_FILE, szTxt );
+    listView->SetItemText (itemPos, FD_FILE, szTxt );
+    return   itemPos;
+} // static int AddNewTftpItem
+
+
+static int UpdateTftpItem (HWND hListV, const struct S_TftpGui *pTftpGui, int itemPos)
+{
+    char szTxt [512];
+
+    lstrcpy (szTxt, "N/A");
+    switch (pTftpGui->stat.ret_code)
+    {
+    case TFTP_TRF_RUNNING :
+        if (pTftpGui->stat.dwTransferSize > 100)
+            wsprintf (szTxt, "%d%%", pTftpGui->stat.dwTotalBytes/(pTftpGui->stat.dwTransferSize/100));
+        break;
+    case TFTP_TRF_SUCCESS :
+        lstrcpy (szTxt, "100%");
+        break;
+    case TFTP_TRF_STOPPED :
+        lstrcpy (szTxt, "STPD");
+        break;
+    case TFTP_TRF_ERROR :
+        lstrcpy (szTxt, "ERR");
+        break;
+    }
+    ListView_SetItemText (hListV, itemPos, FD_PROGRESS, szTxt);
+    wsprintf (szTxt, "%d", pTftpGui->stat.dwTotalBytes);
+    ListView_SetItemText (hListV, itemPos, FD_BYTES, szTxt);
+    wsprintf (szTxt, "%d", pTftpGui->stat.dwTransferSize);
+    ListView_SetItemText (hListV, itemPos, FD_TOTAL,
+                          pTftpGui->stat.dwTransferSize==0 ? "unknown" : szTxt);
+    wsprintf (szTxt, "%d", pTftpGui->stat.dwTotalTimeOut);
+    ListView_SetItemText (hListV, itemPos, FD_TIMEOUT, szTxt);
+    return TRUE;
+} // UpdateTftpItem
+
+
+static int ManageTerminatedTransfers (HWND hListV, int itemPos)
+{
+    char szTxt [512];
+    LVITEM      LvItem;
+    int  tNow  = (int) time(NULL);
+
+    szTxt[sizeof szTxt - 1]=0;
+    ListView_GetItemText (hListV, itemPos, FD_FILE, szTxt, sizeof szTxt -1 );
+    // The '.' is added for terminated transfer
+    if (szTxt [0] != ZOMBIE_STATUS)
+    {
+        // update target name
+        szTxt[0] = ZOMBIE_STATUS;
+        ListView_SetItemText (hListV, itemPos, FD_FILE, szTxt);
+        // Put in param the times before deletion
+        LvItem.iSubItem =FD_PEER;
+        LvItem.mask = LVIF_PARAM;
+        LvItem.iItem = itemPos;
+        if (ListView_GetItem (hListV, & LvItem) )
+        {
+            LvItem.lParam = sSettings.nGuiRemanence + tNow;
+            ListView_SetItem (hListV, & LvItem) ;
+            // SetTimer (hListV,
+        }
+
+        ListView_SetItemText (hListV, itemPos, FD_PROGRESS, "100%");
+        ListView_GetItemText (hListV, itemPos, FD_TOTAL, szTxt, sizeof szTxt -1 );
+        ListView_SetItemText (hListV, itemPos, FD_BYTES, szTxt);
+    } // transfer not already marked as termnated
+    else
+    {
+        LvItem.iSubItem =FD_PEER;
+        LvItem.mask = LVIF_PARAM;
+        LvItem.iItem = itemPos;
+        if (ListView_GetItem (hListV, & LvItem) && LvItem.lParam < tNow)
+        {
+            ListView_DeleteItem (hListV, itemPos);
+        }
+    }
+    return TRUE;
+} // ManageTerminatedTransfers
+
+///////////////////////////////////////////////
+// populate listview
+// called each new transfer or each end of transfer
+int CDownloadDlg::Gui_TftpReporting (const struct S_TftpGui *pTftpGuiFirst)
+{
+    LVFINDINFO  LvInfo;
+    int itemPos;
+    const struct S_TftpGui *pTftpGui;
+    // date of entry
+    int    Ark;
+    short  tPos [512];
+
+    HWND hListV= GetDlgItem (IDC_LV_TFTP)->GetSafeHwnd();
+    CListCtrl* listView = (CListCtrl*)GetDlgItem (IDC_LV_TFTP);
+
+    // ListView_DeleteAllItems (hListV);
+    memset (tPos, 0, sizeof tPos);
+
+    for (Ark=0, pTftpGui = pTftpGuiFirst ; pTftpGui != NULL ; pTftpGui = pTftpGui->next, Ark++)
+    {
+        // search peer field (key)
+        LvInfo.flags = LVFI_PARAM;
+        LvInfo.lParam = pTftpGui->dwTransferId;
+        itemPos = ListView_FindItem (hListV, -1, & LvInfo);
+
+        // item has not been found --> should be inserted
+        if (itemPos==-1)
+        {
+            itemPos = AddNewTftpItem (listView, pTftpGui, Ark);
+        } // create transfers
+        // actualize fields
+        UpdateTftpItem (hListV, pTftpGui, itemPos);
+        // flag : ths item has been processed
+        if (itemPos < SizeOfTab(tPos)) tPos [itemPos] = 1 ;	// flag item
+    }
+
+    // manage item that are not on the stat record --> they are terminated
+    for (Ark=ListView_GetItemCount (hListV) - 1 ; Ark>=0 ;  Ark-- )
+        if (Ark<SizeOfTab(tPos) &&  tPos[Ark]==0)
+            ManageTerminatedTransfers (hListV, Ark) ;
+    // ListView_DeleteItem (hListV, Ark);
+    return Ark;
+} // Reporting
 
 void CDownloadDlg::ClearMessage(void) {
     error_message.Empty();// = "";
