@@ -82,7 +82,6 @@ protected:
 	virtual BOOL OnInitDialog();
   LRESULT OnMessageTftpInfo(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
-	afx_msg void OnClose();
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	afx_msg void OnBnClickedButtonBrowse();
@@ -92,7 +91,6 @@ protected:
   afx_msg void OnTimer(UINT_PTR nIDEvent);
 	DECLARE_MESSAGE_MAP()
 private:
-  PasswordEnterDlg m_PasswordEnterDlg;
   ConfigIni m_Config;
 	CString error_message;
 	int Progress_range;
@@ -100,6 +98,7 @@ private:
 	bool is_downloading;
 	bool downloading_successfull;
 	bool b_download;
+  BOOL m_bSuperMode;
 	CEdit m_MessageControl;
   CStatic m_RomPathStaticText;
 	//char s_PCBNo[16];

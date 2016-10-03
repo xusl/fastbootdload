@@ -22,6 +22,18 @@
     <None Include="res\LifeConnectFirmwareDownload.ico">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="res\icon1.ico">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\SuperMode.ico">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\lock.ico">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="res\unlock.ico">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DownloadDlg.h">

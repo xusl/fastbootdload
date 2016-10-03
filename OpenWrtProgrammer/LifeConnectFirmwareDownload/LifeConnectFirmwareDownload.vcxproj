@@ -95,8 +95,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
+    <None Include="res\icon1.ico" />
     <None Include="res\LifeConnectFirmwareDownload.ico" />
     <None Include="res\LifeConnectFirmwareDownload.rc2" />
+    <None Include="res\lock.ico" />
+    <None Include="res\SuperMode.ico" />
+    <None Include="res\unlock.ico" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="device.h" />
