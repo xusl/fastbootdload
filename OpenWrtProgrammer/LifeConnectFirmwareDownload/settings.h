@@ -11,7 +11,8 @@
 
 enum e_SecurityLevels { SECURITY_NONE, SECURITY_STD, SECURITY_HIGH, SECURITY_READONLY };
 
-#define MAXLEN_IPv6 40
+#define MAXLEN_IPv6             40
+#define IPADDR_BUFFER_LEN       16
 
 struct S_Tftpd32Settings
 {
@@ -59,4 +60,41 @@ extern struct S_Tftpd32Settings sSettings;          // The settings,used anywher
 
 #define TFTP_MAXRETRIES          50 // do not resent same block more than # times
 #define TIME_FOR_LONG_TRANSFER   10 // more than 10 seconds -> beep
+
+#define PKG_SECTION             _T("PackageFiles")
+#define APP_SECTION             _T("App")
+#define PKG_PATH                _T("PackagePath")
+
+static const int FIRMWARE_NUM_MAX = 32;
+static const int FIRMWARE_NAME_LEN = MAX_PATH;
+static const int FIRMWARE_TBL_LEN = FIRMWARE_NUM_MAX * FIRMWARE_NAME_LEN;
+
+class ConfigIni{
+public:
+    ConfigIni();
+    ~ConfigIni();
+    BOOL           ReadConfigIni(const char * ini = _T("Config.ini"));
+    const char *   GetPackageDir(void) { return pkg_dir;};
+    const char *   GetAppConfIniPath(void) { return m_ConfigPath.GetString();};
+    const char *   GetPkgDlImgPath(void) {return pkg_dlimg_file;};
+    // const char *GetPkgConfXmlPath(void) {return pkg_conf_file;};
+    BOOL           GetForceUpdateFlag(void) { return m_forceupdate;};
+    BOOL           GetAutoWorkFlag(void) { return m_bWork; };
+    int            ReadFirmwareFiles(const char* config);
+    int            SetPackageDir(const char* config);
+    const char * const getNetworkSegment() ;
+private:
+
+private:
+    CString                 m_ConfigPath;
+    volatile BOOL           m_bWork;
+    BOOL                    m_forceupdate; // do not check version, if not exist config.xml or version rule is not match
+    char                    pkg_dir[MAX_PATH];
+    //   char                 pkg_conf_file[MAX_PATH];
+    char                    pkg_dlimg_file[MAX_PATH];
+    char                    m_NetworkSegment[IPADDR_BUFFER_LEN];
+    CString                 mRomPath;
+    CString                 mModulePath;
+};
+
 

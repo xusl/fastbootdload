@@ -105,6 +105,7 @@
     <ClInclude Include="global.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="md5.h" />
+    <ClInclude Include="PasswordEnterDlg.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="settings.h" />
     <ClInclude Include="stdafx.h" />
@@ -120,6 +121,7 @@
     <ClCompile Include="GetIp.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="md5.cpp" />
+    <ClCompile Include="PasswordEnterDlg.cpp" />
     <ClCompile Include="settings.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

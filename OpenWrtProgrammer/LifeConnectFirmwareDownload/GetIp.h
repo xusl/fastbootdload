@@ -6,7 +6,6 @@
 
 using namespace std;
 
-#define IPADDR_BUFFER_LEN       16
 
 bool Ping(const char *ip_addr);
 

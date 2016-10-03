@@ -7,9 +7,10 @@
 #include "GetIp.h"
 #include "device.h"
 #include "TextProgressCtrl.h"
+#include "PasswordEnterDlg.h"
+#include "settings.h"
 
-
-#define CONFIG_FILE_PATH         _T("Config.ini")
+#define CONFIG_FILE         _T("Config.ini")
 #define WS_LABEL_DIR             TEXT(".\\Label\\")
 //TCP port 23 is reserved for Telnet client and server communication.
 #define TELNET_PORT      IPPORT_TELNET
@@ -56,8 +57,6 @@ protected:
 	DWORD   Server_Listen_Thread_ID;
 	DWORD   Send_Comand_Thread_ID;
   DWORD   m_NetworkSnifferThreadID;
-	CString mRomPath;
-  CString mModulePath;
   BOOL  mWSAInitialized;
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
 	void OnSend_Comand(SOCKET sockClient, const char * cmd);
@@ -89,24 +88,22 @@ protected:
 	afx_msg void OnBnClickedButtonBrowse();
 	afx_msg void OnBnClickedStart();
 	afx_msg void OnBnClickedStop();
+    afx_msg void OnBnClickedDisableCheck();
   afx_msg void OnTimer(UINT_PTR nIDEvent);
-  afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);
 	DECLARE_MESSAGE_MAP()
 private:
+  PasswordEnterDlg m_PasswordEnterDlg;
+  ConfigIni m_Config;
 	CString error_message;
 	int Progress_range;
 	bool server_state;
 	bool is_downloading;
 	bool downloading_successfull;
 	bool b_download;
-	CEdit* Line_edit;
-  CEdit m_CUEdit;
-  CEdit m_ORDEREdit;
+	CEdit m_MessageControl;
   CStatic m_RomPathStaticText;
-	char s_PTS_new[4];
 	//char s_PCBNo[16];
 	char s_MMIFlag[2];
-  char m_NetworkSegment[IPADDR_BUFFER_LEN];
 	DWORD dwBeginTime;
 	char s_Trace[50];
 	CTextProgressCtrl m_progMac2;

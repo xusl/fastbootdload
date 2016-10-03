@@ -12,7 +12,6 @@
 #include <dbt.h>
 #include "telnet.h"
 #include "tftp.h"
-#include "settings.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -43,15 +42,6 @@ static struct S_TftpGui *pTftpGuiFirst=NULL;
 const struct S_TftpGui *Gui_GetFirstGuiItem (void) { return pTftpGuiFirst; }
 
 int Gui_TftpReporting (HWND hListV, const struct S_TftpGui *pTftpGuiFirst);
-
-
-char	s_NAPUAP[10][7];
-char 	s_Order[21];
-int iGetIMEIFromDatabase;
-char s_CommercialRef[21];
-char s_PTS[4];
-bool b_checkTrace;
-string mac_old;
 
 static void gmt_time_string(char *buf, size_t buf_len, time_t *t)
  {
@@ -93,17 +83,6 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CDownloadDlg::IDD, pParent),
 	mWSAInitialized(FALSE),mHostIPAddr("")
 {
-    char path_buffer[MAX_PATH];
-	char drive[_MAX_DRIVE];
-	char dir[_MAX_DIR];
-	char filename[MAX_PATH] = {0};
-	SYSTEMTIME time;
-
-//	GetCurrentDirectory(MAX_PATH, currdir);
-	GetModuleFileName(NULL, path_buffer, MAX_PATH);
-	_splitpath_s(path_buffer, drive, _MAX_DRIVE, dir, _MAX_DIR, 0, 0, 0, 0);
-	mModulePath.Format("%s%s", drive, dir);
-
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
     m_pCoordinator = new DeviceCoordinator;
     m_SyncSemaphore = CreateSemaphore(NULL, 1, 1, "ThreadSyncDevie");
@@ -113,8 +92,15 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	is_downloading=false;
 	downloading_successfull=false;
 	b_download=false;
-    mRomPath = "cus531-nand-jffs2";
+    m_Config.ReadConfigIni(CONFIG_FILE);
     StartLogging("lifeconnect-flash.log", "all", "all");
+
+    m_PasswordEnterDlg.Create(IDD_ENTER_PASSWORD, this);
+	m_PasswordEnterDlg.ModifyStyle(
+              WS_CHILD | WS_VISIBLE | DS_CENTER,
+              WS_POPUP | DS_MODALFRAME | WS_CAPTION | WS_SYSMENU,
+              SWP_SHOWWINDOW);
+
 }
 
 CDownloadDlg::~CDownloadDlg() {
@@ -134,9 +120,10 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 
 	DDX_Control(pDX, IDC_PROGRESS1, m_progMac2);
-    DDX_Control(pDX, IDC_CU, m_CUEdit);
-	DDX_Control(pDX, IDC_ORDER, m_ORDEREdit);
+    	//m_MessageControl=(CEdit*)GetDlgItem(IDC_Error_Message);
+	DDX_Control(pDX, IDC_Error_Message, m_MessageControl);
     DDX_Control(pDX, IDC_FIRMWARE_IMAGE, m_RomPathStaticText);
+	//DDX_Text(pDX, IDC_EDIT_LINUX_VER_MAIN, m_LinuxVer);
 }
 
 BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
@@ -149,6 +136,7 @@ BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_Browse, &CDownloadDlg::OnBnClickedButtonBrowse)
 	ON_BN_CLICKED(ID_Start, &CDownloadDlg::OnBnClickedStart)
     ON_MESSAGE(UI_MESSAGE_TFTPINFO, &CDownloadDlg::OnMessageTftpInfo)
+    ON_BN_CLICKED(IDC_DISABLE_CHECK, &CDownloadDlg::OnBnClickedDisableCheck)
 END_MESSAGE_MAP()
 
 
@@ -210,81 +198,21 @@ BOOL CDownloadDlg::OnInitDialog()
     listView->InsertColumn(FD_TIMEOUT,  _T("Timeout"), LVCFMT_LEFT, 80);
 
 
-	Line_edit=(CEdit*)GetDlgItem(IDC_Error_Message);
 	m_progMac2.SetRange(0,Progress_range);
 
 	m_progMac2.SetBarColor(RGB(255,255,0));
 	m_progMac2.SetTextColor(RGB(0,0,0));
 	m_progMac2.SetStep(10);
 
-    CString config = mModulePath + _T("Product\\") + CONFIG_FILE_PATH;
-	GetPrivateProfileString(_T("MISC"), _T("CURef"), _T(""), s_CommercialRef,20,config);
-	if(strlen(s_CommercialRef) < 20 && strlen(s_CommercialRef) > 10)
-	{
-        m_CUEdit.SetWindowText(s_CommercialRef);
-	}
-	GetPrivateProfileString(_T("MISC"), _T("Order"), _T(""), s_Order,20,config);
-	if(strlen(s_Order) < 20 && strlen(s_Order) > 3)
-	{
-        m_ORDEREdit.SetWindowText(s_Order);
-	}
-	GetPrivateProfileString(_T("MISC"), _T("PTS"), _T(""), s_PTS,3,config);
-	if(strlen(s_PTS) != 3)
-	{
-        strcpy(s_PTS,"");
-	}
-	GetPrivateProfileString(_T("MISC"), _T("PTS"), _T(""), s_PTS_new, 4, config);
-    s_PTS_new[3] = 0;
-
 	//GetPrivateProfileString(_T("MISC"), _T("SSIDPrefix"), _T(""), s_SSID_Prefix, 20, config);
 	//s_SSID_Prefix[strlen(s_SSID_Prefix)] = 0;
 
-    GetPrivateProfileString(_T("MISC"), _T("NetworkSegment"), _T("192.168.1"),
-                        m_NetworkSegment, IPADDR_BUFFER_LEN,config);
-
-    LOGD("CU REF : %s", s_CommercialRef);
-    LOGD("PTS : %s", s_PTS_new);
-    LOGD("network segment : %s", m_NetworkSegment);
-
-	int i=-1;
-	i = GetPrivateProfileInt("CheckTrace", "CHECKTRACE", 0, "C:\\HDT_LIFECONNECT\\DLoadCfg.ini");
-	if(i == 1)
-	{
-		b_checkTrace = true;
-	}
-	else
-	{
-		b_checkTrace = false;
-	}
-	i=-1;
-	i = GetPrivateProfileInt("MISC", "getIMEIFromDatabase", 0, "D:\\HDT\\HDT.ini");
-	if(i==1||i == 0)
-	{
-		iGetIMEIFromDatabase = i;
-	}
-	else
-	{
-		iGetIMEIFromDatabase = 0;
-	}
-
-	if(iGetIMEIFromDatabase == 1)
-	{
-		GetPrivateProfileString("BTWifi", "CompanyID", "", s_NAPUAP[0], 7, "D:\\HDT\\HDT.ini");
-	}
-	else
-	{
-		if(LoadFactoryBDRange())
-		{
-			AfxMessageBox("Get WIFI file fail!");
-			return false;
-		}
-	}
 
 	if(!PathFileExists(WS_LABEL_DIR)) {
 		CreateDirectory(WS_LABEL_DIR, NULL);
 	}
     GetDlgItem(ID_Start)->EnableWindow(TRUE);
-    m_RomPathStaticText.SetWindowText(mRomPath);
+    m_RomPathStaticText.SetWindowText(m_Config.GetPackageDir());
     GetHostIpAddr();
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -304,16 +232,16 @@ void CDownloadDlg::SniffNetwork() {
         CString ip_addr;
         const char* pcIpAddr;
         string mac;
-        ip_addr.Format("%s.%d", m_NetworkSegment, i);
+        ip_addr.Format("%s.%d", m_Config.getNetworkSegment(), i);
         pcIpAddr = ip_addr.GetString();
         if (pcIpAddr == mHostIPAddr)
             continue;
         if(Ping(pcIpAddr)) {
             if (0 == ResolveIpMac(pcIpAddr, mac)) {
             m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL);
-				if(mac != mac_old)
+//				if(mac != mac_old)
 				{
-					mac_old = mac;
+					//mac_old = mac;
 					b_download = false;
 					m_progMac2.SetPos(0);
 				    m_progMac2.SetBarColor(RGB(255,255,0));
@@ -369,7 +297,7 @@ void CDownloadDlg::server_listen(u_short port)
     }
 
    server_state=false;
-    char const * content = BuildHttpServerResponse(mRomPath.GetString(), &length);
+    char const * content = BuildHttpServerResponse(m_Config.GetPackageDir(), &length);
 
     if(content == NULL) {
         UpdateMessage(_T("Open file failed!"));
@@ -546,6 +474,7 @@ void CDownloadDlg::OnBnClickedButtonBrowse()
 {
     CFileDialog dlgFile(TRUE);
     CString fileName;
+    CString selectedPath;
     const int c_cMaxFiles = 100;
     const int c_cbBuffSize = (c_cMaxFiles * (MAX_PATH + 1)) + 1;
     char *p = fileName.GetBuffer(c_cbBuffSize);
@@ -557,13 +486,12 @@ void CDownloadDlg::OnBnClickedButtonBrowse()
 
     if (dlgFile.DoModal())
     {
-        mRomPath = dlgFile.GetPathName();
+        selectedPath = dlgFile.GetPathName();
     }
 
     fileName.ReleaseBuffer();
 
     /*
-
        char* pBufEnd = p + FILE_LIST_BUFFER_SIZE - 2;
        char* start = p;
        while( ( p < pBufEnd ) && ( *p ) )
@@ -586,49 +514,30 @@ void CDownloadDlg::OnBnClickedButtonBrowse()
        }
        }
        */
-    //::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_BUTTON_Browse,mRomPath);
-	::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_FIRMWARE_IMAGE,mRomPath);
-    if(!PathFileExists(mRomPath)) {
-        ::MessageBox(NULL, mRomPath ,_T("Check Fireware file"),MB_OK);
+    if(!PathFileExists(selectedPath)) {
+        ::MessageBox(NULL, selectedPath ,_T("Check Fireware file"),MB_OK);
         return;
     }
+
+	//::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_FIRMWARE_IMAGE,selectedPath);
+    m_RomPathStaticText.SetWindowText(selectedPath);
+     m_Config.SetPackageDir(selectedPath.GetString());
 }
 
 void CDownloadDlg::OnBnClickedStart() {
-    CString S_Commercial;
-	CString S_OrderLocal;
     m_progMac2.SetPos(0);
     m_progMac2.SetBarColor(RGB(255,255,0));
     m_progMac2.SetWindowText(_T(" "));
     m_progMac2.Invalidate(FALSE);
-    if(mRomPath=="") {
-        ::MessageBox(NULL,_T("Please select software!"),_T("select software"),MB_OK);
-        return;
-    }
+    //if(mRomPath=="") {
+   //     ::MessageBox(NULL,_T("Please select software!"),_T("select software"),MB_OK);
+   //     return;
+    //}
 
     ClearMessage();
 
-    memset(s_CommercialRef, 0, 21);
-	memset(s_Order, 0, 21);
-    //    CEdit *edit1=(CEdit*)GetDlgItem(IDC_CU);
-    m_CUEdit.GetWindowText(S_Commercial);
-    if(S_Commercial.GetLength() > 20 || S_Commercial.GetLength() < 10) {
-        ::MessageBox(NULL,_T("The commercial is invalid!"),_T("Input Commercial Ref"),MB_OK);
-        return;
-    }
-    for(int i = 0; i < S_Commercial.GetLength();i++) {
-        s_CommercialRef[i] = S_Commercial[i];
-    }
-	m_ORDEREdit.GetWindowText(S_OrderLocal);
-    if(S_OrderLocal.GetLength() > 20 || S_OrderLocal.GetLength() < 3) {
-        ::MessageBox(NULL,_T("The Order is invalid!"),_T("Input Order"),MB_OK);
-        return;
-    }
-    for(int i = 0; i < S_OrderLocal.GetLength();i++)
-	{
-        s_Order[i] = S_OrderLocal[i];
-    }
     GetDlgItem(ID_Start)->EnableWindow(false);
+    m_RomPathStaticText.EnableWindow(false);
     error_message=_T("Search Datacard..., please wait...\r\n");
     ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message,error_message);
     is_downloading=false;
@@ -771,14 +680,7 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 				i++;
 			}
 			strncpy(s_PCBNo,s_trace,15);
-			if(b_checkTrace)
-			{
-				if(s_trace[15] != '1')
-				{
-					msg.Format(_T("Check traceability fail!"));
-					goto ERROR;
-				}
-			}
+
 		}
 		i_ret = tn.send_telnet_data(COMMAN_GETMAC, strlen(COMMAN_GETMAC));
 		Sleep(1000);
@@ -815,19 +717,9 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 			toupper(s_OldWIFINo[i*2+1]);
 	    }
 		s_OldWIFINo[6*2]=0;
-		if(strncmp(s_OldWIFINo,"000000",6) == 0 || strncmp(s_OldWIFINo,s_NAPUAP[0],6)!=0)
+
 		{
-			if(iGetIMEIFromDatabase == 1)
-				i_ret = GetWIFIfromDatabase(0,s_PCBNo,s_NewWIFINo);
-			else
-				i_ret = GetBDAddr(s_NewWIFINo);
-			if(i_ret)
-			{
-				closesocket(sock);
-		        dc->RemoveDevice(dev);
-				msg.Format(_T("Get WIFI MAC fail!"));
-				goto ERROR;
-			}
+
 			strcpy(s_InetCmd,"send_data 254 0 3 1 0");
 			for(i=0;i<6;i++)
 			{
@@ -853,23 +745,13 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 			i_ret = tn.send_telnet_data(s_InetCmd, strlen(s_InetCmd));//send command 'ls /\r\n'
         	i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
 		}
-		else
-		{
-			strcpy(s_NewWIFINo,s_OldWIFINo);
-		}
+
 		GaliSNfromWIFI(s_SN,s_NewWIFINo);
 
         //i_ret = tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
         //i_ret = tn.receive_telnet_data(buf, BUFSIZE);
         //i_ret = tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
         //i_ret = tn.receive_telnet_data(buf, BUFSIZE);
-		i_ret = GenSAV_NEW(s_SN, s_PCBNo, s_PTS, "", "",
-				"", 0, 0, s_NewWIFINo,"", "", "", "",s_memo);
-		if(i_ret)
-		{
-			msg.Format(_T("Generate SAV fail!err message:%s"),s_memo);
-			goto ERROR;
-		}
 
         closesocket(sock);
 		dc->Reset();
@@ -897,10 +779,8 @@ ERROR:
 	return 2;
 }
 
-
-
 void CDownloadDlg::GetHostIpAddr() {
-    GetIp Get_Ip(m_NetworkSegment);
+    GetIp Get_Ip(m_Config.getNetworkSegment());
     bool IsGetIp=false;
     mHostIPAddr.clear();
     for(int i = 0; i< 3; i++) {
@@ -1385,7 +1265,7 @@ void CDownloadDlg::ClearMessage(void) {
 void CDownloadDlg::UpdateMessage(CString errormsg){
     CString msg;
     if (errormsg.GetLength() == 0) {
-        Line_edit->Clear();
+        m_MessageControl.Clear();
         return;
     } else if (error_message.GetLength() == 0) {
         error_message = errormsg;
@@ -1396,15 +1276,15 @@ void CDownloadDlg::UpdateMessage(CString errormsg){
     msg = error_message;
     }
     LOGE("%s", errormsg.GetString());
-    ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
-    Line_edit->SetWindowText(msg);
-	Line_edit->SetSel(0,-1);
-	Line_edit->SetFocus();
+    //::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
+    m_MessageControl.SetWindowText(msg);
+	m_MessageControl.SetSel(0,-1);
+	m_MessageControl.SetFocus();
 }
 
 void CDownloadDlg::OnClose() {
 	if(is_downloading==true) {
-		::MessageBoxA(NULL,"Downloading... cannot close tool!","MBO1",MB_SYSTEMMODAL);
+		::MessageBoxA(NULL,"Downloading... cannot close tool!","LifeConnect",MB_SYSTEMMODAL);
 		return;
 	}
 	//if (::MessageBoxA(NULL,"Sure to exit?","Exit",MB_OKCANCEL|MB_ICONQUESTION|MB_SYSTEMMODAL ) != IDOK)
@@ -1417,40 +1297,23 @@ void CDownloadDlg::OnClose() {
     TerminateThread(m_NetworkSnifferThreadHandle, 1);
 }
 
-BOOL CDownloadDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
+void CDownloadDlg::OnBnClickedDisableCheck()
 {
-    if (dwData == 0)
-    {
-        //LOGD("OnDeviceChange, dwData == 0 .EventType: 0x%x", nEventType);
-        return FALSE;
-    }
+//PasswordEnterDlg m_PasswordEnterDlg (this);
+//        m_PasswordEnterDlg.EnableWindow(TRUE);
 
-    DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
-    PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
+ //   m_PasswordEnterDlg.Attach(this->m_hWnd);
+       m_PasswordEnterDlg.ShowWindow(SW_SHOW);//(WS_CHILDWINDOW);
 
-    //DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x", nEventType, phdr->dbch_devicetype);
+    #if 0
+     INT_PTR nResponse = m_PasswordEnterDlg.DoModal();
+	if (nResponse == IDOK)
+	{
+	}
+	else if (nResponse == IDCANCEL)
+	{
 
-    if (nEventType == DBT_DEVICEARRIVAL) {
-        switch( phdr->dbch_devicetype ) {
-        case DBT_DEVTYP_DEVNODE:
-            LOGW("OnDeviceChange, get DBT_DEVTYP_DEVNODE");
-            break;
+	}
 
-        case DBT_DEVTYP_PORT:
-            {
-                LOGI("device arrive, DBT_DEVTYP_PORT");
-                break;
-            }
-        }
-    } else if (nEventType == DBT_DEVICEREMOVECOMPLETE) {
-        switch (phdr->dbch_devicetype) {
-        case DBT_DEVTYP_PORT:
-            {
-                LOGI("device removed, DBT_DEVTYP_PORT");
-                break;
-            }
-        }
-    }
-
-    return TRUE;
+#endif
 }
