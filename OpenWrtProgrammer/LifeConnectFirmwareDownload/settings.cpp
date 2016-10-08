@@ -47,9 +47,10 @@ struct S_Tftpd32Settings sSettings =
 };
 
 ConfigIni::ConfigIni() :
+    m_FirmwareFiles(),
     m_forceupdate(FALSE),
     m_bWork(FALSE){
-//    memset(pkg_conf_file, 0, sizeof pkg_conf_file);
+    memset(pkg_dir, 0, sizeof pkg_dir);
     memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
 }
 
@@ -74,11 +75,8 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     m_ConfigPath += ini;
 
     lpFileName = m_ConfigPath.GetString();
-
     //init app setting.
     m_bWork = GetPrivateProfileInt(APP_SECTION,_T("autowork"), 0, lpFileName);
-
-
     GetPrivateProfileString(_T("MISC"), _T("NetworkSegment"), _T("192.168.1"),
                         m_NetworkSegment, IPADDR_BUFFER_LEN, lpFileName);
 
@@ -117,6 +115,9 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
         }
     }
 #endif
+
+    ReadFirmwareFiles(lpFileName);
+
     return TRUE;
 }
 
@@ -140,6 +141,10 @@ int ConfigIni::ReadFirmwareFiles(const char* config) {
 
   if (config == NULL) {
     LOGE("not specified config file name");
+    return -1;
+  }
+  if (strlen(pkg_dir) == 0) {
+    LOGE("pkg_dir is not initialized");
     return -1;
   }
 
@@ -187,8 +192,9 @@ int ConfigIni::ReadFirmwareFiles(const char* config) {
     if (data_len > 0) {
         path = pkg_dir;
         path += filename;
-      //add_image(firmware, path.GetBuffer(), 0, config);
-      path.ReleaseBuffer();
+      AddFirmwareFiles(path.GetString());
+//      path.GetBuffer()
+//      path.ReleaseBuffer();
     }
 
     firmware = firmware + firmware_len + 1;
@@ -198,8 +204,31 @@ int ConfigIni::ReadFirmwareFiles(const char* config) {
   return 0;
 }
 
-const char * const ConfigIni::getNetworkSegment() {
+const char * const ConfigIni::GetNetworkSegment() {
     return m_NetworkSegment;
+}
+
+BOOL ConfigIni::AddFirmwareFiles(const char* const file){
+    if (file == NULL) {
+        LOGE("Bad parameter");
+        return FALSE;
+    }
+    LOGI("add file %s", file);
+    m_FirmwareFiles.push_back(strdup(file));
+    return TRUE;
+}
+
+BOOL ConfigIni::DestroyFirmwareFiles() {
+    list<char*>::iterator it;
+    for (it = m_FirmwareFiles.begin(); it != m_FirmwareFiles.end(); ++it) {
+        char* item = *it;
+        //item->DeleteMemory();
+        memset(item, 0, strlen(item));
+        delete item;
+        *it = NULL;
+    }
+    m_FirmwareFiles.clear();
+    return TRUE;
 }
 
 ConfigIni::~ConfigIni() {

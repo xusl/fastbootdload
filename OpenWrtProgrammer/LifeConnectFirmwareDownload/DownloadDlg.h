@@ -42,7 +42,7 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
-	static DWORD WINAPI Thread_Server_Listen(LPVOID lpPARAM);
+//	static DWORD WINAPI Thread_Server_Listen(LPVOID lpPARAM);
 	static DWORD WINAPI Thread_Send_Comand(LPVOID lpPARAM);
   static DWORD WINAPI NetworkSniffer(LPVOID lpPARAM);
 
@@ -51,6 +51,7 @@ protected:
 	HICON m_hIcon;
 	struct mg_server *server;
   string mHostIPAddr;
+  string mHostGWAddr;
 	HANDLE m_NetworkSnifferThreadHandle;
 	HANDLE Server_Listen_Thread;
 	HANDLE Send_Comand_Thread;
@@ -59,19 +60,18 @@ protected:
   DWORD   m_NetworkSnifferThreadID;
   BOOL  mWSAInitialized;
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
-	void OnSend_Comand(SOCKET sockClient, const char * cmd);
-	void server_listen(u_short port =DOWNLOAD_SERVER_PORT);
   void SniffNetwork();
   void GetHostIpAddr();
   void UpdateMessage(CString msg);
   void ClearMessage(void);
-  void HandleDownloadException(CString msg, SOCKET &sock);
-  void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
-  char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
-  BOOL BuildUpdateCommand(CString file, CString &cmd);
+  VOID SetDeviceInformation(int type, LPCTSTR lpszString);
+//void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
+//char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
+//BOOL BuildUpdateCommand(CString file, CString &cmd);
+//void OnSend_Comand(SOCKET sockClient, const char * cmd);
+//void server_listen(u_short port =DOWNLOAD_SERVER_PORT);
   DWORD Schedule();
   DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;};
-  void ReleaseThreadSyncSemaphore();
 
   int GuiTFTPNew (const struct S_TftpTrfNew *pTrf);
   int GuiTFTPEnd (struct S_TftpTrfEnd *pTrf);
@@ -92,15 +92,18 @@ protected:
 	DECLARE_MESSAGE_MAP()
 private:
   ConfigIni m_Config;
-	CString error_message;
+	CString m_LogText;
 	int Progress_range;
 	bool server_state;
-	bool is_downloading;
+	BOOL is_downloading;
 	bool downloading_successfull;
 	bool b_download;
   BOOL m_bSuperMode;
 	CEdit m_MessageControl;
   CStatic m_RomPathStaticText;
+  CStatic m_DeviceIpAddress;
+  CStatic m_DeviceOSVersion;
+  CStatic m_DeviceFWVersion;
 	//char s_PCBNo[16];
 	char s_MMIFlag[2];
 	DWORD dwBeginTime;

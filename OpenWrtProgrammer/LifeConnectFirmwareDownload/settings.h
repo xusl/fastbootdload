@@ -8,6 +8,14 @@
 // released under artistic license (see license.txt)
 //
 //////////////////////////////////////////////////////
+#pragma once
+
+#include <vector>
+#include <list>
+#include <algorithm>
+#include <string>
+
+using namespace std;
 
 enum e_SecurityLevels { SECURITY_NONE, SECURITY_STD, SECURITY_HIGH, SECURITY_READONLY };
 
@@ -82,9 +90,10 @@ public:
     BOOL           GetAutoWorkFlag(void) { return m_bWork; };
     int            ReadFirmwareFiles(const char* config);
     int            SetPackageDir(const char* config);
-    const char * const getNetworkSegment() ;
+    const char * const GetNetworkSegment() ;
 private:
-
+    BOOL           DestroyFirmwareFiles();
+    BOOL           AddFirmwareFiles(const char* const file);
 private:
     CString                 m_ConfigPath;
     volatile BOOL           m_bWork;
@@ -93,7 +102,7 @@ private:
     //   char                 pkg_conf_file[MAX_PATH];
     char                    pkg_dlimg_file[MAX_PATH];
     char                    m_NetworkSegment[IPADDR_BUFFER_LEN];
-    CString                 mRomPath;
+    list<char *>            m_FirmwareFiles;
     CString                 mModulePath;
 };
 

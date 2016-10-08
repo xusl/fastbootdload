@@ -17,11 +17,12 @@ public:
     GetIp(string network="192.168.1");
     ~GetIp(void);
     bool GetAdapter();
-    bool GetHostIP(string& ip) {
+    bool GetHostIP(string& ip, string& gw) {
         int refresh = 1;
         do {
             if (!device_ip.empty() &&(device_ip !="")&&(device_ip !="0.0.0.0")) {
                 ip = device_ip;
+                gw = gateway_ip;
                 return true;
             }
             if (refresh >= 1) {
@@ -34,4 +35,5 @@ public:
 private:
     string segment;
     string device_ip;
+    string gateway_ip;
 };

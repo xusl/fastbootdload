@@ -36,16 +36,19 @@ bool GetIp::GetAdapter()
         while (pIpAdapterInfo_Temp)
         {
             IP_ADDR_STRING *pIpAddrString =&(pIpAdapterInfo_Temp->IpAddressList);
+            IP_ADDR_STRING *pGateway = &pIpAdapterInfo_Temp->GatewayList;
             do
             {
                 device_ip =pIpAddrString->IpAddress.String;
+                gateway_ip = pGateway->IpAddress.String;
                 if(device_ip.find(segment)!=-1)
                 {
                     delete pIpAdapterInfo;
                     return true;
                 }
                 pIpAddrString=pIpAddrString->Next;
-            } while (pIpAddrString);
+                pGateway = pGateway->Next;
+            } while (pIpAddrString && pGateway);
             pIpAdapterInfo_Temp = pIpAdapterInfo_Temp->Next;
         }
     }

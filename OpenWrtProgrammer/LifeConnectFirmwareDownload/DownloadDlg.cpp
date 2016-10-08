@@ -17,6 +17,7 @@
 #define new DEBUG_NEW
 #endif
 
+enum EVersion {DEV_FW_VERSION, DEV_OS_VERSION};
 enum E_fields { FD_PEER, FD_FILE, FD_START, FD_PROGRESS, FD_BYTES, FD_TOTAL, FD_TIMEOUT };
 
 // a transfer terminated but still displayed
@@ -74,13 +75,15 @@ END_MESSAGE_MAP()
 
 CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CDownloadDlg::IDD, pParent),
-	mWSAInitialized(FALSE),mHostIPAddr("")
+	mWSAInitialized(FALSE),
+	mHostIPAddr(""),
+	mHostGWAddr(""),
+	m_LogText("")
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
     m_pCoordinator = new DeviceCoordinator;
     m_SyncSemaphore = CreateSemaphore(NULL, 1, 1, "ThreadSyncDevie");
 	server_state=false;
-	error_message="";
 	Progress_range=350;
 	is_downloading=false;
 	downloading_successfull=false;
@@ -110,6 +113,9 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
     	//m_MessageControl=(CEdit*)GetDlgItem(IDC_Error_Message);
 	DDX_Control(pDX, IDC_Error_Message, m_MessageControl);
     DDX_Control(pDX, IDC_FIRMWARE_IMAGE, m_RomPathStaticText);
+    DDX_Control(pDX, IDC_DEVICE_IPADDRESS, m_DeviceIpAddress);
+    DDX_Control(pDX, IDC_DEVICE_OS_VERSION, m_DeviceOSVersion);
+    DDX_Control(pDX, IDC_DEVICE_FIRMWARE_VERSION, m_DeviceFWVersion);
 	//DDX_Text(pDX, IDC_EDIT_LINUX_VER_MAIN, m_LinuxVer);
 }
 
@@ -131,40 +137,38 @@ END_MESSAGE_MAP()
 
 BOOL CDownloadDlg::OnInitDialog()
 {
-	CDialogEx::OnInitDialog();
+    CDialogEx::OnInitDialog();
 
-	// Add "About..." menu item to system menu.
+    // Add "About..." menu item to system menu.
 
-	// IDM_ABOUTBOX must be in the system command range.
-	ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
-	ASSERT(IDM_ABOUTBOX < 0xF000);
+    // IDM_ABOUTBOX must be in the system command range.
+    ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
+    ASSERT(IDM_ABOUTBOX < 0xF000);
 
-	CMenu* pSysMenu = GetSystemMenu(FALSE);
-	if (pSysMenu != NULL)
-	{
-		BOOL bNameValid;
-		CString strAboutMenu;
-		bNameValid = strAboutMenu.LoadString(IDS_ABOUTBOX);
-		ASSERT(bNameValid);
-		if (!strAboutMenu.IsEmpty())
-		{
-			pSysMenu->AppendMenu(MF_SEPARATOR);
-			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
-		}
-	}
+    CMenu* pSysMenu = GetSystemMenu(FALSE);
+    if (pSysMenu != NULL)
+    {
+        BOOL bNameValid;
+        CString strAboutMenu;
+        bNameValid = strAboutMenu.LoadString(IDS_ABOUTBOX);
+        ASSERT(bNameValid);
+        if (!strAboutMenu.IsEmpty())
+        {
+            pSysMenu->AppendMenu(MF_SEPARATOR);
+            pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
+        }
+    }
 
-	// Set the icon for this dialog.  The framework does this automatically
-	//  when the application's main window is not a dialog
-	SetIcon(m_hIcon, TRUE);			// Set big icon
-	SetIcon(m_hIcon, FALSE);		// Set small icon
+    // Set the icon for this dialog.  The framework does this automatically
+    //  when the application's main window is not a dialog
+    SetIcon(m_hIcon, TRUE);			// Set big icon
+    SetIcon(m_hIcon, FALSE);		// Set small icon
 
     WSADATA wsaData;
     WORD  wVersionRequested = MAKEWORD(2, 0);
-    // iResult = WSAStartup( MAKEWORD( 2, 2), &wsaData );
     if ( WSAStartup(wVersionRequested, &wsaData ) != 0 ) {
         AfxMessageBox(IDP_SOCKETS_INIT_FAILED);
     } else {
-        //if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1) {
         if (LOBYTE(wsaData.wVersion) != LOBYTE(wVersionRequested) ||
             HIBYTE(wsaData.wVersion) != HIBYTE(wVersionRequested)) {
             LOGE("WSAStartup error, version not match");
@@ -189,30 +193,32 @@ BOOL CDownloadDlg::OnInitDialog()
     listView->InsertColumn(FD_TIMEOUT,  _T("Timeout"), LVCFMT_LEFT, 80);
 
 
-	m_progMac2.SetRange(0,Progress_range);
-	m_progMac2.SetBarColor(RGB(255,255,0));
-	m_progMac2.SetTextColor(RGB(0,0,0));
-	m_progMac2.SetStep(10);
+    m_progMac2.SetRange(0,Progress_range);
+    m_progMac2.SetBarColor(RGB(255,255,0));
+    m_progMac2.SetTextColor(RGB(0,0,0));
+    m_progMac2.SetStep(10);
 
-	//GetPrivateProfileString(_T("MISC"), _T("SSIDPrefix"), _T(""), s_SSID_Prefix, 20, config);
-	//s_SSID_Prefix[strlen(s_SSID_Prefix)] = 0;
+    //GetPrivateProfileString(_T("MISC"), _T("SSIDPrefix"), _T(""), s_SSID_Prefix, 20, config);
+    //s_SSID_Prefix[strlen(s_SSID_Prefix)] = 0;
 
-	if(!PathFileExists(WS_LABEL_DIR)) {
-		CreateDirectory(WS_LABEL_DIR, NULL);
-	}
+    if(!PathFileExists(WS_LABEL_DIR)) {
+        CreateDirectory(WS_LABEL_DIR, NULL);
+    }
     GetDlgItem(ID_Start)->EnableWindow(TRUE);
     m_RomPathStaticText.SetWindowText(m_Config.GetPackageDir());
-    GetHostIpAddr();
-	return TRUE;  // return TRUE  unless you set the focus to a control
+    return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
- DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
+DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
+    pThis->UpdateMessage(_T("Search Life Connect..., please wait...\r\n"));
+    pThis->GetHostIpAddr();
+
     for(;;) {
         pThis->SniffNetwork();
     }
     return 0;
- }
+}
 
 void CDownloadDlg::SniffNetwork() {
     CString msg;
@@ -220,12 +226,13 @@ void CDownloadDlg::SniffNetwork() {
         CString ip_addr;
         const char* pcIpAddr;
         string mac;
-        ip_addr.Format("%s.%d", m_Config.getNetworkSegment(), i);
+        ip_addr.Format("%s.%d", m_Config.GetNetworkSegment(), i);
         pcIpAddr = ip_addr.GetString();
-        if (pcIpAddr == mHostIPAddr)
+        if (pcIpAddr == mHostIPAddr || pcIpAddr == mHostGWAddr)
             continue;
         if(Ping(pcIpAddr)) {
             if (0 == ResolveIpMac(pcIpAddr, mac)) {
+                m_DeviceIpAddress.SetWindowText(pcIpAddr);
                 m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL);
                 //				if(mac != mac_old)
                 {
@@ -250,167 +257,16 @@ void CDownloadDlg::SniffNetwork() {
     WaitForSingleObject(m_SyncSemaphore, 10000);//INFINITE);
 }
 
-void CDownloadDlg::ReleaseThreadSyncSemaphore() {
-    ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
-}
 DWORD CDownloadDlg::Schedule() {
     if (!m_pCoordinator->IsEmpty()) {
-    Send_Comand_Thread= CreateThread(NULL,0,
-        Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
-   // WaitForSingleObject(Send_Comand_Thread, INFINITE);
+        Send_Comand_Thread= CreateThread(NULL,0,
+                                         Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
+        // WaitForSingleObject(Send_Comand_Thread, INFINITE);
     }
-    //ReleaseThreadSyncSemaphore();
     ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
 
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     return 0;
-}
-
-DWORD WINAPI CDownloadDlg::Thread_Server_Listen(LPVOID lpPARAM) {
-	CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
-	pThis->server_listen();
-	return 1;
-}
-void CDownloadDlg::server_listen(u_short port)
-{
-    SOCKET sockConn = INVALID_SOCKET;
-    SOCKET sockSrv  = INVALID_SOCKET;
-    CString msg;
-    size_t length = 0;
-    __int64 iResult;
-
-    if (mWSAInitialized == FALSE) {
-        UpdateMessage(_T("Server Startup failed!"));
-        return ;
-    }
-
-   server_state=false;
-    char const * content = BuildHttpServerResponse(m_Config.GetPackageDir(), &length);
-
-    if(content == NULL) {
-        UpdateMessage(_T("Open file failed!"));
-        return ;
-    }
-
-    sockSrv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sockSrv == INVALID_SOCKET) {
-        HandleServerException(_T("Create server socket failed!"), sockConn, sockSrv, &content);
-        return ;
-    }
-    SOCKADDR_IN addrSrv;
-    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-    addrSrv.sin_family = AF_INET;
-    addrSrv.sin_port = htons(port);
-    iResult = bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
-    if (iResult == SOCKET_ERROR) {
-        msg.Format(_T("Bind socket port %d failed!"), port);
-        HandleServerException(msg, sockConn, sockSrv, &content);
-        return ;
-    }
-    msg.Format(_T("bind socket success on port :%d"), port);
-    UpdateMessage(msg);
-    if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
-        HandleServerException(_T("server listen failed!"), sockConn, sockSrv, &content);
-        return ;
-    }
-
-    UpdateMessage(_T("Listening on socket..."));
-    SOCKADDR_IN  addrClient;
-    while(true) {
-        unsigned long on = 1;
-        char recvBuf[101]={0};
-
-        int sin_size = sizeof(struct sockaddr_in);
-        sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &sin_size);
-        UpdateMessage(_T("Send softwre ..., please wait..."));
-        ioctlsocket(sockConn, FIONBIO, &on);
-
-        int bytes = 0;
-        do {
-            memset(recvBuf, 0, 101);
-            bytes = recv(sockConn, recvBuf, 100, 0);
-        } while(bytes > 0);
-
-        iResult = send(sockConn, content , length , 0);
-
-        if (iResult == SOCKET_ERROR) {
-            HandleServerException(_T("Send software failed!"), sockConn, sockSrv, &content);
-            break;
-        }
-
-        do {
-            memset(recvBuf, 0, 101);
-            bytes = recv(sockConn, recvBuf, 100, 0);
-        }while(bytes > 0);
-        UpdateMessage(_T("Send softwre successfully!"));
-
-        closesocket(sockConn);
-        sockConn = INVALID_SOCKET;
-    }
-    HandleServerException(_T("Server exist"), sockConn, sockSrv, &content);
-}
-
-void CDownloadDlg::HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent) {
-    UpdateMessage(msg);
-    //        wprintf(L"socket failed with error: %ld\n", WSAGetLastError());
-    if (ppContent != NULL && *ppContent != NULL) {
-        free((void *)*ppContent);
-        *ppContent = NULL;
-    }
-    if (INVALID_SOCKET != sockConn)
-        closesocket(sockConn);
-    if (INVALID_SOCKET != sockSrv)
-        closesocket(sockSrv);
-}
-
-char const* CDownloadDlg::BuildHttpServerResponse(const char *path, size_t  *contentLength) {
-    char* content = NULL;
-    __int64  nLen = 0;
-
-    if (path == NULL || contentLength == NULL) {
-        UpdateMessage(_T("Bad parameter of BuildHttpServerResponse"));
-        return content;
-    }
-    *contentLength = 0;
-
-    FILE *pF = fopen(path, "rb" );
-    if(pF==NULL) {
-        //perror(file_name);
-        UpdateMessage(_T("Open file failed!"));
-        return content;
-    }
-    _fseeki64(pF, 0, SEEK_END);
-    nLen = _ftelli64(pF);
-
-    char temp[64]={0};
-    char date[64]={0};
-    sprintf(temp, "%I64d", nLen);
-    time_t curtime = time(NULL);
-    gmt_time_string(date, sizeof(date), &curtime);
-    string header= "HTTP/1.1 200 OK\r\n";
-    header.append("Content-Length: ").append(temp).append("\r\n");
-    header.append("Date: ").append(date).append("\r\n");
-    header.append("Content-Type: application/x-sam\r\n");
-    header.append("Accept-Ranges: bytes\r\n" );
-    header.append("\r\n");
-    size_t length=header.size() + (size_t)nLen + 1;
-    rewind(pF);
-    content= (char*) malloc(sizeof(char)*length);
-    if(!content) {
-        UpdateMessage(_T("Failed to allocate memory!"));
-        return content;
-    }
-    memset(content, 0, length);
-    memcpy(content, header.c_str(), header.size());
-    int len = header.size();
-
-    fread(content + len, 1, (size_t)nLen, pF);
-    content[length]='\0';
-    fclose(pF);
-    //printf("Header length is %d\n", header.size());
-    //printf("Header is \n%s\n", header.c_str());
-    *contentLength = length;
-    return content;
 }
 
 void CDownloadDlg::OnSysCommand(UINT nID, LPARAM lParam) {
@@ -513,6 +369,15 @@ void CDownloadDlg::OnBnClickedButtonBrowse() {
 }
 
 void CDownloadDlg::OnBnClickedStart() {
+    if(is_downloading) {
+        LOGW("Tool is working now.");
+        if (b_download == false) {
+            TerminateThread(m_NetworkSnifferThreadHandle, 1);
+            GetDlgItem(ID_Start)->SetWindowText("Start");
+            is_downloading = false;
+        }
+        return;
+    }
     m_progMac2.SetPos(0);
     m_progMac2.SetBarColor(RGB(255,255,0));
     m_progMac2.SetWindowText(_T(" "));
@@ -522,27 +387,24 @@ void CDownloadDlg::OnBnClickedStart() {
     //     return;
     //}
 
+    GetDlgItem(ID_Start)->SetWindowText("Stop");
+    GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
+    m_RomPathStaticText.EnableWindow(false);
+
     ClearMessage();
 
-    GetDlgItem(ID_Start)->EnableWindow(false);
-    m_RomPathStaticText.EnableWindow(false);
-    error_message=_T("Search Life Connect..., please wait...\r\n");
-    ::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message,error_message);
-    is_downloading=false;
+    is_downloading=TRUE;
     downloading_successfull=false;
     b_download = false;
-    m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
+
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     //m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
     //Schedule();
-    //    Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
+    //Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
+
+    m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
     _beginthread ( StartTftpd32Services, 0, (void *)GetSafeHwnd());
-
-    GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
-
-  // TerminateThread(m_NetworkSnifferThreadHandle, 1);
 }
-
 
 void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
     KillTimer(nIDEvent);
@@ -642,7 +504,7 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 #define COMMAN_GETTRACE "send_data 254 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n"
 #define COMMAN_GETMAC "send_data 254 0 3 1 1 0 0 0 0 0 0\n"
 #define COMMAN_UPDATE "send_data 254 0 0 7 0 1 0\n"
-#define COMMAN_REBOOT "reboot send_data 254 0 0 5 0 0 0\n"
+#define COMMAN_REBOOT "send_data 254 0 0 5 0 0 0\n"
         i_ret = tn.send_telnet_data(COMMAN_GETTRACE, strlen(COMMAN_GETTRACE));
         Sleep(1000);
         i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
@@ -768,20 +630,85 @@ ERROR:
 }
 
 void CDownloadDlg::GetHostIpAddr() {
-    GetIp Get_Ip(m_Config.getNetworkSegment());
-    bool IsGetIp=false;
+    GetIp getIp(m_Config.GetNetworkSegment());
+
     mHostIPAddr.clear();
+    mHostGWAddr.clear();
     for(int i = 0; i< 3; i++) {
-        if(Get_Ip.GetHostIP(mHostIPAddr)) {
-            IsGetIp=true;
-            UpdateMessage(_T("Get Ip successfully!"));
-            break;
+        if(getIp.GetHostIP(mHostIPAddr, mHostGWAddr)) {
+            CString msg;
+            msg.Format(_T("Get Ip successfully! IP %s, Gateway %s."),
+                mHostIPAddr.c_str(), mHostGWAddr.c_str());
+            UpdateMessage(msg);
+            return;
         }
         Sleep(2000);
     }
-    if(IsGetIp==false) {
-        UpdateMessage(_T("Get IP failed!"));
+    UpdateMessage(_T("Get IP failed!"));
+}
+
+#if 0
+void CDownloadDlg::HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent) {
+    UpdateMessage(msg);
+    //        wprintf(L"socket failed with error: %ld\n", WSAGetLastError());
+    if (ppContent != NULL && *ppContent != NULL) {
+        free((void *)*ppContent);
+        *ppContent = NULL;
     }
+    if (INVALID_SOCKET != sockConn)
+        closesocket(sockConn);
+    if (INVALID_SOCKET != sockSrv)
+        closesocket(sockSrv);
+}
+
+char const* CDownloadDlg::BuildHttpServerResponse(const char *path, size_t  *contentLength) {
+    char* content = NULL;
+    __int64  nLen = 0;
+
+    if (path == NULL || contentLength == NULL) {
+        UpdateMessage(_T("Bad parameter of BuildHttpServerResponse"));
+        return content;
+    }
+    *contentLength = 0;
+
+    FILE *pF = fopen(path, "rb" );
+    if(pF==NULL) {
+        //perror(file_name);
+        UpdateMessage(_T("Open file failed!"));
+        return content;
+    }
+    _fseeki64(pF, 0, SEEK_END);
+    nLen = _ftelli64(pF);
+
+    char temp[64]={0};
+    char date[64]={0};
+    sprintf(temp, "%I64d", nLen);
+    time_t curtime = time(NULL);
+    gmt_time_string(date, sizeof(date), &curtime);
+    string header= "HTTP/1.1 200 OK\r\n";
+    header.append("Content-Length: ").append(temp).append("\r\n");
+    header.append("Date: ").append(date).append("\r\n");
+    header.append("Content-Type: application/x-sam\r\n");
+    header.append("Accept-Ranges: bytes\r\n" );
+    header.append("\r\n");
+    size_t length=header.size() + (size_t)nLen + 1;
+    rewind(pF);
+    content= (char*) malloc(sizeof(char)*length);
+    if(!content) {
+        UpdateMessage(_T("Failed to allocate memory!"));
+        return content;
+    }
+    memset(content, 0, length);
+    memcpy(content, header.c_str(), header.size());
+    int len = header.size();
+
+    fread(content + len, 1, (size_t)nLen, pF);
+    content[length]='\0';
+    fclose(pF);
+    //printf("Header length is %d\n", header.size());
+    //printf("Header is \n%s\n", header.c_str());
+    *contentLength = length;
+    return content;
 }
 
 BOOL CDownloadDlg::BuildUpdateCommand(CString file, CString &cmd) {
@@ -807,35 +734,6 @@ BOOL CDownloadDlg::BuildUpdateCommand(CString file, CString &cmd) {
                                 mHostIPAddr.c_str(), Firmware_name);
 
     return TRUE;
-}
-
-SOCKET CDownloadDlg::CreateSocket(const char *ip_addr,  u_short port) {
-    SOCKET sockClient = INVALID_SOCKET;
-    if (mWSAInitialized == FALSE) {
-        UpdateMessage(_T("Server Startup failed!"));
-        return sockClient;
-    }
-
-    //CString cstr(download_comand.data());
-    SOCKADDR_IN addrSrv;
-    addrSrv.sin_addr.S_un.S_addr = inet_addr(ip_addr);
-    addrSrv.sin_family = AF_INET;
-    addrSrv.sin_port = htons(port);
-    __int64 iResult;
-    sockClient = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    //int timeout=50000;
-    //iResult=setsockopt(sockClient,SOL_SOCKET,SO_RCVTIMEO,(const char*)&timeout,sizeof(int));
-    //if(SOCKET_ERROR==iResult)
-    //return ;
-
-    iResult = connect(sockClient, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
-    if(iResult==SOCKET_ERROR) {
-        closesocket(sockClient);
-       // HandleDownloadException(_T("Connect device failed!"), sockClient);
-       LOGE("Connect device %s failed!", ip_addr);
-        sockClient = INVALID_SOCKET;
-    }
-    return sockClient;
 }
 
 void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
@@ -916,15 +814,116 @@ void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
     } while(bytes > 0);
 }
 
-void CDownloadDlg::HandleDownloadException(CString msg, SOCKET &sock) {
-    UpdateMessage(msg);
-    GetDlgItem(ID_Start)->EnableWindow(true);
-    ::MessageBox(NULL, msg, _T("Download"),MB_OK);
-    is_downloading=false;
-    downloading_successfull=false;
+DWORD WINAPI CDownloadDlg::Thread_Server_Listen(LPVOID lpPARAM) {
+	CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
+	pThis->server_listen();
+	return 1;
+}
+void CDownloadDlg::server_listen(u_short port)
+{
+    SOCKET sockConn = INVALID_SOCKET;
+    SOCKET sockSrv  = INVALID_SOCKET;
+    CString msg;
+    size_t length = 0;
+    __int64 iResult;
 
-    if (sock != INVALID_SOCKET)
-        closesocket(sock);
+    if (mWSAInitialized == FALSE) {
+        UpdateMessage(_T("Server Startup failed!"));
+        return ;
+    }
+
+   server_state=false;
+    char const * content = BuildHttpServerResponse(m_Config.GetPackageDir(), &length);
+
+    if(content == NULL) {
+        UpdateMessage(_T("Open file failed!"));
+        return ;
+    }
+
+    sockSrv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sockSrv == INVALID_SOCKET) {
+        HandleServerException(_T("Create server socket failed!"), sockConn, sockSrv, &content);
+        return ;
+    }
+    SOCKADDR_IN addrSrv;
+    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+    addrSrv.sin_family = AF_INET;
+    addrSrv.sin_port = htons(port);
+    iResult = bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
+    if (iResult == SOCKET_ERROR) {
+        msg.Format(_T("Bind socket port %d failed!"), port);
+        HandleServerException(msg, sockConn, sockSrv, &content);
+        return ;
+    }
+    msg.Format(_T("bind socket success on port :%d"), port);
+    UpdateMessage(msg);
+    if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
+        HandleServerException(_T("server listen failed!"), sockConn, sockSrv, &content);
+        return ;
+    }
+
+    UpdateMessage(_T("Listening on socket..."));
+    SOCKADDR_IN  addrClient;
+    while(true) {
+        unsigned long on = 1;
+        char recvBuf[101]={0};
+
+        int sin_size = sizeof(struct sockaddr_in);
+        sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &sin_size);
+        UpdateMessage(_T("Send softwre ..., please wait..."));
+        ioctlsocket(sockConn, FIONBIO, &on);
+
+        int bytes = 0;
+        do {
+            memset(recvBuf, 0, 101);
+            bytes = recv(sockConn, recvBuf, 100, 0);
+        } while(bytes > 0);
+
+        iResult = send(sockConn, content , length , 0);
+
+        if (iResult == SOCKET_ERROR) {
+            HandleServerException(_T("Send software failed!"), sockConn, sockSrv, &content);
+            break;
+        }
+
+        do {
+            memset(recvBuf, 0, 101);
+            bytes = recv(sockConn, recvBuf, 100, 0);
+        }while(bytes > 0);
+        UpdateMessage(_T("Send softwre successfully!"));
+
+        closesocket(sockConn);
+        sockConn = INVALID_SOCKET;
+    }
+    HandleServerException(_T("Server exist"), sockConn, sockSrv, &content);
+}
+#endif
+
+SOCKET CDownloadDlg::CreateSocket(const char *ip_addr,  u_short port) {
+    SOCKET sockClient = INVALID_SOCKET;
+    if (mWSAInitialized == FALSE) {
+        UpdateMessage(_T("Server Startup failed!"));
+        return sockClient;
+    }
+
+    SOCKADDR_IN addrSrv;
+    addrSrv.sin_addr.S_un.S_addr = inet_addr(ip_addr);
+    addrSrv.sin_family = AF_INET;
+    addrSrv.sin_port = htons(port);
+    __int64 iResult;
+    sockClient = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    //int timeout=50000;
+    //iResult=setsockopt(sockClient,SOL_SOCKET,SO_RCVTIMEO,(const char*)&timeout,sizeof(int));
+    //if(SOCKET_ERROR==iResult)
+    //return ;
+
+    iResult = connect(sockClient, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
+    if(iResult==SOCKET_ERROR) {
+        closesocket(sockClient);
+        LOGE("Connect device %s failed!", ip_addr);
+        sockClient = INVALID_SOCKET;
+    }
+    return sockClient;
 }
 
 // Create a pTftpGui structure and fill it with the msg
@@ -934,11 +933,7 @@ int CDownloadDlg::GuiTFTPNew (const struct S_TftpTrfNew *pTrf)
     pTftpGui = (struct S_TftpGui *)calloc (1, sizeof *pTftpGui);
     pTftpGui->dwTransferId = pTrf->dwTransferId;
     pTftpGui->stat = pTrf->stat;
-#ifdef MSVC
-    pTftpGui->filename = _strdup (pTrf->szFile);
-#else
-    pTftpGui->filename = strdup (pTrf->szFile);
-#endif
+    pTftpGui->filename = _strdup(pTrf->szFile);
     pTftpGui->opcode = pTrf->opcode;
     pTftpGui->stg_addr = pTrf->from_addr;
 
@@ -946,9 +941,7 @@ int CDownloadDlg::GuiTFTPNew (const struct S_TftpTrfNew *pTrf)
     // places the leaf at the head of the structure
     pTftpGuiFirst = pTftpGui;
 
-//GetDlgItem (IDC_LV_TFTP)->m_hWnd,
     Gui_TftpReporting (pTftpGuiFirst);
-
 
     struct subStats stat;
     stat.stat =pTrf->stat;
@@ -964,31 +957,33 @@ int CDownloadDlg::GuiTFTPNew (const struct S_TftpTrfNew *pTrf)
 int CDownloadDlg::GuiTFTPEnd (struct S_TftpTrfEnd *pTrf)
 {
     struct S_TftpGui *pTftpGui, *pTftpPrev;
-
     struct subStats stat;
+    time_t dNow;
+
     stat.stat =pTrf->stat;
     stat.dwTransferId = pTrf->dwTransferId;
-    time_t dNow;
     time(&dNow);
     GuiTFTPStat(&stat, dNow);
 
     // search mathing internal structure and get previous member
-    for ( pTftpPrev=NULL, pTftpGui=pTftpGuiFirst ;
-         pTftpGui != NULL && pTftpGui->dwTransferId != pTrf->dwTransferId ;
-         pTftpGui = pTftpGui->next )
+    for (pTftpPrev=NULL, pTftpGui=pTftpGuiFirst;
+         pTftpGui != NULL && pTftpGui->dwTransferId != pTrf->dwTransferId;
+         pTftpGui = pTftpGui->next)
         pTftpPrev = pTftpGui;
 
     // in the service, the GUI may have missed the begining of the transfer
-    if (pTftpGui==NULL)  return 0;
+    if (pTftpGui==NULL)
+        return 0;
 
     // detach leaf
-    if (pTftpPrev != NULL)  pTftpPrev->next = pTftpGui->next ;
-    else                    pTftpGuiFirst   = pTftpGui->next ;
+    if (pTftpPrev != NULL)
+        pTftpPrev->next = pTftpGui->next ;
+    else
+        pTftpGuiFirst = pTftpGui->next ;
 
     // now we can play with the leaf : it belongs no more to the linked list
     // update stat
     pTftpGui->stat = pTrf->stat;
-    //GetDlgItem (IDC_LV_TFTP)->m_hWnd,
     Gui_TftpReporting (pTftpGuiFirst);
 
     // free allocation
@@ -996,7 +991,7 @@ int CDownloadDlg::GuiTFTPEnd (struct S_TftpTrfEnd *pTrf)
     free (pTftpGui);
     LOGD ("GUI: transfer destroyed\n");
 
-    // recall TftpReporting : it will notice the process //GetDlgItem (hMainWnd, IDC_LV_TFTP),
+    // recall TftpReporting : it will notice the process
     Gui_TftpReporting (pTftpGuiFirst);
     return 0;
 } // GuiTFTPEnd
@@ -1006,42 +1001,35 @@ int CDownloadDlg::GuiTFTPStat (struct subStats *pTrf, time_t dNow)
 {
     struct S_TftpGui *pTftpGui;
     // search mathing internal structure
-    for ( pTftpGui=pTftpGuiFirst ;
-         pTftpGui!=NULL && pTftpGui->dwTransferId != pTrf->dwTransferId ;
-         pTftpGui = pTftpGui->next );
-    if (pTftpGui == NULL) return -1;
-    assert ( pTftpGui != NULL ) ;
+    for ( pTftpGui = pTftpGuiFirst;
+         pTftpGui != NULL && pTftpGui->dwTransferId != pTrf->dwTransferId;
+         pTftpGui = pTftpGui->next);
+
+    if (pTftpGui == NULL)
+        return -1;
+
+    assert (pTftpGui != NULL);
+
     pTftpGui->stat = pTrf->stat;
-
     time (& pTftpGui->stat.dLastUpdate) ;
-
-    HWND hGWnd;
-    char szTitle [_MAX_PATH+sizeof " from 255.255.255.255 "];
 
     // do not update gauge window if last update has been done in the current second
     // NB: another feature is to avoid division by 0
-    if (pTftpGui->stat.dLastUpdate == dNow)  return -1;
-
-    // update progress bar
-//    hGWnd = GetDlgItem (hMainWnd, IDC_TRF_PROGRESS);
-//    if (pTftpGui->stat.dwTransferSize>100)
-//        SendMessage (hGWnd, PBM_SETPOS,
-//                     pTftpGui->stat.dwTotalBytes/(pTftpGui->stat.dwTransferSize/100),
-//                     0);
+    if (pTftpGui->stat.dLastUpdate == dNow)
+        return -1;
 
     ((CProgressCtrl *)GetDlgItem(IDC_TRF_PROGRESS))->SetPos(pTftpGui->stat.dwTotalBytes/(pTftpGui->stat.dwTransferSize/100));
 
     // Update stat text
+    char szTitle [_MAX_PATH+sizeof " from 255.255.255.255 "];
     wsprintf (szTitle, "%d Bytes %s \t %d Bytes/sec",
               pTftpGui->stat.dwTotalBytes,
               (pTftpGui->opcode == TFTP_RRQ) ? "sent" : "rcvd",
               pTftpGui->stat.dwTotalBytes / (dNow-pTftpGui->stat.StartTime) );
 
- //   SetWindowText (GetDlgItem (hMainWnd, IDC_FILE_STATS), szTitle);
+    //   SetWindowText (GetDlgItem (hMainWnd, IDC_FILE_STATS), szTitle);
     GetDlgItem(IDC_FILE_STATS)->SetWindowText(szTitle);
     GetDlgItem(IDC_FILE_SIZE)->SetWindowText(pTftpGui->filename);
-//    ::Invalidate( hMainWnd );
-//    ::UpdateWindow( hMainWnd );
     return 0;
 } // GuiTFTPStat
 
@@ -1050,7 +1038,7 @@ LRESULT CDownloadDlg::OnMessageTftpInfo(WPARAM wParam, LPARAM lParam) {
     case C_TFTP_TRF_STAT:
         {
             struct S_TftpTrfStat *trf_stat = (struct S_TftpTrfStat *)lParam;
-            for (int Ark=0 ; Ark<trf_stat->nbTrf ; Ark++)
+            for (int Ark=0; Ark < trf_stat->nbTrf; Ark++)
                 GuiTFTPStat (& trf_stat->t[Ark], trf_stat->dNow);
             Gui_TftpReporting ( pTftpGuiFirst);
         }
@@ -1122,8 +1110,7 @@ static int AddNewTftpItem (CListCtrl* listView, const struct S_TftpGui *pTftpGui
     //ListView_SetItemText (hListV, itemPos, FD_FILE, szTxt );
     listView->SetItemText (itemPos, FD_FILE, szTxt );
     return   itemPos;
-} // static int AddNewTftpItem
-
+}
 
 static int UpdateTftpItem (HWND hListV, const struct S_TftpGui *pTftpGui, int itemPos)
 {
@@ -1180,7 +1167,6 @@ static int ManageTerminatedTransfers (HWND hListV, int itemPos)
         {
             LvItem.lParam = sSettings.nGuiRemanence + tNow;
             ListView_SetItem (hListV, & LvItem) ;
-            // SetTimer (hListV,
         }
 
         ListView_SetItemText (hListV, itemPos, FD_PROGRESS, "100%");
@@ -1245,8 +1231,8 @@ int CDownloadDlg::Gui_TftpReporting (const struct S_TftpGui *pTftpGuiFirst)
 } // Reporting
 
 void CDownloadDlg::ClearMessage(void) {
-    error_message.Empty();// = "";
-    UpdateMessage(error_message);
+    m_LogText.Empty();// = "";
+    UpdateMessage(m_LogText);
     //GetDlgItem(ID_Start)->EnableWindow(false);
 }
 
@@ -1255,40 +1241,43 @@ void CDownloadDlg::UpdateMessage(CString errormsg){
     if (errormsg.GetLength() == 0) {
         m_MessageControl.Clear();
         return;
-    } else if (error_message.GetLength() == 0) {
-        error_message = errormsg;
-        msg = error_message;
+    } else if (m_LogText.GetLength() == 0) {
+        m_LogText = errormsg;
+        msg = m_LogText;
     } else {
-    error_message += "\r\n";
-    error_message += errormsg;
-    msg = error_message;
+        m_LogText += "\r\n";
+        m_LogText += errormsg;
+        msg = m_LogText;
     }
     LOGE("%s", errormsg.GetString());
     //::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
     m_MessageControl.SetWindowText(msg);
-	m_MessageControl.SetSel(0, 0);
-	m_MessageControl.SetFocus();
+    m_MessageControl.SetSel(0, 0);
+    m_MessageControl.SetFocus();
+}
+
+VOID CDownloadDlg::SetDeviceInformation(int type, LPCTSTR lpszString) {
+    switch(type) {
+    case DEV_FW_VERSION:
+        m_DeviceFWVersion.SetWindowText(lpszString);
+        break;
+    case DEV_OS_VERSION:
+        m_DeviceOSVersion.SetWindowText(lpszString);
+        break;
+    default:
+        break;
+    }
 }
 
 void CDownloadDlg::OnBnClickedDisableCheck()
 {
-    if (m_bSuperMode)
+    if (m_bSuperMode || is_downloading)
         return;
 
     PasswordEnterDlg m_PasswordEnterDlg;
-
-    //  m_PasswordEnterDlg.Create(IDD_ENTER_PASSWORD, this);
-    //	m_PasswordEnterDlg.ModifyStyle(
-    //             WS_CHILD | WS_VISIBLE | DS_CENTER,
-    //             WS_POPUP | DS_MODALFRAME | WS_CAPTION | WS_SYSMENU,
-    //             SWP_SHOWWINDOW);
-    //    m_PasswordEnterDlg.ShowWindow(SW_SHOW);//(WS_CHILDWINDOW);
-
+    //    m_PasswordEnterDlg.ShowWindow(SW_SHOW);
     INT_PTR nResponse = m_PasswordEnterDlg.DoModal();
     if (nResponse == IDOK) {
-//        GetDlgItem(IDC_DISABLE_CHECK)->EnableWindow(false);
-/*        SetDlgItemText(IDC_DISABLE_CHECK, "Version Check DISABLE");
-*/
         CString title;
         GetWindowText(title);
         title = "Super Mode:Version Check DISABLE, " + title;
@@ -1299,9 +1288,9 @@ void CDownloadDlg::OnBnClickedDisableCheck()
         versionCheck->SetIcon(icon);
 
         m_hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_SUPERMODE));
-//        SendMessage(WM_SETICON, ICON_BIG, (LPARAM)hicon);
-    	SetIcon(m_hIcon, TRUE);			// Set big icon
-	    SetIcon(m_hIcon, FALSE);		// Set small icon
+        //        SendMessage(WM_SETICON, ICON_BIG, (LPARAM)hicon);
+        SetIcon(m_hIcon, TRUE);			// Set big icon
+        SetIcon(m_hIcon, FALSE);		// Set small icon
         m_bSuperMode = TRUE;
     } else if (nResponse == IDCANCEL) {
     }
