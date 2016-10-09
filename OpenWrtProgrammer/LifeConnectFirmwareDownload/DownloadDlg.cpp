@@ -13,6 +13,8 @@
 #include "telnet.h"
 #include "tftp.h"
 
+#define TPST
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -34,8 +36,6 @@ struct S_TftpGui {
 };
 
 static struct S_TftpGui *pTftpGuiFirst=NULL;
-
-int Gui_TftpReporting (HWND hListV, const struct S_TftpGui *pTftpGuiFirst);
 
 static void gmt_time_string(char *buf, size_t buf_len, time_t *t)
  {
@@ -78,7 +78,8 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	mWSAInitialized(FALSE),
 	mHostIPAddr(""),
 	mHostGWAddr(""),
-	m_LogText("")
+	m_LogText(""),
+	m_DialgoTitle("LifeConnect TPST")
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
     m_pCoordinator = new DeviceCoordinator;
@@ -116,6 +117,7 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
     DDX_Control(pDX, IDC_DEVICE_IPADDRESS, m_DeviceIpAddress);
     DDX_Control(pDX, IDC_DEVICE_OS_VERSION, m_DeviceOSVersion);
     DDX_Control(pDX, IDC_DEVICE_FIRMWARE_VERSION, m_DeviceFWVersion);
+    DDX_Control(pDX, IDC_DISABLE_CHECK, m_VersionCheckButton);
 	//DDX_Text(pDX, IDC_EDIT_LINUX_VER_MAIN, m_LinuxVer);
 }
 
@@ -205,7 +207,10 @@ BOOL CDownloadDlg::OnInitDialog()
         CreateDirectory(WS_LABEL_DIR, NULL);
     }
     GetDlgItem(ID_Start)->EnableWindow(TRUE);
+
+    SetWindowText(m_DialgoTitle.GetString());
     m_RomPathStaticText.SetWindowText(m_Config.GetPackageDir());
+    m_pCoordinator->SetDownloadFirmware(&m_Config.GetFirmwareFiles());
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -259,9 +264,13 @@ void CDownloadDlg::SniffNetwork() {
 
 DWORD CDownloadDlg::Schedule() {
     if (!m_pCoordinator->IsEmpty()) {
-        Send_Comand_Thread= CreateThread(NULL,0,
-                                         Thread_Send_Comand,this,0,&Send_Comand_Thread_ID);
-        // WaitForSingleObject(Send_Comand_Thread, INFINITE);
+        m_WorkThreadHandle = CreateThread(NULL,
+            0,
+            WorkThread,
+            this,
+            0,
+            &m_WorkThreadID);
+        // WaitForSingleObject(m_WorkThreadHandle, INFINITE);
     }
     ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
 
@@ -411,7 +420,7 @@ void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
     Schedule();
 }
 
-DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
+DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
     CString cmd;
     int i_ret,i,j,k;
@@ -439,183 +448,203 @@ DWORD WINAPI CDownloadDlg::Thread_Send_Comand(LPVOID lpPARAM) {
 
     SOCKET sock = pThis->CreateSocket(dev->GetIpAddr().c_str());
     if ( sock != INVALID_SOCKET) {
-        telnet tn(sock);
-        char buf[BUFSIZE];
+        return 2;
+    }
+
+    telnet tn(sock);
+    char buf[BUFSIZE];
+    Sleep(5000);
+    tn.receive_telnet_data(buf, BUFSIZE);
+
+#ifdef defined(TPST)
+    tn.send_telnet_data(CMD_OS_VERSION, strlen(CMD_OS_VERSION));
+    tn.receive_telnet_data(buf, BUFSIZE);
+        pThis->SetDeviceInformation(DEV_OS_VERSION, buf);
+
+    if (pThis->CheckVersion()) {
+        tn.send_telnet_data(CMD_FW_VERSION, strlen(CMD_FW_VERSION));
+        tn.receive_telnet_data(buf, BUFSIZE);
+        pThis->SetDeviceInformation(DEV_FW_VERSION, buf);
+    }
+    if (dc->RequestDownloadPermission(dev)) {
         Sleep(5000);
-        tn.receive_telnet_data(buf, BUFSIZE);
+    }
 
-#ifdef TEST
-        tn.send_telnet_data("zen\n", strlen("zen\n")); //send user name
-        tn.receive_telnet_data(buf, BUFSIZE);
-        tn.send_telnet_data("zen\n", strlen("zen\n")); //send password
-        tn.receive_telnet_data(buf, BUFSIZE);
-
-        tn.send_telnet_data("ls /\n", strlen("ls /\n"));//send command 'ls /\r\n'
-        tn.receive_telnet_data(buf, BUFSIZE);
-        tn.send_telnet_data("echo hello world\n", strlen("echo hello world\n"));//send command 'ls /\r\n'
-        tn.receive_telnet_data(buf, BUFSIZE);
-        closesocket(sock);
-        dc->RemoveDevice(dev);
 #elif defined(MMI)
-#define COMMAN_UPDATE "send_data 254 0 0 7 0 1 0\n"
-#define COMMAN_REBOOT "reboot send_data 254 0 0 5 0 0 0\n"
-        unsigned char red[100] = "send_data 254 0 2 3 0 1 0\n";
-        unsigned char blue[100] = "send_data 254 0 2 3 0 2 0\n";
-        char *ledon = "send_data 254 0 2 3 0 3 0\n";
-        char *offled = "send_data 254 0 2 3 0 0 0\n";
-        char *keytest = "send_data 254 0 2 4 1 6 0\n";
-        char *factmood = "send_data 254 0 0 6 0 1 0\n";
-        char *wifitest = "send_data 254 0 3 0 1 0 0\n";
-        char *wifitest1 = "wpa_cli -i wlan0 scan_result";
-        char *readtrace = "send_data 254 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0";
-        char *writetrace = "send_data 254 0 0 0 0 1 2 3 4 5 6 7 8 9 1 2 3 4 5 6 1";
+#define COMMAND_UPDATE "send_data 254 0 0 7 0 1 0\n"
+#define CMD_REBOOT "send_data 254 0 0 5 0 0 0\n"
+#define CMD_FW_VERSION "jrd_system_get_firmware_version \n"
+#define CMD_OS_VERSION "cat /proc/version \n"
+    unsigned char red[100] = "send_data 254 0 2 3 0 1 0\n";
+    unsigned char blue[100] = "send_data 254 0 2 3 0 2 0\n";
+    char *ledon = "send_data 254 0 2 3 0 3 0\n";
+    char *keytest = "send_data 254 0 2 4 1 6 0\n";
+    //char *factmood = "send_data 254 0 0 6 0 1 0\n";
+    //char *offled = "send_data 254 0 2 3 0 0 0\n";
+    char *wifitest = "send_data 254 0 3 0 1 0 0\n";
+    char *wifitest1 = "wpa_cli -i wlan0 scan_result \n";
+    char *readtrace = "send_data 254 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 \n";
+    char *writetrace = "send_data 254 0 0 0 0 1 2 3 4 5 6 7 8 9 1 2 3 4 5 6 1 \n";
 
-        //tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
-        //tn.receive_telnet_data(buf, BUFSIZE);
-        //tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
-        //tn.receive_telnet_data(buf, BUFSIZE);
+    //tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
+    //tn.receive_telnet_data(buf, BUFSIZE);
+    //tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
+    //tn.receive_telnet_data(buf, BUFSIZE);
+    tn.receive_telnet_data(buf, BUFSIZE);
+    tn.send_telnet_data(ledon, strlen(ledon));
+    tn.receive_telnet_data(buf, BUFSIZE);
+    pThis->UpdateMessage(buf);
+
+    tn.send_telnet_data(keytest, strlen(keytest));
+    pThis->UpdateMessage("Please PRESS key in 6 seconds");
+    tn.receive_telnet_data(buf, BUFSIZE);
+    pThis->UpdateMessage(buf);
+
+    tn.send_telnet_data(wifitest, strlen(wifitest));
+    tn.receive_telnet_data(buf, BUFSIZE);
+
+    pThis->UpdateMessage(buf);
+    for (int i = 0; i <= 6; i++) {
         tn.receive_telnet_data(buf, BUFSIZE);
-        tn.send_telnet_data(ledon, strlen(ledon));
-        tn.receive_telnet_data(buf, BUFSIZE);
-        pThis->UpdateMessage(buf);
 
-        tn.send_telnet_data(keytest, strlen(keytest));
-        pThis->UpdateMessage("Please PRESS key in 6 seconds");
-        tn.receive_telnet_data(buf, BUFSIZE);
-        pThis->UpdateMessage(buf);
-
-        tn.send_telnet_data(wifitest, strlen(wifitest));
-        tn.receive_telnet_data(buf, BUFSIZE);
-
-        pThis->UpdateMessage(buf);
-        for (int i = 0; i <= 6; i++) {
-            tn.receive_telnet_data(buf, BUFSIZE);
-
-            if (strlen(buf) > 0) {
-                pThis->UpdateMessage(buf);
-                break;
-            }
+        if (strlen(buf) > 0) {
+            pThis->UpdateMessage(buf);
+            break;
         }
-        pThis->UpdateMessage("Finish");
+    }
+    pThis->UpdateMessage("Finish");
 
-        closesocket(sock);
-        dc->RemoveDevice(dev);
-#else //HDT
+    closesocket(sock);
+    dc->RemoveDevice(dev);
+
+#elif defined(HDT)//HDT
 #define COMMAN_GETTRACE "send_data 254 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n"
 #define COMMAN_GETMAC "send_data 254 0 3 1 1 0 0 0 0 0 0\n"
 #define COMMAN_UPDATE "send_data 254 0 0 7 0 1 0\n"
 #define COMMAN_REBOOT "send_data 254 0 0 5 0 0 0\n"
-        i_ret = tn.send_telnet_data(COMMAN_GETTRACE, strlen(COMMAN_GETTRACE));
-        Sleep(1000);
-        i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
-        if(i_ret)
+    i_ret = tn.send_telnet_data(COMMAN_GETTRACE, strlen(COMMAN_GETTRACE));
+    Sleep(1000);
+    i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
+    if(i_ret)
+    {
+        msg.Format(_T("Read traceability fail!"));
+        goto ERROR;
+    }
+    else
+    {
+        j = 0;
+        for(i =67; j < 16; j++)
         {
-            msg.Format(_T("Read traceability fail!"));
-            goto ERROR;
-        }
-        else
-        {
-            j = 0;
-            for(i =67; j < 16; j++)
+            s_trace[j] = atoi(buf+i);
+            while(buf[i] != 0x20 && buf[i] != '#')
             {
-                s_trace[j] = atoi(buf+i);
-                while(buf[i] != 0x20 && buf[i] != '#')
-                {
-                    i++;
-                }
-                if(buf[i] == '#')
-                {
-                    break;
-                }
                 i++;
             }
-            strncpy(s_PCBNo,s_trace,15);
+            if(buf[i] == '#')
+            {
+                break;
+            }
+            i++;
+        }
+        strncpy(s_PCBNo,s_trace,15);
 
-        }
-        i_ret = tn.send_telnet_data(COMMAN_GETMAC, strlen(COMMAN_GETMAC));
-        Sleep(1000);
-        i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
-        if(i_ret)
+    }
+    i_ret = tn.send_telnet_data(COMMAN_GETMAC, strlen(COMMAN_GETMAC));
+    Sleep(1000);
+    i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
+    if(i_ret)
+    {
+        msg.Format(_T("Read WIFI MAC fail!"));
+        goto ERROR;
+    }
+    else
+    {
+        j = 0;
+        for(i =0x2f; j < 6; j++)
         {
-            msg.Format(_T("Read WIFI MAC fail!"));
-            goto ERROR;
-        }
-        else
-        {
-            j = 0;
-            for(i =0x2f; j < 6; j++)
+            s_WIFIREAD[j] = atoi(buf+i);
+            while(buf[i] != 0x20 && buf[i] != '#')
             {
-                s_WIFIREAD[j] = atoi(buf+i);
-                while(buf[i] != 0x20 && buf[i] != '#')
-                {
-                    i++;
-                }
-                if(buf[i] == '#')
-                {
-                    break;
-                }
                 i++;
             }
-            //strncpy(s_PCBNo,s_trace,15);
+            if(buf[i] == '#')
+            {
+                break;
+            }
+            i++;
         }
+        //strncpy(s_PCBNo,s_trace,15);
+    }
+    for(i=0;i<6;i++)
+    {
+        sprintf(s_FmtStr, "%02X", s_WIFIREAD[i]);
+        s_OldWIFINo[i*2]=s_FmtStr[0];
+        toupper(s_OldWIFINo[i*2]);
+        s_OldWIFINo[i*2+1]=s_FmtStr[1];
+        toupper(s_OldWIFINo[i*2+1]);
+    }
+    s_OldWIFINo[6*2]=0;
+
+    {
+
+        strcpy(s_InetCmd,"send_data 254 0 3 1 0");
         for(i=0;i<6;i++)
         {
-            sprintf(s_FmtStr, "%02X", s_WIFIREAD[i]);
-            s_OldWIFINo[i*2]=s_FmtStr[0];
-            toupper(s_OldWIFINo[i*2]);
-            s_OldWIFINo[i*2+1]=s_FmtStr[1];
-            toupper(s_OldWIFINo[i*2+1]);
-        }
-        s_OldWIFINo[6*2]=0;
-
-        {
-
-            strcpy(s_InetCmd,"send_data 254 0 3 1 0");
-            for(i=0;i<6;i++)
+            if(!isxdigit(s_NewWIFINo[2*i]))
             {
-                if(!isxdigit(s_NewWIFINo[2*i]))
-                {
-                    msg.Format(_T("Get WIFI MAC is invalid!"));
-                    goto ERROR;
-                }
-                s_FmtStr[0]=s_NewWIFINo[2*i];
-                if(!isxdigit(s_NewWIFINo[2*i+1]))
-                {
-                    msg.Format(_T("Get WIFI MAC is invalid!"));
-                    goto ERROR;
-                }
-                s_FmtStr[1]=s_NewWIFINo[2*i+1];
-                s_FmtStr[2] = 0;
-                sscanf(s_FmtStr, "%x", &i_TempInt);
-                sprintf(s_FmtStr,"%d",i_TempInt);
-                strcat(s_InetCmd," ");
-                strcat(s_InetCmd,s_FmtStr);
+                msg.Format(_T("Get WIFI MAC is invalid!"));
+                goto ERROR;
             }
-            strcat(s_InetCmd,"\n");
-            i_ret = tn.send_telnet_data(s_InetCmd, strlen(s_InetCmd));//send command 'ls /\r\n'
-            i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
+            s_FmtStr[0]=s_NewWIFINo[2*i];
+            if(!isxdigit(s_NewWIFINo[2*i+1]))
+            {
+                msg.Format(_T("Get WIFI MAC is invalid!"));
+                goto ERROR;
+            }
+            s_FmtStr[1]=s_NewWIFINo[2*i+1];
+            s_FmtStr[2] = 0;
+            sscanf(s_FmtStr, "%x", &i_TempInt);
+            sprintf(s_FmtStr,"%d",i_TempInt);
+            strcat(s_InetCmd," ");
+            strcat(s_InetCmd,s_FmtStr);
         }
-
-        GaliSNfromWIFI(s_SN,s_NewWIFINo);
-
-        //i_ret = tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
-        //i_ret = tn.receive_telnet_data(buf, BUFSIZE);
-        //i_ret = tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
-        //i_ret = tn.receive_telnet_data(buf, BUFSIZE);
-
-        closesocket(sock);
-        dc->Reset();
-        //dc->RemoveDevice(dev);
-        pThis->m_progMac2.SetPos(pThis->Progress_range);
-        pThis->m_progMac2.SetBarColor(RGB(0,255,0));
-        pThis->m_progMac2.SetWindowText(_T("Download successfully!"));
-        pThis->m_progMac2.Invalidate(FALSE);
-        //pThis->GetDlgItem(ID_Start)->EnableWindow(true);
-        pThis->b_download = true;
-#endif
+        strcat(s_InetCmd,"\n");
+        i_ret = tn.send_telnet_data(s_InetCmd, strlen(s_InetCmd));//send command 'ls /\r\n'
+        i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
     }
-    //}
+
+    GaliSNfromWIFI(s_SN,s_NewWIFINo);
+
+    //i_ret = tn.send_telnet_data(COMMAN_UPDATE, strlen(COMMAN_UPDATE));//send command 'ls /\r\n'
+    //i_ret = tn.receive_telnet_data(buf, BUFSIZE);
+    //i_ret = tn.send_telnet_data(COMMAN_REBOOT, strlen(COMMAN_REBOOT));//send command 'ls /\r\n'
+    //i_ret = tn.receive_telnet_data(buf, BUFSIZE);
+
+    closesocket(sock);
+    dc->Reset();
+    //dc->RemoveDevice(dev);
+    pThis->m_progMac2.SetPos(pThis->Progress_range);
+    pThis->m_progMac2.SetBarColor(RGB(0,255,0));
+    pThis->m_progMac2.SetWindowText(_T("Download successfully!"));
+    pThis->m_progMac2.Invalidate(FALSE);
+    //pThis->GetDlgItem(ID_Start)->EnableWindow(true);
+    pThis->b_download = true;
+#elif defined(TEST)
+    tn.send_telnet_data("zen\n", strlen("zen\n")); //send user name
+    tn.receive_telnet_data(buf, BUFSIZE);
+    tn.send_telnet_data("zen\n", strlen("zen\n")); //send password
+    tn.receive_telnet_data(buf, BUFSIZE);
+
+    tn.send_telnet_data("ls /\n", strlen("ls /\n"));//send command 'ls /\r\n'
+    tn.receive_telnet_data(buf, BUFSIZE);
+    tn.send_telnet_data("echo hello world\n", strlen("echo hello world\n"));//send command 'ls /\r\n'
+    tn.receive_telnet_data(buf, BUFSIZE);
+    closesocket(sock);
+    dc->RemoveDevice(dev);
+#endif
+
     return 0;
+
 ERROR:
     closesocket(sock);
     //dc->RemoveDevice(dev);
@@ -901,16 +930,16 @@ void CDownloadDlg::server_listen(u_short port)
 
 SOCKET CDownloadDlg::CreateSocket(const char *ip_addr,  u_short port) {
     SOCKET sockClient = INVALID_SOCKET;
+    SOCKADDR_IN addrSrv;
+    __int64 iResult;
     if (mWSAInitialized == FALSE) {
         UpdateMessage(_T("Server Startup failed!"));
         return sockClient;
     }
 
-    SOCKADDR_IN addrSrv;
     addrSrv.sin_addr.S_un.S_addr = inet_addr(ip_addr);
     addrSrv.sin_family = AF_INET;
     addrSrv.sin_port = htons(port);
-    __int64 iResult;
     sockClient = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     //int timeout=50000;
     //iResult=setsockopt(sockClient,SOL_SOCKET,SO_RCVTIMEO,(const char*)&timeout,sizeof(int));
@@ -927,7 +956,7 @@ SOCKET CDownloadDlg::CreateSocket(const char *ip_addr,  u_short port) {
 }
 
 // Create a pTftpGui structure and fill it with the msg
-int CDownloadDlg::GuiTFTPNew (const struct S_TftpTrfNew *pTrf)
+int CDownloadDlg::TFTPNew (const struct S_TftpTrfNew *pTrf)
 {
     struct S_TftpGui *pTftpGui;
     pTftpGui = (struct S_TftpGui *)calloc (1, sizeof *pTftpGui);
@@ -941,20 +970,20 @@ int CDownloadDlg::GuiTFTPNew (const struct S_TftpTrfNew *pTrf)
     // places the leaf at the head of the structure
     pTftpGuiFirst = pTftpGui;
 
-    Gui_TftpReporting (pTftpGuiFirst);
+    TFTPReporting (pTftpGuiFirst);
 
     struct subStats stat;
     stat.stat =pTrf->stat;
     stat.dwTransferId = pTrf->dwTransferId;
     time_t dNow;
     time(&dNow);
-    GuiTFTPStat(&stat, dNow);
+    TFTPStat(&stat, dNow);
 
     return 0;
 } // GuiNewTrf
 
 // terminates a transfer
-int CDownloadDlg::GuiTFTPEnd (struct S_TftpTrfEnd *pTrf)
+int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
 {
     struct S_TftpGui *pTftpGui, *pTftpPrev;
     struct subStats stat;
@@ -963,7 +992,7 @@ int CDownloadDlg::GuiTFTPEnd (struct S_TftpTrfEnd *pTrf)
     stat.stat =pTrf->stat;
     stat.dwTransferId = pTrf->dwTransferId;
     time(&dNow);
-    GuiTFTPStat(&stat, dNow);
+    TFTPStat(&stat, dNow);
 
     // search mathing internal structure and get previous member
     for (pTftpPrev=NULL, pTftpGui=pTftpGuiFirst;
@@ -984,20 +1013,20 @@ int CDownloadDlg::GuiTFTPEnd (struct S_TftpTrfEnd *pTrf)
     // now we can play with the leaf : it belongs no more to the linked list
     // update stat
     pTftpGui->stat = pTrf->stat;
-    Gui_TftpReporting (pTftpGuiFirst);
+    TFTPReporting (pTftpGuiFirst);
 
     // free allocation
     free (pTftpGui->filename);
     free (pTftpGui);
     LOGD ("GUI: transfer destroyed\n");
 
-    // recall TftpReporting : it will notice the process
-    Gui_TftpReporting (pTftpGuiFirst);
+    // recall TFTPReporting : it will notice the process
+    TFTPReporting (pTftpGuiFirst);
     return 0;
-} // GuiTFTPEnd
+} // TFTPEnd
 
 
-int CDownloadDlg::GuiTFTPStat (struct subStats *pTrf, time_t dNow)
+int CDownloadDlg::TFTPStat (struct subStats *pTrf, time_t dNow)
 {
     struct S_TftpGui *pTftpGui;
     // search mathing internal structure
@@ -1031,7 +1060,7 @@ int CDownloadDlg::GuiTFTPStat (struct subStats *pTrf, time_t dNow)
     GetDlgItem(IDC_FILE_STATS)->SetWindowText(szTitle);
     GetDlgItem(IDC_FILE_SIZE)->SetWindowText(pTftpGui->filename);
     return 0;
-} // GuiTFTPStat
+} // TFTPStat
 
 LRESULT CDownloadDlg::OnMessageTftpInfo(WPARAM wParam, LPARAM lParam) {
     switch(wParam) {
@@ -1039,20 +1068,20 @@ LRESULT CDownloadDlg::OnMessageTftpInfo(WPARAM wParam, LPARAM lParam) {
         {
             struct S_TftpTrfStat *trf_stat = (struct S_TftpTrfStat *)lParam;
             for (int Ark=0; Ark < trf_stat->nbTrf; Ark++)
-                GuiTFTPStat (& trf_stat->t[Ark], trf_stat->dNow);
-            Gui_TftpReporting ( pTftpGuiFirst);
+                TFTPStat(& trf_stat->t[Ark], trf_stat->dNow);
+            TFTPReporting( pTftpGuiFirst);
         }
         //GetSafeHwnd(), m_hWnd
         //            UpdateMessage(_T("TFTP start"));
         break;
     case C_TFTP_TRF_END:
         {
-            GuiTFTPEnd ((struct S_TftpTrfEnd *)lParam);
+            TFTPEnd((struct S_TftpTrfEnd *)lParam);
         }
         //        UpdateMessage(_T("TFTP end"));
         break;
     case C_TFTP_TRF_NEW:
-        GuiTFTPNew ((struct S_TftpTrfNew *)lParam);
+        TFTPNew((struct S_TftpTrfNew *)lParam);
         //            UpdateMessage(_T("TFTP new"));
         break;
     default:
@@ -1067,7 +1096,7 @@ LRESULT CDownloadDlg::OnMessageTftpInfo(WPARAM wParam, LPARAM lParam) {
 // Reporting into LV_LOG list View
 //
 ////////////////////////////////////////////////////////////////////////////////////////
-static int AddNewTftpItem (CListCtrl* listView, const struct S_TftpGui *pTftpGui, int Pos)
+static int TFTPItemAdd (CListCtrl* listView, const struct S_TftpGui *pTftpGui, int Pos)
 {
     LVITEM      LvItem;
     char        szTxt [512] = {0}, szAddr[MAXLEN_IPv6]={0}, szServ[NI_MAXSERV] ={0};
@@ -1102,17 +1131,15 @@ static int AddNewTftpItem (CListCtrl* listView, const struct S_TftpGui *pTftpGui
 #endif
 
     wsprintf (szTxt, "%02d:%02d:%02d", ltime.tm_hour, ltime.tm_min, ltime.tm_sec);
-    //ListView_SetItemText (hListV, itemPos, FD_START, szTxt);
     listView->SetItemText (itemPos, FD_START, szTxt);
     cDel = pTftpGui->opcode == TFTP_RRQ ? '<' : '>';
     wsprintf (szTxt, "%c%s%c", cDel,pTftpGui->filename, cDel );
 
-    //ListView_SetItemText (hListV, itemPos, FD_FILE, szTxt );
     listView->SetItemText (itemPos, FD_FILE, szTxt );
     return   itemPos;
 }
 
-static int UpdateTftpItem (HWND hListV, const struct S_TftpGui *pTftpGui, int itemPos)
+static int TFTPItemUpdate (HWND hListV, const struct S_TftpGui *pTftpGui, int itemPos)
 {
     char szTxt [512];
 
@@ -1141,11 +1168,12 @@ static int UpdateTftpItem (HWND hListV, const struct S_TftpGui *pTftpGui, int it
                           pTftpGui->stat.dwTransferSize==0 ? "unknown" : szTxt);
     wsprintf (szTxt, "%d", pTftpGui->stat.dwTotalTimeOut);
     ListView_SetItemText (hListV, itemPos, FD_TIMEOUT, szTxt);
+    ListView_SetItemState(hListV, itemPos, LVIS_SELECTED,LVIS_SELECTED);
     return TRUE;
-} // UpdateTftpItem
+} // TFTPItemUpdate
 
 
-static int ManageTerminatedTransfers (HWND hListV, int itemPos)
+static int TFTPManageTerminatedTransfers (HWND hListV, int itemPos)
 {
     char szTxt [512];
     LVITEM      LvItem;
@@ -1180,22 +1208,21 @@ static int ManageTerminatedTransfers (HWND hListV, int itemPos)
         LvItem.iItem = itemPos;
         if (ListView_GetItem (hListV, & LvItem) && LvItem.lParam < tNow)
         {
-            ListView_DeleteItem (hListV, itemPos);
+           // ListView_DeleteItem (hListV, itemPos);
         }
     }
     return TRUE;
-} // ManageTerminatedTransfers
+} // TFTPManageTerminatedTransfers
 
 ///////////////////////////////////////////////
 // populate listview
 // called each new transfer or each end of transfer
-int CDownloadDlg::Gui_TftpReporting (const struct S_TftpGui *pTftpGuiFirst)
+int CDownloadDlg::TFTPReporting (const struct S_TftpGui *pTftpGuiFirst)
 {
     LVFINDINFO  LvInfo;
     int itemPos;
     const struct S_TftpGui *pTftpGui;
-    // date of entry
-    int    Ark;
+    int    Ark;         // date of entry
     short  tPos [512];
 
     HWND hListV= GetDlgItem (IDC_LV_TFTP)->GetSafeHwnd();
@@ -1204,7 +1231,7 @@ int CDownloadDlg::Gui_TftpReporting (const struct S_TftpGui *pTftpGuiFirst)
     // ListView_DeleteAllItems (hListV);
     memset (tPos, 0, sizeof tPos);
 
-    for (Ark=0, pTftpGui = pTftpGuiFirst ; pTftpGui != NULL ; pTftpGui = pTftpGui->next, Ark++)
+    for (Ark=0, pTftpGui = pTftpGuiFirst; pTftpGui != NULL; pTftpGui = pTftpGui->next, Ark++)
     {
         // search peer field (key)
         LvInfo.flags = LVFI_PARAM;
@@ -1214,24 +1241,32 @@ int CDownloadDlg::Gui_TftpReporting (const struct S_TftpGui *pTftpGuiFirst)
         // item has not been found --> should be inserted
         if (itemPos==-1)
         {
-            itemPos = AddNewTftpItem (listView, pTftpGui, Ark);
+            itemPos = TFTPItemAdd (listView, pTftpGui, Ark);
+            m_pCoordinator->StartFirmwareTransfer(pTftpGui->stg_addr, pTftpGui->filename);
         } // create transfers
         // actualize fields
-        UpdateTftpItem (hListV, pTftpGui, itemPos);
+        TFTPItemUpdate (hListV, pTftpGui, itemPos);
         // flag : ths item has been processed
-        if (itemPos < SizeOfTab(tPos)) tPos [itemPos] = 1 ;	// flag item
+        if (itemPos < SizeOfTab(tPos)) tPos [itemPos] = 1;	// flag item
     }
 
     // manage item that are not on the stat record --> they are terminated
-    for (Ark=ListView_GetItemCount (hListV) - 1 ; Ark>=0 ;  Ark-- )
-        if (Ark<SizeOfTab(tPos) &&  tPos[Ark]==0)
-            ManageTerminatedTransfers (hListV, Ark) ;
-    // ListView_DeleteItem (hListV, Ark);
+    for (pTftpGui = pTftpGuiFirst, Ark = 0;
+        pTftpGui != NULL && Ark < ListView_GetItemCount(hListV);
+        pTftpGui = pTftpGui->next, Ark++) {
+        if (Ark < SizeOfTab(tPos) && tPos[Ark] == 0)
+            //m_pCoordinator pTftpGui
+            TFTPManageTerminatedTransfers (hListV, Ark);
+            BOOL result = m_pCoordinator->EndFirmwareTransfer(
+                pTftpGui->stg_addr, pTftpGui->filename);
+            if (result)
+                UpdateMessage("Firmware update successfully.");
+        }
     return Ark;
-} // Reporting
+}
 
 void CDownloadDlg::ClearMessage(void) {
-    m_LogText.Empty();// = "";
+    m_LogText.Empty();
     UpdateMessage(m_LogText);
     //GetDlgItem(ID_Start)->EnableWindow(false);
 }
@@ -1271,27 +1306,43 @@ VOID CDownloadDlg::SetDeviceInformation(int type, LPCTSTR lpszString) {
 
 void CDownloadDlg::OnBnClickedDisableCheck()
 {
-    if (m_bSuperMode || is_downloading)
+    if (is_downloading) {
+        ::MessageBox(NULL,
+                     _T("Information"),
+                     _T("Please stop download first."),
+                     MB_OK | MB_ICONINFORMATION);
         return;
+    }
+
+    if (m_bSuperMode) {
+        int result = ::MessageBox(NULL,
+                                  _T("Information"),
+                                  _T("Enbale version check?"),
+                                  MB_OKCANCEL | MB_ICONQUESTION);
+        if (result == IDOK) {
+            SetIcon(m_hIcon, TRUE);
+            SetIcon(m_hIcon, FALSE);
+            m_bSuperMode = FALSE;
+            m_VersionCheckButton.SetIcon(AfxGetApp()->LoadIcon(IDI_LOCK));
+            SetWindowText(m_DialgoTitle.GetString());
+        }
+        return;
+    }
 
     PasswordEnterDlg m_PasswordEnterDlg;
     //    m_PasswordEnterDlg.ShowWindow(SW_SHOW);
     INT_PTR nResponse = m_PasswordEnterDlg.DoModal();
     if (nResponse == IDOK) {
-        CString title;
-        GetWindowText(title);
-        title = "Super Mode:Version Check DISABLE, " + title;
-        SetWindowText(title.GetString());
-
-        HICON icon = AfxGetApp()->LoadIcon(IDI_UNLOCK);
-        CButton* versionCheck = (CButton *)GetDlgItem(IDC_DISABLE_CHECK);
-        versionCheck->SetIcon(icon);
-
-        m_hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_SUPERMODE));
-        //        SendMessage(WM_SETICON, ICON_BIG, (LPARAM)hicon);
-        SetIcon(m_hIcon, TRUE);			// Set big icon
-        SetIcon(m_hIcon, FALSE);		// Set small icon
         m_bSuperMode = TRUE;
+        CString title = m_DialgoTitle + ", Super Mode (Version Check DISABLE)";
+        //GetWindowText(title);
+        SetWindowText(title.GetString());
+        m_VersionCheckButton.SetIcon(AfxGetApp()->LoadIcon(IDI_UNLOCK));
+
+        HICON hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_SUPERMODE));
+        //        SendMessage(WM_SETICON, ICON_BIG, (LPARAM)hicon);
+        SetIcon(hIcon, TRUE);
+        SetIcon(hIcon, FALSE);
     } else if (nResponse == IDCANCEL) {
     }
 }

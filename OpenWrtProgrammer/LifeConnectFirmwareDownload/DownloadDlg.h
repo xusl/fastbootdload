@@ -43,7 +43,7 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
 //	static DWORD WINAPI Thread_Server_Listen(LPVOID lpPARAM);
-	static DWORD WINAPI Thread_Send_Comand(LPVOID lpPARAM);
+	static DWORD WINAPI WorkThread(LPVOID lpPARAM);
   static DWORD WINAPI NetworkSniffer(LPVOID lpPARAM);
 
 // Implementation
@@ -54,9 +54,9 @@ protected:
   string mHostGWAddr;
 	HANDLE m_NetworkSnifferThreadHandle;
 	HANDLE Server_Listen_Thread;
-	HANDLE Send_Comand_Thread;
+	HANDLE m_WorkThreadHandle;
 	DWORD   Server_Listen_Thread_ID;
-	DWORD   Send_Comand_Thread_ID;
+	DWORD   m_WorkThreadID;
   DWORD   m_NetworkSnifferThreadID;
   BOOL  mWSAInitialized;
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
@@ -72,11 +72,12 @@ protected:
 //void server_listen(u_short port =DOWNLOAD_SERVER_PORT);
   DWORD Schedule();
   DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;};
+  BOOL CheckVersion() { return (m_bSuperMode == FALSE);};
 
-  int GuiTFTPNew (const struct S_TftpTrfNew *pTrf);
-  int GuiTFTPEnd (struct S_TftpTrfEnd *pTrf);
-  int GuiTFTPStat (struct subStats *pTrf, time_t dNow);
-  int Gui_TftpReporting (const struct S_TftpGui *pTftpGuiFirst);
+  int TFTPNew (const struct S_TftpTrfNew *pTrf);
+  int TFTPEnd (struct S_TftpTrfEnd *pTrf);
+  int TFTPStat (struct subStats *pTrf, time_t dNow);
+  int TFTPReporting (const struct S_TftpGui *pTftpGuiFirst);
 
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
@@ -87,12 +88,13 @@ protected:
 	afx_msg void OnBnClickedButtonBrowse();
 	afx_msg void OnBnClickedStart();
 	afx_msg void OnBnClickedStop();
-    afx_msg void OnBnClickedDisableCheck();
+  afx_msg void OnBnClickedDisableCheck();
   afx_msg void OnTimer(UINT_PTR nIDEvent);
 	DECLARE_MESSAGE_MAP()
 private:
   ConfigIni m_Config;
 	CString m_LogText;
+  CString m_DialgoTitle;
 	int Progress_range;
 	bool server_state;
 	BOOL is_downloading;
@@ -104,6 +106,7 @@ private:
   CStatic m_DeviceIpAddress;
   CStatic m_DeviceOSVersion;
   CStatic m_DeviceFWVersion;
+  CButton m_VersionCheckButton;
 	//char s_PCBNo[16];
 	char s_MMIFlag[2];
 	DWORD dwBeginTime;

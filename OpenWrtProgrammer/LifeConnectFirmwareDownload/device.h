@@ -24,6 +24,10 @@ using namespace std;
 //using std::vector;
 
 /* Each device has a cdrom */
+enum DEVICE_e {
+  DEVICE_ARRIVE,
+                  DEVICE_COMMAND, DEVICE_REBOOTDOWNLOAD, DEVICE_DWONLOAD,
+                  DEVICE_FINISH, DEVICE_MAX};
 
 class CDevLabel {
   public:
@@ -36,16 +40,23 @@ class CDevLabel {
     CDevLabel & operator =(const CDevLabel & );
     string GetMac() const{ return mMac;};
     string GetIpAddr() const { return mIpAddr;};
+    string GetDownloadIpAddr() const { return mDownloadIpAddr;};
     void SetMac(string mac) { mMac = mac;};
     void SetIpAddr(string ip) { mIpAddr = ip;};
-    void SetCommandSent(bool send) { mCommandSent = send;};
-    bool IsCommandSent() const { return mCommandSent;};
+    void SetDownloadIpAddr(string ip) { mDownloadIpAddr = ip;};
+    void SetStatus(DEVICE_e status) { mStatus = status;};
+    DEVICE_e GetStatus() const { return mStatus;};
     VOID Dump(const char *tag);
+    bool SetFirmware(list<char *> *pFirmware);
+    VOID UpdateFirmwareStatus(const char * const filename, bool value);
+    BOOL IsFirmwareDownload();
 
  private:
-    string mMac;
-    string mIpAddr;
-    bool   mCommandSent;
+    string             mMac;
+    string             mIpAddr;
+    string             mDownloadIpAddr;
+    DEVICE_e           mStatus;
+    map<string, bool>  mFirmwareStatus;
 };
 
 class DeviceCoordinator {
@@ -53,17 +64,23 @@ class DeviceCoordinator {
     DeviceCoordinator();
     ~DeviceCoordinator();
     CDevLabel *GetValidDevice();
-    BOOL GetDevice(const char *const mac, CDevLabel** outDevIntf);
+    CDevLabel *GetRebootDevice();
+    BOOL GetDevice(const char *const ipAddr, CDevLabel** outDevIntf);
     BOOL AddDevice(CDevLabel& dev, CDevLabel** intfs);
     BOOL RemoveDevice(CDevLabel*const & devIntf);
+    BOOL SetDownloadFirmware(list<char *> *firmware);
+    BOOL RequestDownloadPermission(CDevLabel* const & devIntf);
+    BOOL StartFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename);
+    BOOL EndFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename);
     BOOL IsEmpty();
     BOOL Reset();
     VOID Dump(VOID);
 
   private:
-    list<CDevLabel *>  mDevintfList;
+    list<CDevLabel *>              mDevintfList;
+    list<char *>                   *mpFirmware;
     map<string, bool, greater<string>> mMacRecords;
-    CRITICAL_SECTION   mCriticalSection;
+    CRITICAL_SECTION               mCriticalSection;
 };
 
 

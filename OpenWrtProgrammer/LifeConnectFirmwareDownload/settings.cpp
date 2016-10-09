@@ -232,4 +232,5 @@ BOOL ConfigIni::DestroyFirmwareFiles() {
 }
 
 ConfigIni::~ConfigIni() {
+    DestroyFirmwareFiles();
 }

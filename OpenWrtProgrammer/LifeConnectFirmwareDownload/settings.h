@@ -87,7 +87,8 @@ public:
     const char *   GetPkgDlImgPath(void) {return pkg_dlimg_file;};
     // const char *GetPkgConfXmlPath(void) {return pkg_conf_file;};
     BOOL           GetForceUpdateFlag(void) { return m_forceupdate;};
-    BOOL           GetAutoWorkFlag(void) { return m_bWork; };
+    BOOL           GetAutoWorkFlag(void) { return m_bWork;};
+    list<char *>   GetFirmwareFiles(void) { return m_FirmwareFiles;};
     int            ReadFirmwareFiles(const char* config);
     int            SetPackageDir(const char* config);
     const char * const GetNetworkSegment() ;
