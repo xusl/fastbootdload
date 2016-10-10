@@ -54,6 +54,7 @@ ConfigIni::ConfigIni() :
     memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
 }
 
+#define CONFIG_BUFFER_LEN 32
 BOOL ConfigIni::ReadConfigIni(const char * ini){
     LPCTSTR lpFileName;
     int data_len;
@@ -64,6 +65,7 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
 	char drive[_MAX_DRIVE];
 	char dir[_MAX_DIR];
 	char filename[MAX_PATH] = {0};
+    char buffer[CONFIG_BUFFER_LEN] = {0};
 	SYSTEMTIME time;
 
 //	GetCurrentDirectory(MAX_PATH, currdir);
@@ -77,8 +79,20 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     lpFileName = m_ConfigPath.GetString();
     //init app setting.
     m_bWork = GetPrivateProfileInt(APP_SECTION,_T("autowork"), 0, lpFileName);
-    GetPrivateProfileString(_T("MISC"), _T("NetworkSegment"), _T("192.168.1"),
+    GetPrivateProfileString(_T("MISC"), _T("NetworkSegment"), "192.168.1",
                         m_NetworkSegment, IPADDR_BUFFER_LEN, lpFileName);
+    GetPrivateProfileString(TELNET_SECTION, _T("User"), "root",
+                        m_User, USER_LEN_MAX, lpFileName);
+    GetPrivateProfileString(TELNET_SECTION, _T("Password"), "root",
+                        m_Passwd, PASSWD_LEN_MAX, lpFileName);
+
+    memset(buffer, 0, sizeof buffer);
+    GetPrivateProfileString(TELNET_SECTION, _T("Login"), "false",
+                        buffer, CONFIG_BUFFER_LEN, lpFileName);
+    if (stricmp(buffer, "false") == 0)
+        m_Login = FALSE;
+    if (stricmp(buffer, "true") == 0)
+        m_Login = TRUE;
 
     LOGD("network segment : %s", m_NetworkSegment);
     data_len = GetPrivateProfileString(APP_SECTION,
@@ -204,10 +218,6 @@ int ConfigIni::ReadFirmwareFiles(const char* config) {
   return 0;
 }
 
-const char * const ConfigIni::GetNetworkSegment() {
-    return m_NetworkSegment;
-}
-
 BOOL ConfigIni::AddFirmwareFiles(const char* const file){
     if (file == NULL) {
         LOGE("Bad parameter");
@@ -224,7 +234,7 @@ BOOL ConfigIni::DestroyFirmwareFiles() {
         char* item = *it;
         //item->DeleteMemory();
         memset(item, 0, strlen(item));
-        delete item;
+//        delete item;
         *it = NULL;
     }
     m_FirmwareFiles.clear();

@@ -14,7 +14,7 @@
 #include "tftp.h"
 
 #define TPST
-#define LOGIN
+//#define LOGIN
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -413,6 +413,7 @@ void CDownloadDlg::OnBnClickedStart() {
             TerminateThread(m_NetworkSnifferThreadHandle, 1);
             GetDlgItem(ID_Start)->SetWindowText("Start");
             is_downloading = false;
+            m_pCoordinator->Reset();
         }
         return;
     }
@@ -481,34 +482,35 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
         return ERROR_INVALID_HANDLE;
     }
 
-     pThis->SetDeviceInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
+    pThis->SetDeviceInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
+
+    pThis->b_download = true;
 
     telnet tn(sock);
-    char buf[BUFSIZE];
-    //Sleep(1000);
-    tn.receive_telnet_data(buf, BUFSIZE);
-    pThis->UpdateMessage(buf);
-
-#ifdef LOGIN
-    tn.send_telnet_data("zen\n", strlen("zen\n")); //send user name
-    tn.receive_telnet_data(buf, BUFSIZE, false);
-    tn.send_telnet_data("zen\n", strlen("zen\n")); //send password
-    tn.receive_telnet_data(buf, BUFSIZE);
-    pThis->UpdateMessage(buf);
-#endif
-
-#if defined(TPST)
-    //tn.send_telnet_data(CMD_OS_VERSION, strlen(CMD_OS_VERSION));
-    //tn.receive_telnet_data(buf, BUFSIZE);
-
     string result;
-    tn.send_command(CMD_OS_VERSION, result);
-    pThis->SetDeviceInformation(DEV_OS_VERSION, result.c_str());
+    ConfigIni conf;
+    pThis->GetConfig(conf);
+
+ //   tn.receive_telnet_data(buf, BUFSIZE);
+  //  pThis->UpdateMessage(buf);
+
+    //if (strstr(buf, "login") != NULL)
+    {
+    tn.send_command(conf.GetLoginUser(), result, false);
+    pThis->UpdateMessage(result.c_str());
+    tn.send_command(conf.GetLoginPassword(), result, false);
+    pThis->UpdateMessage(result.c_str());
+    }
+#if defined(TPST)
+    string osVersion;
+    string fwVersion;
+    tn.send_command(CMD_OS_VERSION, osVersion);
+    pThis->SetDeviceInformation(DEV_OS_VERSION, osVersion.c_str());
+
+    tn.send_command(CMD_FW_VERSION, fwVersion);
+    pThis->SetDeviceInformation(DEV_FW_VERSION, fwVersion.c_str());
 
     if (pThis->CheckVersion()) {
-        tn.send_telnet_data(CMD_FW_VERSION, strlen(CMD_FW_VERSION));
-        tn.receive_telnet_data(buf, BUFSIZE);
-        pThis->SetDeviceInformation(DEV_FW_VERSION, buf);
     }
 
     for (i = 0; i < 3; i++) {
@@ -525,6 +527,7 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     tn.send_telnet_data(CMD_REBOOT, strlen(CMD_REBOOT));
 
 #elif defined(MMI)
+    char buf[BUFSIZE];
     unsigned char red[100] = "send_data 254 0 2 3 0 1 0\n";
     unsigned char blue[100] = "send_data 254 0 2 3 0 2 0\n";
     char *ledon = "send_data 254 0 2 3 0 3 0\n";
@@ -572,6 +575,7 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
 #define COMMAN_GETMAC "send_data 254 0 3 1 1 0 0 0 0 0 0\n"
 #define COMMAN_UPDATE "send_data 254 0 0 7 0 1 0\n"
 #define COMMAN_REBOOT "send_data 254 0 0 5 0 0 0\n"
+    char buf[BUFSIZE];
     i_ret = tn.send_telnet_data(COMMAN_GETTRACE, strlen(COMMAN_GETTRACE));
     Sleep(1000);
     i_ret = tn.receive_telnet_cmd(buf, BUFSIZE);
@@ -680,6 +684,12 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     //pThis->GetDlgItem(ID_Start)->EnableWindow(true);
     pThis->b_download = true;
 #elif defined(TEST)
+    char buf[BUFSIZE];
+    tn.send_telnet_data("zen\n", strlen("zen\n")); //send user name
+    tn.receive_telnet_data(buf, BUFSIZE, false);
+    tn.send_telnet_data("zen\n", strlen("zen\n")); //send password
+    tn.receive_telnet_data(buf, BUFSIZE);
+    pThis->UpdateMessage(buf);
     tn.send_telnet_data("ls /\n", strlen("ls /\n"));//send command 'ls /\r\n'
     tn.receive_telnet_data(buf, BUFSIZE);
     tn.send_telnet_data("echo hello world\n", strlen("echo hello world\n"));//send command 'ls /\r\n'
@@ -688,13 +698,8 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     dc->RemoveDevice(dev);
 #endif
 
-    return 0;
-
-ERROR:
     closesocket(sock);
-    //dc->RemoveDevice(dev);
-    dc->Reset();
-    return 2;
+    return 0;
 }
 
 void CDownloadDlg::GetHostIpAddr() {
@@ -1044,8 +1049,10 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
 
     BOOL result = m_pCoordinator->EndFirmwareTransfer(pTftpGui->stg_addr,
                                             pTftpGui->filename);
-    if (result)
+    if (result) {
         UpdateMessage("Firmware update successfully.");
+        b_download = false;
+    }
 
     // detach leaf
     if (pTftpPrev != NULL)

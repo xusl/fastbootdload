@@ -193,7 +193,11 @@ BOOL DeviceCoordinator::EndFirmwareTransfer(SOCKADDR_STORAGE addr, const char * 
         CDevLabel *dev = NULL;
         if(GetDevice(szAddr, &dev)) {
             dev->UpdateFirmwareStatus(filename, true);
-            return dev->IsFirmwareDownload();
+            BOOL done = dev->IsFirmwareDownload();
+            if (done) {
+                RemoveDevice(dev);
+            }
+            return done;
         } else {
         LOGE("%s is not in our download manager", szAddr);
         }
@@ -229,7 +233,7 @@ bool CDevLabel::SetFirmware(list<char *> pFirmware) {
     list<char *>::iterator it;
     for (it = pFirmware.begin(); it != pFirmware.end(); ++it) {
         LOGD("ADD FILE %s", *it);
-        mFirmwareStatus.insert(pair<string, bool>(*it, false));
+        mFirmwareStatus.insert(pair<string, bool>(basename(*it), false));
     }
     return true;
 }

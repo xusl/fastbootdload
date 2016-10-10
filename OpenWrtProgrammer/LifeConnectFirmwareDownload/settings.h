@@ -71,12 +71,15 @@ extern struct S_Tftpd32Settings sSettings;          // The settings,used anywher
 
 #define PKG_SECTION             _T("PackageFiles")
 #define APP_SECTION             _T("App")
+#define TELNET_SECTION          _T("Telnet")
 #define PKG_PATH                _T("PackagePath")
 
 static const int FIRMWARE_NUM_MAX = 32;
 static const int FIRMWARE_NAME_LEN = MAX_PATH;
 static const int FIRMWARE_TBL_LEN = FIRMWARE_NUM_MAX * FIRMWARE_NAME_LEN;
 
+#define USER_LEN_MAX        32
+#define PASSWD_LEN_MAX      32
 class ConfigIni{
 public:
     ConfigIni();
@@ -91,7 +94,10 @@ public:
     list<char *>   GetFirmwareFiles(void) { return m_FirmwareFiles;};
     int            ReadFirmwareFiles(const char* config);
     int            SetPackageDir(const char* config);
-    const char * const GetNetworkSegment() ;
+    const char * const GetNetworkSegment() {  return m_NetworkSegment;};
+    const char * const GetLoginUser() { return  m_User;};
+    const char * const GetLoginPassword() { return m_Passwd;};
+    BOOL            IsLoginTelnet() { return m_Login;};
 private:
     BOOL           DestroyFirmwareFiles();
     BOOL           AddFirmwareFiles(const char* const file);
@@ -103,6 +109,9 @@ private:
     //   char                 pkg_conf_file[MAX_PATH];
     char                    pkg_dlimg_file[MAX_PATH];
     char                    m_NetworkSegment[IPADDR_BUFFER_LEN];
+    char                    m_User[USER_LEN_MAX];
+    char                    m_Passwd[PASSWD_LEN_MAX];
+    BOOL                    m_Login;
     list<char *>            m_FirmwareFiles;
     CString                 mModulePath;
 };

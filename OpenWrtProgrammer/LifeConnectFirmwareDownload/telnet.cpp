@@ -835,7 +835,7 @@ CURLcode telnet::telrcv(const unsigned char *inbuf, /* Data received from socket
 }
 /* Escape and send a telnet data block */
 /* TODO: write large chunks of data instead of one byte at a time */
-CURLcode telnet::send_telnet_data(char *buffer, ssize_t len)
+CURLcode telnet::send_telnet_data(const char *buffer, ssize_t len)
 {
   unsigned char outbuf[2];
   ssize_t bytes_written, total_written;
@@ -947,7 +947,7 @@ telnet::telnet(curl_socket_t sock) {
   //subopt_ttype[31] = 0; /* String termination */
   //us_preferred[CURL_TELOPT_TTYPE] = CURL_YES;
 
-  int TimeOut = 5000;//设置接收超时6秒
+  int TimeOut = 6000;//设置接收超时6秒
   setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
   //SOCKET_ERROR
 }
@@ -1025,16 +1025,25 @@ while(TRUE) {
 }
 
 #define CMDRSPBUFLEN (BUFSIZE * 4)
-int telnet::send_command(char *cmd, string &result) {
+int telnet::send_command(const char *cmd, string &result, bool trim) {
      char buf[CMDRSPBUFLEN];
+     string enterCmd;
      assert(cmd != NULL);
-    send_telnet_data(cmd, strlen(cmd)); //send password
+
+     enterCmd.clear();
+     enterCmd = cmd;
+
+     if(strrchr(cmd, '\n') == NULL)
+        enterCmd.append(1, '\n');
+
+    send_telnet_data(enterCmd.c_str(), enterCmd.size()); //send password
 
      result.clear();
      int code;
 
-  //int TimeOut = 1000;//设置接收超时6秒
-  //setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
+  int TimeOut = 3000;
+  if (trim)
+  setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
 
     for (int i = 0 ; i <= 3; i++ ){
          code = receive_telnet_data(buf, CMDRSPBUFLEN, true);
@@ -1048,15 +1057,16 @@ int telnet::send_command(char *cmd, string &result) {
         }
     }
 
-    if ((code == 0 || code == CURLE_RECV_ERROR) && result.length() > strlen(cmd)) {
+    if (trim && (code == 0 || code == CURLE_RECV_ERROR) && result.length() > strlen(cmd)) {
         result.erase (result.begin(), result.begin()+strlen(cmd)+1);
-        size_t found = result.find('\n');
+        size_t found = result.rfind('\n');
         if (found != string::npos)
             result.erase (result.begin()+found, result.end());
     }
 
-    // TimeOut = 5000;//设置接收超时6秒
-  //setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
+  TimeOut = 5000;
+  if (trim)
+  setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
 
     return code;
 }

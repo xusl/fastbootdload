@@ -406,10 +406,10 @@ protected:
      void suboption();
      CURLcode telrcv(const unsigned char *inbuf, /* Data received from socket */
                     ssize_t count);              /* Number of bytes received */
-     CURLcode send_telnet_data(char *buffer, ssize_t nread);
+     CURLcode send_telnet_data(const char *buffer, ssize_t len);
 
      int receive_telnet_cmd(char *buffer, ssize_t len);
-     int send_command(char *buffer, string &result);
+     int send_command(const char *buffer, string &result, bool trim = true);
 };
 
 int Curl_poll(struct pollfd ufds[], unsigned int nfds, int timeout_ms);
