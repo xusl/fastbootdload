@@ -67,7 +67,7 @@ void PasswordEnterDlg::OnBnClickedOk()
     CEdit *passwordEdit=(CEdit*)GetDlgItem(IDC_EDIT_PASSWORD);
     CString password;
     passwordEdit->GetWindowText(password);
-    if(password.Compare(_T("1plus1>2")) != 0) {
+    if(password.Compare(_T("root")) != 0) {
         ::MessageBox(NULL,_T("The enter password is wrong!"),_T("Error Passowrd"),
             MB_OK | MB_ICONINFORMATION);
         return;

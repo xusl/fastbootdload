@@ -14,12 +14,13 @@
 #include "tftp.h"
 
 #define TPST
+#define LOGIN
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
-enum EVersion {DEV_FW_VERSION, DEV_OS_VERSION};
+enum EVersion {DEV_IP_ADDR, DEV_FW_VERSION, DEV_OS_VERSION};
 enum E_fields { FD_PEER, FD_FILE, FD_START, FD_PROGRESS, FD_BYTES, FD_TOTAL, FD_TIMEOUT };
 
 // a transfer terminated but still displayed
@@ -37,9 +38,28 @@ struct S_TftpGui {
 
 static struct S_TftpGui *pTftpGuiFirst=NULL;
 
-static void gmt_time_string(char *buf, size_t buf_len, time_t *t)
+static void gmt_time_string(char *buf, size_t buf_len)
  {
-  strftime(buf, buf_len, "%a, %d %b %Y %H:%M:%S GMT", gmtime(t));
+  struct tm newtime;
+   __int64 ltime;
+   errno_t err;
+
+   _time64( &ltime );
+      // Obtain coordinated universal time:
+   err = _gmtime64_s( &newtime, &ltime );
+   if (err)
+   {
+      LOGE("Invalid Argument to _gmtime64_s.");
+   }
+      // Convert to an ASCII representation
+   err = asctime_s(buf, buf_len, &newtime);
+   if (err)
+   {
+      LOGE("Invalid Argument to asctime_s.");
+   }
+
+  //  time_t curtime = time(NULL);
+  //strftime(buf, buf_len, "%a, %d %b %Y %H:%M:%S GMT", gmtime_s(&curtime));
 }
 
 class CAboutDlg : public CDialogEx
@@ -210,53 +230,62 @@ BOOL CDownloadDlg::OnInitDialog()
 
     SetWindowText(m_DialgoTitle.GetString());
     m_RomPathStaticText.SetWindowText(m_Config.GetPackageDir());
-    m_pCoordinator->SetDownloadFirmware(&m_Config.GetFirmwareFiles());
+    m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
 DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
-    pThis->UpdateMessage(_T("Search Life Connect..., please wait...\r\n"));
+    ConfigIni conf;
+    CString msg;
     pThis->GetHostIpAddr();
+    pThis->UpdateMessage(_T("Search Life Connect..., please wait..."));
+
+    pThis->GetConfig(conf);
+
+    int from = 2;
+    int to = 2;
+    const char * const segment = conf.GetNetworkSegment();
+
+    msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, 1, segment, from, to);
+    pThis->UpdateMessage(msg);
 
     for(;;) {
-        pThis->SniffNetwork();
+        pThis->SniffNetwork(segment, from, to);
     }
     return 0;
 }
 
-void CDownloadDlg::SniffNetwork() {
+void CDownloadDlg::SniffNetwork(const char * const segment, int from, int to) {
     CString msg;
-    for (int i = 1; i < 2; i++) {
+    //const char * const segment = m_Config.GetNetworkSegment();
+    //msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, 1, segment, from, to);
+    //UpdateMessage(msg);
+    for (int i = from; i <= to; i++) {
         CString ip_addr;
         const char* pcIpAddr;
         string mac;
-        ip_addr.Format("%s.%d", m_Config.GetNetworkSegment(), i);
+        ip_addr.Format("%s.%d", segment, i);
         pcIpAddr = ip_addr.GetString();
         if (pcIpAddr == mHostIPAddr || pcIpAddr == mHostGWAddr)
             continue;
-        if(Ping(pcIpAddr)) {
-            if (0 == ResolveIpMac(pcIpAddr, mac)) {
-                m_DeviceIpAddress.SetWindowText(pcIpAddr);
-                m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL);
-                //				if(mac != mac_old)
-                {
-                    //mac_old = mac;
-                    b_download = false;
-                    m_progMac2.SetPos(0);
-                    m_progMac2.SetBarColor(RGB(255,255,0));
-                    m_progMac2.SetWindowText(_T(" "));
-                    m_progMac2.Invalidate(FALSE);
-                    LOGD("ping %s succefully, mac :%s", pcIpAddr, mac.c_str());
-                    msg.Format(_T("ping %s succefully, mac :%s"), pcIpAddr, mac.c_str());
-                    UpdateMessage(msg);
-                }
-                break;
-            }
-        } else {
-            ResolveIpMac(pcIpAddr, mac);
-            LOGD("ping %s failed. mac :%s", pcIpAddr, mac.c_str());
+        if(Ping(pcIpAddr) == FALSE) {
+            LOGD("ping %s failed. ", pcIpAddr);
+            continue;
         }
+
+        if (0 != ResolveIpMac(pcIpAddr, mac)) {
+            LOGD("can not reslove mac of %s. ", pcIpAddr);
+            continue;
+        }
+
+        if (!m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL)) {
+            LOGD("%s have alread been add into device manager", pcIpAddr);
+            continue;
+        }
+        LOGD("ping %s succefully, mac :%s", pcIpAddr, mac.c_str());
+        msg.Format(_T("ping %s succefully, mac :%s"), pcIpAddr, mac.c_str());
+        UpdateMessage(msg);
     }
     SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     WaitForSingleObject(m_SyncSemaphore, 10000);//INFINITE);
@@ -387,10 +416,6 @@ void CDownloadDlg::OnBnClickedStart() {
         }
         return;
     }
-    m_progMac2.SetPos(0);
-    m_progMac2.SetBarColor(RGB(255,255,0));
-    m_progMac2.SetWindowText(_T(" "));
-    m_progMac2.Invalidate(FALSE);
     //if(mRomPath=="") {
     //     ::MessageBox(NULL,_T("Please select software!"),_T("select software"),MB_OK);
     //     return;
@@ -420,6 +445,11 @@ void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
     Schedule();
 }
 
+#define COMMAND_UPDATE "send_data 254 0 0 7 0 1 0\n"
+#define CMD_REBOOT      "send_data 254 0 0 5 0 0 0\n"
+#define CMD_FW_VERSION  "jrd_system_get_firmware_version \n"
+//#define CMD_OS_VERSION  "cat /proc/version \n"
+#define CMD_OS_VERSION  "uname -r\n"
 DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
     CString cmd;
@@ -447,34 +477,54 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     }
 
     SOCKET sock = pThis->CreateSocket(dev->GetIpAddr().c_str());
-    if ( sock != INVALID_SOCKET) {
-        return 2;
+    if ( sock == INVALID_SOCKET) {
+        return ERROR_INVALID_HANDLE;
     }
+
+     pThis->SetDeviceInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
 
     telnet tn(sock);
     char buf[BUFSIZE];
-    Sleep(5000);
+    //Sleep(1000);
     tn.receive_telnet_data(buf, BUFSIZE);
+    pThis->UpdateMessage(buf);
 
-#ifdef defined(TPST)
-    tn.send_telnet_data(CMD_OS_VERSION, strlen(CMD_OS_VERSION));
+#ifdef LOGIN
+    tn.send_telnet_data("zen\n", strlen("zen\n")); //send user name
+    tn.receive_telnet_data(buf, BUFSIZE, false);
+    tn.send_telnet_data("zen\n", strlen("zen\n")); //send password
     tn.receive_telnet_data(buf, BUFSIZE);
-        pThis->SetDeviceInformation(DEV_OS_VERSION, buf);
+    pThis->UpdateMessage(buf);
+#endif
+
+#if defined(TPST)
+    //tn.send_telnet_data(CMD_OS_VERSION, strlen(CMD_OS_VERSION));
+    //tn.receive_telnet_data(buf, BUFSIZE);
+
+    string result;
+    tn.send_command(CMD_OS_VERSION, result);
+    pThis->SetDeviceInformation(DEV_OS_VERSION, result.c_str());
 
     if (pThis->CheckVersion()) {
         tn.send_telnet_data(CMD_FW_VERSION, strlen(CMD_FW_VERSION));
         tn.receive_telnet_data(buf, BUFSIZE);
         pThis->SetDeviceInformation(DEV_FW_VERSION, buf);
     }
+
+    for (i = 0; i < 3; i++) {
     if (dc->RequestDownloadPermission(dev)) {
-        Sleep(5000);
+     break;
+    }
+       Sleep(5000);
+    }
+    if (i == 3) {
+
+        return -1;
     }
 
+    tn.send_telnet_data(CMD_REBOOT, strlen(CMD_REBOOT));
+
 #elif defined(MMI)
-#define COMMAND_UPDATE "send_data 254 0 0 7 0 1 0\n"
-#define CMD_REBOOT "send_data 254 0 0 5 0 0 0\n"
-#define CMD_FW_VERSION "jrd_system_get_firmware_version \n"
-#define CMD_OS_VERSION "cat /proc/version \n"
     unsigned char red[100] = "send_data 254 0 2 3 0 1 0\n";
     unsigned char blue[100] = "send_data 254 0 2 3 0 2 0\n";
     char *ledon = "send_data 254 0 2 3 0 3 0\n";
@@ -630,11 +680,6 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     //pThis->GetDlgItem(ID_Start)->EnableWindow(true);
     pThis->b_download = true;
 #elif defined(TEST)
-    tn.send_telnet_data("zen\n", strlen("zen\n")); //send user name
-    tn.receive_telnet_data(buf, BUFSIZE);
-    tn.send_telnet_data("zen\n", strlen("zen\n")); //send password
-    tn.receive_telnet_data(buf, BUFSIZE);
-
     tn.send_telnet_data("ls /\n", strlen("ls /\n"));//send command 'ls /\r\n'
     tn.receive_telnet_data(buf, BUFSIZE);
     tn.send_telnet_data("echo hello world\n", strlen("echo hello world\n"));//send command 'ls /\r\n'
@@ -649,12 +694,6 @@ ERROR:
     closesocket(sock);
     //dc->RemoveDevice(dev);
     dc->Reset();
-    pThis->m_progMac2.SetPos(pThis->Progress_range);
-    pThis->m_progMac2.SetBarColor(RGB(255,50,50));
-    pThis->m_progMac2.SetWindowText(msg);
-    pThis->m_progMac2.Invalidate(FALSE);
-    //pThis->GetDlgItem(ID_Start)->EnableWindow(true);
-    pThis->b_download = true;
     return 2;
 }
 
@@ -666,14 +705,14 @@ void CDownloadDlg::GetHostIpAddr() {
     for(int i = 0; i< 3; i++) {
         if(getIp.GetHostIP(mHostIPAddr, mHostGWAddr)) {
             CString msg;
-            msg.Format(_T("Get Ip successfully! IP %s, Gateway %s."),
+            msg.Format(_T("Host IP %s, Gateway %s."),
                 mHostIPAddr.c_str(), mHostGWAddr.c_str());
             UpdateMessage(msg);
             return;
         }
         Sleep(2000);
     }
-    UpdateMessage(_T("Get IP failed!"));
+    UpdateMessage(_T("Get Host IP failed!"));
 }
 
 #if 0
@@ -712,8 +751,7 @@ char const* CDownloadDlg::BuildHttpServerResponse(const char *path, size_t  *con
     char temp[64]={0};
     char date[64]={0};
     sprintf(temp, "%I64d", nLen);
-    time_t curtime = time(NULL);
-    gmt_time_string(date, sizeof(date), &curtime);
+    gmt_time_string(date, sizeof(date));
     string header= "HTTP/1.1 200 OK\r\n";
     header.append("Content-Length: ").append(temp).append("\r\n");
     header.append("Date: ").append(date).append("\r\n");
@@ -1004,6 +1042,11 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
     if (pTftpGui==NULL)
         return 0;
 
+    BOOL result = m_pCoordinator->EndFirmwareTransfer(pTftpGui->stg_addr,
+                                            pTftpGui->filename);
+    if (result)
+        UpdateMessage("Firmware update successfully.");
+
     // detach leaf
     if (pTftpPrev != NULL)
         pTftpPrev->next = pTftpGui->next ;
@@ -1251,16 +1294,10 @@ int CDownloadDlg::TFTPReporting (const struct S_TftpGui *pTftpGuiFirst)
     }
 
     // manage item that are not on the stat record --> they are terminated
-    for (pTftpGui = pTftpGuiFirst, Ark = 0;
-        pTftpGui != NULL && Ark < ListView_GetItemCount(hListV);
-        pTftpGui = pTftpGui->next, Ark++) {
-        if (Ark < SizeOfTab(tPos) && tPos[Ark] == 0)
-            //m_pCoordinator pTftpGui
+    for (Ark = 0; Ark < ListView_GetItemCount(hListV); Ark++) {
+        if (Ark < SizeOfTab(tPos) && tPos[Ark] == 0) {
             TFTPManageTerminatedTransfers (hListV, Ark);
-            BOOL result = m_pCoordinator->EndFirmwareTransfer(
-                pTftpGui->stg_addr, pTftpGui->filename);
-            if (result)
-                UpdateMessage("Firmware update successfully.");
+            }
         }
     return Ark;
 }
@@ -1299,6 +1336,9 @@ VOID CDownloadDlg::SetDeviceInformation(int type, LPCTSTR lpszString) {
     case DEV_OS_VERSION:
         m_DeviceOSVersion.SetWindowText(lpszString);
         break;
+    case DEV_IP_ADDR:
+        m_DeviceIpAddress.SetWindowText(lpszString);
+        break;
     default:
         break;
     }
@@ -1308,16 +1348,16 @@ void CDownloadDlg::OnBnClickedDisableCheck()
 {
     if (is_downloading) {
         ::MessageBox(NULL,
-                     _T("Information"),
                      _T("Please stop download first."),
+                     _T("Information"),
                      MB_OK | MB_ICONINFORMATION);
         return;
     }
 
     if (m_bSuperMode) {
         int result = ::MessageBox(NULL,
-                                  _T("Information"),
                                   _T("Enbale version check?"),
+                                  _T("Information"),
                                   MB_OKCANCEL | MB_ICONQUESTION);
         if (result == IDOK) {
             SetIcon(m_hIcon, TRUE);

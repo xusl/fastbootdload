@@ -935,6 +935,7 @@ telnet::telnet(curl_socket_t sock) {
   us_preferred[CURL_TELOPT_SGA] = CURL_YES;
   him_preferred[CURL_TELOPT_BINARY] = CURL_YES;
   him_preferred[CURL_TELOPT_SGA] = CURL_YES;
+  //him_preferred[CURL_TELOPT_ECHO] = CURL_YES;
 
   already_negotiated = 0;
   please_negotiate = 0;
@@ -946,12 +947,12 @@ telnet::telnet(curl_socket_t sock) {
   //subopt_ttype[31] = 0; /* String termination */
   //us_preferred[CURL_TELOPT_TTYPE] = CURL_YES;
 
-  int TimeOut=5000;//设置接收超时6秒
+  int TimeOut = 5000;//设置接收超时6秒
   setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
   //SOCKET_ERROR
 }
 
-int telnet::receive_telnet_data(char *buffer, ssize_t len) {
+int telnet::receive_telnet_data(char *buffer, ssize_t len, bool keep) {
   CURLcode code;
   ssize_t nread;
   char buf[BUFSIZE] = {0};
@@ -963,25 +964,22 @@ while(TRUE) {
     /* read data from network */
     LOGD("Print timestamp ");
     memset(buf, 0, sizeof buf);
-    code = Curl_read(sockfd, buf, BUFSIZE - 1, &nread);
+    code = Curl_read(sockfd, buf, CURLMIN(BUFSIZE, len)  - 1, &nread);
     LOGD("read %d bytes", nread);
     /* read would've blocked. Loop again */
-    if(code == CURLE_AGAIN)
-      continue;//break;
+    if(code == CURLE_AGAIN) {
+          continue;
+    } else if(code) {
     /* returned not-zero, this an error */
-    else if(code) {
       break;
-    }
+    } else if(nread <= 0) {
     /* returned zero but actually received 0 or less here,
        the server closed the connection and we bail out */
-    else if(nread <= 0) {
       break;
     }
 
     if (telnet_cmd_negotiate){
       LOGD("read:: %s", buf);
-    if (len <=0 || nread > len)
-        LOGD("THERE Are not enough data to copy");
     if (len > 0) {
         int rl = CURLMIN(nread, len);
         strncpy(buffer, buf, rl);
@@ -994,7 +992,7 @@ while(TRUE) {
         if(code) {
           LOGD("read:: %s", buf);
           telnet_cmd_negotiate = 1;
-			if (len > 0) 
+			if (len > 0)
 			{
 		        int rl = CURLMIN(nread, len);
 		        strncpy(buffer, buf, rl);
@@ -1012,7 +1010,54 @@ while(TRUE) {
       negotiate();
       already_negotiated = 1;
     }
+
+    if (len <=0) {
+        LOGD("THERE Are not enough data to copy");
+        code = CURLE_OUT_OF_MEMORY;
+        break;
     }
+
+    if(!keep) {
+      break;
+    }
+    }
+    return code;
+}
+
+#define CMDRSPBUFLEN (BUFSIZE * 4)
+int telnet::send_command(char *cmd, string &result) {
+     char buf[CMDRSPBUFLEN];
+     assert(cmd != NULL);
+    send_telnet_data(cmd, strlen(cmd)); //send password
+
+     result.clear();
+     int code;
+
+  //int TimeOut = 1000;//设置接收超时6秒
+  //setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
+
+    for (int i = 0 ; i <= 3; i++ ){
+         code = receive_telnet_data(buf, CMDRSPBUFLEN, true);
+         result += buf;
+        if (code == 0) {
+         break;
+        } else if (code == CURLE_AGAIN) {
+            Curl_wait_ms(3000);
+        } else if (code != CURLE_OUT_OF_MEMORY) {
+            break;
+        }
+    }
+
+    if ((code == 0 || code == CURLE_RECV_ERROR) && result.length() > strlen(cmd)) {
+        result.erase (result.begin(), result.begin()+strlen(cmd)+1);
+        size_t found = result.find('\n');
+        if (found != string::npos)
+            result.erase (result.begin()+found, result.end());
+    }
+
+    // TimeOut = 5000;//设置接收超时6秒
+  //setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
+
     return code;
 }
 
@@ -1034,19 +1079,19 @@ while(TRUE) {
     if(code == CURLE_AGAIN)
       continue;//break;
     /* returned not-zero, this an error */
-    else if(code) 
+    else if(code)
 	{
     	break;
     }
     /* returned zero but actually received 0 or less here,
        the server closed the connection and we bail out */
-    else if(nread <= 0) 
+    else if(nread <= 0)
 	{
     	break;
     }
 	if (len <=0 || nread > len)
 	        LOGD("THERE Are not enough data to copy");
-    if (len > 0) 
+    if (len > 0)
 	{
         rl = CURLMIN(nread, len);
         strncpy(buffer, buf, rl);
@@ -1063,23 +1108,23 @@ while(TRUE) {
     	LOGD("read:: %s", buf);
 	    if (len <=0 || nread > len)
 	        LOGD("THERE Are not enough data to copy");
-	    if (len > 0) 
+	    if (len > 0)
 		{
 	        int rl = CURLMIN(nread, len);
 	        strncpy(buffer, buf, rl);
 	        len -= rl;
 	        buffer += rl;
 	    }
-    } 
-	else 
+    }
+	else
 	{
         code = telrcv((unsigned char *)buf, nread);
         LOGD("telrcv_state %d. return %d", telrcv_state, code);
-        if(code) 
+        if(code)
 		{
 			LOGD("read:: %s", buf);
 			telnet_cmd_negotiate = 1;
-			if (len > 0) 
+			if (len > 0)
 			{
 		        int rl = CURLMIN(nread, len);
 		        strncpy(buffer, buf, rl);

@@ -48,7 +48,7 @@ CDevLabel *DeviceCoordinator::GetValidDevice() {
         CDevLabel *item = *it;
         if (item->GetStatus() != DEVICE_ARRIVE)
             continue;
-        //item->SetStatus(DEVICE_COMMAND);
+        item->SetStatus(DEVICE_COMMAND);
         return item;
     }
     return NULL;
@@ -89,7 +89,7 @@ BOOL DeviceCoordinator::GetDevice(const char * const ipAddr, CDevLabel** outDevI
     return FALSE;
 }
 
-BOOL DeviceCoordinator::SetDownloadFirmware(list<char *> *firmware) {
+BOOL DeviceCoordinator::SetDownloadFirmware(list<char *> firmware) {
     mpFirmware = firmware;
     return TRUE;
 }
@@ -98,7 +98,7 @@ BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,  CDevLabel** intfs) {
     CDevLabel* newDevIntf = NULL;
 
     map <string, bool, greater<string>>::iterator Rit = mMacRecords.find(dev.GetMac());
-    if ( Rit != mMacRecords.end() && mMacRecords[dev.GetMac()]) {
+    if ( Rit != mMacRecords.end() /*&& mMacRecords[dev.GetMac()]*/) {
         return FALSE;
     }
 
@@ -110,6 +110,7 @@ BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,  CDevLabel** intfs) {
 
     if (it != mDevintfList.end()) {
         newDevIntf = *it;
+        return FALSE;
         //TODO::
     } else {
         LOGI("Create new device");
@@ -148,8 +149,8 @@ BOOL DeviceCoordinator::RequestDownloadPermission(CDevLabel* const & devIntf) {
             return FALSE;
         }
     }
-    LeaveCriticalSection(&mCriticalSection);
     devIntf->SetStatus(DEVICE_REBOOTDOWNLOAD);
+    LeaveCriticalSection(&mCriticalSection);
     return TRUE;
 }
 
@@ -223,10 +224,10 @@ VOID CDevLabel::Dump(const char *tag) {
 }
 
 
-bool CDevLabel::SetFirmware(list<char *> *pFirmware) {
-    assert(pFirmware != NULL);
+bool CDevLabel::SetFirmware(list<char *> pFirmware) {
+
     list<char *>::iterator it;
-    for (it = pFirmware->begin(); it != pFirmware->end(); ++it) {
+    for (it = pFirmware.begin(); it != pFirmware.end(); ++it) {
         LOGD("ADD FILE %s", *it);
         mFirmwareStatus.insert(pair<string, bool>(*it, false));
     }

@@ -60,7 +60,7 @@ protected:
   DWORD   m_NetworkSnifferThreadID;
   BOOL  mWSAInitialized;
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
-  void SniffNetwork();
+  void SniffNetwork(const char * const segment, int from, int to);
   void GetHostIpAddr();
   void UpdateMessage(CString msg);
   void ClearMessage(void);
@@ -72,6 +72,7 @@ protected:
 //void server_listen(u_short port =DOWNLOAD_SERVER_PORT);
   DWORD Schedule();
   DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;};
+  VOID GetConfig(ConfigIni & conf) { conf = m_Config;};
   BOOL CheckVersion() { return (m_bSuperMode == FALSE);};
 
   int TFTPNew (const struct S_TftpTrfNew *pTrf);

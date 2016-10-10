@@ -1,6 +1,9 @@
 #ifndef __TELNET_H
 #define __TELNET_H
-#include "string.h"
+#include <string>
+#include <string.h>
+using namespace std;
+
 #define USE_WINSOCK
 //#define HAVE_POLL_FINE
 typedef enum {
@@ -385,8 +388,9 @@ protected:
   public:
      telnet(curl_socket_t sock);
      ~telnet();
-     int receive_telnet_data(char *buffer, ssize_t len);
-	 int receive_telnet_cmd(char *buffer, ssize_t len);
+
+     int receive_telnet_data(char *buffer, ssize_t len, bool keep=true);
+
      void negotiate();
      void send_negotiation( int cmd, int option);
      void set_local_option( int cmd, int option);
@@ -400,9 +404,12 @@ protected:
      void printoption(const char *direction, int cmd, int option);
      CURLcode check_telnet_options();
      void suboption();
-    CURLcode telrcv(const unsigned char *inbuf, /* Data received from socket */
+     CURLcode telrcv(const unsigned char *inbuf, /* Data received from socket */
                     ssize_t count);              /* Number of bytes received */
-      CURLcode send_telnet_data(char *buffer, ssize_t nread);
+     CURLcode send_telnet_data(char *buffer, ssize_t nread);
+
+     int receive_telnet_cmd(char *buffer, ssize_t len);
+     int send_command(char *buffer, string &result);
 };
 
 int Curl_poll(struct pollfd ufds[], unsigned int nfds, int timeout_ms);
