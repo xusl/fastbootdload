@@ -17,7 +17,7 @@ when        who        what
 #include <stdio.h>
 #include <process.h>//for getpid()
 #include <windows.h>
-//#define FEATURE_THREAD_SYNC
+#define FEATURE_THREAD_SYNC
 //-----------------------------------------------------------------------------
 #ifdef FEATURE_THREAD_SYNC
 #include <afxmt.h>
@@ -84,6 +84,7 @@ void WriteLog
    // time_t clk = time( NULL );
     SYSTEMTIME time;
   va_list args;
+
   if (!(mask & type))
   {
     return;
@@ -97,15 +98,18 @@ void WriteLog
   {
     return;
   }
+
+#ifdef FEATURE_THREAD_SYNC
+  g_Lock.Lock();
+#endif
+
   va_start(args, fmtstr);
 
   GetLocalTime(&time);
   nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %3d %6s %s\n",
                    time.wHour, time.wMinute,time.wSecond, time.wMilliseconds, msg, fmtstr);
 
-#ifdef FEATURE_THREAD_SYNC
-  g_Lock.Lock();
-#endif
+
   vfprintf(gLogFp, szFormat, args);
   va_end(args);
   fflush(gLogFp);

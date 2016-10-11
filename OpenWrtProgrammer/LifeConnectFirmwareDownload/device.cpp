@@ -250,7 +250,8 @@ BOOL CDevLabel::IsDownloadFinish() {
     if (GetStatus() != DEVICE_FINISH) {
         map <string, DWORD>::iterator it = mFirmwareStatus.begin();
         for (;it != mFirmwareStatus.end(); ++it) {
-            if(it->second == INVALID_TRANSFERID)
+            DWORD transferId = it->second;
+            if(transferId == INVALID_TRANSFERID)
                 return FALSE;
         }
         SetStatus(DEVICE_FINISH);
@@ -261,7 +262,7 @@ BOOL CDevLabel::IsDownloadFinish() {
 BOOL CDevLabel::GetTransferIDs(list<DWORD> &ids) {
     map <string, DWORD>::iterator it = mFirmwareStatus.begin();
     for (;it != mFirmwareStatus.end(); ++it) {
-        if(it->second == INVALID_TRANSFERID)
+        if(it->second != INVALID_TRANSFERID)
             ids.push_back(it->second);
     }
     return TRUE;

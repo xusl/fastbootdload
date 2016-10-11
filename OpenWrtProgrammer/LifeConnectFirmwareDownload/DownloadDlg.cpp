@@ -25,9 +25,6 @@ using namespace std;
 enum EVersion {DEV_IP_ADDR, DEV_FW_VERSION, DEV_OS_VERSION};
 enum E_fields { FD_PEER, FD_FILE, FD_START, FD_PROGRESS, FD_BYTES, FD_TOTAL, FD_TIMEOUT };
 
-// a transfer terminated but still displayed
-#define ZOMBIE_STATUS ' '
-
 struct S_TftpGui {
     // identifier
     DWORD                     dwTransferId;
@@ -280,7 +277,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     int to = conf.GetHostIPEnd();
     const char * const segment = conf.GetNetworkSegment();
 
-    msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, 1, segment, from, to);
+    msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, from, segment,  to);
     pThis->UpdateMessage(msg);
 
     for(;;) {
@@ -481,6 +478,11 @@ void CDownloadDlg::OnBnClickedStart() {
             GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(true);
             is_downloading = false;
             m_pCoordinator->Reset();
+            m_TransferFileList.DeleteAllItems();
+           m_DeviceIpAddress.SetWindowText("");
+           m_DeviceOSVersion.SetWindowText("");
+           m_DeviceFWVersion.SetWindowText("");
+           m_PSTStatus.SetWindowText("");
         }
         return;
     }
@@ -1141,10 +1143,6 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
     pTftpGui->stat = pTrf->stat;
     TFTPReporting (pTftpGuiFirst);
 
-    //todo:: delete items for the specific pTftpGui->dwTransferId
-    if (result && dev != NULL) {
-    }
-
     // free allocation
     free (pTftpGui->filename);
     free (pTftpGui);
@@ -1304,18 +1302,15 @@ static int TFTPItemUpdate (HWND hListV, const struct S_TftpGui *pTftpGui, int it
 
 static int TFTPManageTerminatedTransfers (HWND hListV, int itemPos)
 {
-    char szTxt [512];
+    char szTxt [512] = {0};
     LVITEM      LvItem;
     int  tNow  = (int) time(NULL);
 
-    szTxt[sizeof szTxt - 1]=0;
-    ListView_GetItemText (hListV, itemPos, FD_FILE, szTxt, sizeof szTxt -1 );
-    // The '.' is added for terminated transfer
-    if (szTxt [0] != ZOMBIE_STATUS)
+    ListView_GetItemText (hListV, itemPos, FD_PROGRESS, szTxt, sizeof szTxt -1 );
+
+    if (strcmp(szTxt, "100%") != 0)
     {
-        // update target name
-        szTxt[0] = ZOMBIE_STATUS;
-        ListView_SetItemText (hListV, itemPos, FD_FILE, szTxt);
+#if 0
         // Put in param the times before deletion
         LvItem.iSubItem =FD_PEER;
         LvItem.mask = LVIF_PARAM;
@@ -1325,6 +1320,7 @@ static int TFTPManageTerminatedTransfers (HWND hListV, int itemPos)
             LvItem.lParam = sSettings.nGuiRemanence + tNow;
             ListView_SetItem (hListV, & LvItem) ;
         }
+#endif
 
         ListView_SetItemText (hListV, itemPos, FD_PROGRESS, "100%");
         ListView_GetItemText (hListV, itemPos, FD_TOTAL, szTxt, sizeof szTxt -1 );
@@ -1332,13 +1328,15 @@ static int TFTPManageTerminatedTransfers (HWND hListV, int itemPos)
     } // transfer not already marked as termnated
     else
     {
+#if 0
         LvItem.iSubItem =FD_PEER;
         LvItem.mask = LVIF_PARAM;
         LvItem.iItem = itemPos;
         if (ListView_GetItem (hListV, & LvItem) && LvItem.lParam < tNow)
         {
-           // ListView_DeleteItem (hListV, itemPos);
+           ListView_DeleteItem (hListV, itemPos);
         }
+#endif
     }
     return TRUE;
 } // TFTPManageTerminatedTransfers

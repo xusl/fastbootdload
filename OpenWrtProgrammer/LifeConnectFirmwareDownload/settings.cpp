@@ -85,6 +85,13 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     m_HostIPStart = GetPrivateProfileInt(NETWORK_SECTION, _T("HostIPStart"), 2, lpFileName);
     m_HostIPEnd = GetPrivateProfileInt(NETWORK_SECTION, _T("HostIPEnd"), 10, lpFileName);
 
+    if (m_HostIPStart > 245)
+        m_HostIPStart = 244;
+    if (m_HostIPEnd > 255)
+        m_HostIPEnd = 254;
+    if (m_HostIPEnd < m_HostIPStart)
+        m_HostIPEnd = m_HostIPStart;
+
     m_TelnetTimeoutMs = GetPrivateProfileInt(TELNET_SECTION, _T("TimeoutMs"), 6000, lpFileName);
     GetPrivateProfileString(TELNET_SECTION, _T("User"), "root",
                         m_User, USER_LEN_MAX, lpFileName);

@@ -46,7 +46,7 @@ class CDevLabel {
     void SetDownloadIpAddr(string ip) { mDownloadIpAddr = ip;};
     void SetStatus(DEVICE_e status) {
       mStatus = status;
-      mStatusEnterMS = ::GetTickCount();
+      mStatusEnterMS = ::GetTickCount(); /*time(NULL);*/
     };
     void TickWatchDog() { mStatusEnterMS = ::GetTickCount();};
     BOOL CheckRemovable();
