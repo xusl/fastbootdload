@@ -66,6 +66,7 @@ extern struct S_Tftpd32Settings sSettings;          // The settings,used anywher
 #  define TFTPD32_DEF_LOG_LEVEL   8
 #  define TFTP_DEFPORT           69
 
+#define INVALID_TRANSFERID       0XFFFFFFFF
 #define TFTP_MAXRETRIES          50 // do not resent same block more than # times
 #define TIME_FOR_LONG_TRANSFER   10 // more than 10 seconds -> beep
 

@@ -66,7 +66,8 @@ CDevLabel *DeviceCoordinator::GetRebootDevice() {
     return NULL;
 }
 
-BOOL DeviceCoordinator::GetDevice(const char * const ipAddr, CDevLabel** outDevIntf) {
+
+BOOL DeviceCoordinator::GetDevice(const char * const ipAddr, CDevLabel** outDevIntf, BOOL byDownload) {
 #if 0
     list<CDevLabel>::iterator it = find(mDevintfList.begin(), mDevintfList.end(), devPath);
     if (it != mDevintfList.end()) {
@@ -80,7 +81,12 @@ BOOL DeviceCoordinator::GetDevice(const char * const ipAddr, CDevLabel** outDevI
 
     list<CDevLabel*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
-        if((*it)->GetDownloadIpAddr() == ipAddr) {
+        string ip;
+        if (byDownload)
+            ip = (*it)->GetDownloadIpAddr();
+        else
+            ip = (*it)->GetIpAddr();
+        if(ip == ipAddr) {
             *outDevIntf = *it;
             return TRUE;
         }
@@ -170,7 +176,7 @@ VOID DeviceCoordinator::Dump(VOID) {
 }
 
 
-BOOL DeviceCoordinator::StartFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename) {
+BOOL DeviceCoordinator::StartFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, DWORD                     dwTransferId) {
     char szAddr[MAXLEN_IPv6]={0}, szServ[NI_MAXSERV] ={0};
         getnameinfo ( (LPSOCKADDR) & addr, sizeof (addr),
                  szAddr, sizeof szAddr,
@@ -184,30 +190,25 @@ BOOL DeviceCoordinator::StartFirmwareTransfer(SOCKADDR_STORAGE addr, const char 
     return TRUE;
 }
 
-BOOL DeviceCoordinator::EndFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename) {
+CDevLabel * DeviceCoordinator::EndFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, DWORD  dwTransferId) {
     char szAddr[MAXLEN_IPv6]={0}, szServ[NI_MAXSERV] ={0};
         getnameinfo ( (LPSOCKADDR) & addr, sizeof (addr),
                  szAddr, sizeof szAddr,
                  szServ, sizeof szServ,
                  NI_NUMERICHOST | AI_NUMERICSERV );
         CDevLabel *dev = NULL;
-        if(GetDevice(szAddr, &dev)) {
-            dev->UpdateFirmwareStatus(filename, true);
-            BOOL done = dev->IsFirmwareDownload();
-            if (done) {
-                RemoveDevice(dev);
-            }
-            return done;
+        if(GetDevice(szAddr, &dev, true)) {
+            dev->UpdateFirmwareStatus(filename, dwTransferId);
         } else {
         LOGE("%s is not in our download manager", szAddr);
         }
-    return FALSE;
+    return dev;
 }
 
 CDevLabel::CDevLabel(string &mac, string &ip_addr) {
     mMac = mac;
     mIpAddr = ip_addr;
-    mStatus = DEVICE_ARRIVE;
+    SetStatus(DEVICE_ARRIVE);
     mDownloadIpAddr = "";
 }
 
@@ -227,32 +228,57 @@ VOID CDevLabel::Dump(const char *tag) {
     LOGD("\tStatus: %d", mStatus);
 }
 
-
 bool CDevLabel::SetFirmware(list<char *> pFirmware) {
-
     list<char *>::iterator it;
     for (it = pFirmware.begin(); it != pFirmware.end(); ++it) {
         LOGD("ADD FILE %s", *it);
-        mFirmwareStatus.insert(pair<string, bool>(basename(*it), false));
+        mFirmwareStatus.insert(pair<string, DWORD>(basename(*it), INVALID_TRANSFERID));
     }
     return true;
 }
-VOID CDevLabel::UpdateFirmwareStatus(const char * const filename, bool value) {
+
+VOID CDevLabel::UpdateFirmwareStatus(const char * const filename, DWORD dwTransferId) {
     assert(filename != NULL);
-    LOGD("UPDAT FILE STATUS %s = %d", filename, value);
-    map <string, bool>::iterator it = mFirmwareStatus.find(filename);
+    LOGD("UPDAT FILE STATUS %s = %d", filename, dwTransferId);
+    map <string, DWORD>::iterator it = mFirmwareStatus.find(filename);
     if ( it != mFirmwareStatus.end()) {
-        mFirmwareStatus[filename] = value;
+        mFirmwareStatus[filename] = dwTransferId;
     }
 }
 
-BOOL CDevLabel::IsFirmwareDownload() {
-    map <string, bool>::iterator it = mFirmwareStatus.begin();
-    for (;it != mFirmwareStatus.end(); ++it) {
-        if(it->second == false)
-            return FALSE;
+BOOL CDevLabel::IsDownloadFinish() {
+    if (GetStatus() != DEVICE_FINISH) {
+        map <string, DWORD>::iterator it = mFirmwareStatus.begin();
+        for (;it != mFirmwareStatus.end(); ++it) {
+            if(it->second == INVALID_TRANSFERID)
+                return FALSE;
+        }
+        SetStatus(DEVICE_FINISH);
     }
     return TRUE;
+}
+
+BOOL CDevLabel::GetTransferIDs(list<DWORD> &ids) {
+    map <string, DWORD>::iterator it = mFirmwareStatus.begin();
+    for (;it != mFirmwareStatus.end(); ++it) {
+        if(it->second == INVALID_TRANSFERID)
+            ids.push_back(it->second);
+    }
+    return TRUE;
+}
+
+BOOL CDevLabel::CheckRemovable() {
+    DWORD timeout = 30000;
+    switch (GetStatus()) {
+        case DEVICE_FINISH:
+            timeout = 10000;
+            break;
+
+        default:
+            return FALSE;
+    }
+
+    return (GetStatusEnterMS() - ::GetTickCount() > timeout);
 }
 
 bool CDevLabel::Match(const CDevLabel * const & dev) const {

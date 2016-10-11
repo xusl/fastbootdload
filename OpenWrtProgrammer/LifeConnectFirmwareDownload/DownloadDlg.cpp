@@ -13,6 +13,8 @@
 #include "telnet.h"
 #include "tftp.h"
 
+using namespace std;
+
 #define TPST
 //#define LOGIN
 
@@ -137,7 +139,11 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
     DDX_Control(pDX, IDC_DEVICE_IPADDRESS, m_DeviceIpAddress);
     DDX_Control(pDX, IDC_DEVICE_OS_VERSION, m_DeviceOSVersion);
     DDX_Control(pDX, IDC_DEVICE_FIRMWARE_VERSION, m_DeviceFWVersion);
+    DDX_Control(pDX, IDC_FILE_STATS, m_PSTStatus);
     DDX_Control(pDX, IDC_DISABLE_CHECK, m_VersionCheckButton);
+
+  DDX_Control(pDX,  IDC_LV_TFTP, m_TransferFileList);
+  //DDX_Control(pDX,  ,m_DeviceList);
 	//DDX_Text(pDX, IDC_EDIT_LINUX_VER_MAIN, m_LinuxVer);
 }
 
@@ -204,15 +210,13 @@ BOOL CDownloadDlg::OnInitDialog()
     CButton* versionCheck = (CButton *)GetDlgItem(IDC_DISABLE_CHECK);
     versionCheck->SetIcon(icon);
 
-    CListCtrl* listView = (CListCtrl*)GetDlgItem (IDC_LV_TFTP);
-
-    listView->InsertColumn(FD_PEER,     _T("Peer"), LVCFMT_LEFT, 130);
-    listView->InsertColumn(FD_FILE,     _T("File"), LVCFMT_LEFT, 180);
-    listView->InsertColumn(FD_START,    _T("Start"), LVCFMT_LEFT, 80);
-    listView->InsertColumn(FD_PROGRESS, _T("Progress"), LVCFMT_LEFT, 60);
-    listView->InsertColumn(FD_BYTES,    _T("Bytes"), LVCFMT_LEFT, 100);
-    listView->InsertColumn(FD_TOTAL,    _T("Total"), LVCFMT_LEFT, 100);
-    listView->InsertColumn(FD_TIMEOUT,  _T("Timeout"), LVCFMT_LEFT, 80);
+    m_TransferFileList.InsertColumn(FD_PEER,     _T("Peer"), LVCFMT_LEFT, 130);
+    m_TransferFileList.InsertColumn(FD_FILE,     _T("File"), LVCFMT_LEFT, 180);
+    m_TransferFileList.InsertColumn(FD_START,    _T("Start"), LVCFMT_LEFT, 80);
+    m_TransferFileList.InsertColumn(FD_PROGRESS, _T("Progress"), LVCFMT_LEFT, 60);
+    m_TransferFileList.InsertColumn(FD_BYTES,    _T("Bytes"), LVCFMT_LEFT, 100);
+    m_TransferFileList.InsertColumn(FD_TOTAL,    _T("Total"), LVCFMT_LEFT, 100);
+    m_TransferFileList.InsertColumn(FD_TIMEOUT,  _T("Timeout"), LVCFMT_LEFT, 80);
 
 
     m_progMac2.SetRange(0,Progress_range);
@@ -234,13 +238,42 @@ BOOL CDownloadDlg::OnInitDialog()
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
+VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
+    list<DWORD> ids;
+
+    CDevLabel *dev = NULL;
+    m_pCoordinator->GetDevice(ipAddr, &dev, true);
+    if(dev == NULL) {
+        m_pCoordinator->GetDevice(ipAddr, &dev, false);
+    }
+
+    if (dev == NULL || FALSE == dev->CheckRemovable()) {
+        return;
+    }
+
+    dev->GetTransferIDs(ids);
+
+    list<DWORD>::iterator it;
+    for (it = ids.begin(); it != ids.end(); ++it) {
+        LVFINDINFO  LvInfo;
+        int itemPos;
+
+        // search peer field (key)
+        LvInfo.flags = LVFI_PARAM;
+        LvInfo.lParam = *it;
+        itemPos = m_TransferFileList.FindItem (& LvInfo);
+        if (itemPos != -1)
+            m_TransferFileList.DeleteItem(itemPos);
+    }
+    m_pCoordinator->RemoveDevice(dev);
+}
+
 DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
     ConfigIni conf;
     CString msg;
     pThis->GetHostIpAddr();
     pThis->UpdateMessage(_T("Search Life Connect..., please wait..."));
-
     pThis->GetConfig(conf);
 
     int from = 2;
@@ -271,6 +304,7 @@ void CDownloadDlg::SniffNetwork(const char * const segment, int from, int to) {
             continue;
         if(Ping(pcIpAddr) == FALSE) {
             LOGD("ping %s failed. ", pcIpAddr);
+            CleanDevice(pcIpAddr);
             continue;
         }
 
@@ -281,6 +315,7 @@ void CDownloadDlg::SniffNetwork(const char * const segment, int from, int to) {
 
         if (!m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL)) {
             LOGD("%s have alread been add into device manager", pcIpAddr);
+            CleanDevice(pcIpAddr);
             continue;
         }
         LOGD("ping %s succefully, mac :%s", pcIpAddr, mac.c_str());
@@ -1047,10 +1082,16 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
     if (pTftpGui==NULL)
         return 0;
 
-    BOOL result = m_pCoordinator->EndFirmwareTransfer(pTftpGui->stg_addr,
-                                            pTftpGui->filename);
+    CDevLabel *dev= m_pCoordinator->EndFirmwareTransfer(pTftpGui->stg_addr,
+                                            pTftpGui->filename,
+                                            pTftpGui->dwTransferId);
+     BOOL result = FALSE;
+     if (dev != NULL)
+         result = dev->IsDownloadFinish();
+
     if (result) {
-        UpdateMessage("Firmware update successfully.");
+        UpdateMessage("Device updated.");
+        m_PSTStatus.SetWindowText("Device updated.");
         b_download = false;
     }
 
@@ -1065,6 +1106,10 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
     pTftpGui->stat = pTrf->stat;
     TFTPReporting (pTftpGuiFirst);
 
+    //todo:: delete items for the specific pTftpGui->dwTransferId
+    if (result && dev != NULL) {
+    }
+
     // free allocation
     free (pTftpGui->filename);
     free (pTftpGui);
@@ -1074,7 +1119,6 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
     TFTPReporting (pTftpGuiFirst);
     return 0;
 } // TFTPEnd
-
 
 int CDownloadDlg::TFTPStat (struct subStats *pTrf, time_t dNow)
 {
@@ -1107,8 +1151,8 @@ int CDownloadDlg::TFTPStat (struct subStats *pTrf, time_t dNow)
               pTftpGui->stat.dwTotalBytes / (dNow-pTftpGui->stat.StartTime) );
 
     //   SetWindowText (GetDlgItem (hMainWnd, IDC_FILE_STATS), szTitle);
-    GetDlgItem(IDC_FILE_STATS)->SetWindowText(szTitle);
-    GetDlgItem(IDC_FILE_SIZE)->SetWindowText(pTftpGui->filename);
+    //GetDlgItem(IDC_FILE_STATS)->SetWindowText(szTitle);
+    //GetDlgItem(IDC_FILE_SIZE)->SetWindowText(pTftpGui->filename);
     return 0;
 } // TFTPStat
 
@@ -1276,7 +1320,6 @@ int CDownloadDlg::TFTPReporting (const struct S_TftpGui *pTftpGuiFirst)
     short  tPos [512];
 
     HWND hListV= GetDlgItem (IDC_LV_TFTP)->GetSafeHwnd();
-    CListCtrl* listView = (CListCtrl*)GetDlgItem (IDC_LV_TFTP);
 
     // ListView_DeleteAllItems (hListV);
     memset (tPos, 0, sizeof tPos);
@@ -1291,8 +1334,9 @@ int CDownloadDlg::TFTPReporting (const struct S_TftpGui *pTftpGuiFirst)
         // item has not been found --> should be inserted
         if (itemPos==-1)
         {
-            itemPos = TFTPItemAdd (listView, pTftpGui, Ark);
-            m_pCoordinator->StartFirmwareTransfer(pTftpGui->stg_addr, pTftpGui->filename);
+            itemPos = TFTPItemAdd (&m_TransferFileList, pTftpGui, Ark);
+            m_pCoordinator->StartFirmwareTransfer(pTftpGui->stg_addr,
+                pTftpGui->filename, pTftpGui->dwTransferId);
         } // create transfers
         // actualize fields
         TFTPItemUpdate (hListV, pTftpGui, itemPos);

@@ -65,6 +65,7 @@ protected:
   void UpdateMessage(CString msg);
   void ClearMessage(void);
   VOID SetDeviceInformation(int type, LPCTSTR lpszString);
+  VOID CleanDevice(const char *const ipAddr);
 //void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
 //char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
 //BOOL BuildUpdateCommand(CString file, CString &cmd);
@@ -107,7 +108,10 @@ private:
   CStatic m_DeviceIpAddress;
   CStatic m_DeviceOSVersion;
   CStatic m_DeviceFWVersion;
+  CStatic m_PSTStatus;
   CButton m_VersionCheckButton;
+  CListCtrl m_TransferFileList;
+  CListCtrl m_DeviceList;
 	//char s_PCBNo[16];
 	char s_MMIFlag[2];
 	DWORD dwBeginTime;

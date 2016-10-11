@@ -44,19 +44,27 @@ class CDevLabel {
     void SetMac(string mac) { mMac = mac;};
     void SetIpAddr(string ip) { mIpAddr = ip;};
     void SetDownloadIpAddr(string ip) { mDownloadIpAddr = ip;};
-    void SetStatus(DEVICE_e status) { mStatus = status;};
+    void SetStatus(DEVICE_e status) {
+      mStatus = status;
+      mStatusEnterMS = ::GetTickCount();
+    };
+    void TickWatchDog() { mStatusEnterMS = ::GetTickCount();};
+    BOOL CheckRemovable();
     DEVICE_e GetStatus() const { return mStatus;};
     VOID Dump(const char *tag);
     bool SetFirmware(list<char *> pFirmware);
-    VOID UpdateFirmwareStatus(const char * const filename, bool value);
-    BOOL IsFirmwareDownload();
+    VOID UpdateFirmwareStatus(const char * const filename, DWORD dwTransferId);
+    BOOL IsDownloadFinish();
+    DWORD GetStatusEnterMS() { return mStatusEnterMS;};
+    BOOL GetTransferIDs(list<DWORD> &ids);
 
  private:
     string             mMac;
     string             mIpAddr;
     string             mDownloadIpAddr;
     DEVICE_e           mStatus;
-    map<string, bool>  mFirmwareStatus;
+    DWORD              mStatusEnterMS;
+    map<string, DWORD>  mFirmwareStatus;
 };
 
 class DeviceCoordinator {
@@ -65,13 +73,14 @@ class DeviceCoordinator {
     ~DeviceCoordinator();
     CDevLabel *GetValidDevice();
     CDevLabel *GetRebootDevice();
-    BOOL GetDevice(const char *const ipAddr, CDevLabel** outDevIntf);
+    BOOL GetDevice(const char *const ipAddr, CDevLabel** outDevIntf, BOOL byDownload);
     BOOL AddDevice(CDevLabel& dev, CDevLabel** intfs);
     BOOL RemoveDevice(CDevLabel*const & devIntf);
     BOOL SetDownloadFirmware(list<char *> firmware);
     BOOL RequestDownloadPermission(CDevLabel* const & devIntf);
-    BOOL StartFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename);
-    BOOL EndFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename);
+    BOOL StartFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, DWORD dwTransferId);
+    CDevLabel * EndFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, DWORD dwTransferId);
+
     BOOL IsEmpty();
     BOOL Reset();
     VOID Dump(VOID);

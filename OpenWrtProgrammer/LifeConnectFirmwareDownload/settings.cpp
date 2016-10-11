@@ -7,9 +7,6 @@
 //
 //////////////////////////////////////////////////////
 
-// registry key :
-//       HKEY_LOCAL_MACHINE\SOFTWARE\TFTPD32
-
 // some shortcurts
 #include "StdAfx.h"
 #include <stdio.h>
@@ -32,7 +29,6 @@ struct S_Tftpd32Settings sSettings =
 	  FALSE,                 // Do not beep for long transfert
 	  FALSE,                 // Virtual Root is not enabled
 	  "",                    // do not filter TFTP'slistening interface
-//	  TFTPD32_ALL_SERVICES,  // all services are enabled
 	  0,  0,                 // use ports assigned by Windows
 	  FALSE,                 // do not support port option
 	  5,					 // after 5 seconds delete Tftp record
@@ -111,6 +107,7 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
         pkg_dir[data_len + 1] = _T('\0');
         data_len++;
     }
+    strncpy(sSettings.szWorkingDirectory, pkg_dir, sizeof sSettings.szWorkingDirectory);
 
 #if 0
     memset(pkg_conf_file, 0, sizeof pkg_conf_file);
@@ -141,7 +138,8 @@ int ConfigIni::SetPackageDir(const char* config) {
     }
 
     WritePrivateProfileString(APP_SECTION, PKG_PATH, config,m_ConfigPath.GetString());
-
+    strncpy(pkg_dir, config, sizeof pkg_dir);
+    strncpy(sSettings.szWorkingDirectory, pkg_dir, sizeof sSettings.szWorkingDirectory);
     return 0;
 }
 

@@ -237,6 +237,9 @@ static void PopulateTftpdStruct (struct LL_TftpInfo *pTftp)
     struct LL_TftpInfo *pTmp;
     static DWORD TransferId=467;    // unique identifiant
 
+    if (TransferId == INVALID_TRANSFERID)
+        TransferId++;
+
     // init or reinit struct
     pTftp->s.dwTimeout = sSettings.Timeout;
     pTftp->s.dwPacketSize = TFTP_SEGSIZE;  // default
