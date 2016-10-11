@@ -91,7 +91,7 @@ BOOL DeviceCoordinator::GetDevice(const char * const ipAddr, CDevLabel** outDevI
             return TRUE;
         }
     }
-    LOGE("Can not get device interface for  %S", ipAddr);
+    LOGE("Can not get device interface for  %s", ipAddr);
     return FALSE;
 }
 

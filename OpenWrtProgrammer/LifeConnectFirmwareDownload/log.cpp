@@ -75,14 +75,14 @@ void WriteLog
 )
 {
 #define MAX_BUF_LEN     (4096 * 8)
-  int   nBuf;
-  char  szBuffer[MAX_BUF_LEN] = {0};
-
 #define FORMAT_SIZE     (256*4)
-  char  szFormat[FORMAT_SIZE] = {0};
+
+  int   nBuf;
+  char  szBuffer[MAX_BUF_LEN];
+  char  szFormat[FORMAT_SIZE];
   //      char timestr[40];
-   // time_t clk = time( NULL );
-    SYSTEMTIME time;
+  // time_t clk = time( NULL );
+  SYSTEMTIME time;
   va_list args;
 
   if (!(mask & type))
@@ -102,6 +102,9 @@ void WriteLog
 #ifdef FEATURE_THREAD_SYNC
   g_Lock.Lock();
 #endif
+
+  memset(szBuffer, 0, sizeof szBuffer);
+  memset(szFormat, 0, sizeof szFormat);
 
   va_start(args, fmtstr);
 
