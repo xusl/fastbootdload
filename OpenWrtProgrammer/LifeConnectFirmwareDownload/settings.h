@@ -73,6 +73,7 @@ extern struct S_Tftpd32Settings sSettings;          // The settings,used anywher
 #define PKG_SECTION             _T("PackageFiles")
 #define APP_SECTION             _T("App")
 #define TELNET_SECTION          _T("Telnet")
+#define NETWORK_SECTION         _T("Network")
 #define PKG_PATH                _T("PackagePath")
 
 static const int FIRMWARE_NUM_MAX = 32;
@@ -88,31 +89,38 @@ public:
     BOOL           ReadConfigIni(const char * ini = _T("Config.ini"));
     const char *   GetPackageDir(void) { return pkg_dir;};
     const char *   GetAppConfIniPath(void) { return m_ConfigPath.GetString();};
-    const char *   GetPkgDlImgPath(void) {return pkg_dlimg_file;};
     // const char *GetPkgConfXmlPath(void) {return pkg_conf_file;};
     BOOL           GetForceUpdateFlag(void) { return m_forceupdate;};
     BOOL           GetAutoWorkFlag(void) { return m_bWork;};
     list<char *>   GetFirmwareFiles(void) { return m_FirmwareFiles;};
-    int            ReadFirmwareFiles(const char* config);
+    BOOL           ReadFirmwareFiles(const char* packageFolder, BOOL dummy = FALSE);
     int            SetPackageDir(const char* config);
     const char * const GetNetworkSegment() {  return m_NetworkSegment;};
     const char * const GetLoginUser() { return  m_User;};
     const char * const GetLoginPassword() { return m_Passwd;};
     BOOL            IsLoginTelnet() { return m_Login;};
+    BOOL           IsPackageChecked() { return m_PackageChecked;}
+    int            GetHostIPStart() { return m_HostIPStart;};
+    int            GetHostIPEnd() { return m_HostIPEnd;};
+    int            GetTelnetTimeoutMs() { return m_TelnetTimeoutMs;};
 private:
     BOOL           DestroyFirmwareFiles();
-    BOOL           AddFirmwareFiles(const char* const file);
+    BOOL           AddFirmwareFiles(const char* const file, BOOL dummy);
+    VOID           AssignPackageDir(const char *dir);
 private:
     CString                 m_ConfigPath;
     volatile BOOL           m_bWork;
     BOOL                    m_forceupdate; // do not check version, if not exist config.xml or version rule is not match
     char                    pkg_dir[MAX_PATH];
     //   char                 pkg_conf_file[MAX_PATH];
-    char                    pkg_dlimg_file[MAX_PATH];
     char                    m_NetworkSegment[IPADDR_BUFFER_LEN];
     char                    m_User[USER_LEN_MAX];
     char                    m_Passwd[PASSWD_LEN_MAX];
+    int                     m_HostIPStart;
+    int                     m_HostIPEnd;
+    BOOL                    m_PackageChecked;
     BOOL                    m_Login;
+    int                     m_TelnetTimeoutMs;
     list<char *>            m_FirmwareFiles;
     CString                 mModulePath;
 };

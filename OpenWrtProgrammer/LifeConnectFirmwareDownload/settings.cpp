@@ -13,6 +13,9 @@
 #include "Tftp.h"
 #include "settings.h"
 #include "log.h"
+
+using namespace std;
+
 struct S_Tftpd32Settings sSettings =
 {
 	  ".",                   // Base directory
@@ -45,9 +48,9 @@ struct S_Tftpd32Settings sSettings =
 ConfigIni::ConfigIni() :
     m_FirmwareFiles(),
     m_forceupdate(FALSE),
-    m_bWork(FALSE){
+    m_bWork(FALSE),
+    m_PackageChecked(FALSE){
     memset(pkg_dir, 0, sizeof pkg_dir);
-    memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
 }
 
 #define CONFIG_BUFFER_LEN 32
@@ -75,8 +78,14 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     lpFileName = m_ConfigPath.GetString();
     //init app setting.
     m_bWork = GetPrivateProfileInt(APP_SECTION,_T("autowork"), 0, lpFileName);
-    GetPrivateProfileString(_T("MISC"), _T("NetworkSegment"), "192.168.1",
+    GetPrivateProfileString(NETWORK_SECTION, _T("NetworkSegment"), "192.168.1",
                         m_NetworkSegment, IPADDR_BUFFER_LEN, lpFileName);
+
+    LOGD("network segment : %s", m_NetworkSegment);
+    m_HostIPStart = GetPrivateProfileInt(NETWORK_SECTION, _T("HostIPStart"), 2, lpFileName);
+    m_HostIPEnd = GetPrivateProfileInt(NETWORK_SECTION, _T("HostIPEnd"), 10, lpFileName);
+
+    m_TelnetTimeoutMs = GetPrivateProfileInt(TELNET_SECTION, _T("TimeoutMs"), 6000, lpFileName);
     GetPrivateProfileString(TELNET_SECTION, _T("User"), "root",
                         m_User, USER_LEN_MAX, lpFileName);
     GetPrivateProfileString(TELNET_SECTION, _T("Password"), "root",
@@ -90,45 +99,18 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     if (stricmp(buffer, "true") == 0)
         m_Login = TRUE;
 
-    LOGD("network segment : %s", m_NetworkSegment);
     data_len = GetPrivateProfileString(APP_SECTION,
                                        PKG_PATH,
                                        mModulePath.GetString(),
-                                       pkg_dir,
+                                       path_buffer,
                                        MAX_PATH,
                                        lpFileName);
+    if (data_len > 0)
+        AssignPackageDir(path_buffer);
 
-    if (pkg_dir[data_len - 1] != _T('\\') ) {
-        if ( data_len > MAX_PATH - 2) {
-            LOGE("bad package directory in the section path.");
-            return FALSE;
-        }
-        pkg_dir[data_len] = _T('\\');
-        pkg_dir[data_len + 1] = _T('\0');
-        data_len++;
-    }
     strncpy(sSettings.szWorkingDirectory, pkg_dir, sizeof sSettings.szWorkingDirectory);
 
-#if 0
-    memset(pkg_conf_file, 0, sizeof pkg_conf_file);
-    wcsncpy(pkg_conf_file, pkg_dir, data_len+1);
-
-    char * candidate[] = {_T("Download.img"), _T("..\\DownloadImage\\Download.img")};
-
-    memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
-    for (int i = 0; i < COUNTOF(candidate); i++) {
-        wcsncpy(pkg_dlimg_file, pkg_dir, data_len+1);
-        wcsncat(pkg_dlimg_file, candidate[i], COUNTOF(pkg_dlimg_file) - data_len);
-        if(GetFileAttributes(pkg_dlimg_file) != INVALID_FILE_ATTRIBUTES) {
-            break;
-        } else {
-            memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
-        }
-    }
-#endif
-
-    ReadFirmwareFiles(lpFileName);
-
+    m_PackageChecked = ReadFirmwareFiles(pkg_dir);
     return TRUE;
 }
 
@@ -137,28 +119,46 @@ int ConfigIni::SetPackageDir(const char* config) {
         return -1;
     }
 
-    WritePrivateProfileString(APP_SECTION, PKG_PATH, config,m_ConfigPath.GetString());
-    strncpy(pkg_dir, config, sizeof pkg_dir);
+    AssignPackageDir(config);
+    WritePrivateProfileString(APP_SECTION, PKG_PATH, pkg_dir, m_ConfigPath.GetString());
     strncpy(sSettings.szWorkingDirectory, pkg_dir, sizeof sSettings.szWorkingDirectory);
+    DestroyFirmwareFiles();
+    ReadFirmwareFiles(pkg_dir);
+
     return 0;
 }
 
-int ConfigIni::ReadFirmwareFiles(const char* config) {
+VOID ConfigIni::AssignPackageDir(const char *dir) {
+    ASSERT(dir != NULL );
+    int data_len = strlen(dir);
+    if (data_len == 0 || data_len >= sizeof pkg_dir) {
+        LOGE("DIR is null or it is too long");
+        return;
+    }
+    strncpy(pkg_dir, dir, data_len);
+        if (pkg_dir[data_len - 1] != _T('\\') ) {
+        if ( data_len > MAX_PATH - 2) {
+            LOGE("bad package directory in the section path.");
+            return;
+        }
+        pkg_dir[data_len] = _T('\\');
+        pkg_dir[data_len + 1] = _T('\0');
+    }
+}
+int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
   char firmware_tbl[FIRMWARE_TBL_LEN] = {0};
   char filename[MAX_PATH];
   char *firmware;
   size_t firmware_len;
-  CString path;
   int data_len;
+  const char* config = m_ConfigPath.GetString();
+  BOOL result = TRUE;
 
-  if (config == NULL) {
-    LOGE("not specified config file name");
-    return -1;
+  if (packageFolder == NULL || strlen(packageFolder) == 0) {
+    LOGE("not specified PACKAGE folder or it is invalid");
+    return FALSE;
   }
-  if (strlen(pkg_dir) == 0) {
-    LOGE("pkg_dir is not initialized");
-    return -1;
-  }
+
 
   data_len = GetPrivateProfileString(PKG_SECTION,
                                      NULL,
@@ -166,31 +166,11 @@ int ConfigIni::ReadFirmwareFiles(const char* config) {
                                      firmware_tbl,
                                      FIRMWARE_TBL_LEN,
                                      config);
-#if 0
+
   if (data_len == 0) {
-    LOGW("no %S exist, load default firmware table.", config);
-    char *imgs[] = {
-      _T("mibib"), _T("sbl1.mbn"),
-      _T("sbl2"), _T("sbl2.mbn"),
-      _T("rpm"), _T("rpm.mbn"),
-      _T("dsp1"), _T("dsp1.mbn"),
-      _T("dsp3"), _T("dsp3.mbn"),
-      _T("dsp2"), _T("dsp2.mbn"),
-      _T("aboot"), _T("appsboot.mbn"),
-      _T("boot"), _T("boot-oe-msm9615.img"),
-      _T("system"), _T("9615-cdp-image-9615-cdp.yaffs2"),
-      _T("userdata"), _T("9615-cdp-usr-image.usrfs.yaffs2"),
-    };
-
-    for (int i = 0; i < sizeof(imgs)/ sizeof(imgs[0]); i += 2) {
-        //parameter push stack from right to left
-        add_image(imgs[i], imgs[i+1], TRUE, config);
-    }
-
-    set_package_dir(GetAppPath(path).GetString(), config);
-    return 0;
+    return FALSE;
   }
-#endif
+
   firmware = firmware_tbl;
   firmware_len = strlen(firmware);
 
@@ -202,9 +182,11 @@ int ConfigIni::ReadFirmwareFiles(const char* config) {
                                        MAX_PATH,
                                        config);
     if (data_len > 0) {
-        path = pkg_dir;
+        string path = packageFolder;
+        path += "\\";
         path += filename;
-      AddFirmwareFiles(path.GetString());
+        result = result && AddFirmwareFiles(path.c_str(), dummy);
+//      AddFirmwareFiles(path.GetString());
 //      path.GetBuffer()
 //      path.ReleaseBuffer();
     }
@@ -213,16 +195,24 @@ int ConfigIni::ReadFirmwareFiles(const char* config) {
     firmware_len = strlen(firmware);
   }
 
-  return 0;
+  return result;
 }
 
-BOOL ConfigIni::AddFirmwareFiles(const char* const file){
+BOOL ConfigIni::AddFirmwareFiles(const char* const file, BOOL dummy){
     if (file == NULL) {
         LOGE("Bad parameter");
         return FALSE;
     }
-    LOGI("add file %s", file);
-    m_FirmwareFiles.push_back(strdup(file));
+
+    //if(GetFileAttributes(file) != INVALID_FILE_ATTRIBUTES)
+     if(!PathFileExists(file)) {
+        return FALSE;
+     }
+
+    if (dummy == FALSE) {
+        LOGI("add file %s", file);
+        m_FirmwareFiles.push_back(strdup(file));
+    }
     return TRUE;
 }
 

@@ -276,8 +276,8 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     pThis->UpdateMessage(_T("Search Life Connect..., please wait..."));
     pThis->GetConfig(conf);
 
-    int from = 2;
-    int to = 2;
+    int from = conf.GetHostIPStart();
+    int to = conf.GetHostIPEnd();
     const char * const segment = conf.GetNetworkSegment();
 
     msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, 1, segment, from, to);
@@ -388,6 +388,7 @@ HCURSOR CDownloadDlg::OnQueryDragIcon()
 }
 
 void CDownloadDlg::OnBnClickedButtonBrowse() {
+#if 0
     CFileDialog dlgFile(TRUE);
     CString fileName;
     CString selectedPath;
@@ -439,6 +440,36 @@ void CDownloadDlg::OnBnClickedButtonBrowse() {
     //::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_FIRMWARE_IMAGE,selectedPath);
     m_RomPathStaticText.SetWindowText(selectedPath);
     m_Config.SetPackageDir(selectedPath.GetString());
+#else
+    char szPath[MAX_PATH] = { 0 };
+    //ZeroMemory(szPath, sizeof(szPath));
+
+    BROWSEINFO bi;
+    bi.hwndOwner = m_hWnd;
+    bi.pidlRoot = NULL;
+    bi.pszDisplayName = szPath;
+    bi.lpszTitle = "Please select path place firmware";
+    bi.ulFlags = 0;
+    bi.lpfn = NULL;
+    bi.lParam = 0;
+    bi.iImage = 0;
+    LPITEMIDLIST lp = SHBrowseForFolder(&bi);
+
+    if(lp && SHGetPathFromIDList(lp, szPath))
+    {
+        if (m_Config.ReadFirmwareFiles(szPath, TRUE)) {
+        m_RomPathStaticText.SetWindowText(szPath);
+        m_Config.SetPackageDir(szPath);
+        m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
+        } else {
+        CString msg;
+        msg.Format("folder %s does not contain any firmware.", szPath);
+        AfxMessageBox(msg);
+        }
+    } else {
+        AfxMessageBox("The folder is not exist");
+    }
+#endif
 }
 
 void CDownloadDlg::OnBnClickedStart() {
@@ -446,16 +477,20 @@ void CDownloadDlg::OnBnClickedStart() {
         LOGW("Tool is working now.");
         if (b_download == false) {
             TerminateThread(m_NetworkSnifferThreadHandle, 1);
-            GetDlgItem(ID_Start)->SetWindowText("Start");
+            GetDlgItem(ID_Start)->SetWindowText("Download");
+            GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(true);
             is_downloading = false;
             m_pCoordinator->Reset();
         }
         return;
     }
-    //if(mRomPath=="") {
-    //     ::MessageBox(NULL,_T("Please select software!"),_T("select software"),MB_OK);
-    //     return;
-    //}
+    if(m_Config.IsPackageChecked() == FALSE) {
+         ::MessageBox(NULL,
+            _T("Please select correct package or check Config.ini!"),
+            _T("No firmware available"),
+            MB_OK);
+         return;
+    }
 
     GetDlgItem(ID_Start)->SetWindowText("Stop");
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
