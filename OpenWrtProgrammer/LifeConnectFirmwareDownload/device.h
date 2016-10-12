@@ -46,9 +46,9 @@ class CDevLabel {
     void SetDownloadIpAddr(string ip) { mDownloadIpAddr = ip;};
     void SetStatus(DEVICE_e status) {
       mStatus = status;
-      mStatusEnterMS = ::GetTickCount(); /*time(NULL);*/
+      TickWatchDog();
     };
-    void TickWatchDog() { mStatusEnterMS = ::GetTickCount();};
+    void TickWatchDog() { mStatusEnterMS = ::GetTickCount();}; /*time(NULL);*/
     BOOL CheckRemovable();
     DEVICE_e GetStatus() const { return mStatus;};
     VOID Dump(const char *tag);
@@ -73,12 +73,13 @@ class DeviceCoordinator {
     ~DeviceCoordinator();
     CDevLabel *GetValidDevice();
     CDevLabel *GetRebootDevice();
+    CDevLabel *GetDevice(const char * const ipAddr, int status);
     BOOL GetDevice(const char *const ipAddr, CDevLabel** outDevIntf, BOOL byDownload);
     BOOL AddDevice(CDevLabel& dev, CDevLabel** intfs);
     BOOL RemoveDevice(CDevLabel*const & devIntf);
     BOOL SetDownloadFirmware(list<char *> firmware);
     BOOL RequestDownloadPermission(CDevLabel* const & devIntf);
-    BOOL StartFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, DWORD dwTransferId);
+    BOOL RefreshFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, BOOL start);
     CDevLabel * EndFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, DWORD dwTransferId);
 
     BOOL IsEmpty();

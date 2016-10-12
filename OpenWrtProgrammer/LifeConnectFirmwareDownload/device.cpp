@@ -66,6 +66,34 @@ CDevLabel *DeviceCoordinator::GetRebootDevice() {
     return NULL;
 }
 
+CDevLabel *DeviceCoordinator::GetDevice(const char * const ipAddr, int status) {
+    list<CDevLabel*>::iterator it;
+    for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+        CDevLabel *item = *it;
+        if (item->GetStatus() != status)
+            continue;
+        switch(status) {
+            case DEVICE_DWONLOAD:
+            case DEVICE_FINISH:
+                if ( item->GetDownloadIpAddr() == ipAddr) {
+                    return item;
+                }
+                break;
+
+            case DEVICE_ARRIVE:
+            case DEVICE_COMMAND:
+            case DEVICE_REBOOTDOWNLOAD:
+                if ( item->GetIpAddr() == ipAddr) {
+                    return item;
+                }
+                break;
+
+            default:
+                break;
+        }
+    }
+    return NULL;
+}
 
 BOOL DeviceCoordinator::GetDevice(const char * const ipAddr, CDevLabel** outDevIntf, BOOL byDownload) {
 #if 0
@@ -176,32 +204,40 @@ VOID DeviceCoordinator::Dump(VOID) {
 }
 
 
-BOOL DeviceCoordinator::StartFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, DWORD                     dwTransferId) {
+BOOL DeviceCoordinator::RefreshFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, BOOL start) {
     char szAddr[MAXLEN_IPv6]={0}, szServ[NI_MAXSERV] ={0};
-        getnameinfo ( (LPSOCKADDR) & addr, sizeof (addr),
-                 szAddr, sizeof szAddr,
-                 szServ, sizeof szServ,
-                 NI_NUMERICHOST | AI_NUMERICSERV);
-    CDevLabel *dev = GetRebootDevice();
-    if(dev != NULL) {
-        dev->SetDownloadIpAddr(szAddr);
+    getnameinfo ( (LPSOCKADDR) & addr, sizeof (addr),
+             szAddr, sizeof szAddr,
+             szServ, sizeof szServ,
+             NI_NUMERICHOST | AI_NUMERICSERV);
+    if (start) {
+        CDevLabel *dev = GetRebootDevice();
+        if(dev != NULL) {
+            dev->SetDownloadIpAddr(szAddr);
+            dev->TickWatchDog();
+        }
     } else {
+        CDevLabel *dev = GetDevice(szAddr, DEVICE_DWONLOAD);
+        if(dev != NULL) {
+            dev->TickWatchDog();
+        }
     }
     return TRUE;
 }
 
 CDevLabel * DeviceCoordinator::EndFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, DWORD  dwTransferId) {
     char szAddr[MAXLEN_IPv6]={0}, szServ[NI_MAXSERV] ={0};
-        getnameinfo ( (LPSOCKADDR) & addr, sizeof (addr),
-                 szAddr, sizeof szAddr,
-                 szServ, sizeof szServ,
-                 NI_NUMERICHOST | AI_NUMERICSERV );
-        CDevLabel *dev = NULL;
-        if(GetDevice(szAddr, &dev, true)) {
-            dev->UpdateFirmwareStatus(filename, dwTransferId);
-        } else {
-        LOGE("%s is not in our download manager", szAddr);
-        }
+    getnameinfo ( (LPSOCKADDR) & addr, sizeof (addr),
+             szAddr, sizeof szAddr,
+             szServ, sizeof szServ,
+             NI_NUMERICHOST | AI_NUMERICSERV );
+    CDevLabel *dev = NULL;
+    if(GetDevice(szAddr, &dev, true)) {
+        dev->UpdateFirmwareStatus(filename, dwTransferId);
+        dev->TickWatchDog();
+    } else {
+    LOGE("%s is not in our download manager", szAddr);
+    }
     return dev;
 }
 
@@ -269,17 +305,19 @@ BOOL CDevLabel::GetTransferIDs(list<DWORD> &ids) {
 }
 
 BOOL CDevLabel::CheckRemovable() {
-    DWORD timeout = 30000;
+    DWORD timeout = 40000;
     switch (GetStatus()) {
         case DEVICE_FINISH:
             timeout = 10000;
             break;
 
         default:
-            return FALSE;
+            break;
     }
-
-    return (GetStatusEnterMS() - ::GetTickCount() > timeout);
+    DWORD tick = ::GetTickCount();
+    LOGE("Status %d, now tick %d, device timestamp %d, elapse %d", GetStatus(),
+        tick, GetStatusEnterMS(), tick - GetStatusEnterMS());
+    return (tick - GetStatusEnterMS() > timeout);
 }
 
 bool CDevLabel::Match(const CDevLabel * const & dev) const {

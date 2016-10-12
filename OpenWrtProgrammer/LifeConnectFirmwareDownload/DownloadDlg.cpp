@@ -231,7 +231,7 @@ BOOL CDownloadDlg::OnInitDialog()
 
 VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
     list<DWORD> ids;
-
+    CString msg;
     CDevLabel *dev = NULL;
     m_pCoordinator->GetDevice(ipAddr, &dev, true);
     if(dev == NULL) {
@@ -241,6 +241,14 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
     if (dev == NULL || FALSE == dev->CheckRemovable()) {
         return;
     }
+
+    msg.Format("Remove device %s, ", ipAddr);
+    if (dev->GetStatus() != DEVICE_FINISH)
+        msg += "for work timeout.";
+    else
+        msg += "for update finish.";
+    UpdateMessage(msg);
+    m_PSTStatus.SetWindowText(msg);
 
     dev->GetTransferIDs(ids);
 
@@ -256,6 +264,7 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
         if (itemPos != -1)
             m_TransferFileList.DeleteItem(itemPos);
     }
+    b_download = false;
     m_pCoordinator->RemoveDevice(dev);
 }
 
@@ -276,6 +285,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 
     for(;;) {
         pThis->SniffNetwork(segment, from, to);
+        Sleep(TIMER_ELAPSE);
     }
     return 0;
 }
@@ -503,6 +513,11 @@ void CDownloadDlg::OnBnClickedStart() {
            m_DeviceOSVersion.SetWindowText("");
            m_DeviceFWVersion.SetWindowText("");
            m_PSTStatus.SetWindowText("");
+        } else {
+         ::MessageBox(NULL,
+            _T("Tool is working now."),
+            _T("Error"),
+            MB_OK);
         }
         return;
     }
@@ -543,7 +558,10 @@ void CDownloadDlg::OnBnClickedStart() {
 int CDownloadDlg::TelnetPST() {
     int i;
     CString msg;
-    //if (pThis->BuildUpdateCommand(pThis->mRomPath, cmd)) {
+    string osVersion;
+    string fwVersion;
+    string customId;
+    string result;
     DeviceCoordinator * dc = GetDeviceCoodinator();
 
     CDevLabel *dev = dc->GetValidDevice();
@@ -560,64 +578,74 @@ int CDownloadDlg::TelnetPST() {
     SetDeviceInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
 
     b_download = true;
-
     telnet tn(sock);
-    string result;
-//    ConfigIni conf;
-//    GetConfig(conf);
 
- //   tn.receive_telnet_data(buf, BUFSIZE);
-//    pThis->UpdateMessage(buf);
+    //   tn.receive_telnet_data(buf, BUFSIZE);
+    //    pThis->UpdateMessage(buf);
+
+    m_PSTStatus.SetWindowText("Do user login");
 
     //if (strstr(buf, "login") != NULL)
     {
-    tn.send_command(m_Config.GetLoginUser(), result, false);
-    UpdateMessage(result.c_str());
-    tn.send_command(m_Config.GetLoginPassword(), result, false);
-    UpdateMessage(result.c_str());
+        dev->TickWatchDog();
+        tn.send_command(m_Config.GetLoginUser(), result, false);
+        UpdateMessage(result.c_str());
+        dev->TickWatchDog();
+        tn.send_command(m_Config.GetLoginPassword(), result, false);
+        UpdateMessage(result.c_str());
     }
 
-    string osVersion;
-    string fwVersion;
-    string customId;
-    tn.send_command(CMD_OS_VERSION, osVersion);
-    SetDeviceInformation(DEV_OS_VERSION, osVersion.c_str());
+    //dev->TickWatchDog();
+    //tn.send_command(CMD_OS_VERSION, osVersion);
+    //SetDeviceInformation(DEV_OS_VERSION, osVersion.c_str());
 
+    dev->TickWatchDog();
+    m_PSTStatus.SetWindowText("Get device firmware version");
     tn.send_command(CMD_FW_VERSION, fwVersion);
     SetDeviceInformation(DEV_FW_VERSION, fwVersion.c_str());
 
-    if (CheckVersion()) {
-    char *resp = strdup( fwVersion.c_str());
- char *result, *context, *token;
-  for (i = 0, result = resp; ; i++, result = NULL) {
-      token = strtok_s(result, "_", &context);
-      if (token == NULL) {
-        LOGE("%s contain none \"_\"", result);
-        break;
-      }
-      if (i == 1)
-        customId = token;
+    char *resp = _strdup( fwVersion.c_str());
+    char *version, *context, *token;
+    for (i = 0, version = resp; ; i++, version = NULL) {
+        token = strtok_s(version, "_", &context);
+        if (token == NULL) {
+            LOGE("%s contain none \"_\"", version);
+            break;
+        }
+        if (i == 1)
+            customId = token;
 
     }
-  if (resp != NULL)
-    free(resp);
-    }
+    if (resp != NULL)
+        free(resp);
     msg.Format("Device custom id is %s", customId.c_str());
     m_PSTStatus.SetWindowText(msg);
 
+    if (CheckVersion() && customId != m_Config.GetFirmwareCustomId()) {
+        m_PSTStatus.SetWindowText("Custom ID is not matched");
+        closesocket(sock);
+        m_pCoordinator->RemoveDevice(dev);
+        b_download = false;
+        return -2;
+    }
+
     for (int i = 0; i < 3; i++) {
-    if (dc->RequestDownloadPermission(dev)) {
-     break;
-    }
+        if (dc->RequestDownloadPermission(dev)) {
+            break;
+        }
 
-       if (i == 3) {
-        return ERROR_INVALID_BLOCK;
+        if (i == 3) {
+            m_PSTStatus.SetWindowText("Request download failed. Other device is block!");
+            closesocket(sock);
+            m_pCoordinator->RemoveDevice(dev);
+            b_download = false;
+            return -3;
+        }
+        Sleep(5000);
     }
-       Sleep(5000);
-    }
-
 
     tn.send_telnet_data(CMD_REBOOT, strlen(CMD_REBOOT));
+    m_PSTStatus.SetWindowText("Device enter download mode");
     closesocket(sock);
     return NO_ERROR;
 }
@@ -1154,6 +1182,8 @@ int CDownloadDlg::TFTPNew (const struct S_TftpTrfNew *pTrf)
 
     TFTPReporting (pTftpGuiFirst);
 
+    m_PSTStatus.SetWindowText("Device get firmware");
+
     struct subStats stat;
     stat.stat =pTrf->stat;
     stat.dwTransferId = pTrf->dwTransferId;
@@ -1438,14 +1468,15 @@ int CDownloadDlg::TFTPReporting (const struct S_TftpGui *pTftpGuiFirst)
         LvInfo.flags = LVFI_PARAM;
         LvInfo.lParam = pTftpGui->dwTransferId;
         itemPos = ListView_FindItem (hListV, -1, & LvInfo);
+        BOOL add = (itemPos==-1);
 
         // item has not been found --> should be inserted
-        if (itemPos==-1)
+        if (add)
         {
             itemPos = TFTPItemAdd (&m_TransferFileList, pTftpGui, Ark);
-            m_pCoordinator->StartFirmwareTransfer(pTftpGui->stg_addr,
-                pTftpGui->filename, pTftpGui->dwTransferId);
         } // create transfers
+        m_pCoordinator->RefreshFirmwareTransfer(pTftpGui->stg_addr,
+                pTftpGui->filename, add);
         // actualize fields
         TFTPItemUpdate (hListV, pTftpGui, itemPos);
         // flag : ths item has been processed
