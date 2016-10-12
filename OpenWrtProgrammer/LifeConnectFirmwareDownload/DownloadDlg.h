@@ -107,6 +107,7 @@ private:
   BOOL m_bSuperMode;
 	CEdit m_MessageControl;
   CStatic m_RomPathStaticText;
+  CStatic m_RomVersion;
   CStatic m_DeviceIpAddress;
   CStatic m_DeviceOSVersion;
   CStatic m_DeviceFWVersion;

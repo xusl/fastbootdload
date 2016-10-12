@@ -68,11 +68,13 @@ extern struct S_Tftpd32Settings sSettings;          // The settings,used anywher
 #define TFTP_MAXRETRIES          50 // do not resent same block more than # times
 #define TIME_FOR_LONG_TRANSFER   10 // more than 10 seconds -> beep
 
-#define PKG_SECTION             _T("PackageFiles")
+#define PKGFILES_SECTION        _T("PackageFiles")
+#define PKGVERSION_SECTION      _T("PackageVersion")
 #define APP_SECTION             _T("App")
 #define TELNET_SECTION          _T("Telnet")
 #define NETWORK_SECTION         _T("Network")
 #define PKG_PATH                _T("PackagePath")
+#define PKG_CONFIG              _T("PackageConfig")
 
 static const int FIRMWARE_NUM_MAX = 32;
 static const int FIRMWARE_NAME_LEN = MAX_PATH;
@@ -80,6 +82,9 @@ static const int FIRMWARE_TBL_LEN = FIRMWARE_NUM_MAX * FIRMWARE_NAME_LEN;
 
 #define USER_LEN_MAX        32
 #define PASSWD_LEN_MAX      32
+#define FW_CUSTOMID_LEN     32
+#define FW_BUILDID_LEN     32
+
 class ConfigIni{
 public:
     ConfigIni();
@@ -92,12 +97,19 @@ public:
     BOOL           GetAutoWorkFlag(void) { return m_bWork;};
     list<char *>   GetFirmwareFiles(void) { return m_FirmwareFiles;};
     BOOL           ReadFirmwareFiles(const char* packageFolder, BOOL dummy = FALSE);
-    int            SetPackageDir(const char* config);
+    int            SetPackageDir(const char* config, BOOL updateConfig);
     const char * const GetNetworkSegment() {  return m_NetworkSegment;};
     const char * const GetLoginUser() { return  m_User;};
     const char * const GetLoginPassword() { return m_Passwd;};
+    const char * const GetFirmwareCustomId() { return m_FirmwareCustomId;};
+    const char * const GetFirmwareBuildId() { return m_FirmwareBuildId;};
+    VOID           GetFirmwareVersion(CString &version) {
+      version = m_FirmwareCustomId;
+      version += "_";
+      version += m_FirmwareBuildId;
+    };
     BOOL            IsLoginTelnet() { return m_Login;};
-    BOOL           IsPackageChecked() { return m_PackageChecked;}
+    BOOL           IsPackageChecked() { return ReadFirmwareFiles(pkg_dir, TRUE);}
     int            GetHostIPStart() { return m_HostIPStart;};
     int            GetHostIPEnd() { return m_HostIPEnd;};
     int            GetTelnetTimeoutMs() { return m_TelnetTimeoutMs;};
@@ -106,7 +118,9 @@ private:
     BOOL           AddFirmwareFiles(const char* const file, BOOL dummy);
     VOID           AssignPackageDir(const char *dir);
 private:
+    CString                 mModulePath;
     CString                 m_ConfigPath;
+    CString                 m_FirmwareConfig;
     volatile BOOL           m_bWork;
     BOOL                    m_forceupdate; // do not check version, if not exist config.xml or version rule is not match
     char                    pkg_dir[MAX_PATH];
@@ -116,11 +130,11 @@ private:
     char                    m_Passwd[PASSWD_LEN_MAX];
     int                     m_HostIPStart;
     int                     m_HostIPEnd;
-    BOOL                    m_PackageChecked;
     BOOL                    m_Login;
     int                     m_TelnetTimeoutMs;
+    char                    m_FirmwareCustomId[FW_CUSTOMID_LEN];
+    char                    m_FirmwareBuildId[FW_BUILDID_LEN];
     list<char *>            m_FirmwareFiles;
-    CString                 mModulePath;
 };
 
 

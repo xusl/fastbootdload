@@ -48,8 +48,14 @@ ConfigIni::ConfigIni() :
     m_FirmwareFiles(),
     m_forceupdate(FALSE),
     m_bWork(FALSE),
-    m_PackageChecked(FALSE){
+    m_FirmwareConfig("")
+{
     memset(pkg_dir, 0, sizeof pkg_dir);
+    memset(m_FirmwareCustomId, 0, sizeof m_FirmwareCustomId);
+    memset(m_FirmwareBuildId, 0, sizeof m_FirmwareBuildId);
+    memset(m_NetworkSegment, 0, sizeof m_NetworkSegment);
+    memset(m_User, 0, sizeof m_User);
+    memset(m_Passwd, 0, sizeof m_Passwd);
 }
 
 #define CONFIG_BUFFER_LEN 32
@@ -105,32 +111,39 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     if (stricmp(buffer, "true") == 0)
         m_Login = TRUE;
 
+
+    data_len = GetPrivateProfileString(APP_SECTION,
+                                       PKG_CONFIG,
+                                       _T("LifeConnectFirmware.ini"),
+                                       filename,
+                                       MAX_PATH,
+                                       lpFileName);
+    m_FirmwareConfig = filename;
+
     data_len = GetPrivateProfileString(APP_SECTION,
                                        PKG_PATH,
                                        mModulePath.GetString(),
                                        path_buffer,
                                        MAX_PATH,
                                        lpFileName);
-    if (data_len > 0)
-        AssignPackageDir(path_buffer);
+    SetPackageDir(path_buffer, FALSE);
 
-    strncpy(sSettings.szWorkingDirectory, pkg_dir, sizeof sSettings.szWorkingDirectory);
-
-    m_PackageChecked = ReadFirmwareFiles(pkg_dir);
     return TRUE;
 }
 
-int ConfigIni::SetPackageDir(const char* config) {
+int ConfigIni::SetPackageDir(const char* config, BOOL updateConfig) {
     if (config == NULL) {
         return -1;
     }
 
     AssignPackageDir(config);
-    WritePrivateProfileString(APP_SECTION, PKG_PATH, pkg_dir, m_ConfigPath.GetString());
+    if (updateConfig)
+        WritePrivateProfileString(APP_SECTION, PKG_PATH, pkg_dir, m_ConfigPath.GetString());
     strncpy(sSettings.szWorkingDirectory, pkg_dir, sizeof sSettings.szWorkingDirectory);
+
+
     DestroyFirmwareFiles();
     ReadFirmwareFiles(pkg_dir);
-
     return 0;
 }
 
@@ -157,7 +170,7 @@ int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
   char *firmware;
   size_t firmware_len;
   int data_len;
-  const char* config = m_ConfigPath.GetString();
+  CString config;
   BOOL result = TRUE;
 
   if (packageFolder == NULL || strlen(packageFolder) == 0) {
@@ -165,13 +178,24 @@ int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
     return FALSE;
   }
 
+   int Rc ;
+   Rc = GetFileAttributes (packageFolder) ;
+   if (Rc == INVALID_FILE_ATTRIBUTES || 0 == (Rc & FILE_ATTRIBUTE_DIRECTORY ))
+    return FALSE;
 
-  data_len = GetPrivateProfileString(PKG_SECTION,
+
+config = packageFolder;
+   if (packageFolder[strlen(packageFolder) -1] != '\\')
+    config += '\\';
+
+  config += m_FirmwareConfig;
+
+  data_len = GetPrivateProfileString(PKGFILES_SECTION,
                                      NULL,
                                      NULL,
                                      firmware_tbl,
                                      FIRMWARE_TBL_LEN,
-                                     config);
+                                     config.GetString());
 
   if (data_len == 0) {
     return FALSE;
@@ -181,7 +205,7 @@ int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
   firmware_len = strlen(firmware);
 
   while (firmware_len > 0) {
-    data_len = GetPrivateProfileString(PKG_SECTION,
+    data_len = GetPrivateProfileString(PKGFILES_SECTION,
                                        firmware,
                                        NULL,
                                        filename,
@@ -199,6 +223,21 @@ int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
 
     firmware = firmware + firmware_len + 1;
     firmware_len = strlen(firmware);
+  }
+
+  if (dummy == FALSE) {
+     GetPrivateProfileString(PKGVERSION_SECTION,
+                                       _T("CustomId"),
+                                       "",
+                                       m_FirmwareCustomId,
+                                       FW_CUSTOMID_LEN,
+                                       config);
+     GetPrivateProfileString(PKGVERSION_SECTION,
+                                       _T("BuildId"),
+                                       "",
+                                       m_FirmwareBuildId,
+                                       FW_BUILDID_LEN,
+                                       config);
   }
 
   return result;
@@ -226,9 +265,8 @@ BOOL ConfigIni::DestroyFirmwareFiles() {
     list<char*>::iterator it;
     for (it = m_FirmwareFiles.begin(); it != m_FirmwareFiles.end(); ++it) {
         char* item = *it;
-        //item->DeleteMemory();
         memset(item, 0, strlen(item));
-//        delete item;
+        free(item);
         *it = NULL;
     }
     m_FirmwareFiles.clear();

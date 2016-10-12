@@ -129,8 +129,8 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
     DDX_Control(pDX, IDC_FILE_STATS, m_PSTStatus);
     DDX_Control(pDX, IDC_DISABLE_CHECK, m_VersionCheckButton);
 
-  DDX_Control(pDX,  IDC_LV_TFTP, m_TransferFileList);
-  //DDX_Control(pDX,  ,m_DeviceList);
+    DDX_Control(pDX, IDC_LV_TFTP, m_TransferFileList);
+    DDX_Control(pDX, IDC_PACKAGE_FIRMWARE_VERSION, m_RomVersion);
 	//DDX_Text(pDX, IDC_EDIT_LINUX_VER_MAIN, m_LinuxVer);
 }
 
@@ -222,6 +222,9 @@ BOOL CDownloadDlg::OnInitDialog()
 
     SetWindowText(m_DialgoTitle.GetString());
     m_RomPathStaticText.SetWindowText(m_Config.GetPackageDir());
+    CString RomVersion;
+    m_Config.GetFirmwareVersion(RomVersion);
+    m_RomVersion.SetWindowText(RomVersion);
     m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -468,9 +471,12 @@ void CDownloadDlg::OnBnClickedButtonBrowse() {
     if(lp && SHGetPathFromIDList(lp, szPath))
     {
         if (m_Config.ReadFirmwareFiles(szPath, TRUE)) {
-        m_RomPathStaticText.SetWindowText(szPath);
-        m_Config.SetPackageDir(szPath);
-        m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
+            m_RomPathStaticText.SetWindowText(szPath);
+            m_Config.SetPackageDir(szPath, TRUE);
+            m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
+            CString RomVersion;
+            m_Config.GetFirmwareVersion(RomVersion);
+            m_RomVersion.SetWindowText(RomVersion);
         } else {
         CString msg;
         msg.Format("folder %s does not contain any firmware.", szPath);
