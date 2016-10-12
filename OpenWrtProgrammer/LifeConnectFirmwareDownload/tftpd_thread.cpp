@@ -6,13 +6,8 @@
 // source released under European Union Public License
 //
 //////////////////////////////////////////////////////
-
-
-
 #undef min
 #define min(a,b)  (((a) < (b)) ? (a) : (b))
-
-
 // #define DEB_TEST
 
 #include <StdAfx.h>
@@ -49,6 +44,7 @@ struct LL_TftpInfo *DoDebugSendAck (struct LL_TftpInfo *pTftp);
 
 int UdpSend (int nFromPort, struct sockaddr *sa_to, int sa_len, const char *data, int len);
 
+static int ReportError(int code, const char * const file);
 
 
 // send data using Udp
@@ -462,6 +458,8 @@ char  szExtendedName [2 * _MAX_PATH];
     if (pTftp->r.hFile == INVALID_HANDLE_VALUE)
     {
         TftpSysError (pTftp, opcode==TFTP_RRQ ? ENOTFOUND : EACCESS, "CreateFile");
+        if (opcode == TFTP_RRQ)
+            ReportError(ENOTFOUND, szExtendedName);
         return  CNX_FAILED;
     }
     pTftp->st.dwTransferSize = GetFileSize (pTftp->r.hFile, NULL);
@@ -701,6 +699,18 @@ LOGD ("end of transfer %d", pTftp->tm.dwTransferId);
 
 return Rc;
 } // ReportEndTrf
+
+static int ReportError(int code, const char * const file)
+{
+    int  Rc = 0;
+    struct S_TftpError gui_msg = {0};
+
+    gui_msg.errorCode = code;
+	strncpy(gui_msg.szFile, file, sizeof gui_msg.szFile);
+    Rc = SendMsgRequest (C_TFTP_TRF_ERROR, (void *) & gui_msg);
+
+return Rc;
+}
 
  //////////////////////////////////////////////////////////////////////////
  //                                                                      //

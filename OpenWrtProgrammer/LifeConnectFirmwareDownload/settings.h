@@ -24,7 +24,6 @@ enum e_SecurityLevels { SECURITY_NONE, SECURITY_STD, SECURITY_HIGH, SECURITY_REA
 
 struct S_Tftpd32Settings
 {
-    char                  szBaseDirectory [_MAX_PATH];
     unsigned              Timeout;
     unsigned              Retransmit;
     unsigned              WinSize;
@@ -43,7 +42,6 @@ struct S_Tftpd32Settings
     unsigned              nTftpLowPort;
     unsigned              nTftpHighPort;
 	BOOL                  bPortOption;			// experimental port option
-	DWORD				  nGuiRemanence;
 	BOOL                  bIgnoreLastBlockAck;
 	BOOL                  bIPv4;
 	BOOL                  bIPv6;

@@ -110,6 +110,8 @@ struct    tftphdr {
 #define PKTSIZE             TFTP_SEGSIZE+4
 #define MAXPKTSIZE          TFTP_MAXSEGSIZE+4
 
+#define ERROR_DETAIL_LEN    512
+
 #define  PLURAL(a)  ((a)>1 ? "s" : "")
 
 #define  SizeOfTab(x)   (sizeof (x) / sizeof (x[0]))
@@ -252,6 +254,13 @@ struct S_TftpKill
    DWORD dwTransferId;
 } ;
 
+struct S_TftpError
+{
+    int  errorCode;
+    char  szFile [_MAX_PATH * 2];
+    //char  detail[ERROR_DETAIL_LEN];
+};
+
 // Events created for main threads
 struct S_ThreadMonitoring
 {
@@ -261,7 +270,17 @@ struct S_ThreadMonitoring
     SOCKET  skt;         // Listening SOCKET
 	int     bSoftReset;  // Thread will be reset
 	BOOL    bInit;		 // inits are terminated
-}  ;
+};
+
+struct S_TftpGui {
+    // identifier
+    DWORD                     dwTransferId;
+    int                       opcode;
+    char                      *filename;
+    SOCKADDR_STORAGE          stg_addr;
+    struct S_Trf_Statistics   stat;
+    struct S_TftpGui          *next;
+};
 
 enum
 {
@@ -276,31 +295,24 @@ enum e_Types
     C_TFTP_TRF_NEW      =  100,
     C_TFTP_TRF_END,
     C_TFTP_TRF_STAT,
+    C_TFTP_TRF_ERROR,
     C_DHCP_LEASE,
     C_TFTP_RPLY_SETTINGS,
     C_DHCP_RPLY_SETTINGS,
     C_REPLY_WORKING_DIR,    // working_dir
-    C_SYSLOG,               // syslog message available
 	C_REPLY_GET_SERVICES,   // get the running services
 	C_REPLY_GET_INTERFACES,      // server ip addresses
 	C_SERVICES_STARTED,          // init done
     C_REPLY_DIRECTORY_CONTENT,   // list directory
-	C_DNS_NEW_ENTRY,              // DNS request
 	C_CHG_SERVICE,				  // Service has been started/stopped
 
     // msg sent from the GUI to the service
     C_CONS_KILL_TRF     = 200,
     C_TFTP_TERMINATE,
-    C_DHCP_TERMINATE,
-	C_SYSLOG_TERMINATE,
-	C_SNTP_TERMINATE,
-	C_DNS_TERMINATE,
     C_TERMINATE,			// kill threads (terminating)
 	C_SUSPEND,              // kill worker services
     C_START,				// start services
-    C_DHCP_RRQ_SETTINGS,
     C_TFTP_RRQ_SETTINGS,
-    C_DHCP_WRQ_SETTINGS,
     C_TFTP_WRQ_SETTINGS,
     C_TFTP_RESTORE_DEFAULT_SETTINGS,  // remove all settings
     C_TFTP_CHG_WORKING_DIR,			  // working_dir
@@ -319,7 +331,7 @@ enum e_Types
 ////////////////////////////////////////////////////////////
 int nak(struct LL_TftpInfo *pTftp, int error);
 int CreateIndexFile (void);
-void StartTftpd32Services (void *);
+void StartTftpd32Services (HWND);
 void StopTftpd32Services (void);
 
 // Access to console

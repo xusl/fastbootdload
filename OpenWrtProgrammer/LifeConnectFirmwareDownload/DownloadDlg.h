@@ -61,6 +61,7 @@ protected:
   BOOL  mWSAInitialized;
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
   void SniffNetwork(const char * const segment, int from, int to);
+  int TelnetPST();
   void GetHostIpAddr();
   void UpdateMessage(CString msg);
   void ClearMessage(void);
@@ -92,6 +93,7 @@ protected:
 	afx_msg void OnBnClickedStop();
   afx_msg void OnBnClickedDisableCheck();
   afx_msg void OnTimer(UINT_PTR nIDEvent);
+  afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	DECLARE_MESSAGE_MAP()
 private:
   ConfigIni m_Config;

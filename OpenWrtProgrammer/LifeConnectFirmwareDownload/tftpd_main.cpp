@@ -745,7 +745,7 @@ int StartTftpdThread ()
 } // StartSingleWorkerThread
 
 
-void StartTftpd32Services (void *param)
+void StartTftpd32Services (HWND param)
 {
 #if 0
     char sz[_MAX_PATH];
@@ -764,7 +764,7 @@ void StartTftpd32Services (void *param)
     Tftpd32ReadSettings ();
     //	DHCPReadConfig ();
 #endif
-    gWndHandle = (HWND ) param;
+    gWndHandle = param;
     // starts worker threads
     StartTftpdThread ();
     LOGD("Worker threads started\n");

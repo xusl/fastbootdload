@@ -18,7 +18,6 @@ using namespace std;
 
 struct S_Tftpd32Settings sSettings =
 {
-	  ".",                   // Base directory
 	  TFTP_TIMEOUT,          // default timeout
 	  TFTP_RETRANSMIT,       // def retransmission7
 	  0,                     // WinSize
@@ -34,7 +33,7 @@ struct S_Tftpd32Settings sSettings =
 	  "",                    // do not filter TFTP'slistening interface
 	  0,  0,                 // use ports assigned by Windows
 	  FALSE,                 // do not support port option
-	  5,					 // after 5 seconds delete Tftp record
+
 	  FALSE,				 // wait for ack of last TFTP packet
 	  TRUE,					 // IPv4
 	  TRUE,					 // IPv6

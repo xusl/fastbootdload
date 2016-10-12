@@ -25,16 +25,6 @@ using namespace std;
 enum EVersion {DEV_IP_ADDR, DEV_FW_VERSION, DEV_OS_VERSION};
 enum E_fields { FD_PEER, FD_FILE, FD_START, FD_PROGRESS, FD_BYTES, FD_TOTAL, FD_TIMEOUT };
 
-struct S_TftpGui {
-    // identifier
-    DWORD                     dwTransferId;
-    int                       opcode;
-    char                      *filename;
-    SOCKADDR_STORAGE          stg_addr;
-    struct S_Trf_Statistics   stat;
-    struct S_TftpGui          *next;
-};
-
 static struct S_TftpGui *pTftpGuiFirst=NULL;
 
 static void gmt_time_string(char *buf, size_t buf_len)
@@ -151,6 +141,7 @@ BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
 	ON_WM_CLOSE()
 	ON_WM_TIMER()
 	ON_WM_DEVICECHANGE()
+	ON_WM_CTLCOLOR()
 	ON_BN_CLICKED(IDC_BUTTON_Browse, &CDownloadDlg::OnBnClickedButtonBrowse)
 	ON_BN_CLICKED(ID_Start, &CDownloadDlg::OnBnClickedStart)
     ON_MESSAGE(UI_MESSAGE_TFTPINFO, &CDownloadDlg::OnMessageTftpInfo)
@@ -315,16 +306,27 @@ void CDownloadDlg::SniffNetwork(const char * const segment, int from, int to) {
             CleanDevice(pcIpAddr);
             continue;
         }
-        LOGD("ping %s succefully, mac :%s", pcIpAddr, mac.c_str());
         msg.Format(_T("ping %s succefully, mac :%s"), pcIpAddr, mac.c_str());
+        LOGD("%s", msg.GetString());
         UpdateMessage(msg);
+        Schedule();
+        //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+        //WaitForSingleObject(m_SyncSemaphore, TIMER_ELAPSE);//INFINITE);
     }
-    SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
-    WaitForSingleObject(m_SyncSemaphore, 10000);//INFINITE);
+}
+
+void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
+   // KillTimer(nIDEvent);
+   // Schedule();
 }
 
 DWORD CDownloadDlg::Schedule() {
+    if (is_downloading == FALSE) {
+        LOGE("PST is now stopped");
+        return -1;
+    }
     if (!m_pCoordinator->IsEmpty()) {
+     //   ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
         m_WorkThreadHandle = CreateThread(NULL,
             0,
             WorkThread,
@@ -333,9 +335,6 @@ DWORD CDownloadDlg::Schedule() {
             &m_WorkThreadID);
         // WaitForSingleObject(m_WorkThreadHandle, INFINITE);
     }
-    ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
-
-    //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     return 0;
 }
 
@@ -384,6 +383,20 @@ HCURSOR CDownloadDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+afx_msg HBRUSH CDownloadDlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor) {
+    HBRUSH brush = CDialog::OnCtlColor(pDC, pWnd, nCtlColor);
+    if(nCtlColor == CTLCOLOR_STATIC){
+      if(pWnd->GetDlgCtrlID()== IDC_FILE_STATS) {
+           pDC->SetTextColor(RGB(255,0,0)); //ÎÄ×ÖÑÕÉ«
+           //pDC->SetBkColor(RGB(251, 247, 200));
+           pDC->SetBkMode(TRANSPARENT);//Í¸Ã÷
+           //return (HBRUSH)::GetStockObject(NULL_BRUSH);
+           //return (HBRUSH) m_Brush.GetSafeHandle();
+       }
+      }
+
+    return brush;
+}
 void CDownloadDlg::OnBnClickedButtonBrowse() {
 #if 0
     CFileDialog dlgFile(TRUE);
@@ -474,6 +487,7 @@ void CDownloadDlg::OnBnClickedStart() {
         LOGW("Tool is working now.");
         if (b_download == false) {
             TerminateThread(m_NetworkSnifferThreadHandle, 1);
+            StopTftpd32Services ();
             GetDlgItem(ID_Start)->SetWindowText("Download");
             GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(true);
             is_downloading = false;
@@ -510,39 +524,109 @@ void CDownloadDlg::OnBnClickedStart() {
     //Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
 
     m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
-    _beginthread ( StartTftpd32Services, 0, (void *)GetSafeHwnd());
+    StartTftpd32Services(GetSafeHwnd()); //m_hWnd
 }
 
-void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
-    KillTimer(nIDEvent);
-    Schedule();
-}
 
 #define COMMAND_UPDATE "send_data 254 0 0 7 0 1 0\n"
 #define CMD_REBOOT      "send_data 254 0 0 5 0 0 0\n"
 #define CMD_FW_VERSION  "jrd_system_get_firmware_version \n"
 //#define CMD_OS_VERSION  "cat /proc/version \n"
 #define CMD_OS_VERSION  "uname -r\n"
+
+int CDownloadDlg::TelnetPST() {
+    int i;
+    CString msg;
+    //if (pThis->BuildUpdateCommand(pThis->mRomPath, cmd)) {
+    DeviceCoordinator * dc = GetDeviceCoodinator();
+
+    CDevLabel *dev = dc->GetValidDevice();
+    if (dev == NULL) {
+        LOGE("There is none device in the network.");
+        return 2;
+    }
+
+    SOCKET sock = CreateSocket(dev->GetIpAddr().c_str());
+    if ( sock == INVALID_SOCKET) {
+        return ERROR_INVALID_HANDLE;
+    }
+
+    SetDeviceInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
+
+    b_download = true;
+
+    telnet tn(sock);
+    string result;
+//    ConfigIni conf;
+//    GetConfig(conf);
+
+ //   tn.receive_telnet_data(buf, BUFSIZE);
+//    pThis->UpdateMessage(buf);
+
+    //if (strstr(buf, "login") != NULL)
+    {
+    tn.send_command(m_Config.GetLoginUser(), result, false);
+    UpdateMessage(result.c_str());
+    tn.send_command(m_Config.GetLoginPassword(), result, false);
+    UpdateMessage(result.c_str());
+    }
+
+    string osVersion;
+    string fwVersion;
+    string customId;
+    tn.send_command(CMD_OS_VERSION, osVersion);
+    SetDeviceInformation(DEV_OS_VERSION, osVersion.c_str());
+
+    tn.send_command(CMD_FW_VERSION, fwVersion);
+    SetDeviceInformation(DEV_FW_VERSION, fwVersion.c_str());
+
+    if (CheckVersion()) {
+    char *resp = strdup( fwVersion.c_str());
+ char *result, *context, *token;
+  for (i = 0, result = resp; ; i++, result = NULL) {
+      token = strtok_s(result, "_", &context);
+      if (token == NULL) {
+        LOGE("%s contain none \"_\"", result);
+        break;
+      }
+      if (i == 1)
+        customId = token;
+
+    }
+  if (resp != NULL)
+    free(resp);
+    }
+    msg.Format("Device custom id is %s", customId.c_str());
+    m_PSTStatus.SetWindowText(msg);
+
+    for (int i = 0; i < 3; i++) {
+    if (dc->RequestDownloadPermission(dev)) {
+     break;
+    }
+
+       if (i == 3) {
+        return ERROR_INVALID_BLOCK;
+    }
+       Sleep(5000);
+    }
+
+
+    tn.send_telnet_data(CMD_REBOOT, strlen(CMD_REBOOT));
+    closesocket(sock);
+    return NO_ERROR;
+}
+
 DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
+#ifdef TPST
+    pThis->TelnetPST();
+    return 0;
+#else
     CString cmd;
-    int i_ret,i,j,k;
-    char s_trace[17]={0};
-    char s_PCBNo[16]={0};
-    char s_OldWIFINo[13]={0},s_WIFIWrite[7]={0},s_NewWIFINo[13] = {0};
-    unsigned char s_WIFIREAD[7]={0};
-    char s_FmtStr[5] ;
-    int i_TempInt;
-    char s_InetCmd[SUBBUFSIZE]={0};
-    char s_SN[16]={0};
-    char s_memo[301]={0};
+
     CString msg;
     //if (pThis->BuildUpdateCommand(pThis->mRomPath, cmd)) {
     DeviceCoordinator * dc = pThis->GetDeviceCoodinator();
-    if (dc == NULL) {
-        LOGE("Can not get available DeviceCoordinator");
-        return 1;
-    }
     CDevLabel *dev = dc->GetValidDevice();
     if (dev == NULL) {
         LOGE("There is none device in the network.");
@@ -555,7 +639,6 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     }
 
     pThis->SetDeviceInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
-
     pThis->b_download = true;
 
     telnet tn(sock);
@@ -565,40 +648,9 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
 
  //   tn.receive_telnet_data(buf, BUFSIZE);
   //  pThis->UpdateMessage(buf);
+ #endif
 
-    //if (strstr(buf, "login") != NULL)
-    {
-    tn.send_command(conf.GetLoginUser(), result, false);
-    pThis->UpdateMessage(result.c_str());
-    tn.send_command(conf.GetLoginPassword(), result, false);
-    pThis->UpdateMessage(result.c_str());
-    }
-#if defined(TPST)
-    string osVersion;
-    string fwVersion;
-    tn.send_command(CMD_OS_VERSION, osVersion);
-    pThis->SetDeviceInformation(DEV_OS_VERSION, osVersion.c_str());
-
-    tn.send_command(CMD_FW_VERSION, fwVersion);
-    pThis->SetDeviceInformation(DEV_FW_VERSION, fwVersion.c_str());
-
-    if (pThis->CheckVersion()) {
-    }
-
-    for (i = 0; i < 3; i++) {
-    if (dc->RequestDownloadPermission(dev)) {
-     break;
-    }
-       Sleep(5000);
-    }
-    if (i == 3) {
-
-        return -1;
-    }
-
-    tn.send_telnet_data(CMD_REBOOT, strlen(CMD_REBOOT));
-
-#elif defined(MMI)
+#if defined(MMI)
     char buf[BUFSIZE];
     unsigned char red[100] = "send_data 254 0 2 3 0 1 0\n";
     unsigned char blue[100] = "send_data 254 0 2 3 0 2 0\n";
@@ -647,6 +699,16 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
 #define COMMAN_GETMAC "send_data 254 0 3 1 1 0 0 0 0 0 0\n"
 #define COMMAN_UPDATE "send_data 254 0 0 7 0 1 0\n"
 #define COMMAN_REBOOT "send_data 254 0 0 5 0 0 0\n"
+    int i_ret,i,j,k;
+    char s_trace[17]={0};
+    char s_PCBNo[16]={0};
+    char s_OldWIFINo[13]={0},s_WIFIWrite[7]={0},s_NewWIFINo[13] = {0};
+    unsigned char s_WIFIREAD[7]={0};
+    char s_FmtStr[5] ;
+    int i_TempInt;
+    char s_InetCmd[SUBBUFSIZE]={0};
+    char s_SN[16]={0};
+    char s_memo[301]={0};
     char buf[BUFSIZE];
     i_ret = tn.send_telnet_data(COMMAN_GETTRACE, strlen(COMMAN_GETTRACE));
     Sleep(1000);
@@ -770,7 +832,6 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     dc->RemoveDevice(dev);
 #endif
 
-    closesocket(sock);
     return 0;
 }
 
@@ -1198,18 +1259,26 @@ LRESULT CDownloadDlg::OnMessageTftpInfo(WPARAM wParam, LPARAM lParam) {
                 TFTPStat(& trf_stat->t[Ark], trf_stat->dNow);
             TFTPReporting( pTftpGuiFirst);
         }
-        //GetSafeHwnd(), m_hWnd
-        //            UpdateMessage(_T("TFTP start"));
         break;
     case C_TFTP_TRF_END:
         {
             TFTPEnd((struct S_TftpTrfEnd *)lParam);
         }
-        //        UpdateMessage(_T("TFTP end"));
         break;
     case C_TFTP_TRF_NEW:
         TFTPNew((struct S_TftpTrfNew *)lParam);
-        //            UpdateMessage(_T("TFTP new"));
+        break;
+    case C_TFTP_TRF_ERROR: {
+        struct S_TftpError *gui_msg = (struct S_TftpError*) lParam;
+        if (gui_msg->errorCode == ENOTFOUND) {
+            CString msg = gui_msg->szFile;
+            msg += " is not exist, please check your update package.";
+            ::MessageBox(NULL,
+                         msg,
+                         _T("File no exist"),
+                         MB_OK | MB_ICONHAND);
+        }
+        }
         break;
     default:
         break;
@@ -1303,7 +1372,7 @@ static int TFTPItemUpdate (HWND hListV, const struct S_TftpGui *pTftpGui, int it
 static int TFTPManageTerminatedTransfers (HWND hListV, int itemPos)
 {
     char szTxt [512] = {0};
-    LVITEM      LvItem;
+//    LVITEM      LvItem;
     int  tNow  = (int) time(NULL);
 
     ListView_GetItemText (hListV, itemPos, FD_PROGRESS, szTxt, sizeof szTxt -1 );
@@ -1389,7 +1458,6 @@ int CDownloadDlg::TFTPReporting (const struct S_TftpGui *pTftpGuiFirst)
 void CDownloadDlg::ClearMessage(void) {
     m_LogText.Empty();
     UpdateMessage(m_LogText);
-    //GetDlgItem(ID_Start)->EnableWindow(false);
 }
 
 void CDownloadDlg::UpdateMessage(CString errormsg){
