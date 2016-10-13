@@ -266,6 +266,7 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
     }
     b_download = false;
     m_pCoordinator->RemoveDevice(dev);
+    //todo:: close telnet socket?????
 }
 
 DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
@@ -580,16 +581,22 @@ int CDownloadDlg::TelnetPST() {
     b_download = true;
     telnet tn(sock);
 
-    //   tn.receive_telnet_data(buf, BUFSIZE);
-    //    pThis->UpdateMessage(buf);
+    LOGE("negotiate");
+    tn.send_command(NULL, result);
+    UpdateMessage(result.c_str());
 
     m_PSTStatus.SetWindowText("Do user login");
+    tn.send_command(NULL, result);
+    UpdateMessage(result.c_str());
 
+    LOGE("User Login, enter user ");
     //if (strstr(buf, "login") != NULL)
     {
         dev->TickWatchDog();
         tn.send_command(m_Config.GetLoginUser(), result, false);
         UpdateMessage(result.c_str());
+
+        LOGE("Send password ");
         dev->TickWatchDog();
         tn.send_command(m_Config.GetLoginPassword(), result, false);
         UpdateMessage(result.c_str());
@@ -604,12 +611,12 @@ int CDownloadDlg::TelnetPST() {
     tn.send_command(CMD_FW_VERSION, fwVersion);
     SetDeviceInformation(DEV_FW_VERSION, fwVersion.c_str());
 
+    LOGE("device firmware is %s ", fwVersion.c_str());
     char *resp = _strdup( fwVersion.c_str());
     char *version, *context, *token;
     for (i = 0, version = resp; ; i++, version = NULL) {
         token = strtok_s(version, "_", &context);
         if (token == NULL) {
-            LOGE("%s contain none \"_\"", version);
             break;
         }
         if (i == 1)
@@ -624,7 +631,6 @@ int CDownloadDlg::TelnetPST() {
     if (CheckVersion() && customId != m_Config.GetFirmwareCustomId()) {
         m_PSTStatus.SetWindowText("Custom ID is not matched");
         closesocket(sock);
-        m_pCoordinator->RemoveDevice(dev);
         b_download = false;
         return -2;
     }
@@ -637,7 +643,6 @@ int CDownloadDlg::TelnetPST() {
         if (i == 3) {
             m_PSTStatus.SetWindowText("Request download failed. Other device is block!");
             closesocket(sock);
-            m_pCoordinator->RemoveDevice(dev);
             b_download = false;
             return -3;
         }

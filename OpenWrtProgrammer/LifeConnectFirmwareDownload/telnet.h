@@ -73,7 +73,7 @@ typedef enum {
                                     default */
   CURLE_SEND_ERROR,              /* 55 - failed sending network data */
   CURLE_RECV_ERROR,              /* 56 - failure in receiving network data */
-  CURLE_OBSOLETE57,              /* 57 - NOT IN USE */
+  CURLE_RECV_TIMEOUT,            /* 57 - NOT IN USE */
   CURLE_SSL_CERTPROBLEM,         /* 58 - problem with the local certificate */
   CURLE_SSL_CIPHER,              /* 59 - couldn't use specified cipher */
   CURLE_SSL_CACERT,              /* 60 - problem with the CA cert (path?) */
@@ -389,7 +389,7 @@ protected:
      telnet(curl_socket_t sock);
      ~telnet();
 
-     int receive_telnet_data(char *buffer, ssize_t len, bool keep=true);
+     int receive_telnet_data(char *buffer, ssize_t len);
 
      void negotiate();
      void send_negotiation( int cmd, int option);

@@ -163,6 +163,20 @@ BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,  CDevLabel** intfs) {
 
 BOOL DeviceCoordinator::RemoveDevice(CDevLabel* const & devIntf)  {
     ASSERT(devIntf != NULL);
+    BOOL found = FALSE;
+    list<CDevLabel*>::iterator it;
+    for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+        if (*it == devIntf) {
+            found = TRUE;
+            break;
+        }
+    }
+
+    if (found == FALSE) {
+        LOGE("Device is already removed");
+        return FALSE;
+    }
+
     LOGE("RemoveDevice !");
     EnterCriticalSection(&mCriticalSection);
     mDevintfList.remove(devIntf);
