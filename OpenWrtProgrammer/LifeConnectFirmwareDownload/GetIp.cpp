@@ -33,16 +33,19 @@ bool GetIp::GetAdapter()
     if (ERROR_SUCCESS == nRel)
     {
         PIP_ADAPTER_INFO pIpAdapterInfo_Temp=pIpAdapterInfo;
+        //PIP_ADDR_STRING current = pIpAdapterInfo->CurrentIpAddress;
         while (pIpAdapterInfo_Temp)
         {
             IP_ADDR_STRING *pIpAddrString =&(pIpAdapterInfo_Temp->IpAddressList);
             IP_ADDR_STRING *pGateway = &pIpAdapterInfo_Temp->GatewayList;
             do
             {
-                device_ip =pIpAddrString->IpAddress.String;
-                gateway_ip = pGateway->IpAddress.String;
-                if(device_ip.find(segment)!=-1)
+                if (pIpAdapterInfo_Temp->Type == MIB_IF_TYPE_ETHERNET)                  
+               // if(device_ip.find(segment) != -1)
+               //if (strcmp(pIpAddrString->IpAddress.String, current->IpAddress.String) == 0)
                 {
+                    device_ip =pIpAddrString->IpAddress.String;
+                    gateway_ip = pGateway->IpAddress.String;
                     delete pIpAdapterInfo;
                     return true;
                 }
@@ -191,4 +194,48 @@ int ResolveIpMac(const char *DestIpString, string & mac)
     }
 
     return 1;
+}
+
+BOOL RegSetIP(LPCTSTR lpszAdapterName, LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate)
+{
+    HKEY hKey;
+    CString strKeyName = "SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\";
+    strKeyName += lpszAdapterName;
+    if(RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                    strKeyName.GetString(),
+                    0,
+                    KEY_WRITE,
+                    &hKey) != ERROR_SUCCESS)
+        return FALSE;
+
+    char* mszIPAddress = new char[100];
+    char* mszNetMask = new char[100];
+    char* mszNetGate = new char[100];
+
+    strncpy(mszIPAddress, pIPAddress, 98);
+    strncpy(mszNetMask, pNetMask, 98);
+    strncpy(mszNetGate, pNetGate, 98);
+
+    int nIP, nMask, nGate;
+
+    nIP = strlen(mszIPAddress);
+    nMask = strlen(mszNetMask);
+    nGate = strlen(mszNetGate);
+
+    *(mszIPAddress + nIP + 1) = 0x00; // REG_MULTI_SZ数据需要在后面再加个0
+    nIP += 2;
+
+    *(mszNetMask + nMask + 1) = 0x00;
+    nMask += 2;
+
+    *(mszNetGate + nGate + 1) = 0x00;
+    nGate += 2;
+
+    RegSetValueEx(hKey, "IPAddress", 0, REG_MULTI_SZ, (unsigned char*)mszIPAddress, nIP);
+    RegSetValueEx(hKey, "SubnetMask", 0, REG_MULTI_SZ, (unsigned char*)mszNetMask, nMask);
+    RegSetValueEx(hKey, "DefaultGateway", 0, REG_MULTI_SZ, (unsigned char*)mszNetGate, nGate);
+
+    RegCloseKey(hKey);
+
+    return TRUE;
 }

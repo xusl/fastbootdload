@@ -29,7 +29,7 @@ extern "C" {
 
 #define FEATURE_LOG_FILE
 #define FEATURE_LOG_SYS
-#define FEATURE_LOG_FUNC_NAME
+//#define FEATURE_LOG_FUNC_NAME
 
 LIBPROGRAMMER const char * basename(const char * f_name);
 #define COUNTOF(array) (sizeof(array)/sizeof(array[0]))
@@ -77,15 +77,6 @@ typedef enum {
 //-----------------------------------------------------------------------------
 LIBPROGRAMMER void WriteLog(AdbTrace tag, TLogMaskEnumType type, const char* msg, const char* fmtstr, ...);
 
-
-//-----------------------------------------------------------------------------
-#undef DEBUG
-#undef LOG
-#undef INFO
-#undef WARN
-#undef ERROR
-#undef CRITICAL
-#undef MEMDUMP
 
 #ifndef TRACE_TAG
 #define TRACE_TAG TRACE_ADB

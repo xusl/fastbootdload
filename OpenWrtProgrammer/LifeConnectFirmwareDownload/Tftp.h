@@ -348,5 +348,5 @@ void SendDirectoryContent (void);
 DWORD WINAPI StartTftpTransfer (LPVOID pThreadArgs);
 int ReportNewTrf (const struct LL_TftpInfo *pTftp);
 
-
+#define BinDump(x, y, z)
 #endif /* _ARPA_TFTP_H */

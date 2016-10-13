@@ -17,6 +17,7 @@ using namespace std;
 
 #define TPST
 //#define LOGIN
+#undef DESKTOP_TEST
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -302,8 +303,17 @@ void CDownloadDlg::SniffNetwork(const char * const segment, int from, int to) {
         string mac;
         ip_addr.Format("%s.%d", segment, i);
         pcIpAddr = ip_addr.GetString();
-        if (pcIpAddr == mHostIPAddr || pcIpAddr == mHostGWAddr)
+
+#ifdef DESKTOP_TEST
+        if (pcIpAddr == mHostIPAddr || pcIpAddr == mHostGWAddr )
+#else
+        if (pcIpAddr == mHostIPAddr )
+#endif
+        {
+            LOGD("SKip host %s", pcIpAddr);
             continue;
+        }
+
         if(Ping(pcIpAddr) == FALSE) {
             LOGD("ping %s failed. ", pcIpAddr);
             CleanDevice(pcIpAddr);
@@ -551,7 +561,8 @@ void CDownloadDlg::OnBnClickedStart() {
 
 
 #define COMMAND_UPDATE "send_data 254 0 0 7 0 1 0\n"
-#define CMD_REBOOT      "send_data 254 0 0 5 0 0 0\n"
+//#define CMD_REBOOT      "send_data 254 0 0 5 0 0 0\n"
+#define CMD_REBOOT      "reboot\n"
 #define CMD_FW_VERSION  "jrd_system_get_firmware_version \n"
 //#define CMD_OS_VERSION  "cat /proc/version \n"
 #define CMD_OS_VERSION  "uname -r\n"
@@ -562,6 +573,7 @@ int CDownloadDlg::TelnetPST() {
     string osVersion;
     string fwVersion;
     string customId;
+    string buildId;
     string result;
     DeviceCoordinator * dc = GetDeviceCoodinator();
 
@@ -584,10 +596,11 @@ int CDownloadDlg::TelnetPST() {
     LOGE("negotiate");
     tn.send_command(NULL, result);
     UpdateMessage(result.c_str());
-
-    m_PSTStatus.SetWindowText("Do user login");
     tn.send_command(NULL, result);
     UpdateMessage(result.c_str());
+
+#ifdef DESKTOP_TEST
+    m_PSTStatus.SetWindowText("Do user login");
 
     LOGE("User Login, enter user ");
     //if (strstr(buf, "login") != NULL)
@@ -601,10 +614,11 @@ int CDownloadDlg::TelnetPST() {
         tn.send_command(m_Config.GetLoginPassword(), result, false);
         UpdateMessage(result.c_str());
     }
+#endif
 
-    //dev->TickWatchDog();
-    //tn.send_command(CMD_OS_VERSION, osVersion);
-    //SetDeviceInformation(DEV_OS_VERSION, osVersion.c_str());
+    dev->TickWatchDog();
+    tn.send_command(CMD_OS_VERSION, osVersion);
+    SetDeviceInformation(DEV_OS_VERSION, osVersion.c_str());
 
     dev->TickWatchDog();
     m_PSTStatus.SetWindowText("Get device firmware version");
@@ -621,18 +635,27 @@ int CDownloadDlg::TelnetPST() {
         }
         if (i == 1)
             customId = token;
-
+        else if (i == 3)
+            buildId = token;
     }
     if (resp != NULL)
         free(resp);
     msg.Format("Device custom id is %s", customId.c_str());
     m_PSTStatus.SetWindowText(msg);
 
-    if (CheckVersion() && customId != m_Config.GetFirmwareCustomId()) {
-        m_PSTStatus.SetWindowText("Custom ID is not matched");
-        closesocket(sock);
-        b_download = false;
-        return -2;
+    if (CheckVersion() ) {
+        if ( customId != m_Config.GetFirmwareCustomId()) {
+            m_PSTStatus.SetWindowText("Custom ID is not matched.");
+            closesocket(sock);
+            b_download = false;
+            return -2;
+        }
+        if (buildId >= m_Config.GetFirmwareBuildId()) {
+            m_PSTStatus.SetWindowText("Pakcage build ID is less than device firmware build ID.");
+            closesocket(sock);
+            b_download = false;
+            return -3;
+        }
     }
 
     for (int i = 0; i < 3; i++) {
@@ -649,7 +672,8 @@ int CDownloadDlg::TelnetPST() {
         Sleep(5000);
     }
 
-    tn.send_telnet_data(CMD_REBOOT, strlen(CMD_REBOOT));
+    tn.send_command(COMMAND_UPDATE, result, false);
+    tn.send_command(CMD_REBOOT, result, false);
     m_PSTStatus.SetWindowText("Device enter download mode");
     closesocket(sock);
     return NO_ERROR;

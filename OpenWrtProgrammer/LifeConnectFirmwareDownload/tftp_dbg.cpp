@@ -9,7 +9,7 @@
 #include <stdafx.h>
 #include "Tftp.h"
 #include "log.h"
-
+#undef  DEBUG
 struct LL_TftpInfo *DoDebugSendBlock (struct LL_TftpInfo *pTftp)
 {
 #ifdef DEB_TEST
@@ -30,8 +30,8 @@ return pTftp; // no warning
 
 struct LL_TftpInfo *DoDebugRcvAck (struct LL_TftpInfo *pTftp)
 {
+        struct tftphdr *tp = (struct tftphdr *) pTftp->b.ackbuf;;
 #ifdef DEB_TEST
-struct tftphdr *tp = (struct tftphdr *) pTftp->b.ackbuf;;
          if ((unsigned short) pTftp->c.nCount<50  ||  (unsigned short) pTftp->c.nCount>65500)
          {
               LOGD("Read ACK block #%d, wanted #%d, Retry %d",
@@ -67,6 +67,7 @@ return pTftp;
 
 struct LL_TftpInfo *DoDebugRcvData (struct LL_TftpInfo *pTftp)
 {
+    struct tftphdr *tp = (struct tftphdr *) pTftp->b.ackbuf;;
 #ifdef DEBUG
     BinDump (pTftp->b.buf, Rc, "Data:");
     LOGD("Read data block #%d, wanted #%d, Retry %d",

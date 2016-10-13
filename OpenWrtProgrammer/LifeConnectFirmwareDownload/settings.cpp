@@ -87,8 +87,8 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
                         m_NetworkSegment, IPADDR_BUFFER_LEN, lpFileName);
 
     LOGD("network segment : %s", m_NetworkSegment);
-    m_HostIPStart = GetPrivateProfileInt(NETWORK_SECTION, _T("HostIPStart"), 2, lpFileName);
-    m_HostIPEnd = GetPrivateProfileInt(NETWORK_SECTION, _T("HostIPEnd"), 10, lpFileName);
+    m_HostIPStart = GetPrivateProfileInt(NETWORK_SECTION, _T("DeviceIPStart"), 2, lpFileName);
+    m_HostIPEnd = GetPrivateProfileInt(NETWORK_SECTION, _T("DeviceIPEnd"), 10, lpFileName);
 
     if (m_HostIPStart > 245)
         m_HostIPStart = 244;

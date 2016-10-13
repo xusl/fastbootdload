@@ -841,8 +841,6 @@ CURLcode telnet::send_telnet_data(const char *buffer, ssize_t len)
   ssize_t bytes_written, total_written;
   int out_count;
   CURLcode rc = CURLE_OK;
-  CURLcode code;
-  ssize_t nread;
   char inbuf[BUFSIZE] = {0};
 
   while(rc == CURLE_OK && len--) {
