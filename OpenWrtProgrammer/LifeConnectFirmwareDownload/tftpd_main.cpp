@@ -34,6 +34,7 @@ struct S_ThreadMonitoring tftpThreadMonitor;// [TH_NUMBER];
 struct LL_TftpInfo *pTftpFirst;
 static int gSendFullStat=FALSE;		// full report should be sent
 HWND    gWndHandle = NULL;
+DeviceCoordinator *gDevCoordinator =NULL;
 // statistics requested by console
 // do not answer immediately since we are in console thread
 // and pTftp data may change
@@ -266,6 +267,7 @@ static void PopulateTftpdStruct (struct LL_TftpInfo *pTftp)
     // clear buffers
     memset (& pTftp->b, 0, sizeof pTftp->b);
     pTftp->dlgHwnd = gWndHandle;
+    pTftp->coordinator = gDevCoordinator;
 } // PopulateTftpdStruct
 
 // Suppress structure item
@@ -745,7 +747,7 @@ int StartTftpdThread ()
 } // StartSingleWorkerThread
 
 
-void StartTftpd32Services (HWND param)
+void StartTftpd32Services (HWND param, DeviceCoordinator *coordinator)
 {
 #if 0
     char sz[_MAX_PATH];
@@ -765,6 +767,7 @@ void StartTftpd32Services (HWND param)
     //	DHCPReadConfig ();
 #endif
     gWndHandle = param;
+    gDevCoordinator = coordinator;
     // starts worker threads
     StartTftpdThread ();
     LOGD("Worker threads started\n");

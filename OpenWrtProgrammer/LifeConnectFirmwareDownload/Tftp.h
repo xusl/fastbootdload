@@ -44,6 +44,7 @@
 #define _ARPA_TFTP_H
 #include "global.h"
 #include "md5.h"
+#include "device.h"
 /*
  * Trivial File Transfer Protocol (IEN-133)
  */
@@ -212,6 +213,7 @@ struct LL_TftpInfo
     struct S_Trf_Statistics     st;
     struct S_Trf_MD5            m;
     HWND                        dlgHwnd;
+    DeviceCoordinator          *coordinator;
 
     struct LL_TftpInfo *next;
 } ;
@@ -257,7 +259,7 @@ struct S_TftpKill
 struct S_TftpError
 {
     int  errorCode;
-    char  szFile [_MAX_PATH * 2];
+    char  detail [_MAX_PATH * 2];
     //char  detail[ERROR_DETAIL_LEN];
 };
 
@@ -331,7 +333,7 @@ enum e_Types
 ////////////////////////////////////////////////////////////
 int nak(struct LL_TftpInfo *pTftp, int error);
 int CreateIndexFile (void);
-void StartTftpd32Services (HWND);
+void StartTftpd32Services (HWND, DeviceCoordinator *);
 void StopTftpd32Services (void);
 
 // Access to console

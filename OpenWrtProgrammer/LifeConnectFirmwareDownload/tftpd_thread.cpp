@@ -44,7 +44,7 @@ struct LL_TftpInfo *DoDebugSendAck (struct LL_TftpInfo *pTftp);
 
 int UdpSend (int nFromPort, struct sockaddr *sa_to, int sa_len, const char *data, int len);
 
-static int ReportError(int code, const char * const file);
+static int ReportError(int code, const char * const detail);
 
 
 // send data using Udp
@@ -355,6 +355,14 @@ int   Ark;
 int   Rc;
 BOOL  bOptionsAccepted = FALSE;
 char  szExtendedName [2 * _MAX_PATH];
+
+if (pTftp->coordinator == NULL ||
+    pTftp->coordinator->CheckDownloadPermission() == FALSE) {
+    nak (pTftp, EACCESS);
+    ReportError(EACCESS, "There are no device request download permission."
+        "If continue, please lock SUPER MODE.");
+    return CNX_FAILED;
+}
 
   // map the datagram on a Tftp structure
   tp = (struct tftphdr *)pTftp->b.cnx_frame;
@@ -700,13 +708,13 @@ LOGD ("end of transfer %d", pTftp->tm.dwTransferId);
 return Rc;
 } // ReportEndTrf
 
-static int ReportError(int code, const char * const file)
+static int ReportError(int code, const char * const detail)
 {
     int  Rc = 0;
     struct S_TftpError gui_msg = {0};
 
     gui_msg.errorCode = code;
-	strncpy(gui_msg.szFile, file, sizeof gui_msg.szFile);
+	strncpy(gui_msg.detail, detail, sizeof gui_msg.detail);
     Rc = SendMsgRequest (C_TFTP_TRF_ERROR, (void *) & gui_msg);
 
 return Rc;

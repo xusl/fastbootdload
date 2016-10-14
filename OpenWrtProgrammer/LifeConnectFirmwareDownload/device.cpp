@@ -23,6 +23,7 @@ DeviceCoordinator::DeviceCoordinator() :
     mDevintfList()
 {
     mDevintfList.clear();
+    SetSuperMode(FALSE);
     InitializeCriticalSection(&mCriticalSection);
 }
 
@@ -48,7 +49,6 @@ CDevLabel *DeviceCoordinator::GetValidDevice() {
         CDevLabel *item = *it;
         if (item->GetStatus() != DEVICE_ARRIVE)
             continue;
-        item->SetStatus(DEVICE_COMMAND);
         return item;
     }
     return NULL;
@@ -217,6 +217,27 @@ VOID DeviceCoordinator::Dump(VOID) {
     LOGI("DeviceCoordinator::===================================END");
 }
 
+BOOL DeviceCoordinator::CheckDownloadPermission() {
+    CDevLabel *dev = GetRebootDevice();
+    if(dev == NULL && GetSuperMode()) {
+        dev = GetValidDevice();
+    }
+
+    if (dev == NULL) {
+        return FALSE;
+    }
+
+#if 0
+    list<char *>::iterator it;
+    for (it = mpFirmware.begin(); it != mpFirmware.end(); ++it) {
+        LOGD("Compare file '%s' <=> '%s'", *it, filename);
+        if (strcmp(basename(*it), basename(filename)) == 0)
+            return TRUE;
+    }
+#endif
+
+    return TRUE;
+}
 
 BOOL DeviceCoordinator::RefreshFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, BOOL start) {
     char szAddr[MAXLEN_IPv6]={0}, szServ[NI_MAXSERV] ={0};
@@ -226,6 +247,9 @@ BOOL DeviceCoordinator::RefreshFirmwareTransfer(SOCKADDR_STORAGE addr, const cha
              NI_NUMERICHOST | AI_NUMERICSERV);
     if (start) {
         CDevLabel *dev = GetRebootDevice();
+        if(dev == NULL && GetSuperMode()) {
+            dev = GetValidDevice();
+        }
         if(dev != NULL) {
             dev->SetDownloadIpAddr(szAddr);
             dev->TickWatchDog();

@@ -99,7 +99,6 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	is_downloading=false;
 	downloading_successfull=false;
 	b_download=false;
-    m_bSuperMode = FALSE;
     m_Config.ReadConfigIni(CONFIG_FILE);
     StartLogging("lifeconnect-flash.log", "all", "all");
 }
@@ -515,8 +514,9 @@ void CDownloadDlg::OnBnClickedStart() {
         if (b_download == false) {
             TerminateThread(m_NetworkSnifferThreadHandle, 1);
             StopTftpd32Services ();
-            GetDlgItem(ID_Start)->SetWindowText("Download");
+            GetDlgItem(ID_Start)->SetWindowText("Start");
             GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(true);
+            m_RomPathStaticText.EnableWindow(true);
             is_downloading = false;
             m_pCoordinator->Reset();
             m_TransferFileList.DeleteAllItems();
@@ -556,7 +556,7 @@ void CDownloadDlg::OnBnClickedStart() {
     //Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
 
     m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
-    StartTftpd32Services(GetSafeHwnd()); //m_hWnd
+    StartTftpd32Services(GetSafeHwnd(), m_pCoordinator); //m_hWnd
 }
 
 
@@ -588,6 +588,7 @@ int CDownloadDlg::TelnetPST() {
         return ERROR_INVALID_HANDLE;
     }
 
+    dev->SetStatus(DEVICE_COMMAND);
     SetDeviceInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
 
     b_download = true;
@@ -643,7 +644,7 @@ int CDownloadDlg::TelnetPST() {
     msg.Format("Device custom id is %s", customId.c_str());
     m_PSTStatus.SetWindowText(msg);
 
-    if (CheckVersion() ) {
+    if (m_pCoordinator->GetSuperMode() == FALSE) {
         if ( customId != m_Config.GetFirmwareCustomId()) {
             m_PSTStatus.SetWindowText("Custom ID is not matched.");
             closesocket(sock);
@@ -1336,11 +1337,16 @@ LRESULT CDownloadDlg::OnMessageTftpInfo(WPARAM wParam, LPARAM lParam) {
     case C_TFTP_TRF_ERROR: {
         struct S_TftpError *gui_msg = (struct S_TftpError*) lParam;
         if (gui_msg->errorCode == ENOTFOUND) {
-            CString msg = gui_msg->szFile;
+            CString msg = gui_msg->detail;
             msg += " is not exist, please check your update package.";
             ::MessageBox(NULL,
                          msg,
                          _T("File no exist"),
+                         MB_OK | MB_ICONHAND);
+        } else if (gui_msg->errorCode == EACCESS) {
+        ::MessageBox(NULL,
+                         gui_msg->detail,
+                         _T("Permission Error"),
                          MB_OK | MB_ICONHAND);
         }
         }
@@ -1572,7 +1578,7 @@ void CDownloadDlg::OnBnClickedDisableCheck()
         return;
     }
 
-    if (m_bSuperMode) {
+    if (m_pCoordinator->GetSuperMode()) {
         int result = ::MessageBox(NULL,
                                   _T("Enbale version check?"),
                                   _T("Information"),
@@ -1580,7 +1586,7 @@ void CDownloadDlg::OnBnClickedDisableCheck()
         if (result == IDOK) {
             SetIcon(m_hIcon, TRUE);
             SetIcon(m_hIcon, FALSE);
-            m_bSuperMode = FALSE;
+            m_pCoordinator->SetSuperMode(FALSE);
             m_VersionCheckButton.SetIcon(AfxGetApp()->LoadIcon(IDI_LOCK));
             SetWindowText(m_DialgoTitle.GetString());
         }
@@ -1591,7 +1597,7 @@ void CDownloadDlg::OnBnClickedDisableCheck()
     //    m_PasswordEnterDlg.ShowWindow(SW_SHOW);
     INT_PTR nResponse = m_PasswordEnterDlg.DoModal();
     if (nResponse == IDOK) {
-        m_bSuperMode = TRUE;
+        m_pCoordinator->SetSuperMode(TRUE);
         CString title = m_DialgoTitle + ", Super Mode (Version Check DISABLE)";
         //GetWindowText(title);
         SetWindowText(title.GetString());

@@ -74,7 +74,6 @@ protected:
   DWORD Schedule();
   DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;};
   VOID GetConfig(ConfigIni & conf) { conf = m_Config;};
-  BOOL CheckVersion() { return (m_bSuperMode == FALSE);};
 
   int TFTPNew (const struct S_TftpTrfNew *pTrf);
   int TFTPEnd (struct S_TftpTrfEnd *pTrf);
@@ -103,7 +102,6 @@ private:
 	BOOL is_downloading;
 	bool downloading_successfull;
 	bool b_download;
-  BOOL m_bSuperMode;
 	CEdit m_MessageControl;
   CStatic m_RomPathStaticText;
   CStatic m_RomVersion;

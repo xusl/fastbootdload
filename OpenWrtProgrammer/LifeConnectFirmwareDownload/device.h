@@ -79,14 +79,17 @@ class DeviceCoordinator {
     BOOL RemoveDevice(CDevLabel*const & devIntf);
     BOOL SetDownloadFirmware(list<char *> firmware);
     BOOL RequestDownloadPermission(CDevLabel* const & devIntf);
+    BOOL CheckDownloadPermission();
     BOOL RefreshFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, BOOL start);
     CDevLabel * EndFirmwareTransfer(SOCKADDR_STORAGE addr, const char * const filename, DWORD dwTransferId);
-
+    BOOL GetSuperMode() { return m_bSuperMode;};
+    VOID SetSuperMode(BOOL superMode) { m_bSuperMode = superMode;};
     BOOL IsEmpty();
     BOOL Reset();
     VOID Dump(VOID);
 
   private:
+    BOOL m_bSuperMode;
     list<CDevLabel *>              mDevintfList;
     list<char *>                   mpFirmware;
     map<string, bool, greater<string>> mMacRecords;
