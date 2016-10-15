@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "GetIp.h"
+#include "NicManager.h"
 #include "device.h"
 #include "TextProgressCtrl.h"
 #include "PasswordEnterDlg.h"
@@ -118,5 +118,6 @@ private:
 	char s_Trace[50];
 	CTextProgressCtrl m_progMac2;
   DeviceCoordinator *m_pCoordinator;
+  NicManager mNic;
   HANDLE m_SyncSemaphore;
 };

@@ -226,6 +226,13 @@ BOOL CDownloadDlg::OnInitDialog()
     m_Config.GetFirmwareVersion(RomVersion);
     m_RomVersion.SetWindowText(RomVersion);
     m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
+
+#if 0
+    GetHostIpAddr();
+    //mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+    mNic.EnableDhcp();
+    GetHostIpAddr();
+#endif
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -900,20 +907,17 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
 }
 
 void CDownloadDlg::GetHostIpAddr() {
-    GetIp getIp(m_Config.GetNetworkSegment());
-
     mHostIPAddr.clear();
     mHostGWAddr.clear();
-    for(int i = 0; i< 3; i++) {
-        if(getIp.GetHostIP(mHostIPAddr, mHostGWAddr)) {
+
+        if(mNic.GetHostIP(mHostIPAddr, mHostGWAddr)) {
             CString msg;
             msg.Format(_T("Host IP %s, Gateway %s."),
                 mHostIPAddr.c_str(), mHostGWAddr.c_str());
             UpdateMessage(msg);
             return;
         }
-        Sleep(2000);
-    }
+
     UpdateMessage(_T("Get Host IP failed!"));
 }
 

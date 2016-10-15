@@ -122,7 +122,7 @@
     <ClCompile Include="device.cpp" />
     <ClCompile Include="DownloadDlg.cpp" />
     <ClCompile Include="Download.cpp" />
-    <ClCompile Include="GetIp.cpp" />
+    <ClCompile Include="NicManager.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="md5.cpp" />
     <ClCompile Include="PasswordEnterDlg.cpp" />
