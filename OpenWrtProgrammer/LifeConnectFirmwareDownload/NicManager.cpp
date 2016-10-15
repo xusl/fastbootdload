@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include "log.h"
 #include <Icmpapi.h>
+#include <devguid.h>
+
 #pragma comment(lib,"Iphlpapi.lib")
 #pragma	 comment(lib,"setupapi.lib")
 //#pragma comment(lib,"icmp.lib")
@@ -51,6 +53,9 @@ bool NicManager::GetAdapter()
                 {
                     device_ip =pIpAddrString->IpAddress.String;
                     gateway_ip = pGateway->IpAddress.String;
+                    LOGE("Adapter %s, IP %s, gateway %s",mAdapterName.c_str(),
+                        device_ip.c_str(), gateway_ip.c_str());
+                        //, pIpAdapterInfo->Address  MAC ADDRESS
                     delete pIpAdapterInfo;
                     return true;
                 }
@@ -443,7 +448,7 @@ BOOL NicManager::NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex)
 //  设置IP地址
 //  如果只绑定一个IP，nIndex = 0，暂时未处理一个网卡绑定多个地址
 //-----------------------------------------------------------------
-BOOL NicManager::SetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate,LPCTSTR pDnsAddress)
+BOOL NicManager::SetIP(LPCTSTR pIPAddress, LPCTSTR pNetGate, LPCTSTR pNetMask, LPCTSTR pDnsAddress)
 {
     if(!RegSetIP(pIPAddress, pNetMask, pNetGate,pDnsAddress))
         return FALSE;
@@ -498,13 +503,15 @@ BOOL NicManager::SetDHCPIP()
 void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
 {
     string DevValue;
-    PNetCardStruct NetCard;
+    NetCardStruct NetCard;
     DWORD  Status, Problem;
     LPTSTR Buffer   = NULL;
     DWORD  BufSize  = 0;
     HDEVINFO hDevInfo   = 0;
 
-    hDevInfo=SetupDiGetClassDevs(NULL,NULL,0,DIGCF_PRESENT|DIGCF_ALLCLASSES);
+    //hDevInfo=SetupDiGetClassDevs(NULL,NULL,0,DIGCF_PRESENT|DIGCF_ALLCLASSES);
+    hDevInfo= SetupDiGetClassDevs(&GUID_DEVCLASS_NET, NULL, NULL, DIGCF_PRESENT);
+
     if(INVALID_HANDLE_VALUE==hDevInfo)
         return;
 
@@ -528,15 +535,22 @@ void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
 
             if (strcmp(DevValue.c_str(),"ROOT") != 0)
             {
-                NetCard = new TNetCardStruct;
-                NetCard->Id = DeviceId;
-                NetCard->Name = "<Unknown Device>";
+                NetCard.Id = DeviceId;
+                NetCard.Name = "<Unknown Device>";
                 if (GetRegistryProperty(hDevInfo, &DeviceInfoData, SPDRP_DRIVER , &Buffer, (PULONG)&BufSize))
+                    ;
+                if (GetRegistryProperty(hDevInfo, &DeviceInfoData, SPDRP_ENUMERATOR_NAME , &Buffer, (PULONG)&BufSize))
+                    NetCard.deviceAddress = Buffer;
                     if (GetRegistryProperty(hDevInfo, &DeviceInfoData, SPDRP_DEVICEDESC , &Buffer, (PULONG)&BufSize))
-                        NetCard->Name = Buffer;
-                NetCard->Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == Problem);
-                NetCard->Changed = false;
-                NetDeviceList->push_back(*NetCard);
+                        NetCard.Name = Buffer;
+                NetCard.Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == Problem);
+                NetCard.Changed = false;
+                LOGE("ADD NIC id %d, name %s", DeviceId, NetCard.Name.c_str());
+                NetDeviceList->push_back(NetCard);
+                if (Buffer != NULL) {
+                    LocalFree(Buffer);
+                    Buffer = NULL;
+                }
             }
         }
     }
@@ -573,8 +587,10 @@ bool NicManager::NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled)
     PNetCardStruct NetCard = (PNetCardStruct)NetCardPoint;
     DWORD DeviceId = NetCard->Id;
     HDEVINFO hDevInfo = 0;
-    if (INVALID_HANDLE_VALUE == (hDevInfo =
-        SetupDiGetClassDevs(NULL,NULL,0,DIGCF_PRESENT |DIGCF_ALLCLASSES)))
+    //hDevInfo = SetupDiGetClassDevs(NULL,NULL,0,DIGCF_PRESENT |DIGCF_ALLCLASSES);
+    hDevInfo= SetupDiGetClassDevs(&GUID_DEVCLASS_NET, NULL, NULL, DIGCF_PRESENT);
+
+    if (INVALID_HANDLE_VALUE == hDevInfo)
         return false;
     SP_DEVINFO_DATA DeviceInfoData = {sizeof(SP_DEVINFO_DATA)};
     DWORD Status, Problem;

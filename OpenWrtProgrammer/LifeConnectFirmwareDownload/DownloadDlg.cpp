@@ -100,7 +100,6 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	downloading_successfull=false;
 	b_download=false;
     m_Config.ReadConfigIni(CONFIG_FILE);
-    StartLogging("lifeconnect-flash.log", "all", "all");
 }
 
 CDownloadDlg::~CDownloadDlg() {
@@ -227,10 +226,16 @@ BOOL CDownloadDlg::OnInitDialog()
     m_RomVersion.SetWindowText(RomVersion);
     m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
 
-#if 0
+#define NIC_DEBUG
+#ifdef NIC_DEBUG
     GetHostIpAddr();
     //mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
-    mNic.EnableDhcp();
+    //mNic.EnableDhcp();
+if(mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0", "222.222.123.1"/*"0.0.0.0"*/) == TRUE)
+::MessageBox(this->m_hWnd, "Successfully!", "Set Ip Result", MB_OK | MB_ICONINFORMATION);
+else
+::MessageBox(this->m_hWnd, "Failed", "Set Ip Result", MB_OK | MB_ICONERROR);
+
     GetHostIpAddr();
 #endif
     return TRUE;  // return TRUE  unless you set the focus to a control

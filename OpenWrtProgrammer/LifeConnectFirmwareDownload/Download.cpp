@@ -5,7 +5,7 @@
 #include "stdafx.h"
 #include "Download.h"
 #include "DownloadDlg.h"
-
+#include "log.h"
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -98,6 +98,8 @@ BOOL CDownloadApp::InitInstance()
 	// TODO: You should modify this string to be something appropriate
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
+
+    StartLogging("lifeconnect-flash.log", "all", "all");
 
 	CDownloadDlg dlg;
 	m_pMainWnd = &dlg;

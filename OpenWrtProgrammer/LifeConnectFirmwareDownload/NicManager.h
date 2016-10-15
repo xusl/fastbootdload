@@ -24,6 +24,7 @@ typedef struct  NetCardStruct
 {
     DWORD    Id;         // 网卡设备号
     string   Name;     // 网卡名
+    string   deviceAddress;
     bool     Disabled;     // 当前是否禁用
     bool     Changed;         // 是否更改过
 }TNetCardStruct;
@@ -40,7 +41,7 @@ public:
     bool GetAdapter();
     BOOL EnableDhcp();
     int SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask);
-    BOOL SetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate,LPCTSTR pDnsAddress);
+    BOOL SetIP(LPCTSTR pIPAddress, LPCTSTR pNetGate, LPCTSTR pNetMask, LPCTSTR pDnsAddress);
     bool GetHostIP(string& ip, string& gw) {
         int refresh = 1;
         do {
