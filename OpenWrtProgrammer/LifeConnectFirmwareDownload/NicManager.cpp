@@ -227,11 +227,16 @@ BOOL NicManager::GetAdapterInfo() {
 
     while(RegEnumKeyEx(hKey, dwIndex++, szSubKey, &dwBufSize, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
     {
-        if(RegOpenKeyEx(hKey, szSubKey, 0, KEY_READ, &hSubKey) == ERROR_SUCCESS)
+        if(RegOpenKeyEx(hKey, szSubKey, 0, KEY_READ, &hSubKey) != ERROR_SUCCESS)
         {
-            if(RegOpenKeyEx(hSubKey, "Ndi\\Interfaces", 0, KEY_READ, &hNdiIntKey) == ERROR_SUCCESS)
+            continue;
+        }
+            if(RegOpenKeyEx(hSubKey, "Ndi\\Interfaces", 0, KEY_READ, &hNdiIntKey) != ERROR_SUCCESS)
             {
-                dwBufSize = 256;
+                RegCloseKey(hSubKey);
+                continue;
+            }
+                dwBufSize = sizeof szData;
                 if(RegQueryValueEx(hNdiIntKey, "LowerRange", 0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
                 {
                     if(strcmp((char*)szData, "ethernet") == 0)//判断是不是以太网卡
@@ -252,9 +257,9 @@ BOOL NicManager::GetAdapterInfo() {
                     }
                 }
                 RegCloseKey(hNdiIntKey);
-            }
+
             RegCloseKey(hSubKey);
-        }
+
 
         dwBufSize = 256;
     } /* end of while */
@@ -303,7 +308,25 @@ BOOL NicManager::RegGetIP(ADAPTER_INFO *pAI)
     return TRUE;
 }
 
-BOOL NicManager::RegSetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, LPCTSTR pDnsAddress)
+int NicManager::RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue) {
+    int cbData;
+    CHAR *pData = NULL;
+    ASSERT(lpValue != NULL);
+    cbData = strlen(lpValue) + 2;
+    pData = (CHAR *)malloc(cbData);
+    if (pData == NULL) {
+        LOGE("OOPS, malloc failed");
+        return 1;
+    }
+    strcpy(pData, lpValue);
+    pData[cbData - 1] = '\0';
+    RegSetValueEx(hKey, lpValueName, 0, REG_MULTI_SZ, (const BYTE *)pData, cbData);
+
+    free(pData);
+    return 0;
+}
+
+BOOL NicManager::RegSetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate)
 {
     HKEY hKey;
     CString strKeyName = "SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\";
@@ -315,53 +338,17 @@ BOOL NicManager::RegSetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate
                     &hKey) != ERROR_SUCCESS)
         return FALSE;
 
-
-    char mszIPAddress[100];
-    char mszNetMask[100];
-    char mszNetGate[100];
-    char szDnsAddr[100];
-
-    strncpy(mszIPAddress, pIPAddress, 98);
-    strncpy(mszNetMask, pNetMask, 98);
-    strncpy(mszNetGate, pNetGate, 98);
-    strncpy(szDnsAddr, pDnsAddress, 98);
-
-
-    int nIP, nMask, nGate,nDnsAddr;
     int enableDHCP=0;
+    int result = 0;
+    result += RegSetMultisz(hKey, "IPAddress", pIPAddress);
+    result += RegSetMultisz(hKey, "SubnetMask", pNetMask);
+    result += RegSetMultisz(hKey, "DefaultGateway", pNetGate);
+    //RegSetValueEx(hKey, "NameServer", );
 
-
-    nIP = strlen(mszIPAddress);
-    nMask = strlen(mszNetMask);
-    nGate = strlen(mszNetGate);
-    nDnsAddr = strlen(szDnsAddr);
-
-
-    *(mszIPAddress + nIP + 1) = 0x00;
-    nIP += 2;
-
-
-    *(mszNetMask + nMask + 1) = 0x00;
-    nMask += 2;
-
-
-    *(mszNetGate + nGate + 1) = 0x00;
-    nGate += 2;
-
-
-    *(szDnsAddr + nDnsAddr + 1) = 0x00;
-    nDnsAddr += 2;
-
-
-    RegSetValueEx(hKey, "IPAddress", 0, REG_MULTI_SZ, (unsigned char*)mszIPAddress, nIP);
-    RegSetValueEx(hKey, "SubnetMask", 0, REG_MULTI_SZ, (unsigned char*)mszNetMask, nMask);
-    RegSetValueEx(hKey, "DefaultGateway", 0, REG_MULTI_SZ, (unsigned char*)mszNetGate, nGate);
-    RegSetValueEx(hKey, "NameServer", 0, REG_SZ, (unsigned char*)szDnsAddr, nDnsAddr);
-
-    RegSetValueEx(hKey, "EnableDHCP", 0, REG_DWORD, (unsigned char*)&enableDHCP, sizeof(DWORD) );
+    result += RegSetValueEx(hKey, "EnableDHCP", 0, REG_DWORD, (unsigned char*)&enableDHCP, sizeof(DWORD) );
     RegCloseKey(hKey);
 
-    return TRUE;
+    return (result == 0);
 }
 
 //-----------------------------------------------------------------
@@ -411,7 +398,7 @@ BOOL NicManager::RegSetDHCPIP()
     RegSetValueEx(hKey, "IPAddress", 0, REG_MULTI_SZ, (unsigned char*)mszIPAddress, nIP);
     RegSetValueEx(hKey, "SubnetMask", 0, REG_MULTI_SZ, (unsigned char*)mszNetMask, nMask);
     RegSetValueEx(hKey, "DefaultGateway", 0, REG_MULTI_SZ, (unsigned char*)mszNetGate, nGate);
-    RegSetValueEx(hKey, "NameServer", 0, REG_SZ, (unsigned char*)szDnsAddr, nDnsAddr);
+    //RegSetValueEx(hKey, "NameServer", 0, REG_SZ, (unsigned char*)szDnsAddr, nDnsAddr);
 
     int errCode = RegSetValueEx(hKey, "EnableDHCP", 0, REG_DWORD, (unsigned char*)&enableDHCP, sizeof(DWORD) );
 
@@ -444,62 +431,6 @@ BOOL NicManager::NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex)
     return bResult;
 }
 
-//-----------------------------------------------------------------
-//  设置IP地址
-//  如果只绑定一个IP，nIndex = 0，暂时未处理一个网卡绑定多个地址
-//-----------------------------------------------------------------
-BOOL NicManager::SetIP(LPCTSTR pIPAddress, LPCTSTR pNetGate, LPCTSTR pNetMask, LPCTSTR pDnsAddress)
-{
-    if(!RegSetIP(pIPAddress, pNetMask, pNetGate,pDnsAddress))
-        return FALSE;
-
-
-    //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
-    //if(!NotifyIPChange(lpszAdapterName, nIndex, pIPAddress, pNetMask))
-    //  return FALSE;
-
-
-    //通过禁用启用网卡实现IP立即生效
-    list<TNetCardStruct> cardList;
-    EnumNetCards(&cardList);
-    if(!cardList.empty())
-    {
-        NetCardStateChange(&cardList.front(),FALSE);
-        Sleep(10);
-        NetCardStateChange(&cardList.front(),TRUE);
-    }
-
-    return TRUE;
-}
-
-
-//-----------------------------------------------------------------
-//  设置DHCP IP地址
-//-----------------------------------------------------------------
-BOOL NicManager::SetDHCPIP()
-{
-    if(!RegSetDHCPIP())
-        return FALSE;
-
-
-    //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
-    //if(!NotifyDHCPIPChange(lpszAdapterName, nIndex))
-    //  return FALSE;
-
-
-    //通过禁用启用网卡实现IP立即生效
-    list<TNetCardStruct> cardList;
-    EnumNetCards(&cardList);
-    if(!cardList.empty())
-    {
-        NetCardStateChange(&cardList.front(),FALSE);
-        Sleep(10);
-        NetCardStateChange(&cardList.front(),TRUE);
-    }
-    return TRUE;
-}
-
-
 void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
 {
     string DevValue;
@@ -517,8 +448,8 @@ void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
 
     SP_DEVINFO_DATA  DeviceInfoData ={sizeof(SP_DEVINFO_DATA)};
 
-    HKEY hKeyClass;
-    char DeviceName[200];
+//    HKEY hKeyClass;
+//    char DeviceName[200];
     for(DWORD DeviceId=0;SetupDiEnumDeviceInfo(hDevInfo,DeviceId,&DeviceInfoData);DeviceId++)
     {
         if (CM_Get_DevNode_Status(&Status, &Problem, DeviceInfoData.DevInst,0) != CR_SUCCESS)
@@ -547,10 +478,10 @@ void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
                 NetCard.Changed = false;
                 LOGE("ADD NIC id %d, name %s", DeviceId, NetCard.Name.c_str());
                 NetDeviceList->push_back(NetCard);
-                if (Buffer != NULL) {
-                    LocalFree(Buffer);
-                    Buffer = NULL;
-                }
+            }
+            if (Buffer != NULL) {
+                LocalFree(Buffer);
+                Buffer = NULL;
             }
         }
     }
@@ -560,20 +491,24 @@ void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
 bool NicManager::GetRegistryProperty(HDEVINFO DeviceInfoSet,
     PSP_DEVINFO_DATA DeviceInfoData,
     ULONG Property,
-    PVOID Buffer,
+    LPTSTR *Buffer,
     PULONG Length)
 {
+    ASSERT(Buffer != NULL);
     while (!SetupDiGetDeviceRegistryProperty(DeviceInfoSet,
-        DeviceInfoData, Property, NULL, (BYTE *)*(TCHAR **)Buffer, *Length, Length))
+        DeviceInfoData, Property, NULL, (PBYTE)(*Buffer), *Length, Length))
     {
         if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
         {
-            if (*(LPTSTR *)Buffer) LocalFree(*(LPTSTR *)Buffer);
-            *(LPTSTR *)Buffer = (PCHAR)LocalAlloc(LPTR,*Length);
+            if (*Buffer) LocalFree(*Buffer);
+            *Buffer = (LPTSTR)LocalAlloc(LPTR,*Length);
         }
-        else return false;
+        else
+        {
+            return FALSE;
+        }
     }
-    return (*(LPTSTR *)Buffer)[0];
+    return TRUE;
 }
 
 
@@ -671,10 +606,11 @@ BOOL NicManager::GetConnectName(CString& name) {
     return result;
 }
 
+#undef USE_NETSH
 // Start an explorer window, directory is Tftpd32's default directory
-//SetIP("192.168.1.10", "255.255.255.0", "192.168.1.1");
-int NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
+BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
 {
+#ifdef USE_NETSH
     CString connectionName;
     CString command;
     GetConnectName(connectionName);
@@ -684,10 +620,35 @@ int NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
 
     device_ip = ip;
     gateway_ip = gateway;
-    return rc;
+    return rc == 0;
+#else
+    if(!RegSetIP(ip, subnetMask, gateway))
+        return FALSE;
+
+
+    //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
+    //if(!NotifyIPChange(lpszAdapterName, nIndex, pIPAddress, pNetMask))
+    //  return FALSE;
+
+
+    //通过禁用启用网卡实现IP立即生效
+    list<TNetCardStruct> cardList;
+    EnumNetCards(&cardList);
+    if(!cardList.empty())
+    {
+        NetCardStateChange(&cardList.front(),FALSE);
+        Sleep(10);
+        NetCardStateChange(&cardList.front(),TRUE);
+    }
+
+    device_ip = ip;
+    gateway_ip = gateway;
+    return TRUE;
+#endif
 } // StartExplorer
 
 BOOL NicManager::EnableDhcp() {
+#ifdef USE_NETSH
     CString connectionName;
     CString command;
     if (FALSE == GetConnectName(connectionName))
@@ -702,6 +663,31 @@ BOOL NicManager::EnableDhcp() {
     gateway_ip.clear();
     GetAdapter();
     return rc == 0;
+#else
+
+    if(!RegSetDHCPIP())
+        return FALSE;
+
+
+    //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
+    //if(!NotifyDHCPIPChange(lpszAdapterName, nIndex))
+    //  return FALSE;
+
+
+    //通过禁用启用网卡实现IP立即生效
+    list<TNetCardStruct> cardList;
+    EnumNetCards(&cardList);
+    if(!cardList.empty())
+    {
+        NetCardStateChange(&cardList.front(),FALSE);
+        Sleep(10);
+        NetCardStateChange(&cardList.front(),TRUE);
+    }
+    device_ip.clear();
+    gateway_ip.clear();
+    GetAdapter();
+    return TRUE;
+#endif
 }
 
 int NicManager::ExecuteCommand(LPSTR lpCommandLine) {

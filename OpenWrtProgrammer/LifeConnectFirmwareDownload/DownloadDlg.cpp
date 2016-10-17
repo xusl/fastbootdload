@@ -229,9 +229,9 @@ BOOL CDownloadDlg::OnInitDialog()
 #define NIC_DEBUG
 #ifdef NIC_DEBUG
     GetHostIpAddr();
-    //mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
-    //mNic.EnableDhcp();
-if(mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0", "222.222.123.1"/*"0.0.0.0"*/) == TRUE)
+//if(mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0") == TRUE)
+if(mNic.SetIP("192.168.1.111", "192.168.1.1", "255.255.255.0") == TRUE)
+//if(mNic.EnableDhcp() == TRUE)
 ::MessageBox(this->m_hWnd, "Successfully!", "Set Ip Result", MB_OK | MB_ICONINFORMATION);
 else
 ::MessageBox(this->m_hWnd, "Failed", "Set Ip Result", MB_OK | MB_ICONERROR);

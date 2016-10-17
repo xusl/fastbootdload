@@ -33,6 +33,8 @@ typedef TNetCardStruct*  PNetCardStruct;
 bool Ping(const char *ip_addr);
 int ResolveIpMac(const char *DestIpString, string & mac);
 
+typedef LPVOID *PPVOID;
+
 class NicManager
 {
 public:
@@ -41,7 +43,6 @@ public:
     bool GetAdapter();
     BOOL EnableDhcp();
     int SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask);
-    BOOL SetIP(LPCTSTR pIPAddress, LPCTSTR pNetGate, LPCTSTR pNetMask, LPCTSTR pDnsAddress);
     bool GetHostIP(string& ip, string& gw) {
         int refresh = 1;
         do {
@@ -59,22 +60,22 @@ public:
     }
 
   BOOL NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex);
+  BOOL GetAdapterInfo();
+  BOOL GetConnectName(CString& name);
+private:
+    int ExecuteCommand(LPSTR lpCommandLine);
   BOOL RegSetDHCPIP();
   BOOL RegGetIP(ADAPTER_INFO *pAI);
-  BOOL SetDHCPIP();
-  BOOL GetAdapterInfo();
+    BOOL RegSetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate);
+  BOOL RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue);
+
+  void EnumNetCards(list<TNetCardStruct>  *NetDeviceList);
+  bool NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled);
   bool GetRegistryProperty(HDEVINFO DeviceInfoSet,
                                     PSP_DEVINFO_DATA DeviceInfoData,
                                     ULONG Property,
-                                    PVOID Buffer,
+                                    LPTSTR *Buffer,
                                     PULONG Length);
-  void EnumNetCards(list<TNetCardStruct>  *NetDeviceList);
-  bool   NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled);
-  BOOL GetConnectName(CString& name);
-
-private:
-    int ExecuteCommand(LPSTR lpCommandLine);
-    BOOL RegSetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, LPCTSTR pDnsAddress);
 private:
     string segment;
     string device_ip;
