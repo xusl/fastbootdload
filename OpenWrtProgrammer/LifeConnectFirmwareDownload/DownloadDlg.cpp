@@ -86,8 +86,6 @@ END_MESSAGE_MAP()
 CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CDownloadDlg::IDD, pParent),
 	mWSAInitialized(FALSE),
-	mHostIPAddr(""),
-	mHostGWAddr(""),
 	m_LogText(""),
 	m_DialgoTitle("LifeConnect TPST")
 {
@@ -97,7 +95,6 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	server_state=false;
 	Progress_range=350;
 	is_downloading=false;
-	downloading_successfull=false;
 	b_download=false;
     m_Config.ReadConfigIni(CONFIG_FILE);
 }
@@ -112,6 +109,7 @@ CDownloadDlg::~CDownloadDlg() {
     m_pCoordinator->Reset();
     delete m_pCoordinator;
     CloseHandle(m_SyncSemaphore);
+    mNic.EnableDhcp();
 }
 
 void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
@@ -127,6 +125,7 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
     DDX_Control(pDX, IDC_DEVICE_FIRMWARE_VERSION, m_DeviceFWVersion);
     DDX_Control(pDX, IDC_FILE_STATS, m_PSTStatus);
     DDX_Control(pDX, IDC_DISABLE_CHECK, m_VersionCheckButton);
+    DDX_Control(pDX, IDC_NIC_INFORMATION, m_NicInformation);
 
     DDX_Control(pDX, IDC_LV_TFTP, m_TransferFileList);
     DDX_Control(pDX, IDC_PACKAGE_FIRMWARE_VERSION, m_RomVersion);
@@ -228,15 +227,18 @@ BOOL CDownloadDlg::OnInitDialog()
 
 #define NIC_DEBUG
 #ifdef NIC_DEBUG
-    GetHostIpAddr();
+mNic.EnumNetCards();
+    NetCardStruct nic = mNic.GetDefaultNic();
+    CString nicInfo;
+    nicInfo.Format("%s %s ", nic.mConnectionName.c_str(), nic.Name.c_str());
+    m_NicInformation.SetWindowText(nicInfo.GetString());
 //if(mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0") == TRUE)
-//if(mNic.SetIP("192.168.1.111", "192.168.1.1", "255.255.255.0") == TRUE)
-mNic.EnableDhcp();
+mNic.SetIP("192.168.1.111", "192.168.1.1", "255.255.255.0") ;
+//mNic.EnableDhcp();
 
 //::MessageBox(this->m_hWnd, "Successfully!", "Set Ip Result", MB_OK | MB_ICONINFORMATION);
 //::MessageBox(this->m_hWnd, "Failed", "Set Ip Result", MB_OK | MB_ICONERROR);
 
-    GetHostIpAddr();
 #endif
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -283,12 +285,15 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
 
 DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
+    BOOL result;
     ConfigIni conf;
+    string ipAddress;
+    NicManager *nm;
     CString msg;
-    pThis->GetHostIpAddr();
     pThis->UpdateMessage(_T("Search Life Connect..., please wait..."));
     pThis->GetConfig(conf);
 
+    nm = pThis->GetNicManager();
     int from = conf.GetHostIPStart();
     int to = conf.GetHostIPEnd();
     const char * const segment = conf.GetNetworkSegment();
@@ -297,57 +302,87 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     pThis->UpdateMessage(msg);
 
     for(;;) {
-        pThis->SniffNetwork(segment, from, to);
+        //for (int i = from; i <= to; i++)
+        //{
+        //    CString ip_addr;
+        //    ip_addr.Format("%s.%d", segment, i);
+        //    pThis->SniffNetwork( ip_addr.GetString());
+        //}
+        ipAddress.clear();
+        if ( pThis->b_download == FALSE || ipAddress.size() == 0) {
+            nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+            ipAddress = "192.168.1.1";
+            result = pThis->SniffNetwork(ipAddress.c_str());
+
+            if ( result == FALSE) {
+#ifdef TPST
+                nm->SetIP("192.168.237.10", "192.168.237.1", "255.255.255.0");
+                ipAddress = "192.168.237.1";
+                result = pThis->SniffNetwork(ipAddress.c_str());
+                if (result == FALSE)
+                    ipAddress.clear();
+#else
+
+            ipAddress.clear();
+#endif
+            }
+        } else {
+            NetCardStruct nic =nm->GetDefaultNic();
+            if (!nic.IsInvalid()) {
+                ipAddress = nic.mGateway;
+            }
+            result = pThis->SniffNetwork(ipAddress.c_str());
+            //if (result == FALSE)
+            //    memset(ipAddress, 0, sizeof ipAddress);
+        }
         Sleep(TIMER_ELAPSE);
     }
     return 0;
 }
 
-void CDownloadDlg::SniffNetwork(const char * const segment, int from, int to) {
+BOOL CDownloadDlg::SniffNetwork(const char * const pcIpAddr) {
     CString msg;
     //const char * const segment = m_Config.GetNetworkSegment();
     //msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, 1, segment, from, to);
     //UpdateMessage(msg);
-    for (int i = from; i <= to; i++) {
-        CString ip_addr;
-        const char* pcIpAddr;
-        string mac;
-        ip_addr.Format("%s.%d", segment, i);
-        pcIpAddr = ip_addr.GetString();
 
+    string mac;
+    ASSERT(pcIpAddr != NULL);
+#if 0
 #ifdef DESKTOP_TEST
-        if (pcIpAddr == mHostIPAddr || pcIpAddr == mHostGWAddr )
+    if (pcIpAddr == mHostIPAddr || pcIpAddr == mHostGWAddr )
 #else
-        if (pcIpAddr == mHostIPAddr )
+    if (pcIpAddr == mHostIPAddr )
 #endif
-        {
-            LOGD("SKip host %s", pcIpAddr);
-            continue;
-        }
-
-        if(Ping(pcIpAddr) == FALSE) {
-            LOGD("ping %s failed. ", pcIpAddr);
-            CleanDevice(pcIpAddr);
-            continue;
-        }
-
-        if (0 != ResolveIpMac(pcIpAddr, mac)) {
-            LOGD("can not reslove mac of %s. ", pcIpAddr);
-            continue;
-        }
-
-        if (!m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL)) {
-            LOGD("%s have alread been add into device manager", pcIpAddr);
-            CleanDevice(pcIpAddr);
-            continue;
-        }
-        msg.Format(_T("ping %s succefully, mac :%s"), pcIpAddr, mac.c_str());
-        LOGD("%s", msg.GetString());
-        UpdateMessage(msg);
-        Schedule();
-        //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
-        //WaitForSingleObject(m_SyncSemaphore, TIMER_ELAPSE);//INFINITE);
+    {
+        LOGD("SKip host %s", pcIpAddr);
+        return FALSE;
     }
+#endif
+
+    if(Ping(pcIpAddr) == FALSE) {
+        LOGD("ping %s failed. ", pcIpAddr);
+        CleanDevice(pcIpAddr);
+        return FALSE;
+    }
+
+    if (0 != ResolveIpMac(pcIpAddr, mac)) {
+        LOGD("can not reslove mac of %s. ", pcIpAddr);
+        return FALSE;
+    }
+
+    if (!m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL)) {
+        LOGD("%s have alread been add into device manager", pcIpAddr);
+        CleanDevice(pcIpAddr);
+        return FALSE;
+    }
+    msg.Format(_T("ping %s succefully, mac :%s"), pcIpAddr, mac.c_str());
+    LOGD("%s", msg.GetString());
+    UpdateMessage(msg);
+    Schedule();
+    //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+    //WaitForSingleObject(m_SyncSemaphore, TIMER_ELAPSE);//INFINITE);
+    return TRUE;
 }
 
 void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
@@ -559,9 +594,13 @@ void CDownloadDlg::OnBnClickedStart() {
     ClearMessage();
 
     is_downloading=TRUE;
-    downloading_successfull=false;
     b_download = false;
 
+    mNic.EnumNetCards();
+    NetCardStruct nic = mNic.GetDefaultNic();
+    CString nicInfo;
+    nicInfo.Format("%s %s ", nic.mConnectionName.c_str(), nic.Name.c_str());
+    m_NicInformation.SetWindowText(nicInfo.GetString());
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     //m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
     //Schedule();
@@ -689,6 +728,7 @@ int CDownloadDlg::TelnetPST() {
     tn.send_command(CMD_REBOOT, result, false);
     m_PSTStatus.SetWindowText("Device enter download mode");
     closesocket(sock);
+    mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
     return NO_ERROR;
 }
 
@@ -911,21 +951,6 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     return 0;
 }
 
-void CDownloadDlg::GetHostIpAddr() {
-    mHostIPAddr.clear();
-    mHostGWAddr.clear();
-
-        if(mNic.GetHostIP(mHostIPAddr, mHostGWAddr)) {
-            CString msg;
-            msg.Format(_T("Host IP %s, Gateway %s."),
-                mHostIPAddr.c_str(), mHostGWAddr.c_str());
-            UpdateMessage(msg);
-            return;
-        }
-
-    UpdateMessage(_T("Get Host IP failed!"));
-}
-
 #if 0
 void CDownloadDlg::HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent) {
     UpdateMessage(msg);
@@ -1049,7 +1074,6 @@ void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
         //m_progMac2.Invalidate(FALSE);
         if((Send_result.find("[processCommand] Processing send"))!=-1) {
             UpdateMessage(_T("send software successfully!"));
-            downloading_successfull=true;
             /*m_progMac2.SetPos(Progress_range);
               m_progMac2.Invalidate(FALSE);
               m_progMac2.SetBarColor(RGB(0,255,0));
@@ -1067,7 +1091,6 @@ void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
             GenSAV(s_SN,s_CommercialRef,s_PCBNo,s_PTS_new,"","","",0,"HDT",dwSpaceTime,0,MAC_label,s_SSID,"","","");
             GetDlgItem(ID_Start)->EnableWindow(true);
             is_downloading=false;
-            downloading_successfull=false;
             ::MessageBoxA(NULL,"Download finished, please remove the device for next!","MBO1",MB_SYSTEMMODAL);*/
             m_progMac2.SetWindowText(_T("Send software finished!, Please wait for the device update and then restart "));
             m_progMac2.Invalidate(FALSE);
@@ -1075,7 +1098,6 @@ void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
             //TODO:: comment by xusl
             //			get_Wifi_connect();
             //is_downloading=false;
-            //downloading_successfull=true;
             break;
         }
 
@@ -1084,7 +1106,6 @@ void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
             m_progMac2.SetBarColor(RGB(255,50,50));
             m_progMac2.Invalidate(FALSE);
             GetDlgItem(ID_Start)->EnableWindow(true);
-            downloading_successfull=false;
             is_downloading=false;
             ::MessageBox(NULL,_T("Download failed!"),_T("Download"),MB_OK);
             break;

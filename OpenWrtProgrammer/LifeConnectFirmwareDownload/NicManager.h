@@ -12,8 +12,9 @@ using namespace std;
 
 typedef int (CALLBACK* DHCPNOTIFYPROC)(LPWSTR, LPWSTR, BOOL, DWORD, DWORD, DWORD, int);
 
-typedef struct  NetCardStruct
+class  NetCardStruct
 {
+public:
     DWORD    Id;         // 网卡设备号
     string   Name;     // 网卡名
     string   driver;
@@ -24,8 +25,28 @@ typedef struct  NetCardStruct
     string   mGateway;// 网关
     bool     Disabled;     // 当前是否禁用
     bool     Changed;         // 是否更改过
-}TNetCardStruct;
-typedef TNetCardStruct*  PNetCardStruct;
+
+    NetCardStruct() {
+      Reset();
+    };
+    ~NetCardStruct() {
+    };
+
+    VOID Reset() {
+      Id = -1;
+      Name.clear();
+      driver.clear();
+      mConnectionName.clear();
+      mAdapterName.clear();
+      mIPAddress.clear();
+      mSubnetMask.clear();
+    };
+
+    BOOL IsInvalid() {
+      return (Id == -1);
+    };
+};
+typedef  NetCardStruct*  PNetCardStruct;
 
 bool Ping(const char *ip_addr);
 int ResolveIpMac(const char *DestIpString, string & mac);
@@ -37,44 +58,29 @@ class NicManager
 public:
     NicManager(string network="192.168.1");
     ~NicManager(void);
-    bool GetAdapter();
+   void EnumNetCards();
+    const list<NetCardStruct>* GetNicList() const { return  &mNicList;}
+    NetCardStruct GetDefaultNic() const { return m_DefaultNic;};
     BOOL EnableDhcp();
     int SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask);
-    bool GetHostIP(string& ip, string& gw) {
-        int refresh = 1;
-        do {
-            if (!device_ip.empty() &&(device_ip !="")&&(device_ip !="0.0.0.0")) {
-                ip = device_ip;
-                gw = gateway_ip;
-                return true;
-            }
-            if (refresh >= 1) {
-                if(!GetAdapter())
-                    return false;
-            }
-        } while(refresh-- >= 0);
-        return false;
-    }
-
-  BOOL NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex);
+    BOOL UpdateIP();
+    BOOL NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex);
   //BOOL GetAdapterInfo();
 
 private:
     int ExecuteCommand(LPSTR lpCommandLine);
-  BOOL RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway);
-    BOOL RegSetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, DWORD enableDHCP);
-  BOOL RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue);
-
-  BOOL RegReadConnectName(const string & adapter, string& name);
-BOOL RegReadAdapter(const char* driver, string &adapter);
-  void EnumNetCards(list<TNetCardStruct>  *NetDeviceList);
-  bool NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled);
-  ULONG GetRegistryProperty(HDEVINFO DeviceInfoSet,
-                                    PSP_DEVINFO_DATA DeviceInfoData,
-                                    ULONG Property,
-                                    LPTSTR *Buffer);
+    BOOL RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway);
+    BOOL RegSetIP(const string & adapter, LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, DWORD enableDHCP);
+    BOOL RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue);
+    BOOL RegReadConnectName(const string & adapter, string& name);
+    BOOL RegReadAdapter(const char* driver, string &adapter);
+    bool NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled);
+    ULONG GetRegistryProperty(HDEVINFO DeviceInfoSet,
+                                      PSP_DEVINFO_DATA DeviceInfoData,
+                                      ULONG Property,
+                                      LPTSTR *Buffer);
 private:
     string segment;
-    list<TNetCardStruct> mNicList;
-    TNetCardStruct *m_pDefaultNic;
+    list<NetCardStruct> mNicList;
+    NetCardStruct m_DefaultNic;
 };

@@ -10,12 +10,8 @@
 //#pragma comment(lib,"icmp.lib")
 
 NicManager::NicManager(string network):
-    device_ip(""),
-    m_pDefaultNic(NULL),
     segment(network)
 {
-    device_ip.clear();
-    gateway_ip.clear();
     mNicList.clear();
 }
 
@@ -331,7 +327,7 @@ BOOL NicManager::RegReadAdapter(const char* driver, string &adapter) {
     ASSERT(driver != NULL);
 
     if(RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                    "System\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}",
+                    "System\\CurrentControlSet\\Control\\Class\\",//{4d36e972-e325-11ce-bfc1-08002be10318}",
                     0,
                     KEY_READ,
                     &hKey) != ERROR_SUCCESS) {
@@ -461,17 +457,19 @@ int NicManager::RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue
     return 0;
 }
 
-BOOL NicManager::RegSetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, DWORD enableDHCP)
+BOOL NicManager::RegSetIP(const string & adapter, LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, DWORD enableDHCP)
 {
     HKEY hKey;
-    CString strKeyName = "SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\";
-    strKeyName += mAdapterName.c_str();
+    CString keyName = "SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\";
+    keyName += adapter.c_str();
     if(RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                    strKeyName.GetString(),
+                    keyName.GetString(),
                     0,
                     KEY_WRITE,
-                    &hKey) != ERROR_SUCCESS)
+                    &hKey) != ERROR_SUCCESS) {
+        LOGE("Open %s failed", keyName.GetString());
         return FALSE;
+    }
 
     int result = 0;
     result += RegSetMultisz(hKey, "IPAddress", pIPAddress);
@@ -529,7 +527,7 @@ BOOL NicManager::NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex)
 //HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Network\{4D36E972-E325-11CE-BFC1-08002BE10318}\{9FFD1018-51D8-4A42-8167-E40813931790}\Connection
 //als exact "PCI\VEN_10EC&DEV_8168&SUBSYS_3670103C&REV_06\4&3B992247&0&00E1" by key "PnpInstanceID", this
 //is what we get by SetDi* function.
-void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
+void NicManager::EnumNetCards()
 {
     NetCardStruct nic;
     DWORD  Status, Problem, code;
@@ -545,11 +543,12 @@ void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
         return;
 
     SP_DEVINFO_DATA  diData ={sizeof(SP_DEVINFO_DATA)};
+    mNicList.clear();
+    m_DefaultNic.Reset();
 
     for(DWORD DeviceId=0;
         SetupDiEnumDeviceInfo(hDevInfo,DeviceId,&diData);
-        DeviceId++)
-    {
+        DeviceId++) {
         if ((code = CM_Get_DevNode_Status(&Status, &Problem, diData.DevInst,0)) != CR_SUCCESS) {
             LOGE("CM_Get_DevNode_Status return %d", code);
             continue;
@@ -570,7 +569,6 @@ void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
         //"ROOT" OR "PCI"
         //GetRegistryProperty(hDevInfo, &diData, SPDRP_ENUMERATOR_NAME , &Buffer);
 
-
         if (GetRegistryProperty(hDevInfo, &diData, SPDRP_DEVICEDESC, &name) &&
             GetRegistryProperty(hDevInfo, &diData, SPDRP_DRIVER , &driver)) {
             nic.Id = DeviceId;
@@ -580,12 +578,11 @@ void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
             nic.Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == Problem);
             nic.Changed = false;
             result = RegReadAdapter(driver, nic.mAdapterName);
-            LOGE("SPDRP_HARDWAREID %s", driver);
+            LOGE("SPDRP_DRIVER %s, SPDRP_DEVICEDESC %s", driver, name);
             if (result) {
                 RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway);
                 RegReadConnectName(nic.mAdapterName, nic.mConnectionName);
-
-                NetDeviceList->push_back(nic);
+                mNicList.push_back(nic);
             }
         }
 
@@ -597,6 +594,9 @@ void NicManager::EnumNetCards(list<TNetCardStruct> *NetDeviceList)
             LocalFree(name);
             name = NULL;
         }
+    }
+    if(!mNicList.empty()) {
+        m_DefaultNic = mNicList.front();
     }
 }
 
@@ -684,6 +684,16 @@ bool NicManager::NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled)
     return true;
 }
 
+BOOL NicManager::UpdateIP() {
+    list<NetCardStruct>::iterator it;
+    for (it = mNicList.begin(); it != mNicList.end(); ++it) {
+        RegGetIP(it->mAdapterName, it->mIPAddress, it->mSubnetMask, it->mGateway);
+    }
+
+    RegGetIP(m_DefaultNic.mAdapterName, m_DefaultNic.mIPAddress,
+        m_DefaultNic.mSubnetMask, m_DefaultNic.mGateway);
+    return TRUE;
+}
 
 #undef USE_NETSH
 // Start an explorer window, directory is Tftpd32's default directory
@@ -701,69 +711,65 @@ BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
     gateway_ip = gateway;
     return rc == 0;
 #else
-    if(!RegSetIP(ip, subnetMask, gateway, 0))
+    if (m_DefaultNic.IsInvalid()) {
+        LOGE("There are no valid NIC");
         return FALSE;
+    }
+    if(!RegSetIP(m_DefaultNic.mAdapterName, ip, subnetMask, gateway, 0)) {
+        LOGE("RegSetIP failed");
+        return FALSE;
+    }
 
     //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
     //if(!NotifyIPChange(lpszAdapterName, nIndex, pIPAddress, pNetMask))
     //  return FALSE;
 
     //通过禁用启用网卡实现IP立即生效
-    list<TNetCardStruct> cardList;
-    EnumNetCards(&cardList);
-    if(!cardList.empty())
-    {
-        NetCardStateChange(&cardList.front(),FALSE);
-        Sleep(10);
-        NetCardStateChange(&cardList.front(),TRUE);
-    }
+    NetCardStateChange(&m_DefaultNic, FALSE);
+    Sleep(100);
+    NetCardStateChange(&m_DefaultNic,TRUE);
 
-    device_ip = ip;
-    gateway_ip = gateway;
+    Sleep(1000);
+    UpdateIP();
     return TRUE;
 #endif
 } // StartExplorer
 
 BOOL NicManager::EnableDhcp() {
-#ifdef USE_NETSH
-    CString connectionName;
-    CString command;
-    if (FALSE == GetConnectName(connectionName))
+#ifndef USE_NETSH
+    if (m_DefaultNic.IsInvalid()) {
+        LOGE("There are no valid NIC");
         return FALSE;
-
-    command.Format("netsh int ip set addr \"%s\" dhcp ", connectionName.GetString());
-    int rc = ExecuteCommand((LPSTR)command.GetString());
-    //command.Format("netsh int ip set dns \"%s\" dhcp", connectionName.GetString());
-    //rc += ExecuteCommand((LPSTR)command.GetString());
-
-    device_ip.clear();
-    gateway_ip.clear();
-    GetAdapter();
-    return rc == 0;
-#else
-
-    if(!RegSetIP("0.0.0.0","0.0.0.0", "0.0.0.0", 1))
+    }
+    if(!RegSetIP(m_DefaultNic.mAdapterName, "0.0.0.0","0.0.0.0", "0.0.0.0", 1)) {
+        LOGE("RegSetIP failed");
         return FALSE;
-
+    }
 
     //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
     //if(!NotifyDHCPIPChange(lpszAdapterName, nIndex))
     //  return FALSE;
 
-
     //通过禁用启用网卡实现IP立即生效
-    list<TNetCardStruct> cardList;
-    EnumNetCards(&cardList);
-    if(!cardList.empty())
-    {
-        NetCardStateChange(&cardList.front(),FALSE);
-        Sleep(10);
-        NetCardStateChange(&cardList.front(),TRUE);
-    }
-    device_ip.clear();
-    gateway_ip.clear();
-    GetAdapter();
+    NetCardStateChange(&m_DefaultNic,FALSE);
+    Sleep(100);
+    NetCardStateChange(&m_DefaultNic,TRUE);
+
+    Sleep(1000);
+    UpdateIP();
     return TRUE;
+
+#else
+    CString connectionName;
+    CString command;
+    if (FALSE == GetConnectName(connectionName))
+        return FALSE;
+    command.Format("netsh int ip set addr \"%s\" dhcp ", connectionName.GetString());
+    int rc = ExecuteCommand((LPSTR)command.GetString());
+    //command.Format("netsh int ip set dns \"%s\" dhcp", connectionName.GetString());
+    //rc += ExecuteCommand((LPSTR)command.GetString());
+    GetAdapter();
+    return rc == 0;
 #endif
 }
 

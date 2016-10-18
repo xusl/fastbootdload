@@ -49,8 +49,6 @@ public:
 protected:
 	HICON m_hIcon;
 	struct mg_server *server;
-  string mHostIPAddr;
-  string mHostGWAddr;
 	HANDLE m_NetworkSnifferThreadHandle;
 	HANDLE Server_Listen_Thread;
 	HANDLE m_WorkThreadHandle;
@@ -59,9 +57,8 @@ protected:
   DWORD   m_NetworkSnifferThreadID;
   BOOL  mWSAInitialized;
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
-  void SniffNetwork(const char * const segment, int from, int to);
+  BOOL SniffNetwork(const char * const pcIpAddr);
   int TelnetPST();
-  void GetHostIpAddr();
   void UpdateMessage(CString msg);
   void ClearMessage(void);
   VOID SetDeviceInformation(int type, LPCTSTR lpszString);
@@ -73,6 +70,7 @@ protected:
 //void server_listen(u_short port =DOWNLOAD_SERVER_PORT);
   DWORD Schedule();
   DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;};
+  NicManager * GetNicManager() { return &mNic;};
   VOID GetConfig(ConfigIni & conf) { conf = m_Config;};
 
   int TFTPNew (const struct S_TftpTrfNew *pTrf);
@@ -100,11 +98,11 @@ private:
 	int Progress_range;
 	bool server_state;
 	BOOL is_downloading;
-	bool downloading_successfull;
 	bool b_download;
 	CEdit m_MessageControl;
   CStatic m_RomPathStaticText;
   CStatic m_RomVersion;
+  CStatic m_NicInformation;
   CStatic m_DeviceIpAddress;
   CStatic m_DeviceOSVersion;
   CStatic m_DeviceFWVersion;
