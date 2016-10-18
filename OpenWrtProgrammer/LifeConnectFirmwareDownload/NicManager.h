@@ -12,19 +12,16 @@ using namespace std;
 
 typedef int (CALLBACK* DHCPNOTIFYPROC)(LPWSTR, LPWSTR, BOOL, DWORD, DWORD, DWORD, int);
 
-typedef struct tagAdapterInfo
-{
-  string strName;// 适配器名称
-  string strDriverDesc;// 适配器描述
-  string strIP; // IP地址
-  string strNetMask;// 子网掩码
-  string strNetGate;// 网关
-}ADAPTER_INFO;
 typedef struct  NetCardStruct
 {
     DWORD    Id;         // 网卡设备号
     string   Name;     // 网卡名
-    string   deviceAddress;
+    string   driver;
+    string   mConnectionName;
+    string   mAdapterName;
+    string   mIPAddress; // IP地址
+    string   mSubnetMask;// 子网掩码
+    string   mGateway;// 网关
     bool     Disabled;     // 当前是否禁用
     bool     Changed;         // 是否更改过
 }TNetCardStruct;
@@ -60,26 +57,24 @@ public:
     }
 
   BOOL NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex);
-  BOOL GetAdapterInfo();
-  BOOL GetConnectName(CString& name);
+  //BOOL GetAdapterInfo();
+
 private:
     int ExecuteCommand(LPSTR lpCommandLine);
-  BOOL RegSetDHCPIP();
-  BOOL RegGetIP(ADAPTER_INFO *pAI);
-    BOOL RegSetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate);
+  BOOL RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway);
+    BOOL RegSetIP(LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, DWORD enableDHCP);
   BOOL RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue);
 
+  BOOL RegReadConnectName(const string & adapter, string& name);
+BOOL RegReadAdapter(const char* driver, string &adapter);
   void EnumNetCards(list<TNetCardStruct>  *NetDeviceList);
   bool NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled);
-  bool GetRegistryProperty(HDEVINFO DeviceInfoSet,
+  ULONG GetRegistryProperty(HDEVINFO DeviceInfoSet,
                                     PSP_DEVINFO_DATA DeviceInfoData,
                                     ULONG Property,
-                                    LPTSTR *Buffer,
-                                    PULONG Length);
+                                    LPTSTR *Buffer);
 private:
     string segment;
-    string device_ip;
-    string gateway_ip;
-    string mAdapterName;
-    vector<ADAPTER_INFO*> AdapterInfoVector;
+    list<TNetCardStruct> mNicList;
+    TNetCardStruct *m_pDefaultNic;
 };

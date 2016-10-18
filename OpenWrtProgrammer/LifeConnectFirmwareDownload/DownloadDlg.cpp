@@ -230,11 +230,11 @@ BOOL CDownloadDlg::OnInitDialog()
 #ifdef NIC_DEBUG
     GetHostIpAddr();
 //if(mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0") == TRUE)
-if(mNic.SetIP("192.168.1.111", "192.168.1.1", "255.255.255.0") == TRUE)
-//if(mNic.EnableDhcp() == TRUE)
-::MessageBox(this->m_hWnd, "Successfully!", "Set Ip Result", MB_OK | MB_ICONINFORMATION);
-else
-::MessageBox(this->m_hWnd, "Failed", "Set Ip Result", MB_OK | MB_ICONERROR);
+//if(mNic.SetIP("192.168.1.111", "192.168.1.1", "255.255.255.0") == TRUE)
+mNic.EnableDhcp();
+
+//::MessageBox(this->m_hWnd, "Successfully!", "Set Ip Result", MB_OK | MB_ICONINFORMATION);
+//::MessageBox(this->m_hWnd, "Failed", "Set Ip Result", MB_OK | MB_ICONERROR);
 
     GetHostIpAddr();
 #endif
