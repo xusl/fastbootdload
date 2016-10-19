@@ -105,7 +105,6 @@ CDownloadDlg::~CDownloadDlg() {
         mWSAInitialized = FALSE;
     }
 
-    StopLogging();
     m_pCoordinator->Reset();
     delete m_pCoordinator;
     CloseHandle(m_SyncSemaphore);
@@ -301,6 +300,7 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
     }
     b_download = false;
     m_pCoordinator->RemoveDevice(dev);
+    StopTftpd32Services ();
     //todo:: close telnet socket?????
 }
 
@@ -400,13 +400,14 @@ BOOL CDownloadDlg::SniffNetwork(const char * const pcIpAddr) {
         return FALSE;
     }
 #endif
-
+//unfortunately, uboot do not response PING message.
+/*
     if(Ping(pcIpAddr) == FALSE) {
         LOGD("ping %s failed. ", pcIpAddr);
         CleanDevice(pcIpAddr);
         return FALSE;
     }
-
+*/
     if (0 != ResolveIpMac(pcIpAddr, mac)) {
         LOGD("can not reslove mac of %s. ", pcIpAddr);
         return FALSE;
@@ -418,9 +419,9 @@ BOOL CDownloadDlg::SniffNetwork(const char * const pcIpAddr) {
         return FALSE;
     }
     msg.Format(_T("ping %s succefully, mac :%s"), pcIpAddr, mac.c_str());
-    LOGD("%s", msg.GetString());
     UpdateMessage(msg);
-    Schedule();
+    TelnetPST();
+    //Schedule();
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     //WaitForSingleObject(m_SyncSemaphore, TIMER_ELAPSE);//INFINITE);
     return TRUE;
@@ -649,10 +650,20 @@ void CDownloadDlg::OnBnClickedStart() {
     //Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
 
     m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
-    StartTftpd32Services(GetSafeHwnd(), m_pCoordinator); //m_hWnd
 }
 
-
+int CDownloadDlg::TFTPDownload() {
+CString msg;
+    NetCardStruct nic = mNic.GetDefaultNic();
+    if (nic.mIPAddress != "192.168.1.10") {
+        mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+        msg.Format("NIC IP is %s, change to the default IP", nic.mIPAddress.c_str());
+        m_PSTStatus.SetWindowText(msg);
+        SetInformation(HOST_NIC, NULL);
+    }
+    StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
+    return 0;
+}
 #define COMMAND_UPDATE "send_data 254 0 0 7 0 1 0\n"
 //#define CMD_REBOOT      "send_data 254 0 0 5 0 0 0\n"
 #define CMD_REBOOT      "reboot\n"
@@ -678,6 +689,8 @@ int CDownloadDlg::TelnetPST() {
 
     SOCKET sock = CreateSocket(dev->GetIpAddr().c_str());
     if ( sock == INVALID_SOCKET) {
+        LOGE("Can not setup telnet session");
+        TFTPDownload();
         return ERROR_INVALID_HANDLE;
     }
 
@@ -689,9 +702,9 @@ int CDownloadDlg::TelnetPST() {
 
     LOGE("negotiate");
     tn.send_command(NULL, result);
-    UpdateMessage(result.c_str());
+    //UpdateMessage(result.c_str());
     tn.send_command(NULL, result);
-    UpdateMessage(result.c_str());
+    //UpdateMessage(result.c_str());
 
 #ifdef DESKTOP_TEST
     m_PSTStatus.SetWindowText("Do user login");
@@ -770,14 +783,8 @@ int CDownloadDlg::TelnetPST() {
     tn.send_command(CMD_REBOOT, result, false);
     m_PSTStatus.SetWindowText("Device enter download mode");
     closesocket(sock);
+    TFTPDownload();
 
-    NetCardStruct nic = mNic.GetDefaultNic();
-    if (nic.mIPAddress != "192.168.1.10") {
-        mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
-        msg.Format("NIC IP is %s, change to the default IP", nic.mIPAddress.c_str());
-        m_PSTStatus.SetWindowText(msg);
-        SetInformation(HOST_NIC, NULL);
-    }
     return NO_ERROR;
 }
 
@@ -1467,7 +1474,7 @@ static int TFTPItemAdd (CListCtrl* listView, const struct S_TftpGui *pTftpGui, i
                  NI_NUMERICHOST | AI_NUMERICSERV );
 
     wsprintf (szTxt, "%s:%s", szAddr, szServ);
-    LOGE ("CREATING item <%s>\n", szTxt);
+    LOGD ("CREATING item <%s>", szTxt);
     //ListView_SetItemText (hListV, itemPos, FD_PEER, szTxt);
     listView->SetItemText (itemPos, FD_PEER, szTxt);
 #ifdef _MSC_VER
@@ -1624,7 +1631,7 @@ void CDownloadDlg::UpdateMessage(CString errormsg){
         m_LogText += errormsg;
         msg = m_LogText;
     }
-    LOGE("%s", errormsg.GetString());
+    LOGD("%s", errormsg.GetString());
     //::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
     m_MessageControl.SetWindowText(msg);
     m_MessageControl.SetSel(0, 0);

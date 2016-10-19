@@ -74,13 +74,10 @@ void WriteLog
 	...
 )
 {
-#define MAX_BUF_LEN     (4096 * 8)
-#define FORMAT_SIZE     (256*4)
+#define FORMAT_SIZE     (512*4)
 
-  int   nBuf;
-  char  szBuffer[MAX_BUF_LEN];
-  char  szFormat[FORMAT_SIZE];
-  //      char timestr[40];
+  int   len;
+  char  szFormat[FORMAT_SIZE] = {0};
   // time_t clk = time( NULL );
   SYSTEMTIME time;
   va_list args;
@@ -103,18 +100,19 @@ void WriteLog
   g_Lock.Lock();
 #endif
 
-  memset(szBuffer, 0, sizeof szBuffer);
-  memset(szFormat, 0, sizeof szFormat);
+  //memset(szFormat, 0, sizeof szFormat);
 
   va_start(args, fmtstr);
 
   GetLocalTime(&time);
-  nBuf = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %3d %6s %s\n",
+  len = _snprintf(szFormat, COUNTOF(szFormat), "%02d:%02d:%02d %3d %6s %s",
                    time.wHour, time.wMinute,time.wSecond, time.wMilliseconds, msg, fmtstr);
-
 
   vfprintf(gLogFp, szFormat, args);
   va_end(args);
+  len = strlen(fmtstr);
+  if (len >= 1 && '\n' != fmtstr[len -1])
+    fputc('\n', gLogFp);
   fflush(gLogFp);
   //ASSERT(nBuf >= 0);
 

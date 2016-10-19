@@ -59,6 +59,7 @@ protected:
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
   BOOL SniffNetwork(const char * const pcIpAddr);
   int TelnetPST();
+  int TFTPDownload();
   void UpdateMessage(CString msg);
   void ClearMessage(void);
   VOID SetInformation(int type, LPCTSTR lpszString);

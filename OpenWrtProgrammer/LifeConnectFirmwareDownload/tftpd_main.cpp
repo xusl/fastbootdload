@@ -277,7 +277,7 @@ static struct LL_TftpInfo *TftpdDestroyThreadItem (struct LL_TftpInfo *pTftp)
 
     LOGD ("thread %d has exited", pTftp->tm.dwThreadHandle);
 
-    LOGD ("removing thread %d (%p/%p/%p)\n", pTftp->tm.dwThreadHandleId, pTftp, pTftpFirst, pTftpFirst->next);
+    LOGD ("removing thread %d (%p/%p/%p)", pTftp->tm.dwThreadHandleId, pTftp, pTftpFirst, pTftpFirst->next);
     // do not cancel permanent Thread
     if (! pTftp->tm.bPermanentThread )
     {
@@ -455,13 +455,12 @@ static int TftpdChooseNewThread (SOCKET sListenerSocket)
                                                      pTftp,
                                                      0,
                                                      & pTftp->tm.dwThreadHandleId);
-            LOGD ("Thread %d transfer %d started (records %p/%p)\n", pTftp->tm.dwThreadHandleId, pTftp->tm.dwTransferId, pTftpFirst, pTftp);
+            LOGD ("Thread %d transfer %d started (records %p/%p)", pTftp->tm.dwThreadHandleId, pTftp->tm.dwTransferId, pTftpFirst, pTftp);
             LOGD("thread %d started", pTftp->tm.dwThreadHandle);
-
         }
         else                 // Start the thread
         {
-            LOGD ("waking up thread %d for transfer %d\n",
+            LOGD ("waking up thread %d for transfer %d",
                   pTftp->tm.dwThreadHandleId,
                   pTftp->tm.dwTransferId );
             if (pTftp->tm.hEvent!=NULL)       SetEvent (pTftp->tm.hEvent);
@@ -606,7 +605,7 @@ void TftpdMain (void *param)
     // creates socket and starts permanent threads
     if (pTftpFirst==NULL)  CreatePermanentThreads ();
 
-    tftpThreadMonitor.bInit = TRUE;  // inits OK
+    //tftpThreadMonitor.bInit = TRUE;  // inits OK
 
     // Socket was not opened at the start since we have to use interface
     // once an address as been assigned
@@ -670,10 +669,10 @@ void TftpdMain (void *param)
 
     // Should the main thread kill other threads ?
     if ( tftpThreadMonitor.bSoftReset )
-        LOGE ("do NOT signal worker threads\n");
+        LOGE ("do NOT signal worker threads");
     else
     {
-        LOGE ("signalling worker threads\n");
+        LOGE ("signalling worker threads");
         /////////////////////////////////
         // wait for end of worker threads
         for (pTftp=pTftpFirst ; pTftp!=NULL  ; pTftp=pTftp->next)
@@ -681,12 +680,12 @@ void TftpdMain (void *param)
             if (pTftp->tm.bActive)                nak (pTftp, ECANCELLED);
             else if (pTftp->tm.bPermanentThread)  SetEvent (pTftp->tm.hEvent);
         }
-        LOGE ("waiting for worker threads\n");
+        LOGE ("waiting for worker threads");
 
         while ( pTftpFirst != NULL )
         {
             WaitForSingleObject (pTftpFirst->tm.dwThreadHandle, 10000);
-            LOGE ("End of thread %d\n", pTftpFirst->tm.dwThreadHandleId);
+            LOGE ("End of thread %d", pTftpFirst->tm.dwThreadHandleId);
             pTftpFirst->tm.bPermanentThread = FALSE;
             TftpdDestroyThreadItem (pTftpFirst);
         }
@@ -696,7 +695,7 @@ void TftpdMain (void *param)
     tftpThreadMonitor.skt=INVALID_SOCKET;
     WSACloseEvent (hSocketEvent);
 
-    LOGE ("main TFTP thread ends here\n");
+    LOGE ("main TFTP thread ends here");
     _endthread ();
 } // Tftpd main thread
 
@@ -708,9 +707,14 @@ static void FreeThreadResources ()
         closesocket (tftpThreadMonitor.skt);
     if (tftpThreadMonitor.hEv != INVALID_HANDLE_VALUE)
         CloseHandle (tftpThreadMonitor.hEv);
+    if (tftpThreadMonitor.tTh != INVALID_HANDLE_VALUE)
+        CloseHandle (tftpThreadMonitor.tTh);
     tftpThreadMonitor.skt = INVALID_SOCKET;
     tftpThreadMonitor.hEv = INVALID_HANDLE_VALUE;
+    tftpThreadMonitor.tTh = INVALID_HANDLE_VALUE;
     tftpThreadMonitor.bSoftReset = FALSE;
+    tftpThreadMonitor.gRunning = FALSE;
+
 }
 int StartTftpdThread ()
 {
@@ -770,7 +774,7 @@ void StartTftpd32Services (HWND param, DeviceCoordinator *coordinator)
     gDevCoordinator = coordinator;
     // starts worker threads
     StartTftpdThread ();
-    LOGD("Worker threads started\n");
+    LOGD("Worker threads started");
 } // StartTftpd32Services
 
 void StopTftpd32Services (void)

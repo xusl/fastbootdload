@@ -40,6 +40,8 @@ BOOL DeviceCoordinator::Reset() {
         //*it = NULL;
     }
     mDevintfList.clear();
+
+    LOGD("DeviceCoordinator::Reset");
     return TRUE;
 }
 
@@ -51,6 +53,7 @@ CDevLabel *DeviceCoordinator::GetValidDevice() {
             continue;
         return item;
     }
+    LOGD("There are no arrive device");
     return NULL;
 }
 
@@ -63,6 +66,7 @@ CDevLabel *DeviceCoordinator::GetRebootDevice() {
         item->SetStatus(DEVICE_DWONLOAD);
         return item;
     }
+    LOGD("There are no rebooting device");
     return NULL;
 }
 
@@ -131,8 +135,11 @@ BOOL DeviceCoordinator::SetDownloadFirmware(list<char *> firmware) {
 BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,  CDevLabel** intfs) {
     CDevLabel* newDevIntf = NULL;
 
+    LOGD("Enter DeviceCoordinator::AddDevice");
+
     map <string, bool, greater<string>>::iterator Rit = mMacRecords.find(dev.GetMac());
     if ( Rit != mMacRecords.end() /*&& mMacRecords[dev.GetMac()]*/) {
+        LOGI("device %s have already updated.", dev.GetMac().c_str());
         return FALSE;
     }
 
@@ -144,16 +151,22 @@ BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,  CDevLabel** intfs) {
 
     if (it != mDevintfList.end()) {
         newDevIntf = *it;
+        LOGI("device %s (ip:%s, dlip:%s) is already added in coordinator.",
+            newDevIntf->GetMac().c_str(),
+            newDevIntf->GetIpAddr().c_str(),
+            newDevIntf->GetDownloadIpAddr().c_str());
         return FALSE;
-        //TODO::
     } else {
-        LOGI("Create new device");
         EnterCriticalSection(&mCriticalSection);
         mMacRecords.insert(pair<string, bool>(dev.GetMac(), false));
         newDevIntf = new CDevLabel(dev);
         newDevIntf->SetFirmware(mpFirmware);
         mDevintfList.push_back(newDevIntf);
         LeaveCriticalSection(&mCriticalSection);
+        LOGI("add device %s (ip:%s, dlip:%s) into coordinator.",
+            newDevIntf->GetMac().c_str(),
+            newDevIntf->GetIpAddr().c_str(),
+            newDevIntf->GetDownloadIpAddr().c_str());
     }
     if (intfs != NULL) {
         *intfs = newDevIntf;
@@ -224,6 +237,7 @@ BOOL DeviceCoordinator::CheckDownloadPermission() {
     }
 
     if (dev == NULL) {
+        LOGD("There are no device can enter download.");
         return FALSE;
     }
 

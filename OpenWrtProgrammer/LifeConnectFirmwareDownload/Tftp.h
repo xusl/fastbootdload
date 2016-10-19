@@ -271,7 +271,7 @@ struct S_ThreadMonitoring
     HANDLE  hEv;         // wake up event
     SOCKET  skt;         // Listening SOCKET
 	int     bSoftReset;  // Thread will be reset
-	BOOL    bInit;		 // inits are terminated
+	//BOOL    bInit;		 // inits are terminated
 };
 
 struct S_TftpGui {
