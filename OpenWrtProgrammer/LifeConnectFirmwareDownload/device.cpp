@@ -18,6 +18,7 @@ when        who        what
 #include "log.h"
 
 using namespace std;
+#undef MULTI_DEVICE_FEATURE
 
 DeviceCoordinator::DeviceCoordinator() :
     mDevintfList()
@@ -79,17 +80,25 @@ CDevLabel *DeviceCoordinator::GetDevice(const char * const ipAddr, int status) {
         switch(status) {
             case DEVICE_DWONLOAD:
             case DEVICE_FINISH:
+#ifdef MULTI_DEVICE_FEATURE
                 if ( item->GetDownloadIpAddr() == ipAddr) {
                     return item;
                 }
+#else
+                return item;
+#endif
                 break;
 
             case DEVICE_ARRIVE:
             case DEVICE_COMMAND:
             case DEVICE_REBOOTDOWNLOAD:
+#ifdef MULTI_DEVICE_FEATURE
                 if ( item->GetIpAddr() == ipAddr) {
                     return item;
                 }
+#else
+                return item;
+#endif
                 break;
 
             default:
@@ -113,6 +122,7 @@ BOOL DeviceCoordinator::GetDevice(const char * const ipAddr, CDevLabel** outDevI
 
     list<CDevLabel*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+#ifdef MULTI_DEVICE_FEATURE
         string ip;
         if (byDownload)
             ip = (*it)->GetDownloadIpAddr();
@@ -122,6 +132,10 @@ BOOL DeviceCoordinator::GetDevice(const char * const ipAddr, CDevLabel** outDevI
             *outDevIntf = *it;
             return TRUE;
         }
+#else
+       *outDevIntf = *it;
+        return TRUE;
+#endif
     }
     LOGE("Can not get device interface for  %s", ipAddr);
     return FALSE;
@@ -143,6 +157,7 @@ BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,  CDevLabel** intfs) {
         return FALSE;
     }
 
+#ifdef MULTI_DEVICE_FEATURE
     list<CDevLabel*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
         CDevLabel* item = *it;
@@ -168,9 +183,27 @@ BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,  CDevLabel** intfs) {
             newDevIntf->GetIpAddr().c_str(),
             newDevIntf->GetDownloadIpAddr().c_str());
     }
+#else
+if (IsEmpty() == FALSE) {
+    LOGE("there are a device in coordinator");
+    return FALSE;
+}
+    EnterCriticalSection(&mCriticalSection);
+    mMacRecords.insert(pair<string, bool>(dev.GetMac(), false));
+    newDevIntf = new CDevLabel(dev);
+    newDevIntf->SetFirmware(mpFirmware);
+    mDevintfList.push_back(newDevIntf);
+    LeaveCriticalSection(&mCriticalSection);
+    LOGI("add device %s (ip:%s, dlip:%s) into coordinator.",
+        newDevIntf->GetMac().c_str(),
+        newDevIntf->GetIpAddr().c_str(),
+        newDevIntf->GetDownloadIpAddr().c_str());
+#endif
+
     if (intfs != NULL) {
         *intfs = newDevIntf;
     }
+
     return TRUE;
 }
 
@@ -232,6 +265,9 @@ VOID DeviceCoordinator::Dump(VOID) {
 
 BOOL DeviceCoordinator::CheckDownloadPermission() {
     CDevLabel *dev = GetRebootDevice();
+    if(dev == NULL) {
+        dev = GetDevice("", DEVICE_DWONLOAD);
+    }
     if(dev == NULL && GetSuperMode()) {
         dev = GetValidDevice();
     }
@@ -357,7 +393,7 @@ BOOL CDevLabel::GetTransferIDs(list<DWORD> &ids) {
 }
 
 BOOL CDevLabel::CheckRemovable() {
-    DWORD timeout = 40000;
+    DWORD timeout = 140000;
     switch (GetStatus()) {
         case DEVICE_FINISH:
             timeout = 10000;

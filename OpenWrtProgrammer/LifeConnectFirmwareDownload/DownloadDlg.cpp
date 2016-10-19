@@ -105,7 +105,6 @@ CDownloadDlg::~CDownloadDlg() {
         mWSAInitialized = FALSE;
     }
 
-    m_pCoordinator->Reset();
     delete m_pCoordinator;
     CloseHandle(m_SyncSemaphore);
     mNic.EnableDhcp();
@@ -349,20 +348,28 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             result = pThis->SniffNetwork(ipAddress.c_str());
             }
 #else
-            ipAddress = "192.168.1.1";
-            if (nic.mGateway != ipAddress)
-                nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
-            result = pThis->SniffNetwork(ipAddress.c_str());
-
-            if ( result == FALSE) {
-                nm->SetIP("192.168.237.10", "192.168.237.1", "255.255.255.0");
-                ipAddress = "192.168.237.1";
-                result = pThis->SniffNetwork(ipAddress.c_str());
-                if (result == FALSE)
-                    ipAddress.clear();
+            if ((nic.mGateway == "192.168.1.1") || (nic.mGateway == "192.168.237.1")) {
+                result = pThis->SniffNetwork(nic.mGateway.c_str());
+                if (result)
+                    ipAddress = nic.mGateway;
             }
-            if (result)
+
+            if (result == FALSE && nic.mGateway != "192.168.1.1") {
+                nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+                result = pThis->SniffNetwork("192.168.1.1");
+                if (result)
+                ipAddress = "192.168.1.1";
+            }
+            if ( result == FALSE && nic.mGateway != "192.168.237.1") {
+                nm->SetIP("192.168.237.10", "192.168.237.1", "255.255.255.0");
+                result = pThis->SniffNetwork("192.168.237.1");
+                if (result)
+                    ipAddress = "192.168.237.1";
+            }
+            if (result) {
                 pThis->SetInformation(HOST_NIC, NULL);
+                pThis->TelnetPST();
+            }
 #endif
         } else {
             NetCardStruct nic =nm->GetDefaultNic();
@@ -375,6 +382,10 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
         }
 #else
         result = pThis->SniffNetwork(ipAddress.c_str());
+        if (result) {
+                pThis->SetInformation(HOST_NIC, NULL);
+                pThis->TelnetPST();
+        }
 #endif
         Sleep(TIMER_ELAPSE);
     }
@@ -410,6 +421,7 @@ BOOL CDownloadDlg::SniffNetwork(const char * const pcIpAddr) {
 */
     if (0 != ResolveIpMac(pcIpAddr, mac)) {
         LOGD("can not reslove mac of %s. ", pcIpAddr);
+        CleanDevice(pcIpAddr);
         return FALSE;
     }
 
@@ -418,9 +430,8 @@ BOOL CDownloadDlg::SniffNetwork(const char * const pcIpAddr) {
         CleanDevice(pcIpAddr);
         return FALSE;
     }
-    msg.Format(_T("ping %s succefully, mac :%s"), pcIpAddr, mac.c_str());
+    msg.Format(_T("Found device mac :%s, ip: %s"), mac.c_str(), pcIpAddr);
     UpdateMessage(msg);
-    TelnetPST();
     //Schedule();
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     //WaitForSingleObject(m_SyncSemaphore, TIMER_ELAPSE);//INFINITE);
