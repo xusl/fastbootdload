@@ -23,6 +23,7 @@ public:
     string   mIPAddress; // IP地址
     string   mSubnetMask;// 子网掩码
     string   mGateway;// 网关
+    BOOL     mEnableDHCP;
     bool     Disabled;     // 当前是否禁用
     bool     Changed;         // 是否更改过
 
@@ -69,7 +70,7 @@ public:
 
 private:
     int ExecuteCommand(LPSTR lpCommandLine);
-    BOOL RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway);
+    BOOL RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway,  BOOL& enableDHCP);
     BOOL RegSetIP(const string & adapter, LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, DWORD enableDHCP);
     BOOL RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue);
     BOOL RegReadConnectName(const string & adapter, string& name);

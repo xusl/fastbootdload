@@ -23,7 +23,7 @@ using namespace std;
 #define new DEBUG_NEW
 #endif
 
-enum EVersion {DEV_IP_ADDR, DEV_FW_VERSION, DEV_OS_VERSION};
+enum E_information {HOST_NIC, DEV_IP_ADDR, DEV_FW_VERSION, DEV_OS_VERSION};
 enum E_fields { FD_PEER, FD_FILE, FD_START, FD_PROGRESS, FD_BYTES, FD_TOTAL, FD_TIMEOUT };
 
 static struct S_TftpGui *pTftpGuiFirst=NULL;
@@ -204,6 +204,26 @@ BOOL CDownloadDlg::OnInitDialog()
     m_TransferFileList.InsertColumn(FD_TOTAL,    _T("Total"), LVCFMT_LEFT, 100);
     m_TransferFileList.InsertColumn(FD_TIMEOUT,  _T("Timeout"), LVCFMT_LEFT, 80);
 
+/*
+  CFont * font = emphasize->GetFont();
+  if (font != NULL) {
+    CFont boldFont;
+    LOGFONT lf;
+    font->GetObject(sizeof(LOGFONT), & lf);
+    lf.lfWeight = FW_BOLD;
+    boldFont.CreateFontIndirect(&lf);
+    emphasize->SetFont(&boldFont);
+    boldFont.Detach();
+  }
+*/
+    CFont* ptf = m_PSTStatus.GetFont();
+    LOGFONT lf;
+    ptf->GetLogFont(&lf);
+    lf.lfHeight = 20;
+    lf.lfWeight = FW_BOLD;
+    CFont font;
+    font.CreateFontIndirect(&lf);
+    m_PSTStatus.SetFont(&font);
 
     m_progMac2.SetRange(0,Progress_range);
     m_progMac2.SetBarColor(RGB(255,255,0));
@@ -225,16 +245,17 @@ BOOL CDownloadDlg::OnInitDialog()
     m_RomVersion.SetWindowText(RomVersion);
     m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
 
-#define NIC_DEBUG
+//#define NIC_DEBUG
 #ifdef NIC_DEBUG
 mNic.EnumNetCards();
     NetCardStruct nic = mNic.GetDefaultNic();
     CString nicInfo;
     nicInfo.Format("%s %s ", nic.mConnectionName.c_str(), nic.Name.c_str());
     m_NicInformation.SetWindowText(nicInfo.GetString());
-//if(mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0") == TRUE)
-mNic.SetIP("192.168.1.111", "192.168.1.1", "255.255.255.0") ;
-//mNic.EnableDhcp();
+//mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+//mNic.SetIP("192.168.1.121", "192.168.1.1", "255.255.255.0") ;
+//mNic.SetIP("192.168.237.138", "192.168.237.1", "255.255.255.0") ;
+mNic.EnableDhcp();
 
 //::MessageBox(this->m_hWnd, "Successfully!", "Set Ip Result", MB_OK | MB_ICONINFORMATION);
 //::MessageBox(this->m_hWnd, "Failed", "Set Ip Result", MB_OK | MB_ICONERROR);
@@ -294,12 +315,21 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     pThis->GetConfig(conf);
 
     nm = pThis->GetNicManager();
+    nm->UpdateIP();
+
     int from = conf.GetHostIPStart();
     int to = conf.GetHostIPEnd();
     const char * const segment = conf.GetNetworkSegment();
 
-    msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, from, segment,  to);
-    pThis->UpdateMessage(msg);
+    //msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, from, segment,  to);
+    //pThis->UpdateMessage(msg);
+#ifdef TPST
+    ipAddress.clear();
+#else
+    nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+    ipAddress = "192.168.1.1";
+    pThis->SetInformation(HOST_NIC, NULL);
+#endif
 
     for(;;) {
         //for (int i = from; i <= to; i++)
@@ -308,24 +338,32 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
         //    ip_addr.Format("%s.%d", segment, i);
         //    pThis->SniffNetwork( ip_addr.GetString());
         //}
-        ipAddress.clear();
+#ifdef TPST
         if ( pThis->b_download == FALSE || ipAddress.size() == 0) {
-            nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+            NetCardStruct nic = nm->GetDefaultNic();
+#if 0
+            if(!nic.IsInvalid() || !nic.mEnableDHCP) {
+            nm->EnableDhcp();
+            } else {
+             ipAddress = nic.mGateway;
+            result = pThis->SniffNetwork(ipAddress.c_str());
+            }
+#else
             ipAddress = "192.168.1.1";
+            if (nic.mGateway != ipAddress)
+                nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
             result = pThis->SniffNetwork(ipAddress.c_str());
 
             if ( result == FALSE) {
-#ifdef TPST
                 nm->SetIP("192.168.237.10", "192.168.237.1", "255.255.255.0");
                 ipAddress = "192.168.237.1";
                 result = pThis->SniffNetwork(ipAddress.c_str());
                 if (result == FALSE)
                     ipAddress.clear();
-#else
-
-            ipAddress.clear();
-#endif
             }
+            if (result)
+                pThis->SetInformation(HOST_NIC, NULL);
+#endif
         } else {
             NetCardStruct nic =nm->GetDefaultNic();
             if (!nic.IsInvalid()) {
@@ -335,6 +373,9 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             //if (result == FALSE)
             //    memset(ipAddress, 0, sizeof ipAddress);
         }
+#else
+        result = pThis->SniffNetwork(ipAddress.c_str());
+#endif
         Sleep(TIMER_ELAPSE);
     }
     return 0;
@@ -394,6 +435,10 @@ DWORD CDownloadDlg::Schedule() {
     if (is_downloading == FALSE) {
         LOGE("PST is now stopped");
         return -1;
+    }
+    if (b_download) {
+        LOGE("PST is now updating a device");
+        return -2;
     }
     if (!m_pCoordinator->IsEmpty()) {
      //   ReleaseSemaphore(m_SyncSemaphore, 1, NULL);
@@ -597,10 +642,7 @@ void CDownloadDlg::OnBnClickedStart() {
     b_download = false;
 
     mNic.EnumNetCards();
-    NetCardStruct nic = mNic.GetDefaultNic();
-    CString nicInfo;
-    nicInfo.Format("%s %s ", nic.mConnectionName.c_str(), nic.Name.c_str());
-    m_NicInformation.SetWindowText(nicInfo.GetString());
+    SetInformation(HOST_NIC, NULL);
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     //m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
     //Schedule();
@@ -640,7 +682,7 @@ int CDownloadDlg::TelnetPST() {
     }
 
     dev->SetStatus(DEVICE_COMMAND);
-    SetDeviceInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
+    SetInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
 
     b_download = true;
     telnet tn(sock);
@@ -670,12 +712,12 @@ int CDownloadDlg::TelnetPST() {
 
     dev->TickWatchDog();
     tn.send_command(CMD_OS_VERSION, osVersion);
-    SetDeviceInformation(DEV_OS_VERSION, osVersion.c_str());
+    SetInformation(DEV_OS_VERSION, osVersion.c_str());
 
     dev->TickWatchDog();
     m_PSTStatus.SetWindowText("Get device firmware version");
     tn.send_command(CMD_FW_VERSION, fwVersion);
-    SetDeviceInformation(DEV_FW_VERSION, fwVersion.c_str());
+    SetInformation(DEV_FW_VERSION, fwVersion.c_str());
 
     LOGE("device firmware is %s ", fwVersion.c_str());
     char *resp = _strdup( fwVersion.c_str());
@@ -728,7 +770,14 @@ int CDownloadDlg::TelnetPST() {
     tn.send_command(CMD_REBOOT, result, false);
     m_PSTStatus.SetWindowText("Device enter download mode");
     closesocket(sock);
-    mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+
+    NetCardStruct nic = mNic.GetDefaultNic();
+    if (nic.mIPAddress != "192.168.1.10") {
+        mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+        msg.Format("NIC IP is %s, change to the default IP", nic.mIPAddress.c_str());
+        m_PSTStatus.SetWindowText(msg);
+        SetInformation(HOST_NIC, NULL);
+    }
     return NO_ERROR;
 }
 
@@ -754,7 +803,7 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
         return ERROR_INVALID_HANDLE;
     }
 
-    pThis->SetDeviceInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
+    pThis->SetInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
     pThis->b_download = true;
 
     telnet tn(sock);
@@ -1582,7 +1631,7 @@ void CDownloadDlg::UpdateMessage(CString errormsg){
     m_MessageControl.SetFocus();
 }
 
-VOID CDownloadDlg::SetDeviceInformation(int type, LPCTSTR lpszString) {
+VOID CDownloadDlg::SetInformation(int type, LPCTSTR lpszString) {
     switch(type) {
     case DEV_FW_VERSION:
         m_DeviceFWVersion.SetWindowText(lpszString);
@@ -1593,6 +1642,14 @@ VOID CDownloadDlg::SetDeviceInformation(int type, LPCTSTR lpszString) {
     case DEV_IP_ADDR:
         m_DeviceIpAddress.SetWindowText(lpszString);
         break;
+    case HOST_NIC: {
+            NetCardStruct nic = mNic.GetDefaultNic();
+            CString nicInfo;
+            nicInfo.Format("%s, %s ", nic.mConnectionName.c_str(), nic.mIPAddress.c_str());
+            m_NicInformation.SetWindowText(nicInfo.GetString());
+        }
+        break;
+
     default:
         break;
     }

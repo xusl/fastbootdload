@@ -318,7 +318,7 @@ bool NicManager::GetAdapter()
 #endif
 
 BOOL NicManager::RegReadAdapter(const char* driver, string &adapter) {
-  HKEY hKey, hSubKey, hNdiIntKey;
+    HKEY hKey, hSubKey, hNdiIntKey;
     DWORD dwBufSize = 256;
     DWORD dwDataType;
     unsigned char szData[256] = {0};
@@ -338,13 +338,13 @@ BOOL NicManager::RegReadAdapter(const char* driver, string &adapter) {
     if(RegOpenKeyEx(hKey, driver, 0, KEY_READ, &hSubKey) != ERROR_SUCCESS)
     {
         LOGE("RegOpenKeyEx '%s' failed", driver);
-RegCloseKey(hKey);
-return result;
+        RegCloseKey(hKey);
+        return result;
     }
     if(RegOpenKeyEx(hSubKey, "Ndi\\Interfaces", 0, KEY_READ, &hNdiIntKey) != ERROR_SUCCESS)
     {
         LOGE("RegOpenKeyEx 'Ndi\\Interfaces' failed");
-RegCloseKey(hKey);
+        RegCloseKey(hKey);
         RegCloseKey(hSubKey);
         return result;
     }
@@ -354,12 +354,12 @@ RegCloseKey(hKey);
         LOGE("'LowerRange' of %s is '%s'", driver, szData);
         if(strcmp((char*)szData, "ethernet") == 0)//判断是不是以太网卡
         {
-                dwBufSize = sizeof szData;
-                if(RegQueryValueEx(hSubKey, "NetCfgInstanceID", 0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
-                {
-                    adapter = (char *)szData;
-                    result = TRUE;
-                }
+            dwBufSize = sizeof szData;
+            if(RegQueryValueEx(hSubKey, "NetCfgInstanceID", 0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
+            {
+                adapter = (char *)szData;
+                result = TRUE;
+            }
         }
     } else {
         LOGE("get register key 'LowerRange' value failed");
@@ -371,9 +371,10 @@ RegCloseKey(hKey);
     return result;
 }
 
-BOOL NicManager::RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway)
+BOOL NicManager::RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway, BOOL& enableDHCP)
 {
     HKEY hKey;
+    BOOL result = TRUE;
     string strKeyName = "SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\";
 
     if (adapter.length() <=0) {
@@ -386,8 +387,10 @@ BOOL NicManager::RegGetIP(const string & adapter, string& ip, string &subnetMask
                     strKeyName.c_str(),
                     0,
                     KEY_READ,
-                    &hKey) != ERROR_SUCCESS)
+                    &hKey) != ERROR_SUCCESS) {
+        LOGE("OpenKey %s failed", strKeyName.c_str());
         return FALSE;
+    }
 
     unsigned char szData[256];
     DWORD dwDataType, dwBufSize;
@@ -395,17 +398,38 @@ BOOL NicManager::RegGetIP(const string & adapter, string& ip, string &subnetMask
     dwBufSize = sizeof szData;
     if(RegQueryValueEx(hKey, "IPAddress", 0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
         ip = (LPCTSTR)szData;
+    else {
+        LOGE("Query %s failed", "IPAddress");
+        result = FALSE;
+    }
 
     dwBufSize = sizeof szData;
     if(RegQueryValueEx(hKey, "SubnetMask", 0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
         subnetMask = (LPCTSTR)szData;
+    else {
+        LOGE("Query %s failed", "SubnetMask");
+        result = FALSE;
+    }
 
     dwBufSize = sizeof szData;
     if(RegQueryValueEx(hKey, "DefaultGateway", 0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
         gateway = (LPCTSTR)szData;
+    else {
+        LOGE("Query %s failed", "DefaultGateway");
+        result = FALSE;
+    }
+
+    DWORD value;
+    dwBufSize = sizeof DWORD;
+    if(RegQueryValueEx(hKey, "EnableDHCP", 0, &dwDataType, (LPBYTE)&value, &dwBufSize) == ERROR_SUCCESS)
+        enableDHCP = (value != 0);
+    else {
+        LOGE("Query %s failed", "DefaultGateway");
+        result = FALSE;
+    }
 
     RegCloseKey(hKey);
-    return TRUE;
+    return result;
 }
 
 BOOL NicManager::RegReadConnectName(const string & adapter, string& name) {
@@ -555,7 +579,7 @@ void NicManager::EnumNetCards()
         }
 
         if ((Status & DN_NO_SHOW_IN_DM) == DN_NO_SHOW_IN_DM) {
-            LOGW("this device is not in device manager");
+            //LOGW("this device is not in device manager");
             continue;
         }
 
@@ -580,7 +604,7 @@ void NicManager::EnumNetCards()
             result = RegReadAdapter(driver, nic.mAdapterName);
             LOGE("SPDRP_DRIVER %s, SPDRP_DEVICEDESC %s", driver, name);
             if (result) {
-                RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway);
+                RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
                 RegReadConnectName(nic.mAdapterName, nic.mConnectionName);
                 mNicList.push_back(nic);
             }
@@ -686,13 +710,21 @@ bool NicManager::NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled)
 
 BOOL NicManager::UpdateIP() {
     list<NetCardStruct>::iterator it;
+    BOOL result = TRUE;
     for (it = mNicList.begin(); it != mNicList.end(); ++it) {
-        RegGetIP(it->mAdapterName, it->mIPAddress, it->mSubnetMask, it->mGateway);
+        result = result && RegGetIP(it->mAdapterName,
+            it->mIPAddress,
+            it->mSubnetMask,
+            it->mGateway,
+            it->mEnableDHCP);
     }
 
-    RegGetIP(m_DefaultNic.mAdapterName, m_DefaultNic.mIPAddress,
-        m_DefaultNic.mSubnetMask, m_DefaultNic.mGateway);
-    return TRUE;
+    result = result && RegGetIP(m_DefaultNic.mAdapterName,
+        m_DefaultNic.mIPAddress,
+        m_DefaultNic.mSubnetMask,
+        m_DefaultNic.mGateway,
+        m_DefaultNic.mEnableDHCP);
+    return result;
 }
 
 #undef USE_NETSH
@@ -729,7 +761,7 @@ BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
     Sleep(100);
     NetCardStateChange(&m_DefaultNic,TRUE);
 
-    Sleep(1000);
+    Sleep(10000);
     UpdateIP();
     return TRUE;
 #endif
@@ -755,8 +787,12 @@ BOOL NicManager::EnableDhcp() {
     Sleep(100);
     NetCardStateChange(&m_DefaultNic,TRUE);
 
-    Sleep(1000);
-    UpdateIP();
+    int i = 0;
+    BOOL result;
+    do {
+        Sleep(5000);
+        result = UpdateIP();
+    } while(i++< 4 && !result);
     return TRUE;
 
 #else

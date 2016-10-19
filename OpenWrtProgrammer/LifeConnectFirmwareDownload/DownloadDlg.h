@@ -61,7 +61,7 @@ protected:
   int TelnetPST();
   void UpdateMessage(CString msg);
   void ClearMessage(void);
-  VOID SetDeviceInformation(int type, LPCTSTR lpszString);
+  VOID SetInformation(int type, LPCTSTR lpszString);
   VOID CleanDevice(const char *const ipAddr);
 //void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
 //char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
