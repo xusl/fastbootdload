@@ -57,7 +57,7 @@ protected:
   DWORD   m_NetworkSnifferThreadID;
   BOOL  mWSAInitialized;
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
-  BOOL SniffNetwork(const char * const pcIpAddr);
+  BOOL SniffNetwork(const char * const tag, const char * const pcIpAddr);
   int TelnetPST();
   int TFTPDownload();
   void UpdateMessage(CString msg);
@@ -111,6 +111,7 @@ private:
   CStatic m_DeviceFWVersion;
   CStatic m_PSTStatus;
   CButton m_VersionCheckButton;
+  CButton m_ExitButton;
   CListCtrl m_TransferFileList;
   CListCtrl m_DeviceList;
 	//char s_PCBNo[16];

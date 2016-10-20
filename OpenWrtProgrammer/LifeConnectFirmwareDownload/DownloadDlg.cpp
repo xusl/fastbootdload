@@ -124,7 +124,7 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
     DDX_Control(pDX, IDC_FILE_STATS, m_PSTStatus);
     DDX_Control(pDX, IDC_DISABLE_CHECK, m_VersionCheckButton);
     DDX_Control(pDX, IDC_NIC_INFORMATION, m_NicInformation);
-
+    DDX_Control(pDX, IDCANCEL, m_ExitButton);
     DDX_Control(pDX, IDC_LV_TFTP, m_TransferFileList);
     DDX_Control(pDX, IDC_PACKAGE_FIRMWARE_VERSION, m_RomVersion);
 	//DDX_Text(pDX, IDC_EDIT_LINUX_VER_MAIN, m_LinuxVer);
@@ -352,7 +352,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             }
 */
             if ((nic.mGateway == "192.168.1.1") || (nic.mGateway == "192.168.237.1")) {
-                result = pThis->SniffNetwork(nic.mGateway.c_str());
+                result = pThis->SniffNetwork("Default policy", nic.mGateway.c_str());
                 if (result)
                     ipAddress = nic.mGateway;
             }
@@ -362,7 +362,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                     "192.168.1.10", "192.168.1.1", "255.255.255.0");
                 pThis->UpdateMessage(msg);
                 nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
-                result = pThis->SniffNetwork("192.168.1.1");
+                result = pThis->SniffNetwork("Policy 1", "192.168.1.1");
                 if (result)
                     ipAddress = "192.168.1.1";
             }
@@ -371,7 +371,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                     "192.168.237.10", "192.168.237.1", "255.255.255.0");
                 pThis->UpdateMessage(msg);
                 nm->SetIP("192.168.237.10", "192.168.237.1", "255.255.255.0");
-                result = pThis->SniffNetwork("192.168.237.1");
+                result = pThis->SniffNetwork("Policy 2", "192.168.237.1");
                 if (result)
                     ipAddress = "192.168.237.1";
             }
@@ -384,11 +384,10 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             if (!nic.IsInvalid()) {
                 ipAddress = nic.mGateway;
             }
-            pThis->UpdateMessage("Monitor tick");
-            result = pThis->SniffNetwork(ipAddress.c_str());
+            result = pThis->SniffNetwork("Monitor tick", ipAddress.c_str());
         }
 #else
-        result = pThis->SniffNetwork(ipAddress.c_str());
+        result = pThis->SniffNetwork("HDT", ipAddress.c_str());
         if (result) {
                 pThis->SetInformation(HOST_NIC, NULL);
                 pThis->TelnetPST();
@@ -399,16 +398,16 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     return 0;
 }
 
-BOOL CDownloadDlg::SniffNetwork(const char * const pcIpAddr) {
+BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpAddr) {
     CString msg;
     //const char * const segment = m_Config.GetNetworkSegment();
     //msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, 1, segment, from, to);
     //UpdateMessage(msg);
 
     string mac;
-    ASSERT(pcIpAddr != NULL);
+    ASSERT(pcIpAddr != NULL && tag != NULL);
 
-    msg.Format(_T("sniff ip: %s"), pcIpAddr);
+    msg.Format(_T("%s sniff device %s"), tag, pcIpAddr);
     UpdateMessage(msg);
 
 #ifdef DESKTOP_TEST
@@ -428,13 +427,15 @@ BOOL CDownloadDlg::SniffNetwork(const char * const pcIpAddr) {
     }
 */
     if (0 != ResolveIpMac(pcIpAddr, mac)) {
-        LOGD("can not reslove mac of %s. ", pcIpAddr);
+        msg.Format("can not reslove mac of %s. ", pcIpAddr);
+        m_PSTStatus.SetWindowText(msg);
         CleanDevice(pcIpAddr);
         return FALSE;
     }
 
     if (!m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL)) {
-        LOGD("%s have alread been add into device manager", pcIpAddr);
+        msg.Format("%s have alread been add into device manager", pcIpAddr);
+        m_PSTStatus.SetWindowText(msg);
         CleanDevice(pcIpAddr);
         return FALSE;
     }
@@ -631,6 +632,7 @@ void CDownloadDlg::OnBnClickedStart() {
             GetDlgItem(ID_Start)->SetWindowText("Start");
             GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(true);
             m_RomPathStaticText.EnableWindow(true);
+            m_ExitButton.EnableWindow();
             is_downloading = false;
             m_pCoordinator->Reset();
             m_TransferFileList.DeleteAllItems();
@@ -657,6 +659,7 @@ void CDownloadDlg::OnBnClickedStart() {
     GetDlgItem(ID_Start)->SetWindowText("Stop");
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
     m_RomPathStaticText.EnableWindow(false);
+    m_ExitButton.EnableWindow(FALSE);
 
     ClearMessage();
 
@@ -685,6 +688,7 @@ int CDownloadDlg::TFTPDownload() {
             "192.168.1.10", "192.168.1.1", "255.255.255.0");
         UpdateMessage(msg);
     }
+    m_PSTStatus("start TFTP service");
     StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
     return 0;
 }
@@ -707,13 +711,13 @@ int CDownloadDlg::TelnetPST() {
 
     CDevLabel *dev = dc->GetValidDevice();
     if (dev == NULL) {
-        LOGE("There is none device in the network.");
+        m_PSTStatus.SetWindowText("There is none device in the network.");
         return 2;
     }
 
     SOCKET sock = CreateSocket(dev->GetIpAddr().c_str());
     if ( sock == INVALID_SOCKET) {
-        LOGE("Can not setup telnet session");
+        m_PSTStatus.SetWindowText("Can not setup telnet session");
         TFTPDownload();
         return ERROR_INVALID_HANDLE;
     }
@@ -779,12 +783,14 @@ int CDownloadDlg::TelnetPST() {
             m_PSTStatus.SetWindowText("Custom ID is not matched.");
             closesocket(sock);
             b_download = false;
+            MessageBeep(MB_ICONERROR);
             return -2;
         }
         if (buildId >= m_Config.GetFirmwareBuildId()) {
             m_PSTStatus.SetWindowText("Pakcage build ID is less than device firmware build ID.");
             closesocket(sock);
             b_download = false;
+            MessageBeep(MB_ICONERROR);
             return -3;
         }
     }
