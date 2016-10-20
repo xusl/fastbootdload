@@ -285,6 +285,7 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
 
     dev->GetTransferIDs(ids);
 
+#ifdef MULTI_DEVICE_FEATURE
     list<DWORD>::iterator it;
     for (it = ids.begin(); it != ids.end(); ++it) {
         LVFINDINFO  LvInfo;
@@ -297,6 +298,10 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
         if (itemPos != -1)
             m_TransferFileList.DeleteItem(itemPos);
     }
+#else
+    m_TransferFileList.DeleteAllItems();
+#endif
+
     b_download = false;
 
     MessageBeep(MB_ICONWARNING);
@@ -341,8 +346,8 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
         //    pThis->SniffNetwork( ip_addr.GetString());
         //}
 #ifdef TPST
+        NetCardStruct nic =nm->GetDefaultNic();
         if ( pThis->b_download == FALSE || ipAddress.size() == 0) {
-            NetCardStruct nic = nm->GetDefaultNic();
 /*
             if(!nic.IsInvalid() || !nic.mEnableDHCP) {
             nm->EnableDhcp();
@@ -351,7 +356,8 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             result = pThis->SniffNetwork(ipAddress.c_str());
             }
 */
-            if ((nic.mGateway == "192.168.1.1") || (nic.mGateway == "192.168.237.1")) {
+            if ((!nic.IsInvalid()) &&
+                ((nic.mGateway == "192.168.1.1") || (nic.mGateway == "192.168.237.1"))) {
                 result = pThis->SniffNetwork("Default policy", nic.mGateway.c_str());
                 if (result)
                     ipAddress = nic.mGateway;
@@ -380,7 +386,6 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                 pThis->TelnetPST();
             }
         } else {
-            NetCardStruct nic =nm->GetDefaultNic();
             if (!nic.IsInvalid()) {
                 ipAddress = nic.mGateway;
             }
@@ -688,7 +693,7 @@ int CDownloadDlg::TFTPDownload() {
             "192.168.1.10", "192.168.1.1", "255.255.255.0");
         UpdateMessage(msg);
     }
-    m_PSTStatus("start TFTP service");
+    m_PSTStatus.SetWindowText("start TFTP service");
     StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
     return 0;
 }
@@ -1649,21 +1654,24 @@ void CDownloadDlg::ClearMessage(void) {
 void CDownloadDlg::UpdateMessage(CString errormsg){
     CString msg;
     int nLen;
+    SYSTEMTIME time;
+    GetLocalTime(&time);
+    CString timestamp;
+    timestamp.Format("%02d:%02d:%02d ", time.wHour, time.wMinute,time.wSecond);
     if (errormsg.GetLength() == 0) {
         m_MessageControl.Clear();
         return;
-    } else if (m_LogText.GetLength() == 0) {
-        m_LogText = errormsg;
-        msg = m_LogText;
-    } else {
+    }
+    m_LogText += timestamp;
+    m_LogText += errormsg;
+//    m_LogText = errormsg;
+    if (m_LogText.GetLength() != 0) {
         m_LogText += "\r\n";
-        m_LogText += errormsg;
-        msg = m_LogText;
     }
     LOGD("%s", errormsg.GetString());
     //::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
     nLen = m_MessageControl.GetWindowTextLength();
-    m_MessageControl.SetWindowText(msg);
+    m_MessageControl.SetWindowText(m_LogText);
     m_MessageControl.SetSel(nLen, nLen);//(0, 0);
     m_MessageControl.LineScroll(m_MessageControl.GetLineCount());
     m_MessageControl.SetFocus();
