@@ -239,7 +239,7 @@ BOOL CDownloadDlg::OnInitDialog()
     SetWindowText(m_DialgoTitle.GetString());
     m_RomPathStaticText.SetWindowText(m_Config.GetPackageDir());
     CString RomVersion;
-    m_Config.GetFirmwareVersion(RomVersion);
+    m_Config.GetFirmwareReleaseVersion(RomVersion);
     m_RomVersion.SetWindowText(RomVersion);
     m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
 
@@ -275,7 +275,7 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
         return;
     }
 
-    msg.Format("Remove device %s, ", ipAddr);
+    msg.Format("Remove device %s ", ipAddr);
     if (dev->GetStatus() != DEVICE_FINISH)
         msg += "for work timeout.";
     else
@@ -298,6 +298,8 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
             m_TransferFileList.DeleteItem(itemPos);
     }
     b_download = false;
+
+    MessageBeep(MB_ICONWARNING);
     m_pCoordinator->RemoveDevice(dev);
     StopTftpd32Services ();
     //todo:: close telnet socket?????
@@ -316,19 +318,20 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     nm = pThis->GetNicManager();
     nm->UpdateIP();
 
-    int from = conf.GetHostIPStart();
-    int to = conf.GetHostIPEnd();
-    const char * const segment = conf.GetNetworkSegment();
-
+    //int from = conf.GetHostIPStart();
+    //int to = conf.GetHostIPEnd();
+    //const char * const segment = conf.GetNetworkSegment();
     //msg.Format(_T("Search device by IP from %s.%d to %s.%d"), segment, from, segment,  to);
     //pThis->UpdateMessage(msg);
+
 #ifdef TPST
     ipAddress.clear();
 #else
     nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
     ipAddress = "192.168.1.1";
-    pThis->SetInformation(HOST_NIC, NULL);
 #endif
+
+    pThis->SetInformation(HOST_NIC, NULL);
 
     for(;;) {
         //for (int i = from; i <= to; i++)
@@ -340,14 +343,14 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 #ifdef TPST
         if ( pThis->b_download == FALSE || ipAddress.size() == 0) {
             NetCardStruct nic = nm->GetDefaultNic();
-#if 0
+/*
             if(!nic.IsInvalid() || !nic.mEnableDHCP) {
             nm->EnableDhcp();
             } else {
              ipAddress = nic.mGateway;
             result = pThis->SniffNetwork(ipAddress.c_str());
             }
-#else
+*/
             if ((nic.mGateway == "192.168.1.1") || (nic.mGateway == "192.168.237.1")) {
                 result = pThis->SniffNetwork(nic.mGateway.c_str());
                 if (result)
@@ -355,12 +358,18 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             }
 
             if (result == FALSE && nic.mGateway != "192.168.1.1") {
+                msg.Format("Change IP Address, IP:%s, Gateway:%s, SubnetMask:%s",
+                    "192.168.1.10", "192.168.1.1", "255.255.255.0");
+                pThis->UpdateMessage(msg);
                 nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
                 result = pThis->SniffNetwork("192.168.1.1");
                 if (result)
-                ipAddress = "192.168.1.1";
+                    ipAddress = "192.168.1.1";
             }
             if ( result == FALSE && nic.mGateway != "192.168.237.1") {
+                msg.Format("Change IP Address, IP:%s, Gateway:%s, SubnetMask:%s",
+                    "192.168.237.10", "192.168.237.1", "255.255.255.0");
+                pThis->UpdateMessage(msg);
                 nm->SetIP("192.168.237.10", "192.168.237.1", "255.255.255.0");
                 result = pThis->SniffNetwork("192.168.237.1");
                 if (result)
@@ -370,15 +379,13 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                 pThis->SetInformation(HOST_NIC, NULL);
                 pThis->TelnetPST();
             }
-#endif
         } else {
             NetCardStruct nic =nm->GetDefaultNic();
             if (!nic.IsInvalid()) {
                 ipAddress = nic.mGateway;
             }
+            pThis->UpdateMessage("Monitor tick");
             result = pThis->SniffNetwork(ipAddress.c_str());
-            //if (result == FALSE)
-            //    memset(ipAddress, 0, sizeof ipAddress);
         }
 #else
         result = pThis->SniffNetwork(ipAddress.c_str());
@@ -400,17 +407,18 @@ BOOL CDownloadDlg::SniffNetwork(const char * const pcIpAddr) {
 
     string mac;
     ASSERT(pcIpAddr != NULL);
-#if 0
+
+    msg.Format(_T("sniff ip: %s"), pcIpAddr);
+    UpdateMessage(msg);
+
 #ifdef DESKTOP_TEST
     if (pcIpAddr == mHostIPAddr || pcIpAddr == mHostGWAddr )
-#else
-    if (pcIpAddr == mHostIPAddr )
-#endif
     {
         LOGD("SKip host %s", pcIpAddr);
         return FALSE;
     }
 #endif
+
 //unfortunately, uboot do not response PING message.
 /*
     if(Ping(pcIpAddr) == FALSE) {
@@ -443,6 +451,7 @@ void CDownloadDlg::OnTimer(UINT_PTR nIDEvent) {
    // Schedule();
 }
 
+#ifdef MULTI_DEVICE_FEATURE
 DWORD CDownloadDlg::Schedule() {
     if (is_downloading == FALSE) {
         LOGE("PST is now stopped");
@@ -464,6 +473,7 @@ DWORD CDownloadDlg::Schedule() {
     }
     return 0;
 }
+#endif
 
 void CDownloadDlg::OnSysCommand(UINT nID, LPARAM lParam) {
 	if ((nID & 0xFFF0) == IDM_ABOUTBOX) {
@@ -599,7 +609,7 @@ void CDownloadDlg::OnBnClickedButtonBrowse() {
             m_Config.SetPackageDir(szPath, TRUE);
             m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
             CString RomVersion;
-            m_Config.GetFirmwareVersion(RomVersion);
+            m_Config.GetFirmwareReleaseVersion(RomVersion);
             m_RomVersion.SetWindowText(RomVersion);
         } else {
         CString msg;
@@ -664,13 +674,16 @@ void CDownloadDlg::OnBnClickedStart() {
 }
 
 int CDownloadDlg::TFTPDownload() {
-CString msg;
+    CString msg;
     NetCardStruct nic = mNic.GetDefaultNic();
     if (nic.mIPAddress != "192.168.1.10") {
-        mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
         msg.Format("NIC IP is %s, change to the default IP", nic.mIPAddress.c_str());
         m_PSTStatus.SetWindowText(msg);
+        mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
         SetInformation(HOST_NIC, NULL);
+        msg.Format("Change IP Address, IP:%s, Gateway:%s, SubnetMask:%s",
+            "192.168.1.10", "192.168.1.1", "255.255.255.0");
+        UpdateMessage(msg);
     }
     StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
     return 0;
@@ -1351,7 +1364,7 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
          result = dev->IsDownloadFinish();
 
     if (result) {
-        UpdateMessage("Device updated.");
+        MessageBeep(MB_ICONINFORMATION);
         m_PSTStatus.SetWindowText("Device updated.");
         b_download = false;
     }
@@ -1436,15 +1449,13 @@ LRESULT CDownloadDlg::OnMessageTftpInfo(WPARAM wParam, LPARAM lParam) {
         if (gui_msg->errorCode == ENOTFOUND) {
             CString msg = gui_msg->detail;
             msg += " is not exist, please check your update package.";
-            ::MessageBox(NULL,
-                         msg,
-                         _T("File no exist"),
-                         MB_OK | MB_ICONHAND);
+            MessageBeep(MB_ICONERROR);
+            UpdateMessage(msg);
+            //::MessageBox(NULL, msg, _T("File no exist"), MB_OK | MB_ICONHAND);
         } else if (gui_msg->errorCode == EACCESS) {
-        ::MessageBox(NULL,
-                         gui_msg->detail,
-                         _T("Permission Error"),
-                         MB_OK | MB_ICONHAND);
+            MessageBeep(MB_ICONERROR);
+            UpdateMessage(gui_msg->detail);
+            //::MessageBox(NULL, gui_msg->detail, _T("Permission Error"), MB_OK | MB_ICONHAND);
         }
         }
         break;
@@ -1631,6 +1642,7 @@ void CDownloadDlg::ClearMessage(void) {
 
 void CDownloadDlg::UpdateMessage(CString errormsg){
     CString msg;
+    int nLen;
     if (errormsg.GetLength() == 0) {
         m_MessageControl.Clear();
         return;
@@ -1644,8 +1656,10 @@ void CDownloadDlg::UpdateMessage(CString errormsg){
     }
     LOGD("%s", errormsg.GetString());
     //::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
+    nLen = m_MessageControl.GetWindowTextLength();
     m_MessageControl.SetWindowText(msg);
-    m_MessageControl.SetSel(0, 0);
+    m_MessageControl.SetSel(nLen, nLen);//(0, 0);
+    m_MessageControl.LineScroll(m_MessageControl.GetLineCount());
     m_MessageControl.SetFocus();
 }
 

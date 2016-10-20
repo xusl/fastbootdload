@@ -707,8 +707,6 @@ static void FreeThreadResources ()
         closesocket (tftpThreadMonitor.skt);
     if (tftpThreadMonitor.hEv != INVALID_HANDLE_VALUE)
         CloseHandle (tftpThreadMonitor.hEv);
-    if (tftpThreadMonitor.tTh != INVALID_HANDLE_VALUE)
-        CloseHandle (tftpThreadMonitor.tTh);
     tftpThreadMonitor.skt = INVALID_SOCKET;
     tftpThreadMonitor.hEv = INVALID_HANDLE_VALUE;
     tftpThreadMonitor.tTh = INVALID_HANDLE_VALUE;

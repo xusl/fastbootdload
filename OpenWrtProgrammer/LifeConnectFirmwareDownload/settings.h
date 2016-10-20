@@ -83,7 +83,8 @@ static const int FIRMWARE_TBL_LEN = FIRMWARE_NUM_MAX * FIRMWARE_NAME_LEN;
 #define USER_LEN_MAX        32
 #define PASSWD_LEN_MAX      32
 #define FW_CUSTOMID_LEN     32
-#define FW_BUILDID_LEN     32
+#define FW_BUILDID_LEN      32
+#define FW_VERSION_LEN      32
 
 class ConfigIni{
 public:
@@ -103,8 +104,10 @@ public:
     const char * const GetLoginPassword() { return m_Passwd;};
     const char * const GetFirmwareCustomId() { return m_FirmwareCustomId;};
     const char * const GetFirmwareBuildId() { return m_FirmwareBuildId;};
-    VOID           GetFirmwareVersion(CString &version) {
+    VOID           GetFirmwareReleaseVersion(CString &version) {
       version = m_FirmwareCustomId;
+      version += "_";
+      version += m_FirmwareVersion;
       version += "_";
       version += m_FirmwareBuildId;
     };
@@ -134,6 +137,7 @@ private:
     int                     m_TelnetTimeoutMs;
     char                    m_FirmwareCustomId[FW_CUSTOMID_LEN];
     char                    m_FirmwareBuildId[FW_BUILDID_LEN];
+    char                    m_FirmwareVersion[FW_VERSION_LEN];
     list<char *>            m_FirmwareFiles;
 };
 

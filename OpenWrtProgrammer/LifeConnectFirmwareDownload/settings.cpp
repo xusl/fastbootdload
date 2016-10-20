@@ -233,6 +233,12 @@ config = packageFolder;
                                        FW_CUSTOMID_LEN,
                                        config);
      GetPrivateProfileString(PKGVERSION_SECTION,
+                                       _T("Version"),
+                                       "",
+                                       m_FirmwareVersion,
+                                       FW_VERSION_LEN,
+                                       config);
+     GetPrivateProfileString(PKGVERSION_SECTION,
                                        _T("BuildId"),
                                        "",
                                        m_FirmwareBuildId,

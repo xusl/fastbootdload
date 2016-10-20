@@ -24,7 +24,7 @@ enum
   TIMER_EVT_ALL
 };
 
-#define TIMER_ELAPSE   (10 * 1000)
+#define TIMER_ELAPSE   (15 * 1000)
 
 
 // CDownloadDlg dialog
@@ -69,7 +69,9 @@ protected:
 //BOOL BuildUpdateCommand(CString file, CString &cmd);
 //void OnSend_Comand(SOCKET sockClient, const char * cmd);
 //void server_listen(u_short port =DOWNLOAD_SERVER_PORT);
+#ifdef MULTI_DEVICE_FEATURE
   DWORD Schedule();
+#endif
   DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;};
   NicManager * GetNicManager() { return &mNic;};
   VOID GetConfig(ConfigIni & conf) { conf = m_Config;};
