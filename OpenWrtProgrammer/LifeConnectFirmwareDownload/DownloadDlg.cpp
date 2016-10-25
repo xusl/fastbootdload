@@ -23,7 +23,14 @@ using namespace std;
 #define new DEBUG_NEW
 #endif
 
-enum E_information {HOST_NIC, DEV_IP_ADDR, DEV_FW_VERSION, DEV_OS_VERSION};
+enum E_information {
+    HOST_NIC,
+    PTS_STATUS,
+    DEV_IP_ADDR,
+    DEV_FW_VERSION,
+    DEV_OS_VERSION
+};
+
 enum E_fields { FD_PEER, FD_FILE, FD_START, FD_PROGRESS, FD_BYTES, FD_TOTAL, FD_TIMEOUT };
 
 static struct S_TftpGui *pTftpGuiFirst=NULL;
@@ -266,10 +273,14 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
     list<DWORD> ids;
     CString msg;
     CDevLabel *dev = NULL;
+
     m_pCoordinator->GetDevice(ipAddr, &dev, true);
+
+#ifdef MULTI_DEVICE_FEATURE
     if(dev == NULL) {
         m_pCoordinator->GetDevice(ipAddr, &dev, false);
     }
+#endif
 
     if (dev == NULL || FALSE == dev->CheckRemovable()) {
         return;
@@ -337,7 +348,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 #endif
 
     pThis->SetInformation(HOST_NIC, NULL);
-
+    NetCardStruct nic =nm->GetDefaultNic();
     for(;;) {
         //for (int i = from; i <= to; i++)
         //{
@@ -346,7 +357,6 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
         //    pThis->SniffNetwork( ip_addr.GetString());
         //}
 #ifdef TPST
-        NetCardStruct nic =nm->GetDefaultNic();
         if ( pThis->b_download == FALSE || ipAddress.size() == 0) {
 /*
             if(!nic.IsInvalid() || !nic.mEnableDHCP) {
@@ -356,6 +366,12 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             result = pThis->SniffNetwork(ipAddress.c_str());
             }
 */
+            if (nm->GetConnectedState() == FALSE) {
+                Sleep(TIMER_ELAPSE);
+                pThis->SetInformation(PTS_STATUS,
+                    "No network connection, please check whether cable inserted.");
+                continue;
+            }
             if ((!nic.IsInvalid()) &&
                 ((nic.mGateway == "192.168.1.1") || (nic.mGateway == "192.168.237.1"))) {
                 result = pThis->SniffNetwork("Default policy", nic.mGateway.c_str());
@@ -384,12 +400,18 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             if (result) {
                 pThis->SetInformation(HOST_NIC, NULL);
                 pThis->TelnetPST();
+                nic =nm->GetDefaultNic();
+                Sleep(TIMER_ELAPSE);
+            } else {
+                Sleep(SHORT_TIMER_ELAPSE);
             }
         } else {
             if (!nic.IsInvalid()) {
                 ipAddress = nic.mGateway;
             }
-            result = pThis->SniffNetwork("Monitor tick", ipAddress.c_str());
+            //result = pThis->SniffNetwork("Monitor tick", ipAddress.c_str());
+            pThis->CleanDevice(ipAddress.c_str());
+            Sleep(TIMER_ELAPSE);
         }
 #else
         result = pThis->SniffNetwork("HDT", ipAddress.c_str());
@@ -398,7 +420,6 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                 pThis->TelnetPST();
         }
 #endif
-        Sleep(TIMER_ELAPSE);
     }
     return 0;
 }
@@ -431,7 +452,7 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
         return FALSE;
     }
 */
-    if (0 != ResolveIpMac(pcIpAddr, mac)) {
+    if (0 != mNic.ResolveIpMac(pcIpAddr, mac)) {
         msg.Format("can not reslove mac of %s. ", pcIpAddr);
         m_PSTStatus.SetWindowText(msg);
         CleanDevice(pcIpAddr);
@@ -1687,6 +1708,9 @@ VOID CDownloadDlg::SetInformation(int type, LPCTSTR lpszString) {
         break;
     case DEV_IP_ADDR:
         m_DeviceIpAddress.SetWindowText(lpszString);
+        break;
+    case PTS_STATUS:
+        m_PSTStatus.SetWindowText(lpszString);
         break;
     case HOST_NIC: {
             NetCardStruct nic = mNic.GetDefaultNic();

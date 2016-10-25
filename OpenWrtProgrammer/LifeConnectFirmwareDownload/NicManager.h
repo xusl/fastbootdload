@@ -16,13 +16,16 @@ class  NetCardStruct
 {
 public:
     DWORD    Id;         // 网卡设备号
-    string   Name;     // 网卡名
+    string   DeviceDesc;     // 网卡名
+    string   mNicDesc;
     string   driver;
     string   mConnectionName;
     string   mAdapterName;
     string   mIPAddress; // IP地址
     string   mSubnetMask;// 子网掩码
     string   mGateway;// 网关
+    UCHAR    mPhysAddr[MAXLEN_PHYSADDR];
+    //string   mPhysAddr;
     BOOL     mEnableDHCP;
     bool     Disabled;     // 当前是否禁用
     bool     Changed;         // 是否更改过
@@ -35,7 +38,10 @@ public:
 
     VOID Reset() {
       Id = -1;
-      Name.clear();
+      memset(mPhysAddr, 0, sizeof mPhysAddr);
+      //mPhysAddr.clear();
+      DeviceDesc.clear();
+      mNicDesc.clear();
       driver.clear();
       mConnectionName.clear();
       mAdapterName.clear();
@@ -49,8 +55,8 @@ public:
 };
 typedef  NetCardStruct*  PNetCardStruct;
 
-bool Ping(const char *ip_addr);
-int ResolveIpMac(const char *DestIpString, string & mac);
+//bool Ping(const char *ip_addr);
+//int ResolveIpMac(const char *DestIpString, string & mac);
 
 typedef LPVOID *PPVOID;
 
@@ -66,10 +72,14 @@ public:
     int SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask);
     BOOL UpdateIP();
     BOOL NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex);
-  //BOOL GetAdapterInfo();
+    BOOL GetConnectedState();
+    int ResolveIpMac(const char *DestIpString, string & mac);
+    bool Ping(const char *ip_addr);
 
 private:
     int ExecuteCommand(LPSTR lpCommandLine);
+
+    BOOL GetNicInfo(NetCardStruct &netCard);
     BOOL RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway,  BOOL& enableDHCP);
     BOOL RegSetIP(const string & adapter, LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, DWORD enableDHCP);
     BOOL RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue);

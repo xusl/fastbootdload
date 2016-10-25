@@ -4,10 +4,17 @@
 #include "log.h"
 #include <Icmpapi.h>
 #include <devguid.h>
+#include <Wininet.h>
+#include <Sensapi.h>
 
-#pragma comment(lib,"Iphlpapi.lib")
-#pragma	 comment(lib,"setupapi.lib")
+#pragma comment(lib, "Iphlpapi.lib")
+#pragma	comment(lib, "setupapi.lib")
+#pragma	comment(lib, "Wininet.lib")
+#pragma	comment(lib, "Sensapi.lib")
 //#pragma comment(lib,"icmp.lib")
+
+#define MAX_BUF_SIZE   300
+#undef USE_NETSH
 
 NicManager::NicManager(string network):
     segment(network)
@@ -17,10 +24,10 @@ NicManager::NicManager(string network):
 
 NicManager::~NicManager(void)
 {
+    mNicList.clear();
 }
 
-#define MAX_BUF_SIZE   300
-bool Ping(const char *ip_addr) {
+bool NicManager::Ping(const char *ip_addr) {
     HANDLE hIcmpFile = NULL;
     DWORD dwRetVal = 0;
     IPAddr ipaddr = INADDR_NONE;
@@ -77,7 +84,7 @@ bool Ping(const char *ip_addr) {
 }
 
 
-int ResolveIpMac(const char *DestIpString, string & mac)
+int NicManager::ResolveIpMac(const char *DestIpString, string & mac)
 {
 #define BUFFER_LEN  6
     DWORD dwRetVal;
@@ -86,10 +93,6 @@ int ResolveIpMac(const char *DestIpString, string & mac)
     ULONG MacAddr[2];       /* for 6-byte hardware addresses */
     ULONG PhysAddrLen = 6;  /* default to length of six bytes */
     CHAR  Buffer[BUFFER_LEN];
-
-    //char *DestIpString = NULL;
-    //char *SrcIpString = NULL;
-
     BYTE *bPhysAddr;
     unsigned int i;
 
@@ -125,23 +128,29 @@ int ResolveIpMac(const char *DestIpString, string & mac)
     } else {
         const char * errstr = "";
         switch (dwRetVal) {
+        case ERROR_NETWORK_UNREACHABLE:
+            errstr = _T("ERROR_NETWORK_UNREACHABLE");
+            break;
         case ERROR_GEN_FAILURE:
-            errstr = _T(" (ERROR_GEN_FAILURE)");
+            errstr = _T("ERROR_GEN_FAILURE");
             break;
         case ERROR_INVALID_PARAMETER:
-            errstr = _T(" (ERROR_INVALID_PARAMETER)");
+            errstr = _T("ERROR_INVALID_PARAMETER");
             break;
         case ERROR_INVALID_USER_BUFFER:
-            errstr = _T(" (ERROR_INVALID_USER_BUFFER)");
+            errstr = _T("ERROR_INVALID_USER_BUFFER");
             break;
         case ERROR_BAD_NET_NAME:
-            errstr = _T(" (ERROR_GEN_FAILURE)");
+            errstr = _T("ERROR_BAD_NET_NAME");
             break;
         case ERROR_BUFFER_OVERFLOW:
-            errstr = _T(" (ERROR_BUFFER_OVERFLOW)");
+            errstr = _T("ERROR_BUFFER_OVERFLOW");
             break;
         case ERROR_NOT_FOUND:
-            errstr = _T(" (ERROR_NOT_FOUND)");
+            errstr = _T("ERROR_NOT_FOUND");
+            break;
+        case ERROR_NO_NETWORK:
+            errstr = _T("ERROR_NO_NETWORK");
             break;
         default:
             break;
@@ -149,7 +158,56 @@ int ResolveIpMac(const char *DestIpString, string & mac)
         LOGE("Error: SendArp failed with error: %d(%s)", dwRetVal, errstr);
     }
 
-    return 1;
+    return dwRetVal;
+}
+
+BOOL NicManager::GetConnectedState() {
+    DWORD flag;
+    //TCHAR connectionName[256] = {0};
+    BOOL result;
+    DWORD dwSize = 0;
+    MIB_IFTABLE *mit = NULL;
+    INTERNAL_IF_OPER_STATUS operStatus = IF_OPER_STATUS_NON_OPERATIONAL;
+
+    result = IsNetworkAlive(&flag);
+
+    LOGE("Get network alive %d, flag 0x%x", result, flag);
+
+    //result = InternetGetConnectedStateEx(&flag, connectionName, sizeof connectionName, NULL);
+    //if (result == FALSE)
+    //    return result;
+    //LOGE("Get connection status 0x%x", flag);
+
+    GetIfTable(NULL, &dwSize, true);
+    mit = (MIB_IFTABLE*) new BYTE[dwSize];
+
+    if(NO_ERROR != GetIfTable(mit, &dwSize, true))
+    {
+        delete []mit;
+        return FALSE;
+    }
+
+    for(DWORD i = 0; i < mit->dwNumEntries; i++) {
+        PMIB_IFROW pRow = mit->table+ i;
+        if (m_DefaultNic.mNicDesc == (char*) pRow->bDescr ||
+            0 == memcmp(m_DefaultNic.mPhysAddr, pRow->bPhysAddr, sizeof pRow->bPhysAddr)) {
+#if 0
+            mit->table[i].dwAdminStatus = MIB_IF_ADMIN_STATUS_DOWN;
+            if(NO_ERROR == SetIfEntry(&mit->table[i])) {
+                LOGE("Stop adapter succed!");
+            }
+            mit->table[i].dwAdminStatus=MIB_IF_ADMIN_STATUS_UP;
+            if(NO_ERROR==SetIfEntry(&mit->table[i])){
+                LOGE("Start adapter succed!");
+            }
+#endif
+            operStatus = pRow->dwOperStatus;
+            LOGD("Get %s status %d", pRow->bDescr, operStatus);
+        }
+    }
+
+    delete []mit;
+    return operStatus == IF_OPER_STATUS_OPERATIONAL;
 }
 #if 0
 //-----------------------------------------------------------------
@@ -265,57 +323,54 @@ int GetInterfacesFunction()
     FREE(pInfo);
     return (iReturn);
 }
+#endif
 
-bool NicManager::GetAdapter()
-{
+BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
     PIP_ADAPTER_INFO pIpAdapterInfo = new IP_ADAPTER_INFO();
     unsigned long stSize = sizeof(IP_ADAPTER_INFO);
     int nRel = GetAdaptersInfo(pIpAdapterInfo,&stSize);
-    GetInterfacesFunction();
+    BOOL result = FALSE;
+    //GetInterfacesFunction();
 
-    if (ERROR_BUFFER_OVERFLOW == nRel)
-    {
+    if (ERROR_BUFFER_OVERFLOW == nRel) {
         delete pIpAdapterInfo;
         pIpAdapterInfo = (PIP_ADAPTER_INFO)new BYTE[stSize];
         nRel=GetAdaptersInfo(pIpAdapterInfo,&stSize);
     }
-    if (ERROR_SUCCESS == nRel)
-    {
-        PIP_ADAPTER_INFO pIpAdapterInfo_Temp=pIpAdapterInfo;
-        mAdapterName = pIpAdapterInfo->AdapterName;
-        //PIP_ADDR_STRING current = pIpAdapterInfo->CurrentIpAddress;
-        while (pIpAdapterInfo_Temp)
-        {
-            IP_ADDR_STRING *pIpAddrString =&(pIpAdapterInfo_Temp->IpAddressList);
-            IP_ADDR_STRING *pGateway = &pIpAdapterInfo_Temp->GatewayList;
-            do
-            {
-                if (pIpAdapterInfo_Temp->Type == MIB_IF_TYPE_ETHERNET)
-                    // if(device_ip.find(segment) != -1)
-                    //if (strcmp(pIpAddrString->IpAddress.String, current->IpAddress.String) == 0)
-                {
-                    device_ip =pIpAddrString->IpAddress.String;
-                    gateway_ip = pGateway->IpAddress.String;
-                    LOGE("Adapter %s, IP %s, gateway %s",mAdapterName.c_str(),
-                        device_ip.c_str(), gateway_ip.c_str());
-                        //, pIpAdapterInfo->Address  MAC ADDRESS
-                    delete pIpAdapterInfo;
-                    return true;
-                }
-                pIpAddrString=pIpAddrString->Next;
-                pGateway = pGateway->Next;
-            } while (pIpAddrString && pGateway);
-            pIpAdapterInfo_Temp = pIpAdapterInfo_Temp->Next;
-        }
+
+    if (ERROR_SUCCESS != nRel) {
+        goto GETADAPTEROUT;
     }
 
-    if (pIpAdapterInfo)
-    {
+    PIP_ADAPTER_INFO pInfo=pIpAdapterInfo;
+    //PIP_ADDR_STRING current = pIpAdapterInfo->CurrentIpAddress;
+    while (pInfo) {
+        IP_ADDR_STRING *pIpAddrString =&(pInfo->IpAddressList);
+        IP_ADDR_STRING *pGateway = &pInfo->GatewayList;
+        //do {
+        //    //if (pInfo->Type == MIB_IF_TYPE_ETHERNET)
+        //    // if(device_ip.find(segment) != -1)
+        if (netCard.mAdapterName == pIpAdapterInfo->AdapterName) {
+            netCard.mNicDesc = pInfo->Description;
+            netCard.mIPAddress =pIpAddrString->IpAddress.String;
+            netCard.mGateway = pGateway->IpAddress.String;
+            netCard.mEnableDHCP = pInfo->DhcpEnabled;
+            memcpy(netCard.mPhysAddr, pInfo->Address, sizeof netCard.mPhysAddr);
+            delete pIpAdapterInfo;
+            return TRUE;
+        }
+        //    pIpAddrString=pIpAddrString->Next;
+        //    pGateway = pGateway->Next;
+        //} while (pIpAddrString && pGateway);
+        pInfo = pInfo->Next;
+    }
+
+GETADAPTEROUT:
+    if (pIpAdapterInfo) {
         delete pIpAdapterInfo;
     }
-    return false;
+    return result;
 }
-#endif
 
 BOOL NicManager::RegReadAdapter(const char* driver, string &adapter) {
     HKEY hKey, hSubKey, hNdiIntKey;
@@ -596,7 +651,7 @@ void NicManager::EnumNetCards()
         if (GetRegistryProperty(hDevInfo, &diData, SPDRP_DEVICEDESC, &name) &&
             GetRegistryProperty(hDevInfo, &diData, SPDRP_DRIVER , &driver)) {
             nic.Id = DeviceId;
-            nic.Name = name;
+            nic.DeviceDesc = name;
             nic.driver = driver;
             //IT IS ALWAYS ENABLED.
             nic.Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == Problem);
@@ -604,6 +659,7 @@ void NicManager::EnumNetCards()
             result = RegReadAdapter(driver, nic.mAdapterName);
             LOGE("SPDRP_DRIVER %s, SPDRP_DEVICEDESC %s", driver, name);
             if (result) {
+                GetNicInfo(nic);
                 RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
                 RegReadConnectName(nic.mAdapterName, nic.mConnectionName);
                 mNicList.push_back(nic);
@@ -727,7 +783,6 @@ BOOL NicManager::UpdateIP() {
     return result;
 }
 
-#undef USE_NETSH
 // Start an explorer window, directory is Tftpd32's default directory
 BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
 {
