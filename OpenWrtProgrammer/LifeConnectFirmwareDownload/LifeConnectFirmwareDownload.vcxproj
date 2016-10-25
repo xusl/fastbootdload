@@ -12,7 +12,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{23E4202E-2B9D-425A-8E09-0247DE02D4C6}</ProjectGuid>
-    <RootNamespace>LifeConnectFirmwareDownload</RootNamespace>
+    <RootNamespace>LifeConnectPST</RootNamespace>
     <Keyword>MFCProj</Keyword>
     <ProjectName>LifeConnectPST</ProjectName>
   </PropertyGroup>
@@ -97,7 +97,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
-    <None Include="res\icon1.ico" />
     <None Include="res\LifeConnectFirmwareDownload.ico" />
     <None Include="res\LifeConnectFirmwareDownload.rc2" />
     <None Include="res\lock.ico" />

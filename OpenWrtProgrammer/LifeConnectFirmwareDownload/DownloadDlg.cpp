@@ -312,7 +312,7 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
 
 DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
-    BOOL result;
+    BOOL result = FALSE;
     ConfigIni conf;
     string ipAddress;
     NicManager *nm;

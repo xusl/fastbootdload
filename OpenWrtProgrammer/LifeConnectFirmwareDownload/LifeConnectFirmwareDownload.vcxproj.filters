@@ -22,9 +22,6 @@
     <None Include="res\LifeConnectFirmwareDownload.ico">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="res\icon1.ico">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="res\SuperMode.ico">
       <Filter>Resource Files</Filter>
     </None>
