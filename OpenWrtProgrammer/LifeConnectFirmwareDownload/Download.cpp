@@ -113,6 +113,7 @@ BOOL CDownloadApp::InitInstance()
 	{
 		// TODO: Place code here to handle when the dialog is
 		//  dismissed with Cancel
+		dlg.ExitDialog();
 	}
 
 	// Delete the shell manager created above.
@@ -123,6 +124,8 @@ BOOL CDownloadApp::InitInstance()
 
     StopLogging();
 
+	CloseHandle(m_hMutex);
+	m_hMutex = NULL;
 	// Since the dialog has been closed, return FALSE so that we exit the
 	//  application, rather than start the application's message pump.
 	return FALSE;

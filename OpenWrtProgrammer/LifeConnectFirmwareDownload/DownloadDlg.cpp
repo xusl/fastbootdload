@@ -114,6 +114,10 @@ CDownloadDlg::~CDownloadDlg() {
 
     delete m_pCoordinator;
     CloseHandle(m_SyncSemaphore);
+}
+
+
+VOID CDownloadDlg::ExitDialog() {
     mNic.EnableDhcp();
 }
 

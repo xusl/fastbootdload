@@ -36,6 +36,8 @@ public:
 	CDownloadDlg(CWnd* pParent = NULL);	// standard constructor
 	~CDownloadDlg();
 
+  VOID ExitDialog();
+
 // Dialog Data
 	enum { IDD = IDD_LIFECONNECTFIRMWAREDOWNLOAD_DIALOG };
 
