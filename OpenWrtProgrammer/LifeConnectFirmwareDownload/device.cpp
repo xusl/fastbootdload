@@ -362,7 +362,7 @@ bool CDevLabel::SetFirmware(list<char *> pFirmware) {
 }
 
 VOID CDevLabel::UpdateFirmwareStatus(const char * const filename, DWORD dwTransferId) {
-    assert(filename != NULL);
+    ASSERT(filename != NULL);
     LOGD("UPDAT FILE STATUS %s = %d", filename, dwTransferId);
     map <string, DWORD>::iterator it = mFirmwareStatus.find(filename);
     if ( it != mFirmwareStatus.end()) {

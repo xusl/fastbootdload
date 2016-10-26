@@ -1438,7 +1438,7 @@ int CDownloadDlg::TFTPStat (struct subStats *pTrf, time_t dNow)
     if (pTftpGui == NULL)
         return -1;
 
-    assert (pTftpGui != NULL);
+    ASSERT (pTftpGui != NULL);
 
     pTftpGui->stat = pTrf->stat;
     time (& pTftpGui->stat.dLastUpdate) ;

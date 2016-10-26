@@ -618,7 +618,7 @@ static int TftpSendOack (struct LL_TftpInfo *pTftp)
 {
 int Rc;
 
-        assert (pTftp!=NULL);
+        ASSERT (pTftp!=NULL);
 
         // OACK packet is in ackbuf
         pTftp->c.dwBytes += sizeof (short);
@@ -736,7 +736,7 @@ static int TftpSendFile (struct LL_TftpInfo *pTftp)
 int Rc;
 struct tftphdr *tp;
 
-    assert (pTftp!=NULL);
+    ASSERT (pTftp!=NULL);
     pTftp->c.nLastToSend = 1;
 
     if (pTftp->m.bInit)  MD5Init (& pTftp->m.ctx);
@@ -903,7 +903,7 @@ static int TftpRecvFile (struct LL_TftpInfo *pTftp, BOOL bOACK)
 int Rc;
 struct tftphdr *tp;
 
-     assert (pTftp!=NULL);
+     ASSERT (pTftp!=NULL);
 
     // if no OACK ready, we have to send an ACK to acknowledge the transfer
      tp = (struct tftphdr *) pTftp->b.ackbuf;

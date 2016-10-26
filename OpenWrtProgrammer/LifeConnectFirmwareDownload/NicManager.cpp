@@ -667,11 +667,15 @@ void NicManager::EnumNetCards()
             result = RegReadAdapter(driver, nic.mAdapterName);
             LOGE("SPDRP_DRIVER %s, SPDRP_DEVICEDESC %s", driver, name);
             if (result) {
-                GetNicInfo(nic);
-                //RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
-                RegReadConnectName(nic.mAdapterName, nic.mConnectionName);
-                mNicList.push_back(nic);
+                result = GetNicInfo(nic);
             }
+            if (result)
+            {
+            //RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
+                RegReadConnectName(nic.mAdapterName, nic.mConnectionName);
+            }
+            if (result)
+                mNicList.push_back(nic);
         }
 
         if (driver != NULL) {
