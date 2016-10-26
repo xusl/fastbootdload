@@ -117,11 +117,6 @@ CDownloadDlg::~CDownloadDlg() {
     CloseHandle(m_SyncSemaphore);
 }
 
-
-VOID CDownloadDlg::ExitDialog() {
-    mNic.EnableDhcp();
-}
-
 void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
@@ -156,6 +151,7 @@ BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
     ON_MESSAGE(UI_MESSAGE_TFTPINFO, &CDownloadDlg::OnMessageTftpInfo)
     ON_BN_CLICKED(IDC_DISABLE_CHECK, &CDownloadDlg::OnBnClickedDisableCheck)
     ON_BN_CLICKED(IDC_CHANGE_NIC, &CDownloadDlg::OnBnClickedChangeNic)
+    ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
 
@@ -408,7 +404,6 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                     ipAddress = "192.168.237.1";
             }
             if (result) {
-                pThis->SetInformation(HOST_NIC, NULL);
                 pThis->TelnetPST();
                 nic =nm->GetDefaultNic();
                 Sleep(TIMER_ELAPSE);
@@ -426,7 +421,6 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 #else
         result = pThis->SniffNetwork("HDT", ipAddress.c_str());
         if (result) {
-                pThis->SetInformation(HOST_NIC, NULL);
                 pThis->TelnetPST();
         }
 #endif
@@ -445,6 +439,7 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
 
     msg.Format(_T("%s sniff device %s"), tag, pcIpAddr);
     UpdateMessage(msg);
+    SetInformation(HOST_NIC, NULL);
 
 #ifdef DESKTOP_TEST
     if (pcIpAddr == mHostIPAddr || pcIpAddr == mHostGWAddr )
@@ -1788,4 +1783,13 @@ void CDownloadDlg::OnBnClickedChangeNic()
       SetInformation(HOST_NIC, NULL);
     } else if (nResponse == IDCANCEL) {
     }
+}
+
+
+void CDownloadDlg::OnClose()
+{
+    // TODO: Add your message handler code here and/or call default
+
+    mNic.EnableDhcp(FALSE);
+    CDialogEx::OnClose();
 }

@@ -341,6 +341,7 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
     }
 
     if (ERROR_SUCCESS != nRel) {
+        LOGE("GetAdaptersInfo failed, return %d", nRel);
         goto GETADAPTEROUT;
     }
 
@@ -366,6 +367,8 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
         //} while (pIpAddrString && pGateway);
         pInfo = pInfo->Next;
     }
+
+    LOGE("Can not update adapter %s information", netCard.DeviceDesc);
 
 GETADAPTEROUT:
     if (pIpAdapterInfo) {
@@ -452,8 +455,18 @@ BOOL NicManager::RegGetIP(const string & adapter, string& ip, string &subnetMask
     unsigned char szData[256];
     DWORD dwDataType, dwBufSize;
 
+    DWORD value;
+    dwBufSize = sizeof DWORD;
+    if(RegQueryValueEx(hKey, "EnableDHCP", 0, &dwDataType, (LPBYTE)&value, &dwBufSize) == ERROR_SUCCESS)
+        enableDHCP = (value != 0);
+    else {
+        LOGE("Query %s failed", "DefaultGateway");
+        result = FALSE;
+    }
+
     dwBufSize = sizeof szData;
-    if(RegQueryValueEx(hKey, "IPAddress", 0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
+    if(RegQueryValueEx(hKey,enableDHCP ? "DhcpIPAddress" : "IPAddress",
+        0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
         ip = (LPCTSTR)szData;
     else {
         LOGE("Query %s failed", "IPAddress");
@@ -461,7 +474,8 @@ BOOL NicManager::RegGetIP(const string & adapter, string& ip, string &subnetMask
     }
 
     dwBufSize = sizeof szData;
-    if(RegQueryValueEx(hKey, "SubnetMask", 0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
+    if(RegQueryValueEx(hKey, enableDHCP ? "DhcpSubnetMask" : "SubnetMask",
+        0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
         subnetMask = (LPCTSTR)szData;
     else {
         LOGE("Query %s failed", "SubnetMask");
@@ -469,17 +483,9 @@ BOOL NicManager::RegGetIP(const string & adapter, string& ip, string &subnetMask
     }
 
     dwBufSize = sizeof szData;
-    if(RegQueryValueEx(hKey, "DefaultGateway", 0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
+    if(RegQueryValueEx(hKey, enableDHCP ? "DhcpDefaultGateway" : "DefaultGateway",
+        0, &dwDataType, szData, &dwBufSize) == ERROR_SUCCESS)
         gateway = (LPCTSTR)szData;
-    else {
-        LOGE("Query %s failed", "DefaultGateway");
-        result = FALSE;
-    }
-
-    DWORD value;
-    dwBufSize = sizeof DWORD;
-    if(RegQueryValueEx(hKey, "EnableDHCP", 0, &dwDataType, (LPBYTE)&value, &dwBufSize) == ERROR_SUCCESS)
-        enableDHCP = (value != 0);
     else {
         LOGE("Query %s failed", "DefaultGateway");
         result = FALSE;
@@ -786,6 +792,18 @@ bool NicManager::NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled)
 BOOL NicManager::UpdateIP() {
     list<NetCardStruct>::iterator it;
     BOOL result = TRUE;
+
+//#define NIC_IPUPDATE_TEST
+
+#ifdef NIC_IPUPDATE_TEST
+    for (it = mNicList.begin(); it != mNicList.end(); ++it) {
+        LOG("Now %s, %s, %s", it->mConnectionName.c_str(),
+            it->mIPAddress.c_str(), it->mGateway.c_str());
+    }
+    LOG("Default Now %s, %s, %s", m_DefaultNic.mConnectionName.c_str(),
+            m_DefaultNic.mIPAddress.c_str(), m_DefaultNic.mGateway.c_str());
+#endif
+
     for (it = mNicList.begin(); it != mNicList.end(); ++it) {
 /*        result = result && RegGetIP(it->mAdapterName,
             it->mIPAddress,
@@ -793,8 +811,9 @@ BOOL NicManager::UpdateIP() {
             it->mGateway,
             it->mEnableDHCP);
 */
-        result = result && GetNicInfo(*it);
+        result = GetNicInfo(*it) && result;
     }
+
 /*
     result = result && RegGetIP(m_DefaultNic.mAdapterName,
         m_DefaultNic.mIPAddress,
@@ -802,7 +821,17 @@ BOOL NicManager::UpdateIP() {
         m_DefaultNic.mGateway,
         m_DefaultNic.mEnableDHCP);
    */
-    result = result && GetNicInfo(*it);
+    result = GetNicInfo(m_DefaultNic) && result;
+
+#ifdef NIC_IPUPDATE_TEST
+    for (it = mNicList.begin(); it != mNicList.end(); ++it) {
+        LOG("Updated %s, %s, %s", it->mConnectionName.c_str(),
+            it->mIPAddress.c_str(), it->mGateway.c_str());
+    }
+    LOG("Default Updated %s, %s, %s", m_DefaultNic.mConnectionName.c_str(),
+            m_DefaultNic.mIPAddress.c_str(), m_DefaultNic.mGateway.c_str());
+#endif
+
     return result;
 }
 
@@ -845,7 +874,7 @@ BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
 #endif
 } // StartExplorer
 
-BOOL NicManager::EnableDhcp() {
+BOOL NicManager::EnableDhcp(BOOL updateIp) {
 #ifndef USE_NETSH
     if (m_DefaultNic.IsInvalid()) {
         LOGE("There are no valid NIC");
@@ -864,6 +893,9 @@ BOOL NicManager::EnableDhcp() {
     NetCardStateChange(&m_DefaultNic,FALSE);
     Sleep(100);
     NetCardStateChange(&m_DefaultNic,TRUE);
+
+    if (updateIp == FALSE)
+        return TRUE;
 
     int i = 0;
     BOOL result;

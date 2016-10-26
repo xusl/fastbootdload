@@ -113,7 +113,6 @@ BOOL CDownloadApp::InitInstance()
 	{
 		// TODO: Place code here to handle when the dialog is
 		//  dismissed with Cancel
-		dlg.ExitDialog();
 	}
 
 	// Delete the shell manager created above.

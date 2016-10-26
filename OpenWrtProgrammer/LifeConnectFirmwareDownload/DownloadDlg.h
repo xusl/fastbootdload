@@ -36,8 +36,6 @@ public:
 	CDownloadDlg(CWnd* pParent = NULL);	// standard constructor
 	~CDownloadDlg();
 
-  VOID ExitDialog();
-
 // Dialog Data
 	enum { IDD = IDD_LIFECONNECTFIRMWAREDOWNLOAD_DIALOG };
 
@@ -127,4 +125,6 @@ private:
   NicManager mNic;
   HANDLE m_SyncSemaphore;
 
+public:
+    afx_msg void OnClose();
 };

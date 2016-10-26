@@ -70,7 +70,7 @@ public:
     int GetNicNum() { return mNicList.size(); }
     NetCardStruct GetDefaultNic() const { return m_DefaultNic;};
     BOOL SetDefaultNic(DWORD id);
-    BOOL EnableDhcp();
+    BOOL EnableDhcp(BOOL updateIp);
     int SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask);
     BOOL UpdateIP();
     BOOL NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex);
