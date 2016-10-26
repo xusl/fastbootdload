@@ -37,6 +37,7 @@ void NicListDlg::DoDataExchange(CDataExchange* pDX)
 
 
 BEGIN_MESSAGE_MAP(NicListDlg, CDialogEx)
+    ON_NOTIFY(NM_DBLCLK, IDC_LIST_NIC, &NicListDlg::OnNMDblclkListNic)
 END_MESSAGE_MAP()
 
 
@@ -51,14 +52,14 @@ BOOL NicListDlg::OnInitDialog()
     if (m_pNicManager == NULL)
         return TRUE;
 
+    m_NicList.SetExtendedStyle(LVS_EX_GRIDLINES|LVS_EX_FULLROWSELECT);
+    m_NicList.InsertColumn(NICFD_DEVICENAME,  _T("Description"), LVCFMT_LEFT, 250);
     m_NicList.InsertColumn(NICFD_CONNECTION,  _T("Ethernet adapter"), LVCFMT_LEFT, 180);
-    m_NicList.InsertColumn(NICFD_DEVICENAME,  _T("Description"), LVCFMT_LEFT, 130);
-    m_NicList.InsertColumn(NICFD_PHYSADDRESS,  _T("Physical Address"), LVCFMT_LEFT, 80);
+    m_NicList.InsertColumn(NICFD_PHYSADDRESS,  _T("Physical Address"), LVCFMT_LEFT, 140);
     //m_NicList.InsertColumn(FD_PROGRESS,  _T("Progress"), LVCFMT_LEFT, 60);
     //m_NicList.InsertColumn(FD_BYTES,    _T("Bytes"), LVCFMT_LEFT, 100);
     //m_NicList.InsertColumn(FD_TOTAL,    _T("Total"), LVCFMT_LEFT, 100);
     //m_NicList.InsertColumn(FD_TIMEOUT,  _T("Timeout"), LVCFMT_LEFT, 80);
-
 
     LVITEM      LvItem;
     int         itemPos = 0;
@@ -93,4 +94,38 @@ BOOL NicListDlg::OnInitDialog()
 BOOL NicListDlg::SetNicManager(NicManager &manager) {
     m_pNicManager = & manager;
     return TRUE;
+}
+
+void NicListDlg::OnOK()
+{
+    LVITEM      LvItem;
+
+    CDialogEx::OnOK();
+    int index = m_NicList.GetNextItem(-1,LVIS_SELECTED);
+    index = m_NicList.GetSelectionMark();
+        LvItem.iSubItem =0;
+        LvItem.mask = LVIF_PARAM;
+        LvItem.iItem = index;
+        if (m_NicList.GetItem (& LvItem) ) {
+            m_pNicManager->SetDefaultNic((DWORD)LvItem.lParam);
+        }
+}
+
+
+void NicListDlg::OnNMDblclkListNic(NMHDR *pNMHDR, LRESULT *pResult)
+{
+    LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+    // TODO: Add your control notification handler code here
+    //m_pNicManager->SetDefaultNic((DWORD)pNMItemActivate->lParam);
+    LVITEM      LvItem;
+        LvItem.iSubItem =0;
+        LvItem.mask = LVIF_PARAM;
+        LvItem.iItem = pNMItemActivate->iItem;
+        if (m_NicList.GetItem (& LvItem) ) {
+            m_pNicManager->SetDefaultNic((DWORD)LvItem.lParam);
+        }
+
+
+    EndDialog(IDOK);
+    *pResult = 0;
 }

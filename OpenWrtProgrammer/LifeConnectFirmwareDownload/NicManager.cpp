@@ -16,6 +16,8 @@
 #define MAX_BUF_SIZE   300
 #undef USE_NETSH
 
+using namespace std;
+
 NicManager::NicManager(string network):
     segment(network)
 {
@@ -608,7 +610,6 @@ BOOL NicManager::NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex)
 //is what we get by SetDi* function.
 void NicManager::EnumNetCards()
 {
-    NetCardStruct nic;
     DWORD  Status, Problem, code;
     LPTSTR name = NULL;
     LPTSTR driver = NULL;
@@ -650,6 +651,7 @@ void NicManager::EnumNetCards()
 
         if (GetRegistryProperty(hDevInfo, &diData, SPDRP_DEVICEDESC, &name) &&
             GetRegistryProperty(hDevInfo, &diData, SPDRP_DRIVER , &driver)) {
+            NetCardStruct nic;
             nic.Id = DeviceId;
             nic.DeviceDesc = name;
             nic.driver = driver;
@@ -660,7 +662,7 @@ void NicManager::EnumNetCards()
             LOGE("SPDRP_DRIVER %s, SPDRP_DEVICEDESC %s", driver, name);
             if (result) {
                 GetNicInfo(nic);
-                RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
+                //RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
                 RegReadConnectName(nic.mAdapterName, nic.mConnectionName);
                 mNicList.push_back(nic);
             }
@@ -678,6 +680,23 @@ void NicManager::EnumNetCards()
     if(!mNicList.empty()) {
         m_DefaultNic = mNicList.front();
     }
+}
+
+BOOL NicManager::SetDefaultNic(DWORD id) {
+    list<NetCardStruct>::iterator it;
+    if (id == m_DefaultNic.Id) {
+        LOGD("Do not need update default NIC");
+        return FALSE;
+    }
+
+    for (it = mNicList.begin(); it != mNicList.end(); ++it) {
+        if (id == it->Id) {
+            m_DefaultNic = *it;
+            LOGD("Update default NIC %s", m_DefaultNic.DeviceDesc.c_str());
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 //---------------------------------------------------------------------------
@@ -768,18 +787,22 @@ BOOL NicManager::UpdateIP() {
     list<NetCardStruct>::iterator it;
     BOOL result = TRUE;
     for (it = mNicList.begin(); it != mNicList.end(); ++it) {
-        result = result && RegGetIP(it->mAdapterName,
+/*        result = result && RegGetIP(it->mAdapterName,
             it->mIPAddress,
             it->mSubnetMask,
             it->mGateway,
             it->mEnableDHCP);
+*/
+        result = result && GetNicInfo(*it);
     }
-
+/*
     result = result && RegGetIP(m_DefaultNic.mAdapterName,
         m_DefaultNic.mIPAddress,
         m_DefaultNic.mSubnetMask,
         m_DefaultNic.mGateway,
         m_DefaultNic.mEnableDHCP);
+   */
+    result = result && GetNicInfo(*it);
     return result;
 }
 

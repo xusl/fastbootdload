@@ -67,7 +67,9 @@ public:
     ~NicManager(void);
    void EnumNetCards();
     const list<NetCardStruct>* GetNicList() const { return  &mNicList;}
+    int GetNicNum() { return mNicList.size(); }
     NetCardStruct GetDefaultNic() const { return m_DefaultNic;};
+    BOOL SetDefaultNic(DWORD id);
     BOOL EnableDhcp();
     int SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask);
     BOOL UpdateIP();

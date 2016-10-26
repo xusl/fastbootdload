@@ -245,9 +245,9 @@ BOOL CDownloadDlg::OnInitDialog()
     //GetPrivateProfileString(_T("MISC"), _T("SSIDPrefix"), _T(""), s_SSID_Prefix, 20, config);
     //s_SSID_Prefix[strlen(s_SSID_Prefix)] = 0;
 
-    if(!PathFileExists(WS_LABEL_DIR)) {
-        CreateDirectory(WS_LABEL_DIR, NULL);
-    }
+    //if(!PathFileExists(WS_LABEL_DIR)) {
+    //    CreateDirectory(WS_LABEL_DIR, NULL);
+    //}
     GetDlgItem(ID_Start)->EnableWindow(TRUE);
 
     SetWindowText(m_DialgoTitle.GetString());
@@ -259,6 +259,8 @@ BOOL CDownloadDlg::OnInitDialog()
 
     mNic.EnumNetCards();
     SetInformation(HOST_NIC, NULL);
+    if (mNic.GetNicNum() <= 1)
+        m_ChangeNic.ShowWindow(SW_HIDE);
 
 //#define NIC_DEBUG
 #ifdef NIC_DEBUG
