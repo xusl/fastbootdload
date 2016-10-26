@@ -75,6 +75,9 @@
     <ClInclude Include="PasswordEnterDlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="NicListDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DownloadDlg.cpp">
@@ -123,6 +126,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="NicManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NicListDlg.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

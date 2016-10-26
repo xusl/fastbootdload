@@ -94,6 +94,7 @@ protected:
 	afx_msg void OnBnClickedStart();
 	afx_msg void OnBnClickedStop();
   afx_msg void OnBnClickedDisableCheck();
+  afx_msg void OnBnClickedChangeNic();
   afx_msg void OnTimer(UINT_PTR nIDEvent);
   afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	DECLARE_MESSAGE_MAP()
@@ -115,8 +116,8 @@ private:
   CStatic m_PSTStatus;
   CButton m_VersionCheckButton;
   CButton m_ExitButton;
+  CButton m_ChangeNic;
   CListCtrl m_TransferFileList;
-  CListCtrl m_DeviceList;
 	//char s_PCBNo[16];
 	char s_MMIFlag[2];
 	DWORD dwBeginTime;
@@ -125,4 +126,5 @@ private:
   DeviceCoordinator *m_pCoordinator;
   NicManager mNic;
   HANDLE m_SyncSemaphore;
+
 };

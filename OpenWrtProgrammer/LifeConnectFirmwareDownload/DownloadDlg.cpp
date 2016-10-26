@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "Download.h"
 #include "DownloadDlg.h"
+#include "NicListDlg.h"
 #include "afxdialogex.h"
 #include "Utils.h"
 #include "log.h"
@@ -138,7 +139,8 @@ void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
     DDX_Control(pDX, IDCANCEL, m_ExitButton);
     DDX_Control(pDX, IDC_LV_TFTP, m_TransferFileList);
     DDX_Control(pDX, IDC_PACKAGE_FIRMWARE_VERSION, m_RomVersion);
-	//DDX_Text(pDX, IDC_EDIT_LINUX_VER_MAIN, m_LinuxVer);
+  	DDX_Control(pDX, IDC_CHANGE_NIC, m_ChangeNic);
+//	DDX_Text(pDX, IDC_CHANGE_NIC, m_ChangeNic);
 }
 
 BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
@@ -153,6 +155,7 @@ BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
 	ON_BN_CLICKED(ID_Start, &CDownloadDlg::OnBnClickedStart)
     ON_MESSAGE(UI_MESSAGE_TFTPINFO, &CDownloadDlg::OnMessageTftpInfo)
     ON_BN_CLICKED(IDC_DISABLE_CHECK, &CDownloadDlg::OnBnClickedDisableCheck)
+    ON_BN_CLICKED(IDC_CHANGE_NIC, &CDownloadDlg::OnBnClickedChangeNic)
 END_MESSAGE_MAP()
 
 
@@ -254,22 +257,23 @@ BOOL CDownloadDlg::OnInitDialog()
     m_RomVersion.SetWindowText(RomVersion);
     m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
 
+    mNic.EnumNetCards();
+    SetInformation(HOST_NIC, NULL);
+
 //#define NIC_DEBUG
 #ifdef NIC_DEBUG
-mNic.EnumNetCards();
     NetCardStruct nic = mNic.GetDefaultNic();
     CString nicInfo;
     nicInfo.Format("%s %s ", nic.mConnectionName.c_str(), nic.Name.c_str());
     m_NicInformation.SetWindowText(nicInfo.GetString());
-//mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
-//mNic.SetIP("192.168.1.121", "192.168.1.1", "255.255.255.0") ;
-//mNic.SetIP("192.168.237.138", "192.168.237.1", "255.255.255.0") ;
-mNic.EnableDhcp();
-
-//::MessageBox(this->m_hWnd, "Successfully!", "Set Ip Result", MB_OK | MB_ICONINFORMATION);
-//::MessageBox(this->m_hWnd, "Failed", "Set Ip Result", MB_OK | MB_ICONERROR);
-
+    //mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+    //mNic.SetIP("192.168.1.121", "192.168.1.1", "255.255.255.0") ;
+    //mNic.SetIP("192.168.237.138", "192.168.237.1", "255.255.255.0") ;
+    mNic.EnableDhcp();
+    //::MessageBox(this->m_hWnd, "Successfully!", "Set Ip Result", MB_OK | MB_ICONINFORMATION);
+    //::MessageBox(this->m_hWnd, "Failed", "Set Ip Result", MB_OK | MB_ICONERROR);
 #endif
+
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -663,6 +667,7 @@ void CDownloadDlg::OnBnClickedStart() {
             GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(true);
             m_RomPathStaticText.EnableWindow(true);
             m_ExitButton.EnableWindow();
+            m_ChangeNic.EnableWindow();
             is_downloading = false;
             m_pCoordinator->Reset();
             m_TransferFileList.DeleteAllItems();
@@ -690,14 +695,13 @@ void CDownloadDlg::OnBnClickedStart() {
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
     m_RomPathStaticText.EnableWindow(false);
     m_ExitButton.EnableWindow(FALSE);
+    m_ChangeNic.EnableWindow(FALSE);
 
     ClearMessage();
 
     is_downloading=TRUE;
     b_download = false;
 
-    mNic.EnumNetCards();
-    SetInformation(HOST_NIC, NULL);
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     //m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
     //Schedule();
@@ -1768,6 +1772,18 @@ void CDownloadDlg::OnBnClickedDisableCheck()
         //        SendMessage(WM_SETICON, ICON_BIG, (LPARAM)hicon);
         SetIcon(hIcon, TRUE);
         SetIcon(hIcon, FALSE);
+    } else if (nResponse == IDCANCEL) {
+    }
+}
+
+
+void CDownloadDlg::OnBnClickedChangeNic()
+{
+    NicListDlg dlg;
+    dlg.SetNicManager(mNic);
+    INT_PTR nResponse = dlg.DoModal();
+    if (nResponse == IDOK) {
+      SetInformation(HOST_NIC, NULL);
     } else if (nResponse == IDCANCEL) {
     }
 }

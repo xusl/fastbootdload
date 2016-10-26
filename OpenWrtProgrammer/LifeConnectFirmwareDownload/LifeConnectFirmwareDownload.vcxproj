@@ -110,6 +110,7 @@
     <ClInclude Include="global.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="md5.h" />
+    <ClInclude Include="NicListDlg.h" />
     <ClInclude Include="PasswordEnterDlg.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="settings.h" />
@@ -123,6 +124,7 @@
     <ClCompile Include="device.cpp" />
     <ClCompile Include="DownloadDlg.cpp" />
     <ClCompile Include="Download.cpp" />
+    <ClCompile Include="NicListDlg.cpp" />
     <ClCompile Include="NicManager.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="md5.cpp" />
