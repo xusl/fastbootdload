@@ -41,8 +41,6 @@ BOOL DeviceCoordinator::Reset() {
         //*it = NULL;
     }
     mDevintfList.clear();
-
-    LOGD("DeviceCoordinator::Reset");
     return TRUE;
 }
 

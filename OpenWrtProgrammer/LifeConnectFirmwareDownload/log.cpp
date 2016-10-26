@@ -96,6 +96,8 @@ void WriteLog
     return;
   }
 
+  ASSERT (gLogFp != NULL);
+
 #ifdef FEATURE_THREAD_SYNC
   g_Lock.Lock();
 #endif
