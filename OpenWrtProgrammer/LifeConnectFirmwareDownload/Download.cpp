@@ -17,6 +17,40 @@ BEGIN_MESSAGE_MAP(CDownloadApp, CWinApp)
 	ON_COMMAND(ID_HELP, &CWinApp::OnHelp)
 END_MESSAGE_MAP()
 
+/*
+ * Wow64 means Windows-On-Windows64.
+ * https://msdn.microsoft.com/en-us/library/windows/desktop/ms684139%28v=vs.85%29.aspx
+ * WOW64 is the x86 emulator that allows 32-bit Windows-based applications to
+ * run seamlessly on 64-bit Windows. WOW64 is provided with the operating
+ * system and does not have to be explicitly enabled.
+ *
+ * So, build this tools under X86 (or win32), do not use X64 build.
+ *
+ */
+typedef BOOL (WINAPI *LPFN_ISWOW64PROCESS) (HANDLE, PBOOL);
+
+LPFN_ISWOW64PROCESS fnIsWow64Process;
+
+BOOL IsWow64()
+{
+    BOOL bIsWow64 = FALSE;
+
+    //IsWow64Process is not available on all supported versions of Windows.
+    //Use GetModuleHandle to get a handle to the DLL that contains the function
+    //and GetProcAddress to get a pointer to the function if available.
+
+    fnIsWow64Process = (LPFN_ISWOW64PROCESS) GetProcAddress(
+        GetModuleHandle(TEXT("kernel32")),"IsWow64Process");
+
+    if(NULL != fnIsWow64Process)
+    {
+        if (!fnIsWow64Process(GetCurrentProcess(),&bIsWow64))
+        {
+            //handle error
+        }
+    }
+    return bIsWow64;
+}
 
 // CDownloadApp construction
 
@@ -64,6 +98,20 @@ BOOL CDownloadApp::InitInstance()
 	InitCommonControlsEx(&InitCtrls);
 
 	CWinApp::InitInstance();
+
+#ifdef _WIN64
+	if (!IsWow64()) {
+		AfxMessageBox("This is x64 Build, please use win32 build");
+        return FALSE;
+	}
+#endif
+
+#ifdef _WIN32
+	if (IsWow64()) {
+		AfxMessageBox("This is win32 Build, please use x86 build");
+         return FALSE;
+	}
+#endif
 
     /*
     如果用MFC的CSocket类则需要调用AfxSocketInit()初始化，
