@@ -616,7 +616,7 @@ BOOL NicManager::NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex)
 //is what we get by SetDi* function.
 void NicManager::EnumNetCards()
 {
-    DWORD  Status, Problem, code;
+    DWORD  Status, error, code;
     LPTSTR name = NULL;
     LPTSTR driver = NULL;
     HDEVINFO hDevInfo = 0;
@@ -635,7 +635,7 @@ void NicManager::EnumNetCards()
     for(DWORD DeviceId=0;
         SetupDiEnumDeviceInfo(hDevInfo,DeviceId,&diData);
         DeviceId++) {
-        if ((code = CM_Get_DevNode_Status(&Status, &Problem, diData.DevInst,0)) != CR_SUCCESS) {
+        if ((code = CM_Get_DevNode_Status(&Status, &error, diData.DevInst,0)) != CR_SUCCESS) {
             LOGE("CM_Get_DevNode_Status return %d", code);
             continue;
         }
@@ -662,7 +662,7 @@ void NicManager::EnumNetCards()
             nic.DeviceDesc = name;
             nic.driver = driver;
             //IT IS ALWAYS ENABLED.
-            nic.Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == Problem);
+            nic.Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error);
             nic.Changed = false;
             result = RegReadAdapter(driver, nic.mAdapterName);
             LOGE("SPDRP_DRIVER %s, SPDRP_DEVICEDESC %s", driver, name);
@@ -711,14 +711,14 @@ BOOL NicManager::SetDefaultNic(DWORD id) {
 
 //---------------------------------------------------------------------------
 ULONG NicManager::GetRegistryProperty(HDEVINFO DeviceInfoSet,
-    PSP_DEVINFO_DATA DeviceInfoData,
+    PSP_DEVINFO_DATA diData,
     ULONG Property,
     LPTSTR *Buffer)
 {
     ASSERT(Buffer != NULL);
     ULONG Length = 0;
     while (!SetupDiGetDeviceRegistryProperty(DeviceInfoSet,
-        DeviceInfoData, Property, NULL, (PBYTE)(*Buffer), Length, &Length))
+        diData, Property, NULL, (PBYTE)(*Buffer), Length, &Length))
     {
         if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
         {
@@ -747,49 +747,58 @@ bool NicManager::NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled)
     //hDevInfo = SetupDiGetClassDevs(NULL,NULL,0,DIGCF_PRESENT |DIGCF_ALLCLASSES);
     hDevInfo= SetupDiGetClassDevs(&GUID_DEVCLASS_NET, NULL, NULL, DIGCF_PRESENT);
 
-    if (INVALID_HANDLE_VALUE == hDevInfo)
+    if (INVALID_HANDLE_VALUE == hDevInfo) {
+        LOGE("SetupDiGetClassDevs return invalid handle");
         return false;
-    SP_DEVINFO_DATA DeviceInfoData = {sizeof(SP_DEVINFO_DATA)};
-    DWORD Status, Problem;
-    if (!SetupDiEnumDeviceInfo(hDevInfo,DeviceId,&DeviceInfoData))
-        return false;
+    }
 
-    if (CM_Get_DevNode_Status(&Status, &Problem,
-        DeviceInfoData.DevInst,0) != CR_SUCCESS)
+    SP_DEVINFO_DATA diData = {sizeof(SP_DEVINFO_DATA)};
+    DWORD Status, error;
+    if (!SetupDiEnumDeviceInfo(hDevInfo,DeviceId,&diData)) {
+        LOGE("SetupDiEnumDeviceInfo return ERROR");
         return false;
+    }
 
-    SP_PROPCHANGE_PARAMS PropChangeParams = {sizeof(SP_CLASSINSTALL_HEADER)};
-    PropChangeParams.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
-    PropChangeParams.Scope = DICS_FLAG_GLOBAL;
-    if (Enabled)
-    {
-        if (!((Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == Problem)))
-        {
+    if (CM_Get_DevNode_Status(&Status, &error, diData.DevInst,0) != CR_SUCCESS) {
+        LOGE("CM_Get_DevNode_Status is return error");
+        return false;
+    }
+
+    SP_PROPCHANGE_PARAMS params = {sizeof(SP_CLASSINSTALL_HEADER)};
+    params.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
+    params.Scope = DICS_FLAG_GLOBAL;
+    if (Enabled) {
+        if (!((Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error))) {
             NetCard->Disabled = false;
+            LOGE("ERROR1, status 0X%X, error %d", Status, error);
             return false;
         }
-        PropChangeParams.StateChange = DICS_ENABLE;
-    }
-    else
-    {
-        if ((Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == Problem))
-        {
+        params.StateChange = DICS_ENABLE;
+    } else {
+        if ((Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error)) {
             NetCard->Disabled = true;
+            LOGE("ERROR2, status 0X%X, error %d", Status, error);
             return false;
         }
-        if (!((Status & DN_DISABLEABLE) && (CM_PROB_HARDWARE_DISABLED != Problem)))
+        if (!((Status & DN_DISABLEABLE) && (CM_PROB_HARDWARE_DISABLED != error))) {
+            LOGE("ERROR3, status 0X%X, error %d", Status, error);
             return false;
-        PropChangeParams.StateChange = DICS_DISABLE;
+        }
+        params.StateChange = DICS_DISABLE;
     }
 
-    if (!SetupDiSetClassInstallParams(hDevInfo, &DeviceInfoData,
-        (SP_CLASSINSTALL_HEADER *)&PropChangeParams, sizeof(PropChangeParams)))
+    if (!SetupDiSetClassInstallParams(hDevInfo, &diData, (SP_CLASSINSTALL_HEADER *)&params, sizeof(params))) {
+        LOGE("SetupDiSetClassInstallParams error");
         return false;
-    if (!SetupDiCallClassInstaller(DIF_PROPERTYCHANGE, hDevInfo, &DeviceInfoData))
+    }
+
+    if (!SetupDiCallClassInstaller(DIF_PROPERTYCHANGE, hDevInfo, &diData)) {
+        LOGE("SetupDiCallClassInstaller error: %d", GetLastError());
         return false;
-    if (CM_Get_DevNode_Status(&Status, &Problem,
-        DeviceInfoData.DevInst,0) == CR_SUCCESS)
-        NetCard->Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == Problem);
+    }
+
+    if (CM_Get_DevNode_Status(&Status, &error, diData.DevInst,0) == CR_SUCCESS)
+        NetCard->Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error);
     return true;
 }
 
