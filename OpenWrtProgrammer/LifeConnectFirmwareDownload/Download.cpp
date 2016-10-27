@@ -121,8 +121,6 @@ BOOL CDownloadApp::InitInstance()
 		delete pShellManager;
 	}
 
-    StopLogging();
-
 	CloseHandle(m_hMutex);
 	m_hMutex = NULL;
 	// Since the dialog has been closed, return FALSE so that we exit the

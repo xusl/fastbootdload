@@ -6,6 +6,7 @@
 #include <devguid.h>
 #include <Wininet.h>
 #include <Sensapi.h>
+#include <mprapi.h>
 
 #pragma comment(lib, "Iphlpapi.lib")
 #pragma	comment(lib, "setupapi.lib")
@@ -193,16 +194,6 @@ BOOL NicManager::GetConnectedState() {
         PMIB_IFROW pRow = mit->table+ i;
         if (m_DefaultNic.mNicDesc == (char*) pRow->bDescr ||
             0 == memcmp(m_DefaultNic.mPhysAddr, pRow->bPhysAddr, sizeof pRow->bPhysAddr)) {
-#if 0
-            mit->table[i].dwAdminStatus = MIB_IF_ADMIN_STATUS_DOWN;
-            if(NO_ERROR == SetIfEntry(&mit->table[i])) {
-                LOGE("Stop adapter succed!");
-            }
-            mit->table[i].dwAdminStatus=MIB_IF_ADMIN_STATUS_UP;
-            if(NO_ERROR==SetIfEntry(&mit->table[i])){
-                LOGE("Start adapter succed!");
-            }
-#endif
             operStatus = pRow->dwOperStatus;
             LOGD("Get %s status %d", pRow->bDescr, operStatus);
         }
@@ -210,6 +201,42 @@ BOOL NicManager::GetConnectedState() {
 
     delete []mit;
     return operStatus == IF_OPER_STATUS_OPERATIONAL;
+}
+
+BOOL NicManager::SwitchNic(NetCardStruct &netCard, bool Enabled) {
+    DWORD dwSize = 0;
+    BOOL result = FALSE;
+    MIB_IFTABLE *mit = NULL;
+    INTERNAL_IF_OPER_STATUS operStatus = IF_OPER_STATUS_NON_OPERATIONAL;
+
+    GetIfTable(NULL, &dwSize, true);
+    mit = (MIB_IFTABLE*) new BYTE[dwSize];
+
+    if(NO_ERROR != GetIfTable(mit, &dwSize, true)) {
+        delete []mit;
+        return result;
+    }
+
+    for(DWORD i = 0; i < mit->dwNumEntries; i++) {
+        PMIB_IFROW pRow = mit->table+ i;
+        if (netCard.mNicDesc != (char*) pRow->bDescr &&
+            memcmp(netCard.mPhysAddr, pRow->bPhysAddr, 6)) {
+            continue;
+        }
+
+        mit->table[i].dwAdminStatus = Enabled ? MIB_IF_ADMIN_STATUS_UP : MIB_IF_ADMIN_STATUS_DOWN;
+        if(NO_ERROR == SetIfEntry(&mit->table[i])) {
+            LOGE("%s adapter succed!", Enabled ? "Enable" : "Disable");
+            result = TRUE;
+        } else {
+            LOGE("%s adapter failed!", Enabled ? "Enable" : "Disable");
+        }
+
+        break;
+    }
+
+    delete []mit;
+    return result;
 }
 #if 0
 //-----------------------------------------------------------------
@@ -324,6 +351,72 @@ int GetInterfacesFunction()
 
     FREE(pInfo);
     return (iReturn);
+}
+void CIpChangeDlg::GetConnectNames()
+{
+    /*******************************************
+    *通过mprapi库获取连接名称
+    *并通过index将网卡信息和连接名称相关联
+    ********************************************/
+    HANDLE   hMprConfig;                    //连接信息的句柄
+    DWORD   dwRet=0;                        //返回值
+    PIP_INTERFACE_INFO   plfTable = NULL;   //接口信息表
+    DWORD   dwBufferSize=0;                 //接口信息表空间大小
+
+    m_AdapterInfo.csConnectName = new char [m_AdapterInfo.iCount] [256];  //申请空间存储连接名
+
+    dwRet = MprConfigServerConnect(NULL, &hMprConfig);  //获得句柄
+    dwRet = GetInterfaceInfo(NULL, &dwBufferSize);      //获得接口信息表大小
+
+    if(dwRet == ERROR_INSUFFICIENT_BUFFER)              //获得接口信息
+    {
+        plfTable = (PIP_INTERFACE_INFO)HeapAlloc(GetProcessHeap(),
+                                                  HEAP_ZERO_MEMORY, dwBufferSize);
+        GetInterfaceInfo(plfTable, &dwBufferSize);
+    }
+
+
+    TCHAR   szFriendName[256];                   //接口名称
+    DWORD   tchSize = sizeof(TCHAR) * 256;
+    ZeroMemory(&szFriendName, tchSize);
+
+    for (UINT i = 0; i < plfTable-> NumAdapters; i++)
+    {
+        IP_ADAPTER_INDEX_MAP   AdaptMap;         //接口信息
+        AdaptMap = plfTable->Adapter[i];
+
+        dwRet = MprConfigGetFriendlyName(hMprConfig, AdaptMap.Name,
+            (PWCHAR)szFriendName, tchSize);      //获得连接名称unicode
+        USES_CONVERSION;
+        char* pName = W2A((PWCHAR)szFriendName);                           //转换为ansi
+
+        InsertConnectName(AdaptMap.Index, pName);                          //根据Index存储名字信息
+    }
+    HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, plfTable);
+}
+
+//
+void NotifyAddrChangeTest()
+{
+  OVERLAPPED overlap;
+  DWORD ret;
+
+  HANDLE hand = NULL;
+  overlap.hEvent = WSACreateEvent();
+
+  ret = NotifyAddrChange(&hand, &overlap);
+
+  if (ret != NO_ERROR)
+  {
+    if (WSAGetLastError() != WSA_IO_PENDING)
+    {
+      printf("NotifyAddrChange error...%d\n", WSAGetLastError());
+      return;
+    }
+  }
+
+  if ( WaitForSingleObject(overlap.hEvent, INFINITE) == WAIT_OBJECT_0 )
+    printf("IP Address table changed..\n");
 }
 #endif
 
@@ -690,6 +783,8 @@ void NicManager::EnumNetCards()
     if(!mNicList.empty()) {
         m_DefaultNic = mNicList.front();
     }
+
+    SetupDiDestroyDeviceInfoList(hDevInfo);
 }
 
 BOOL NicManager::SetDefaultNic(DWORD id) {
@@ -739,10 +834,11 @@ ULONG NicManager::GetRegistryProperty(HDEVINFO DeviceInfoSet,
 //             NetCardPoint 是 PNetCardStruct 的指针.
 //             Enabled     true = 启用     false = 禁用
 //---------------------------------------------------------------------------
-bool NicManager::NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled)
+bool NicManager::NetCardStateChange(NetCardStruct &NetCard, bool Enabled)
 {
-    PNetCardStruct NetCard = (PNetCardStruct)NetCardPoint;
-    DWORD DeviceId = NetCard->Id;
+    bool result = false;
+    SP_PROPCHANGE_PARAMS params = {sizeof(SP_CLASSINSTALL_HEADER)};
+    DWORD DeviceId = NetCard.Id;
     HDEVINFO hDevInfo = 0;
     //hDevInfo = SetupDiGetClassDevs(NULL,NULL,0,DIGCF_PRESENT |DIGCF_ALLCLASSES);
     hDevInfo= SetupDiGetClassDevs(&GUID_DEVCLASS_NET, NULL, NULL, DIGCF_PRESENT);
@@ -756,50 +852,59 @@ bool NicManager::NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled)
     DWORD Status, error;
     if (!SetupDiEnumDeviceInfo(hDevInfo,DeviceId,&diData)) {
         LOGE("SetupDiEnumDeviceInfo return ERROR");
-        return false;
+        goto NICSTATUSCHANGEOUT;
     }
 
     if (CM_Get_DevNode_Status(&Status, &error, diData.DevInst,0) != CR_SUCCESS) {
         LOGE("CM_Get_DevNode_Status is return error");
-        return false;
+        goto NICSTATUSCHANGEOUT;
     }
 
-    SP_PROPCHANGE_PARAMS params = {sizeof(SP_CLASSINSTALL_HEADER)};
     params.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
-    params.Scope = DICS_FLAG_GLOBAL;
+    //params.Scope = DICS_FLAG_GLOBAL;
+    params.Scope = DICS_FLAG_CONFIGSPECIFIC;
+    params.HwProfile = 0;
     if (Enabled) {
         if (!((Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error))) {
-            NetCard->Disabled = false;
+            NetCard.Disabled = false;
             LOGE("ERROR1, status 0X%X, error %d", Status, error);
-            return false;
+            goto NICSTATUSCHANGEOUT;
         }
         params.StateChange = DICS_ENABLE;
     } else {
         if ((Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error)) {
-            NetCard->Disabled = true;
+            NetCard.Disabled = true;
             LOGE("ERROR2, status 0X%X, error %d", Status, error);
-            return false;
+            goto NICSTATUSCHANGEOUT;
         }
         if (!((Status & DN_DISABLEABLE) && (CM_PROB_HARDWARE_DISABLED != error))) {
-            LOGE("ERROR3, status 0X%X, error %d", Status, error);
-            return false;
+            LOGE("ERROR3, status 0x%X, error %d", Status, error);
+            goto NICSTATUSCHANGEOUT;
         }
         params.StateChange = DICS_DISABLE;
     }
 
-    if (!SetupDiSetClassInstallParams(hDevInfo, &diData, (SP_CLASSINSTALL_HEADER *)&params, sizeof(params))) {
+    if (!SetupDiSetClassInstallParams(hDevInfo, &diData, &params.ClassInstallHeader, sizeof(params))) {
         LOGE("SetupDiSetClassInstallParams error");
-        return false;
+        goto NICSTATUSCHANGEOUT;
     }
 
+    //if (diData.DevInst != NULL) {
+    //    LOGE("DevInst is NULL");
+    //}
+
     if (!SetupDiCallClassInstaller(DIF_PROPERTYCHANGE, hDevInfo, &diData)) {
-        LOGE("SetupDiCallClassInstaller error: %d", GetLastError());
-        return false;
+        LOGE("SetupDiCallClassInstaller error: 0x%X", GetLastError());
+        goto NICSTATUSCHANGEOUT;
     }
 
     if (CM_Get_DevNode_Status(&Status, &error, diData.DevInst,0) == CR_SUCCESS)
-        NetCard->Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error);
-    return true;
+        NetCard.Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error);
+    result = true;
+
+NICSTATUSCHANGEOUT:
+    SetupDiDestroyDeviceInfoList(hDevInfo);
+    return result;
 }
 
 BOOL NicManager::UpdateIP() {
@@ -847,7 +952,7 @@ BOOL NicManager::UpdateIP() {
 
     return result;
 }
-
+#define DISETUP_SWITCH
 // Start an explorer window, directory is Tftpd32's default directory
 BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
 {
@@ -862,7 +967,7 @@ BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
     device_ip = ip;
     gateway_ip = gateway;
     return rc == 0;
-#else
+#elif defined(DISETUP_SWITCH)
     if (m_DefaultNic.IsInvalid()) {
         LOGE("There are no valid NIC");
         return FALSE;
@@ -877,11 +982,25 @@ BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
     //  return FALSE;
 
     //通过禁用启用网卡实现IP立即生效
-    NetCardStateChange(&m_DefaultNic, FALSE);
+    NetCardStateChange(m_DefaultNic, FALSE);
     Sleep(100);
-    NetCardStateChange(&m_DefaultNic,TRUE);
+    NetCardStateChange(m_DefaultNic,TRUE);
 
     Sleep(10000);
+    UpdateIP();
+    return TRUE;
+#else
+    if (m_DefaultNic.IsInvalid()) {
+        LOGE("There are no valid NIC");
+        return FALSE;
+    }
+    SwitchNic(m_DefaultNic, FALSE);
+    if(!RegSetIP(m_DefaultNic.mAdapterName, ip, subnetMask, gateway, 0)) {
+        LOGE("RegSetIP failed");
+        return FALSE;
+    }
+    SwitchNic(m_DefaultNic, TRUE);
+    Sleep(8000);
     UpdateIP();
     return TRUE;
 #endif
@@ -903,9 +1022,9 @@ BOOL NicManager::EnableDhcp(BOOL updateIp) {
     //  return FALSE;
 
     //通过禁用启用网卡实现IP立即生效
-    NetCardStateChange(&m_DefaultNic,FALSE);
+    NetCardStateChange(m_DefaultNic,FALSE);
     Sleep(100);
-    NetCardStateChange(&m_DefaultNic,TRUE);
+    NetCardStateChange(m_DefaultNic,TRUE);
 
     if (updateIp == FALSE)
         return TRUE;
@@ -933,9 +1052,10 @@ BOOL NicManager::EnableDhcp(BOOL updateIp) {
 }
 
 int NicManager::ExecuteCommand(LPSTR lpCommandLine) {
+    int Rc = 0;
+#if 0
     STARTUPINFO sInfo;
     PROCESS_INFORMATION pInfo;
-    int Rc;
 
     memset (& sInfo, 0, sizeof sInfo);
     sInfo.cb = sizeof sInfo;
@@ -946,6 +1066,26 @@ int NicManager::ExecuteCommand(LPSTR lpCommandLine) {
                        NORMAL_PRIORITY_CLASS, NULL, NULL, &sInfo, &pInfo) ;
     CloseHandle (pInfo.hProcess);
     CloseHandle (pInfo.hThread);
+#else
+    //初始化shellexe信息
+    SHELLEXECUTEINFO   ExeInfo;
+    ZeroMemory(&ExeInfo, sizeof(SHELLEXECUTEINFO));
+    ExeInfo.cbSize = sizeof(SHELLEXECUTEINFO);
+    ExeInfo.lpFile = "cmd.exe";
+    ExeInfo.lpParameters = lpCommandLine;
+    ExeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+    ExeInfo.nShow = SW_HIDE;
+    ExeInfo.hwnd = NULL;
+    ExeInfo.lpVerb = NULL;
+    ExeInfo.lpDirectory = NULL;
+    ExeInfo.hInstApp = NULL;
 
+    //执行命令
+    ShellExecuteEx(&ExeInfo);
+
+    //等待进程结束
+    WaitForSingleObject(ExeInfo.hProcess, INFINITE);
+
+#endif
     return Rc;
 }

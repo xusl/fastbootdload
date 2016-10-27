@@ -53,7 +53,7 @@ public:
       return (Id == -1);
     };
 };
-typedef  NetCardStruct*  PNetCardStruct;
+//typedef  NetCardStruct*  PNetCardStruct;
 
 //bool Ping(const char *ip_addr);
 //int ResolveIpMac(const char *DestIpString, string & mac);
@@ -87,7 +87,8 @@ private:
     BOOL RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue);
     BOOL RegReadConnectName(const string & adapter, string& name);
     BOOL RegReadAdapter(const char* driver, string &adapter);
-    bool NetCardStateChange(PNetCardStruct NetCardPoint, bool Enabled);
+    bool NetCardStateChange(NetCardStruct &netCard, bool Enabled);
+    BOOL SwitchNic(NetCardStruct &netCard, bool Enabled);
     ULONG GetRegistryProperty(HDEVINFO DeviceInfoSet,
                                       PSP_DEVINFO_DATA DeviceInfoData,
                                       ULONG Property,

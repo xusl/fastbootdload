@@ -115,6 +115,8 @@ CDownloadDlg::~CDownloadDlg() {
 
     delete m_pCoordinator;
     CloseHandle(m_SyncSemaphore);
+
+    StopLogging();
 }
 
 void CDownloadDlg::DoDataExchange(CDataExchange* pDX)
@@ -262,12 +264,12 @@ BOOL CDownloadDlg::OnInitDialog()
 #ifdef NIC_DEBUG
     NetCardStruct nic = mNic.GetDefaultNic();
     CString nicInfo;
-    nicInfo.Format("%s %s ", nic.mConnectionName.c_str(), nic.Name.c_str());
+    nicInfo.Format("%s %s ", nic.mConnectionName.c_str(), nic.mNicDesc.c_str());
     m_NicInformation.SetWindowText(nicInfo.GetString());
-    //mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+    mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
     //mNic.SetIP("192.168.1.121", "192.168.1.1", "255.255.255.0") ;
     //mNic.SetIP("192.168.237.138", "192.168.237.1", "255.255.255.0") ;
-    mNic.EnableDhcp();
+    //mNic.EnableDhcp();
     //::MessageBox(this->m_hWnd, "Successfully!", "Set Ip Result", MB_OK | MB_ICONINFORMATION);
     //::MessageBox(this->m_hWnd, "Failed", "Set Ip Result", MB_OK | MB_ICONERROR);
 #endif
