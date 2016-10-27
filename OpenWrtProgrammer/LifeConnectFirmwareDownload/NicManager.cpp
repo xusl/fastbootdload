@@ -86,6 +86,69 @@ bool NicManager::Ping(const char *ip_addr) {
     }
 }
 
+BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
+{
+     ULONG nSize = 0;
+     DWORD dwRet = 0;
+     BOOL result = FALSE;
+
+     ASSERT(ip != NULL);
+
+    dwRet = GetIpNetTable(NULL, &nSize, TRUE);
+    if (dwRet == ERROR_NO_DATA || nSize == 0) {
+        LOGE("There are date in arp table, return %d, size %d", dwRet, nSize);
+        return FALSE;
+    }
+    if (dwRet != ERROR_INSUFFICIENT_BUFFER && dwRet != NO_ERROR) {
+        LOGE("GetIpNetTable occur error %d", dwRet);
+        return FALSE;
+    }
+    PMIB_IPNETTABLE pMib = (PMIB_IPNETTABLE)malloc(sizeof(MIB_IPNETTABLE)+sizeof(MIB_IPNETROW)*nSize);
+    memset(pMib, 0, sizeof(MIB_IPNETTABLE)+sizeof(MIB_IPNETROW)*nSize);
+    if (pMib == NULL) {
+        LOGE("NO memory");
+        return FALSE;
+    }
+
+    dwRet = GetIpNetTable(pMib,&nSize,TRUE);
+
+     if (dwRet != NO_ERROR) {
+        free(pMib);
+        LOGE("GetIpNetTable error, return %d, size %d", dwRet, nSize);
+        return FALSE;
+    }
+
+	LOGD("Internet Address      Physical Address         Type");
+    for (int i = 0; i < nSize; i++) {
+		char ipaddr[20] = {0}, macaddr[20] = {0};
+        char *pType = "Unknown";
+
+		sprintf(ipaddr,"%d.%d.%d.%d",
+			    ( pMib->table[i].dwAddr&0x0000ff),
+			    ((pMib->table[i].dwAddr&0xff00)>>8),
+                ((pMib->table[i].dwAddr&0xff0000)>>16),
+                (pMib->table[i].dwAddr>>24));
+
+		sprintf(macaddr, "%02x-%02x-%02x-%02x-%02x-%02x",
+			   pMib->table[i].bPhysAddr[0],pMib->table[i].bPhysAddr[1],
+			   pMib->table[i].bPhysAddr[2],pMib->table[i].bPhysAddr[3],
+			   pMib->table[i].bPhysAddr[4],pMib->table[i].bPhysAddr[5]
+		);
+        if ( MIB_IPNET_TYPE_DYNAMIC == pMib->table[i].dwType)
+            pType = "Dynamic";
+        else if (MIB_IPNET_TYPE_STATIC == pMib->table[i].dwType)
+            pType = "Static";
+        LOGD("%-20s  %-25s  %-20s",ipaddr,macaddr, pType);
+        if (strcmp(ip, ipaddr) == 0) {
+            mac = macaddr;
+            result = TRUE;
+            break;
+        }
+    }
+
+    free(pMib);
+    return result;
+}
 
 int NicManager::ResolveIpMac(const char *DestIpString, string & mac)
 {
@@ -203,6 +266,8 @@ BOOL NicManager::GetConnectedState() {
     return operStatus == IF_OPER_STATUS_OPERATIONAL;
 }
 
+/*deprecated Now.
+*/
 BOOL NicManager::SwitchNic(NetCardStruct &netCard, bool Enabled) {
     DWORD dwSize = 0;
     BOOL result = FALSE;
@@ -892,7 +957,9 @@ bool NicManager::NetCardStateChange(NetCardStruct &NetCard, bool Enabled)
     //if (diData.DevInst != NULL) {
     //    LOGE("DevInst is NULL");
     //}
-
+    /*
+    In Win7 x64, must use x64 build. Otherwise it works inproperly.
+    */
     if (!SetupDiCallClassInstaller(DIF_PROPERTYCHANGE, hDevInfo, &diData)) {
         LOGE("SetupDiCallClassInstaller error: 0x%X", GetLastError());
         goto NICSTATUSCHANGEOUT;

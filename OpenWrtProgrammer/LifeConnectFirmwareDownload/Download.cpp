@@ -100,10 +100,10 @@ BOOL CDownloadApp::InitInstance()
 	CWinApp::InitInstance();
 
 #ifdef _WIN64
-	if (!IsWow64()) {
-		AfxMessageBox("This is x64 Build, please use win32 build");
-        return FALSE;
-	}
+	//if (!IsWow64()) {
+	//	AfxMessageBox("This is x64 Build, please use win32 build");
+    //    return FALSE;
+	//}
 #endif
 
 #ifdef _WIN32

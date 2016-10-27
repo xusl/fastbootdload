@@ -459,8 +459,9 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
         return FALSE;
     }
 */
-    if (0 != mNic.ResolveIpMac(pcIpAddr, mac)) {
-        msg.Format("can not reslove mac of %s. ", pcIpAddr);
+//    if (0 != mNic.ResolveIpMac(pcIpAddr, mac)) {
+    if (!mNic.CheckIpInArpTable(pcIpAddr, mac)) {
+        msg.Format("can not find device assigned IP %s . ", pcIpAddr);
         m_PSTStatus.SetWindowText(msg);
         CleanDevice(pcIpAddr);
         return FALSE;

@@ -67,7 +67,7 @@ public:
     ~NicManager(void);
    void EnumNetCards();
     const list<NetCardStruct>* GetNicList() const { return  &mNicList;}
-    int GetNicNum() { return mNicList.size(); }
+    int GetNicNum() { return (int)mNicList.size(); }
     NetCardStruct GetDefaultNic() const { return m_DefaultNic;};
     BOOL SetDefaultNic(DWORD id);
     BOOL EnableDhcp(BOOL updateIp);
@@ -75,6 +75,7 @@ public:
     BOOL UpdateIP();
     BOOL NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex);
     BOOL GetConnectedState();
+    BOOL CheckIpInArpTable(const char *ip, string & mac);
     int ResolveIpMac(const char *DestIpString, string & mac);
     bool Ping(const char *ip_addr);
 
