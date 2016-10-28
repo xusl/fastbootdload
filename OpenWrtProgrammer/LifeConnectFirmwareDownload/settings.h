@@ -99,11 +99,13 @@ public:
     list<char *>   GetFirmwareFiles(void) { return m_FirmwareFiles;};
     BOOL           ReadFirmwareFiles(const char* packageFolder, BOOL dummy = FALSE);
     int            SetPackageDir(const char* config, BOOL updateConfig);
+    BOOL           ParseExternalVersion(string &extVersion, string& customId, string& version, string& buildId);
     const char * const GetNetworkSegment() {  return m_NetworkSegment;};
     const char * const GetLoginUser() { return  m_User;};
     const char * const GetLoginPassword() { return m_Passwd;};
-    const char * const GetFirmwareCustomId() { return m_FirmwareCustomId;};
-    const char * const GetFirmwareBuildId() { return m_FirmwareBuildId;};
+#if USE_SIMPLE_CONFIG
+    const char * const GetFirmwareCustomId() { return m_FirmwareCustomId;}
+    const char * const GetFirmwareBuildId() { return m_FirmwareBuildId;}
     VOID           GetFirmwareReleaseVersion(CString &version) {
       version = m_FirmwareCustomId;
       version += "_";
@@ -111,6 +113,19 @@ public:
       version += "_";
       version += m_FirmwareBuildId;
     };
+#else
+    string&        GetFirmwareCustomId() { return m_FirmwareCustomId;};
+    string&        GetFirmwareBuildId() { return m_FirmwareBuildId;};
+    VOID           GetFirmwareReleaseVersion(CString &version) {
+      version = m_FirmwareCustomId.c_str();
+      version += "_";
+      version += m_FirmwareVersion.c_str();
+      version += "_";
+      version += m_FirmwareBuildId.c_str();
+    };
+#endif
+
+
     BOOL            IsLoginTelnet() { return m_Login;};
     BOOL           IsPackageChecked() { return ReadFirmwareFiles(pkg_dir, TRUE);}
     int            GetHostIPStart() { return m_HostIPStart;};
@@ -135,9 +150,15 @@ private:
     int                     m_HostIPEnd;
     BOOL                    m_Login;
     int                     m_TelnetTimeoutMs;
+#if USE_SIMPLE_CONFIG
     char                    m_FirmwareCustomId[FW_CUSTOMID_LEN];
     char                    m_FirmwareBuildId[FW_BUILDID_LEN];
     char                    m_FirmwareVersion[FW_VERSION_LEN];
+#else
+    string                    m_FirmwareCustomId;
+    string                    m_FirmwareBuildId;
+    string                    m_FirmwareVersion;
+#endif
     list<char *>            m_FirmwareFiles;
 };
 

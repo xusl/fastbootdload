@@ -459,8 +459,8 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
         return FALSE;
     }
 */
-//    if (0 != mNic.ResolveIpMac(pcIpAddr, mac)) {
-    if (!mNic.CheckIpInArpTable(pcIpAddr, mac)) {
+    if (0 != mNic.ResolveIpMac(pcIpAddr, mac) &&
+       !mNic.CheckIpInArpTable(pcIpAddr, mac)) {
         msg.Format("can not find device assigned IP %s . ", pcIpAddr);
         m_PSTStatus.SetWindowText(msg);
         CleanDevice(pcIpAddr);
@@ -660,7 +660,7 @@ void CDownloadDlg::OnBnClickedButtonBrowse() {
 void CDownloadDlg::OnBnClickedStart() {
     if(is_downloading) {
         LOGW("Tool is working now.");
-        if (b_download == false) {
+        if (b_download == false && mNic.IsChangingIp() == FALSE) {
             TerminateThread(m_NetworkSnifferThreadHandle, 1);
             StopTftpd32Services ();
             GetDlgItem(ID_Start)->SetWindowText("Start");
@@ -739,6 +739,7 @@ int CDownloadDlg::TelnetPST() {
     string osVersion;
     string fwVersion;
     string customId;
+    string versionCode;
     string buildId;
     string result;
     DeviceCoordinator * dc = GetDeviceCoodinator();
@@ -795,20 +796,7 @@ int CDownloadDlg::TelnetPST() {
     SetInformation(DEV_FW_VERSION, fwVersion.c_str());
 
     LOGE("device firmware is %s ", fwVersion.c_str());
-    char *resp = _strdup( fwVersion.c_str());
-    char *version, *context, *token;
-    for (i = 0, version = resp; ; i++, version = NULL) {
-        token = strtok_s(version, "_", &context);
-        if (token == NULL) {
-            break;
-        }
-        if (i == 1)
-            customId = token;
-        else if (i == 3)
-            buildId = token;
-    }
-    if (resp != NULL)
-        free(resp);
+    m_Config.ParseExternalVersion(fwVersion, customId, versionCode, buildId);
     msg.Format("Device custom id is %s", customId.c_str());
     m_PSTStatus.SetWindowText(msg);
 

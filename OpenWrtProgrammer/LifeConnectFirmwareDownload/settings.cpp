@@ -10,6 +10,7 @@
 // some shortcurts
 #include "StdAfx.h"
 #include <stdio.h>
+#include "XmlParser.h"
 #include "Tftp.h"
 #include "settings.h"
 #include "log.h"
@@ -51,8 +52,14 @@ ConfigIni::ConfigIni() :
     m_FirmwareConfig("")
 {
     memset(pkg_dir, 0, sizeof pkg_dir);
+#if USE_SIMPLE_CONFIG
     memset(m_FirmwareCustomId, 0, sizeof m_FirmwareCustomId);
     memset(m_FirmwareBuildId, 0, sizeof m_FirmwareBuildId);
+#else
+    m_FirmwareBuildId = "";
+    m_FirmwareCustomId = "";
+    m_FirmwareVersion = "";
+#endif
     memset(m_NetworkSegment, 0, sizeof m_NetworkSegment);
     memset(m_User, 0, sizeof m_User);
     memset(m_Passwd, 0, sizeof m_Passwd);
@@ -111,10 +118,9 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     if (stricmp(buffer, "true") == 0)
         m_Login = TRUE;
 
-
     data_len = GetPrivateProfileString(APP_SECTION,
                                        PKG_CONFIG,
-                                       _T("LifeConnectFirmware.ini"),
+                                       _T("config.xml"),
                                        filename,
                                        MAX_PATH,
                                        lpFileName);
@@ -164,89 +170,134 @@ VOID ConfigIni::AssignPackageDir(const char *dir) {
         pkg_dir[data_len + 1] = _T('\0');
     }
 }
+
+BOOL ConfigIni::ParseExternalVersion(string &extVersion, string& customId,
+    string& versionCode, string& buildId) {
+   char *resp = _strdup( extVersion.c_str());
+    char *version, *context, *token;
+    int i = 0;
+    for (version = resp; ; i++, version = NULL) {
+        token = strtok_s(version, "_", &context);
+        if (token == NULL) {
+            break;
+        }
+        if (i == 1)
+            customId = token;
+        else if (i == 2)
+            versionCode = token;
+        else if (i == 3)
+            buildId = token;
+    }
+    if (resp != NULL)
+        free(resp);
+    return TRUE;
+}
+
 int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
-  char firmware_tbl[FIRMWARE_TBL_LEN] = {0};
-  char filename[MAX_PATH];
-  char *firmware;
-  size_t firmware_len;
-  int data_len;
-  CString config;
-  BOOL result = TRUE;
+    char firmware_tbl[FIRMWARE_TBL_LEN] = {0};
+    char filename[MAX_PATH];
+    char *firmware;
+    size_t firmware_len;
+    int data_len;
+    CString config;
+    BOOL result = TRUE;
 
-  if (packageFolder == NULL || strlen(packageFolder) == 0) {
-    LOGE("not specified PACKAGE folder or it is invalid");
-    return FALSE;
-  }
+    if (packageFolder == NULL || strlen(packageFolder) == 0) {
+        LOGE("not specified PACKAGE folder or it is invalid");
+        return FALSE;
+    }
 
-   int Rc ;
-   Rc = GetFileAttributes (packageFolder) ;
-   if (Rc == INVALID_FILE_ATTRIBUTES || 0 == (Rc & FILE_ATTRIBUTE_DIRECTORY ))
-    return FALSE;
+    int Rc ;
+    Rc = GetFileAttributes (packageFolder) ;
+    if (Rc == INVALID_FILE_ATTRIBUTES || 0 == (Rc & FILE_ATTRIBUTE_DIRECTORY )) {
+        LOGE("%s is an invalid folder", packageFolder);
+        return FALSE;
+    }
 
+    config = packageFolder;
+    if (packageFolder[strlen(packageFolder) -1] != '\\')
+        config += '\\';
 
-config = packageFolder;
-   if (packageFolder[strlen(packageFolder) -1] != '\\')
-    config += '\\';
+    config += m_FirmwareConfig;
 
-  config += m_FirmwareConfig;
+     if(!PathFileExists(config.GetString())) {
+        LOGE("%s is not exist", config.GetString());
+        return FALSE;
+     }
 
-  data_len = GetPrivateProfileString(PKGFILES_SECTION,
-                                     NULL,
-                                     NULL,
-                                     firmware_tbl,
-                                     FIRMWARE_TBL_LEN,
-                                     config.GetString());
-
-  if (data_len == 0) {
-    return FALSE;
-  }
-
-  firmware = firmware_tbl;
-  firmware_len = strlen(firmware);
-
-  while (firmware_len > 0) {
     data_len = GetPrivateProfileString(PKGFILES_SECTION,
+                                       NULL,
+                                       NULL,
+                                       firmware_tbl,
+                                       FIRMWARE_TBL_LEN,
+#if USE_SIMPLE_CONFIG
+                                       config.GetString());
+#else
+                                       m_ConfigPath.GetString());
+#endif
+
+    if (data_len == 0) {
+        LOGE("There are none '%s' in .ini", PKGFILES_SECTION);
+        return FALSE;
+    }
+
+    firmware = firmware_tbl;
+    firmware_len = strlen(firmware);
+
+    while (firmware_len > 0) {
+        data_len = GetPrivateProfileString(PKGFILES_SECTION,
                                        firmware,
                                        NULL,
                                        filename,
                                        MAX_PATH,
-                                       config);
-    if (data_len > 0) {
-        string path = packageFolder;
-        path += "\\";
-        path += filename;
-        result = result && AddFirmwareFiles(path.c_str(), dummy);
-//      AddFirmwareFiles(path.GetString());
-//      path.GetBuffer()
-//      path.ReleaseBuffer();
+#if USE_SIMPLE_CONFIG
+                                       config.GetString());
+#else
+                                       m_ConfigPath.GetString());
+#endif
+        if (data_len > 0) {
+            string path = packageFolder;
+            path += "\\";
+            path += filename;
+            result = result && AddFirmwareFiles(path.c_str(), dummy);
+            //      AddFirmwareFiles(path.GetString());
+            //      path.GetBuffer()
+            //      path.ReleaseBuffer();
+        }
+
+        firmware = firmware + firmware_len + 1;
+        firmware_len = strlen(firmware);
     }
 
-    firmware = firmware + firmware_len + 1;
-    firmware_len = strlen(firmware);
-  }
+    if (dummy == FALSE) {
+#if USE_SIMPLE_CONFIG
+        GetPrivateProfileString(PKGVERSION_SECTION,
+                                _T("CustomId"),
+                                "",
+                                m_FirmwareCustomId,
+                                FW_CUSTOMID_LEN,
+                                config);
+        GetPrivateProfileString(PKGVERSION_SECTION,
+                                _T("Version"),
+                                "",
+                                m_FirmwareVersion,
+                                FW_VERSION_LEN,
+                                config);
+        GetPrivateProfileString(PKGVERSION_SECTION,
+                                _T("BuildId"),
+                                "",
+                                m_FirmwareBuildId,
+                                FW_BUILDID_LEN,
+                                config);
+#else
+    XmlParser confParser;
+    confParser.Parse(config);
+    string extVersion=confParser.get_XML_Value("External_Ver");
+    ParseExternalVersion(extVersion, m_FirmwareCustomId, m_FirmwareVersion, m_FirmwareBuildId);
+#endif
+    }
 
-  if (dummy == FALSE) {
-     GetPrivateProfileString(PKGVERSION_SECTION,
-                                       _T("CustomId"),
-                                       "",
-                                       m_FirmwareCustomId,
-                                       FW_CUSTOMID_LEN,
-                                       config);
-     GetPrivateProfileString(PKGVERSION_SECTION,
-                                       _T("Version"),
-                                       "",
-                                       m_FirmwareVersion,
-                                       FW_VERSION_LEN,
-                                       config);
-     GetPrivateProfileString(PKGVERSION_SECTION,
-                                       _T("BuildId"),
-                                       "",
-                                       m_FirmwareBuildId,
-                                       FW_BUILDID_LEN,
-                                       config);
-  }
-
-  return result;
+    return result;
 }
 
 BOOL ConfigIni::AddFirmwareFiles(const char* const file, BOOL dummy){

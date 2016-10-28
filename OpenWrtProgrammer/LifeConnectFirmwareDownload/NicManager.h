@@ -69,6 +69,7 @@ public:
     const list<NetCardStruct>* GetNicList() const { return  &mNicList;}
     int GetNicNum() { return (int)mNicList.size(); }
     NetCardStruct GetDefaultNic() const { return m_DefaultNic;};
+    BOOL IsChangingIp() const { return m_IsChangingIp;}
     BOOL SetDefaultNic(DWORD id);
     BOOL EnableDhcp(BOOL updateIp);
     int SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask);
@@ -96,6 +97,7 @@ private:
                                       LPTSTR *Buffer);
 private:
     string segment;
+    BOOL             m_IsChangingIp;
     list<NetCardStruct> mNicList;
     NetCardStruct m_DefaultNic;
 };

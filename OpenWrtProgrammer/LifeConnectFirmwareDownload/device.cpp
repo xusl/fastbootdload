@@ -206,6 +206,7 @@ if (IsEmpty() == FALSE) {
 }
 
 BOOL DeviceCoordinator::RemoveDevice(CDevLabel* const & devIntf)  {
+#ifdef MULTI_DEVICE_FEATURE
     ASSERT(devIntf != NULL);
     BOOL found = FALSE;
     list<CDevLabel*>::iterator it;
@@ -228,6 +229,19 @@ BOOL DeviceCoordinator::RemoveDevice(CDevLabel* const & devIntf)  {
     delete devIntf;
     LeaveCriticalSection(&mCriticalSection);
     return TRUE;
+#else
+    LOGE("RemoveDevice, clear!");
+    list<CDevLabel*>::iterator it;
+    for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+        CDevLabel *item = *it;
+        mMacRecords[item->GetMac()] = true;
+        delete item;
+    }
+
+    mDevintfList.clear();
+
+    return TRUE;
+#endif
 }
 
 BOOL DeviceCoordinator::RequestDownloadPermission(CDevLabel* const & devIntf) {

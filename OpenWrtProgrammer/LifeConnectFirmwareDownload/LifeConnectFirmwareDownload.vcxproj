@@ -205,6 +205,7 @@
     <ClInclude Include="telnet.h" />
     <ClInclude Include="Tftp.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="XmlParser.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.cpp" />
@@ -229,6 +230,7 @@
     <ClCompile Include="tftpd_util.cpp" />
     <ClCompile Include="tftp_dbg.cpp" />
     <ClCompile Include="utils.cpp" />
+    <ClCompile Include="XmlParser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="LifeConnectFirmwareDownload.rc" />

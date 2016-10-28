@@ -20,7 +20,8 @@
 using namespace std;
 
 NicManager::NicManager(string network):
-    segment(network)
+    segment(network),
+    m_IsChangingIp(FALSE)
 {
     mNicList.clear();
 }
@@ -119,7 +120,7 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
     }
 
 	LOGD("Internet Address      Physical Address         Type");
-    for (int i = 0; i < nSize; i++) {
+    for (int i = 0; i < pMib->dwNumEntries; i++) {
 		char ipaddr[20] = {0}, macaddr[20] = {0};
         char *pType = "Unknown";
 
@@ -1049,9 +1050,11 @@ BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
     //  return FALSE;
 
     //通过禁用启用网卡实现IP立即生效
+    m_IsChangingIp = TRUE;
     NetCardStateChange(m_DefaultNic, FALSE);
     Sleep(100);
     NetCardStateChange(m_DefaultNic,TRUE);
+    m_IsChangingIp = FALSE;
 
     Sleep(10000);
     UpdateIP();
@@ -1089,9 +1092,11 @@ BOOL NicManager::EnableDhcp(BOOL updateIp) {
     //  return FALSE;
 
     //通过禁用启用网卡实现IP立即生效
+    m_IsChangingIp = TRUE;
     NetCardStateChange(m_DefaultNic,FALSE);
     Sleep(100);
     NetCardStateChange(m_DefaultNic,TRUE);
+    m_IsChangingIp = FALSE;
 
     if (updateIp == FALSE)
         return TRUE;
