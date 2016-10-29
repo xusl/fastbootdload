@@ -24,7 +24,7 @@ enum e_SecurityLevels { SECURITY_NONE, SECURITY_STD, SECURITY_HIGH, SECURITY_REA
 
 #define NIC_NETSH_TOGGLE        0
 #define NIC_SETUPDI_TOGGLE      1
-#define NIC_SETIF_TOGGLE        2
+//#define NIC_SETIF_TOGGLE        2
 
 struct S_Tftpd32Settings
 {

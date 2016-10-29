@@ -71,10 +71,11 @@ public:
     const list<NetCardStruct>* GetNicList() const { return  &mNicList;}
     int GetNicNum() { return (int)mNicList.size(); }
     NetCardStruct GetDefaultNic() const { return m_DefaultNic;};
+    BOOL RestoreDefaultNic();
     BOOL IsChangingIp() const { return m_IsChangingIp;}
     BOOL SetDefaultNic(DWORD id);
     BOOL EnableDhcp(BOOL updateIp);
-    int SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask);
+    int SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp=TRUE);
     BOOL UpdateIP();
     BOOL NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex);
     BOOL GetConnectedState();
@@ -100,6 +101,7 @@ private:
     BOOL                 m_IsChangingIp;
     list<NetCardStruct>  mNicList;
     NetCardStruct        m_DefaultNic;
+    NetCardStruct        m_DefaultNicOrigin;
     int                  m_NicToggle;
     int                  m_Timeout;
 };

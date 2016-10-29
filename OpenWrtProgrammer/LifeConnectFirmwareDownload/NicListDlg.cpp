@@ -107,6 +107,7 @@ void NicListDlg::OnOK()
         LvItem.mask = LVIF_PARAM;
         LvItem.iItem = index;
         if (m_NicList.GetItem (& LvItem) ) {
+            m_pNicManager->RestoreDefaultNic();
             m_pNicManager->SetDefaultNic((DWORD)LvItem.lParam);
         }
 }
@@ -122,6 +123,7 @@ void NicListDlg::OnNMDblclkListNic(NMHDR *pNMHDR, LRESULT *pResult)
         LvItem.mask = LVIF_PARAM;
         LvItem.iItem = pNMItemActivate->iItem;
         if (m_NicList.GetItem (& LvItem) ) {
+            m_pNicManager->RestoreDefaultNic();
             m_pNicManager->SetDefaultNic((DWORD)LvItem.lParam);
         }
 

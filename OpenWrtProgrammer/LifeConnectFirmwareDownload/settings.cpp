@@ -49,7 +49,7 @@ ConfigIni::ConfigIni() :
     m_FirmwareFiles(),
     m_forceupdate(FALSE),
     m_bWork(FALSE),
-    m_NicToggle(NIC_SETIF_TOGGLE),
+    m_NicToggle(NIC_NETSH_TOGGLE),
     m_FirmwareConfig("")
 {
     memset(pkg_dir, 0, sizeof pkg_dir);

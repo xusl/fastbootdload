@@ -24,6 +24,7 @@ private:
   CListCtrl m_NicList;
   NicManager *m_pNicManager;
   virtual void OnOK();
+
 public:
     afx_msg void OnNMDblclkListNic(NMHDR *pNMHDR, LRESULT *pResult);
 };

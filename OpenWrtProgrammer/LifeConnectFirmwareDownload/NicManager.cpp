@@ -840,7 +840,7 @@ void NicManager::EnumNetCards()
             }
             if (result)
             {
-            //RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
+                RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
                 RegReadConnectName(nic.mAdapterName, nic.mConnectionName);
             }
             if (result)
@@ -880,6 +880,31 @@ BOOL NicManager::SetDefaultNic(DWORD id) {
     return FALSE;
 }
 
+BOOL NicManager::RestoreDefaultNic() {
+    if (m_DefaultNic.Id != m_DefaultNicOrigin.Id ||
+        m_DefaultNic.mConnectionName != m_DefaultNicOrigin.mConnectionName) {
+        LOGE("Error, nic not matched!");
+        return FALSE;
+    }
+    if (m_DefaultNicOrigin.mEnableDHCP) {
+        if (!m_DefaultNic.mEnableDHCP) {
+            LOGD("restore ip address, enable dhcp");
+           EnableDhcp(FALSE);
+        }
+       return TRUE;
+    }
+
+    if (m_DefaultNicOrigin.mGateway != m_DefaultNic.mGateway ||
+        m_DefaultNicOrigin.mIPAddress!= m_DefaultNic.mIPAddress) {
+        LOGD("restore ip address, %s, %s, %s", m_DefaultNicOrigin.mIPAddress.c_str(),
+            m_DefaultNicOrigin.mGateway.c_str(),
+            m_DefaultNicOrigin.mSubnetMask.c_str());
+        SetIP(m_DefaultNicOrigin.mIPAddress.c_str(), m_DefaultNicOrigin.mGateway.c_str(),
+            m_DefaultNicOrigin.mSubnetMask.c_str(), FALSE);
+        return TRUE;
+    }
+    return FALSE;
+}
 //---------------------------------------------------------------------------
 ULONG NicManager::GetRegistryProperty(HDEVINFO DeviceInfoSet,
     PSP_DEVINFO_DATA diData,
@@ -1032,7 +1057,7 @@ BOOL NicManager::UpdateIP() {
 }
 
 // Start an explorer window, directory is Tftpd32's default directory
-BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
+BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
 {
     if (m_DefaultNic.IsInvalid()) {
         LOGE("There are no valid NIC");
@@ -1041,6 +1066,7 @@ BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
 
     if (m_NicToggle== NIC_NETSH_TOGGLE) {
         CString command;
+        m_IsChangingIp = TRUE;
         //command.Format("/c netsh int ip set address name=\"%s\" source=static %s %s %s 1",
         //               m_DefaultNic.mConnectionName.c_str(), ip, subnetMask, gateway);
         //int rc = ExecuteCommand("cmd.exe", (LPSTR)command.GetString());
@@ -1048,7 +1074,9 @@ BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
         command.Format("int ip set address name=\"%s\" source=static %s %s %s 1",
                        m_DefaultNic.mConnectionName.c_str(), ip, subnetMask, gateway);
         int rc = ExecuteCommand("netsh", (LPSTR)command.GetString());
-
+        m_IsChangingIp = FALSE;
+        if (updateIp == FALSE)
+            return TRUE;
         UpdateIP();
         return rc == 0;
     } else if (m_NicToggle == NIC_SETUPDI_TOGGLE)  {
@@ -1067,6 +1095,9 @@ BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
         Sleep(100);
         NetCardStateChange(m_DefaultNic,TRUE);
         m_IsChangingIp = FALSE;
+
+        if (updateIp == FALSE)
+            return TRUE;
 
         Sleep(m_Timeout);
         UpdateIP();
@@ -1093,6 +1124,7 @@ BOOL NicManager::EnableDhcp(BOOL updateIp) {
     if (m_NicToggle == NIC_NETSH_TOGGLE) {
         CString command;
 
+        m_IsChangingIp = TRUE;
         //command.Format("/c netsh int ip set addr \"%s\" dhcp ", m_DefaultNic.mConnectionName.c_str());
         //int rc = ExecuteCommand("cmd.exe", (LPSTR)command.GetString());
 
@@ -1101,6 +1133,7 @@ BOOL NicManager::EnableDhcp(BOOL updateIp) {
 
         //command.Format("netsh int ip set dns \"%s\" dhcp", connectionName.GetString());
         //rc += ExecuteCommand((LPSTR)command.GetString());
+        m_IsChangingIp = FALSE;
 
         if (updateIp == FALSE)
             return TRUE;
@@ -1171,7 +1204,7 @@ int NicManager::ExecuteCommand(LPSTR command, LPSTR parameter) {
 
     //等待进程结束
     WaitForSingleObject(ExeInfo.hProcess, m_Timeout * 3/*INFINITE*/);
-    
+
     LOGE("execute done");
 #endif
     return Rc;
