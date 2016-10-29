@@ -396,6 +396,8 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 
     pThis->SetInformation(HOST_NIC, NULL);
     NetCardStruct nic =nm->GetDefaultNic();
+    DeviceCoordinator * dc = GetDeviceCoodinator();
+
     for(;;) {
         //for (int i = from; i <= to; i++)
         //{
@@ -404,7 +406,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
         //    pThis->SniffNetwork( ip_addr.GetString());
         //}
 #ifdef TPST
-        if ( pThis->b_download == FALSE || ipAddress.size() == 0) {
+        if ( (dc->IsEmpty() == FALSE) && (pThis->b_download == FALSE || ipAddress.size() == 0)) {
             LOGD("b_download %d, ipAddress %s", pThis->b_download, ipAddress.c_str());
 /*
             if(!nic.IsInvalid() || !nic.mEnableDHCP) {
