@@ -22,6 +22,10 @@ enum e_SecurityLevels { SECURITY_NONE, SECURITY_STD, SECURITY_HIGH, SECURITY_REA
 #define MAXLEN_IPv6             40
 #define IPADDR_BUFFER_LEN       16
 
+#define NIC_NETSH_TOGGLE        0
+#define NIC_SETUPDI_TOGGLE      1
+#define NIC_SETIF_TOGGLE        2
+
 struct S_Tftpd32Settings
 {
     unsigned              Timeout;
@@ -99,6 +103,8 @@ public:
     list<char *>   GetFirmwareFiles(void) { return m_FirmwareFiles;};
     BOOL           ReadFirmwareFiles(const char* packageFolder, BOOL dummy = FALSE);
     int            SetPackageDir(const char* config, BOOL updateConfig);
+    int            GetNicToggle() const { return m_NicToggle;}
+    int            GetToggleTimeoutMs() const { return m_ToggleTimeoutMs;}
     BOOL           ParseExternalVersion(string &extVersion, string& customId, string& version, string& buildId);
     const char * const GetNetworkSegment() {  return m_NetworkSegment;};
     const char * const GetLoginUser() { return  m_User;};
@@ -150,6 +156,8 @@ private:
     int                     m_HostIPEnd;
     BOOL                    m_Login;
     int                     m_TelnetTimeoutMs;
+    int                     m_NicToggle;
+    int                     m_ToggleTimeoutMs;
 #if USE_SIMPLE_CONFIG
     char                    m_FirmwareCustomId[FW_CUSTOMID_LEN];
     char                    m_FirmwareBuildId[FW_BUILDID_LEN];

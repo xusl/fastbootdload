@@ -7,6 +7,7 @@
 #include <cfgmgr32.h>
 #include <vector>
 #include <list>
+#include "settings.h"
 
 using namespace std;
 
@@ -63,9 +64,10 @@ typedef LPVOID *PPVOID;
 class NicManager
 {
 public:
-    NicManager(string network="192.168.1");
+    NicManager();
     ~NicManager(void);
-   void EnumNetCards();
+    VOID Configuration( ConfigIni * config) ;
+    void EnumNetCards();
     const list<NetCardStruct>* GetNicList() const { return  &mNicList;}
     int GetNicNum() { return (int)mNicList.size(); }
     NetCardStruct GetDefaultNic() const { return m_DefaultNic;};
@@ -81,8 +83,7 @@ public:
     bool Ping(const char *ip_addr);
 
 private:
-    int ExecuteCommand(LPSTR lpCommandLine);
-
+    int ExecuteCommand(LPSTR command, LPSTR parameter);
     BOOL GetNicInfo(NetCardStruct &netCard);
     BOOL RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway,  BOOL& enableDHCP);
     BOOL RegSetIP(const string & adapter, LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, DWORD enableDHCP);
@@ -96,8 +97,9 @@ private:
                                       ULONG Property,
                                       LPTSTR *Buffer);
 private:
-    string segment;
-    BOOL             m_IsChangingIp;
-    list<NetCardStruct> mNicList;
-    NetCardStruct m_DefaultNic;
+    BOOL                 m_IsChangingIp;
+    list<NetCardStruct>  mNicList;
+    NetCardStruct        m_DefaultNic;
+    int                  m_NicToggle;
+    int                  m_Timeout;
 };

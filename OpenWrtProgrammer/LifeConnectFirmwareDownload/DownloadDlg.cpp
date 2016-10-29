@@ -105,6 +105,7 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	is_downloading=false;
 	b_download=false;
     m_Config.ReadConfigIni(CONFIG_FILE);
+    mNic.Configuration(&m_Config);
 }
 
 CDownloadDlg::~CDownloadDlg() {

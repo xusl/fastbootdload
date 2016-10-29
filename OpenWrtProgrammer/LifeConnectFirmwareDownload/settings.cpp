@@ -49,6 +49,7 @@ ConfigIni::ConfigIni() :
     m_FirmwareFiles(),
     m_forceupdate(FALSE),
     m_bWork(FALSE),
+    m_NicToggle(NIC_SETIF_TOGGLE),
     m_FirmwareConfig("")
 {
     memset(pkg_dir, 0, sizeof pkg_dir);
@@ -63,6 +64,7 @@ ConfigIni::ConfigIni() :
     memset(m_NetworkSegment, 0, sizeof m_NetworkSegment);
     memset(m_User, 0, sizeof m_User);
     memset(m_Passwd, 0, sizeof m_Passwd);
+    m_NicToggle = NIC_SETUPDI_TOGGLE;
 }
 
 #define CONFIG_BUFFER_LEN 32
@@ -88,10 +90,14 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     m_ConfigPath += ini;
 
     lpFileName = m_ConfigPath.GetString();
-    //init app setting.
-    m_bWork = GetPrivateProfileInt(APP_SECTION,_T("autowork"), 0, lpFileName);
-    GetPrivateProfileString(NETWORK_SECTION, _T("NetworkSegment"), "192.168.1",
-                        m_NetworkSegment, IPADDR_BUFFER_LEN, lpFileName);
+
+    //network section
+    m_NicToggle = GetPrivateProfileInt(NETWORK_SECTION, _T("NICToggle"),
+                                  NIC_SETUPDI_TOGGLE, lpFileName);
+    m_ToggleTimeoutMs = GetPrivateProfileInt(NETWORK_SECTION, _T("ToggleTimeoutMs"),
+                                  10000, lpFileName);
+    GetPrivateProfileString(NETWORK_SECTION, _T("NetworkSegment"),
+                        "192.168.1", m_NetworkSegment, IPADDR_BUFFER_LEN, lpFileName);
 
     LOGD("network segment : %s", m_NetworkSegment);
     m_HostIPStart = GetPrivateProfileInt(NETWORK_SECTION, _T("DeviceIPStart"), 2, lpFileName);
@@ -104,6 +110,7 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     if (m_HostIPEnd < m_HostIPStart)
         m_HostIPEnd = m_HostIPStart;
 
+    //telnet section
     m_TelnetTimeoutMs = GetPrivateProfileInt(TELNET_SECTION, _T("TimeoutMs"), 6000, lpFileName);
     GetPrivateProfileString(TELNET_SECTION, _T("User"), "root",
                         m_User, USER_LEN_MAX, lpFileName);
@@ -118,6 +125,8 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
     if (stricmp(buffer, "true") == 0)
         m_Login = TRUE;
 
+    //app section
+    m_bWork = GetPrivateProfileInt(APP_SECTION,_T("autowork"), 0, lpFileName);
     data_len = GetPrivateProfileString(APP_SECTION,
                                        PKG_CONFIG,
                                        _T("config.xml"),
@@ -201,6 +210,7 @@ int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
     int data_len;
     CString config;
     BOOL result = TRUE;
+    XmlParser confParser;
 
     if (packageFolder == NULL || strlen(packageFolder) == 0) {
         LOGE("not specified PACKAGE folder or it is invalid");
@@ -225,16 +235,33 @@ int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
         return FALSE;
      }
 
-    data_len = GetPrivateProfileString(PKGFILES_SECTION,
-                                       NULL,
-                                       NULL,
-                                       firmware_tbl,
-                                       FIRMWARE_TBL_LEN,
+    confParser.Parse(config);
+
+    if (dummy == FALSE) {
 #if USE_SIMPLE_CONFIG
-                                       config.GetString());
+        GetPrivateProfileString(PKGVERSION_SECTION, _T("CustomId"), "",
+                                m_FirmwareCustomId, FW_CUSTOMID_LEN, config);
+        GetPrivateProfileString(PKGVERSION_SECTION, _T("Version"), "",
+                                m_FirmwareVersion, FW_VERSION_LEN, config);
+        GetPrivateProfileString(PKGVERSION_SECTION, _T("BuildId"), "",
+                                m_FirmwareBuildId, FW_BUILDID_LEN, config);
 #else
-                                       m_ConfigPath.GetString());
+    string extVersion=confParser.get_XML_Value("External_Ver");
+    ParseExternalVersion(extVersion, m_FirmwareCustomId, m_FirmwareVersion, m_FirmwareBuildId);
 #endif
+    }
+
+    string projectPkg=confParser.get_XML_Value("Project_Code");
+    projectPkg.append("_").append(PKGFILES_SECTION);
+    data_len = GetPrivateProfileString(projectPkg.c_str(), NULL, NULL, firmware_tbl,
+                                       FIRMWARE_TBL_LEN, m_ConfigPath.GetString());
+    if (data_len == 0) {
+        LOGE("None data in section %s, query default section %s",
+            projectPkg.c_str(), PKGFILES_SECTION);
+        data_len = GetPrivateProfileString(PKGFILES_SECTION, NULL, NULL,
+                                           firmware_tbl, FIRMWARE_TBL_LEN,
+                                           m_ConfigPath.GetString());
+    }
 
     if (data_len == 0) {
         LOGE("There are none '%s' in .ini", PKGFILES_SECTION);
@@ -245,16 +272,10 @@ int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
     firmware_len = strlen(firmware);
 
     while (firmware_len > 0) {
-        data_len = GetPrivateProfileString(PKGFILES_SECTION,
-                                       firmware,
-                                       NULL,
-                                       filename,
-                                       MAX_PATH,
-#if USE_SIMPLE_CONFIG
-                                       config.GetString());
-#else
+        data_len = GetPrivateProfileString(PKGFILES_SECTION, firmware,
+                                       NULL, filename, MAX_PATH,
                                        m_ConfigPath.GetString());
-#endif
+
         if (data_len > 0) {
             string path = packageFolder;
             path += "\\";
@@ -267,34 +288,6 @@ int ConfigIni::ReadFirmwareFiles(const char* packageFolder, BOOL dummy) {
 
         firmware = firmware + firmware_len + 1;
         firmware_len = strlen(firmware);
-    }
-
-    if (dummy == FALSE) {
-#if USE_SIMPLE_CONFIG
-        GetPrivateProfileString(PKGVERSION_SECTION,
-                                _T("CustomId"),
-                                "",
-                                m_FirmwareCustomId,
-                                FW_CUSTOMID_LEN,
-                                config);
-        GetPrivateProfileString(PKGVERSION_SECTION,
-                                _T("Version"),
-                                "",
-                                m_FirmwareVersion,
-                                FW_VERSION_LEN,
-                                config);
-        GetPrivateProfileString(PKGVERSION_SECTION,
-                                _T("BuildId"),
-                                "",
-                                m_FirmwareBuildId,
-                                FW_BUILDID_LEN,
-                                config);
-#else
-    XmlParser confParser;
-    confParser.Parse(config);
-    string extVersion=confParser.get_XML_Value("External_Ver");
-    ParseExternalVersion(extVersion, m_FirmwareCustomId, m_FirmwareVersion, m_FirmwareBuildId);
-#endif
     }
 
     return result;

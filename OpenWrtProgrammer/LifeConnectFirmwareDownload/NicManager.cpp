@@ -14,21 +14,31 @@
 #pragma	comment(lib, "Sensapi.lib")
 //#pragma comment(lib,"icmp.lib")
 
+#pragma warning(disable : 4996)
+
 #define MAX_BUF_SIZE   300
-#undef USE_NETSH
 
 using namespace std;
 
-NicManager::NicManager(string network):
-    segment(network),
+NicManager::NicManager():
     m_IsChangingIp(FALSE)
 {
     mNicList.clear();
+    m_NicToggle = NIC_SETUPDI_TOGGLE;
+    m_Timeout = 6000;
 }
 
 NicManager::~NicManager(void)
 {
     mNicList.clear();
+}
+
+VOID NicManager::Configuration( ConfigIni * config) {
+    m_NicToggle = config->GetNicToggle();
+    m_Timeout = config->GetToggleTimeoutMs();
+    LOGD("Toggle method %s, timeout %d",
+        m_NicToggle == NIC_NETSH_TOGGLE ? "Netsh command" : "setup api",
+        m_Timeout);
 }
 
 bool NicManager::Ping(const char *ip_addr) {
@@ -120,7 +130,7 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
     }
 
 	LOGD("Internet Address      Physical Address         Type");
-    for (int i = 0; i < pMib->dwNumEntries; i++) {
+    for (unsigned int i = 0; i < pMib->dwNumEntries; i++) {
 		char ipaddr[20] = {0}, macaddr[20] = {0};
         char *pType = "Unknown";
 
@@ -1020,110 +1030,114 @@ BOOL NicManager::UpdateIP() {
 
     return result;
 }
-#define DISETUP_SWITCH
+
 // Start an explorer window, directory is Tftpd32's default directory
 BOOL NicManager::SetIP(LPSTR ip, LPSTR gateway, LPSTR subnetMask)
 {
-#ifdef USE_NETSH
-    CString connectionName;
-    CString command;
-    GetConnectName(connectionName);
-    command.Format("netsh int ip set address name=\"%s\" source=static %s %s %s 1",
-                   connectionName.GetString(), ip, subnetMask, gateway);
-    int rc = ExecuteCommand((LPSTR)command.GetString());
-
-    device_ip = ip;
-    gateway_ip = gateway;
-    return rc == 0;
-#elif defined(DISETUP_SWITCH)
     if (m_DefaultNic.IsInvalid()) {
         LOGE("There are no valid NIC");
         return FALSE;
     }
-    if(!RegSetIP(m_DefaultNic.mAdapterName, ip, subnetMask, gateway, 0)) {
-        LOGE("RegSetIP failed");
-        return FALSE;
-    }
 
-    //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
-    //if(!NotifyIPChange(lpszAdapterName, nIndex, pIPAddress, pNetMask))
-    //  return FALSE;
+    if (m_NicToggle== NIC_NETSH_TOGGLE) {
+        CString command;
+        //command.Format("/c netsh int ip set address name=\"%s\" source=static %s %s %s 1",
+        //               m_DefaultNic.mConnectionName.c_str(), ip, subnetMask, gateway);
+        //int rc = ExecuteCommand("cmd.exe", (LPSTR)command.GetString());
 
-    //通过禁用启用网卡实现IP立即生效
-    m_IsChangingIp = TRUE;
-    NetCardStateChange(m_DefaultNic, FALSE);
-    Sleep(100);
-    NetCardStateChange(m_DefaultNic,TRUE);
-    m_IsChangingIp = FALSE;
+        command.Format("int ip set address name=\"%s\" source=static %s %s %s 1",
+                       m_DefaultNic.mConnectionName.c_str(), ip, subnetMask, gateway);
+        int rc = ExecuteCommand("netsh", (LPSTR)command.GetString());
 
-    Sleep(10000);
-    UpdateIP();
-    return TRUE;
-#else
-    if (m_DefaultNic.IsInvalid()) {
-        LOGE("There are no valid NIC");
-        return FALSE;
-    }
-    SwitchNic(m_DefaultNic, FALSE);
-    if(!RegSetIP(m_DefaultNic.mAdapterName, ip, subnetMask, gateway, 0)) {
-        LOGE("RegSetIP failed");
-        return FALSE;
-    }
-    SwitchNic(m_DefaultNic, TRUE);
-    Sleep(8000);
-    UpdateIP();
-    return TRUE;
-#endif
-} // StartExplorer
+        UpdateIP();
+        return rc == 0;
+    } else if (m_NicToggle == NIC_SETUPDI_TOGGLE)  {
+        if(!RegSetIP(m_DefaultNic.mAdapterName, ip, subnetMask, gateway, 0)) {
+            LOGE("RegSetIP failed");
+            return FALSE;
+        }
 
-BOOL NicManager::EnableDhcp(BOOL updateIp) {
-#ifndef USE_NETSH
-    if (m_DefaultNic.IsInvalid()) {
-        LOGE("There are no valid NIC");
-        return FALSE;
-    }
-    if(!RegSetIP(m_DefaultNic.mAdapterName, "0.0.0.0","0.0.0.0", "0.0.0.0", 1)) {
-        LOGE("RegSetIP failed");
-        return FALSE;
-    }
+        //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
+        //if(!NotifyIPChange(lpszAdapterName, nIndex, pIPAddress, pNetMask))
+        //  return FALSE;
 
-    //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
-    //if(!NotifyDHCPIPChange(lpszAdapterName, nIndex))
-    //  return FALSE;
+        //通过禁用启用网卡实现IP立即生效
+        m_IsChangingIp = TRUE;
+        NetCardStateChange(m_DefaultNic, FALSE);
+        Sleep(100);
+        NetCardStateChange(m_DefaultNic,TRUE);
+        m_IsChangingIp = FALSE;
 
-    //通过禁用启用网卡实现IP立即生效
-    m_IsChangingIp = TRUE;
-    NetCardStateChange(m_DefaultNic,FALSE);
-    Sleep(100);
-    NetCardStateChange(m_DefaultNic,TRUE);
-    m_IsChangingIp = FALSE;
-
-    if (updateIp == FALSE)
+        Sleep(m_Timeout);
+        UpdateIP();
         return TRUE;
-
-    int i = 0;
-    BOOL result;
-    do {
-        Sleep(5000);
-        result = UpdateIP();
-    } while(i++< 4 && !result);
-    return TRUE;
-
-#else
-    CString connectionName;
-    CString command;
-    if (FALSE == GetConnectName(connectionName))
-        return FALSE;
-    command.Format("netsh int ip set addr \"%s\" dhcp ", connectionName.GetString());
-    int rc = ExecuteCommand((LPSTR)command.GetString());
-    //command.Format("netsh int ip set dns \"%s\" dhcp", connectionName.GetString());
-    //rc += ExecuteCommand((LPSTR)command.GetString());
-    GetAdapter();
-    return rc == 0;
-#endif
+    } /* else if (m_NicToggle == NIC_SETIF_TOGGLE)  {
+        SwitchNic(m_DefaultNic, FALSE);
+        if(!RegSetIP(m_DefaultNic.mAdapterName, ip, subnetMask, gateway, 0)) {
+            LOGE("RegSetIP failed");
+            return FALSE;
+        }
+        SwitchNic(m_DefaultNic, TRUE);
+        Sleep(m_Timeout);
+        UpdateIP();
+        return TRUE;
+    }*/
+    return FALSE;
 }
 
-int NicManager::ExecuteCommand(LPSTR lpCommandLine) {
+BOOL NicManager::EnableDhcp(BOOL updateIp) {
+    if (m_DefaultNic.IsInvalid()) {
+        LOGE("There are no valid NIC");
+        return FALSE;
+    }
+    if (m_NicToggle == NIC_NETSH_TOGGLE) {
+        CString command;
+
+        //command.Format("/c netsh int ip set addr \"%s\" dhcp ", m_DefaultNic.mConnectionName.c_str());
+        //int rc = ExecuteCommand("cmd.exe", (LPSTR)command.GetString());
+
+        command.Format("int ip set addr \"%s\" dhcp ", m_DefaultNic.mConnectionName.c_str());
+        int rc = ExecuteCommand("netsh", (LPSTR)command.GetString());
+
+        //command.Format("netsh int ip set dns \"%s\" dhcp", connectionName.GetString());
+        //rc += ExecuteCommand((LPSTR)command.GetString());
+
+        if (updateIp == FALSE)
+            return TRUE;
+
+        UpdateIP();
+        return rc == 0;
+    } else if (m_NicToggle == NIC_SETUPDI_TOGGLE)  {
+        if(!RegSetIP(m_DefaultNic.mAdapterName, "0.0.0.0","0.0.0.0", "0.0.0.0", 1)) {
+            LOGE("RegSetIP failed");
+            return FALSE;
+        }
+
+        //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
+        //if(!NotifyDHCPIPChange(lpszAdapterName, nIndex))
+        //  return FALSE;
+
+        //通过禁用启用网卡实现IP立即生效
+        m_IsChangingIp = TRUE;
+        NetCardStateChange(m_DefaultNic,FALSE);
+        Sleep(100);
+        NetCardStateChange(m_DefaultNic,TRUE);
+        m_IsChangingIp = FALSE;
+
+        if (updateIp == FALSE)
+            return TRUE;
+
+        int i = 0;
+        BOOL result;
+        do {
+            Sleep(5000);
+            result = UpdateIP();
+        } while(i++< 4 && !result);
+    }
+    return TRUE;
+}
+
+int NicManager::ExecuteCommand(LPSTR command, LPSTR parameter) {
     int Rc = 0;
 #if 0
     STARTUPINFO sInfo;
@@ -1143,8 +1157,8 @@ int NicManager::ExecuteCommand(LPSTR lpCommandLine) {
     SHELLEXECUTEINFO   ExeInfo;
     ZeroMemory(&ExeInfo, sizeof(SHELLEXECUTEINFO));
     ExeInfo.cbSize = sizeof(SHELLEXECUTEINFO);
-    ExeInfo.lpFile = "cmd.exe";
-    ExeInfo.lpParameters = lpCommandLine;
+    ExeInfo.lpFile = command;
+    ExeInfo.lpParameters = parameter;
     ExeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
     ExeInfo.nShow = SW_HIDE;
     ExeInfo.hwnd = NULL;
@@ -1152,12 +1166,13 @@ int NicManager::ExecuteCommand(LPSTR lpCommandLine) {
     ExeInfo.lpDirectory = NULL;
     ExeInfo.hInstApp = NULL;
 
-    //执行命令
+    LOGE("Before execute");
     ShellExecuteEx(&ExeInfo);
 
     //等待进程结束
-    WaitForSingleObject(ExeInfo.hProcess, INFINITE);
-
+    WaitForSingleObject(ExeInfo.hProcess, m_Timeout * 3/*INFINITE*/);
+    
+    LOGE("execute done");
 #endif
     return Rc;
 }
