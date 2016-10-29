@@ -90,6 +90,12 @@ LIBPROGRAMMER void WriteLog(AdbTrace tag, TLogMaskEnumType type, const char* msg
 #define LOG(fmt, ...)				WriteLog(TRACE_TAG,LOG_MASK_LOG, "LOG", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
 #define LOGW(fmt, ...)			WriteLog(TRACE_TAG,LOG_MASK_WARNING, "WARN",TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
 #define LOGE(fmt, ...)			WriteLog(TRACE_TAG,LOG_MASK_ERROR, "ERR", TRACE_FMT## fmt, LOG_TRACE, __VA_ARGS__)
+
+#define SLOGD(TXT)			WriteLog(TRACE_TAG,LOG_MASK_DEBUG, "DBG", TRACE_FMT "%s", LOG_TRACE, TXT)
+#define SLOGI(TXT)				WriteLog(TRACE_TAG,LOG_MASK_INFO, "INFO", TRACE_FMT "%s", LOG_TRACE, TXT)
+#define SLOG(TXT)				WriteLog(TRACE_TAG,LOG_MASK_LOG, "LOG", TRACE_FMT "%s", LOG_TRACE, TXT)
+#define SLOGW(TXT)			WriteLog(TRACE_TAG,LOG_MASK_WARNING, "WARN",TRACE_FMT "%s", LOG_TRACE, TXT)
+#define SLOGE(TXT)			WriteLog(TRACE_TAG,LOG_MASK_ERROR, "ERR", TRACE_FMT "%s", LOG_TRACE, TXT)
 #else // !FEATURE_LOG_SYS
 #define LOGD(fmt, ...)
 #define LOGI(fmt, ...)

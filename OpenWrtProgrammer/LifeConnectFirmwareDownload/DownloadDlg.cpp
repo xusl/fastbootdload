@@ -358,6 +358,8 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
     m_TransferFileList.DeleteAllItems();
 #endif
 
+    LOGD("Remove device, download finished");
+
     b_download = false;
 
     MessageBeep(MB_ICONWARNING);
@@ -403,6 +405,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
         //}
 #ifdef TPST
         if ( pThis->b_download == FALSE || ipAddress.size() == 0) {
+            LOGD("b_download %d, ipAddress %s", pThis->b_download, ipAddress.c_str());
 /*
             if(!nic.IsInvalid() || !nic.mEnableDHCP) {
             nm->EnableDhcp();
@@ -443,6 +446,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                     ipAddress = "192.168.237.1";
             }
             if (result) {
+                LOGD("Start update device %s", ipAddress.c_str());
                 pThis->TelnetPST();
                 nic =nm->GetDefaultNic();
                 Sleep(TIMER_ELAPSE);
@@ -453,6 +457,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             if (!nic.IsInvalid()) {
                 ipAddress = nic.mGateway;
             }
+            LOGD("Watchdog bite %d", ipAddress.c_str());
             //result = pThis->SniffNetwork("Monitor tick", ipAddress.c_str());
             pThis->CleanDevice(ipAddress.c_str());
             Sleep(TIMER_ELAPSE);
@@ -765,15 +770,14 @@ int CDownloadDlg::TFTPDownload() {
     CString msg;
     NetCardStruct nic = mNic.GetDefaultNic();
     if (nic.mIPAddress != "192.168.1.10") {
-        msg.Format("NIC IP is %s, change to the default IP", nic.mIPAddress.c_str());
+        msg.Format("NIC IP now is %s, change to the default IP", nic.mIPAddress.c_str());
         m_PSTStatus.SetWindowText(msg);
         mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
         SetInformation(HOST_NIC, NULL);
-        msg.Format("Change IP Address, IP:%s, Gateway:%s, SubnetMask:%s",
-            "192.168.1.10", "192.168.1.1", "255.255.255.0");
+        msg.Format("NIC change to the default IP.");
         UpdateMessage(msg);
     }
-    m_PSTStatus.SetWindowText("start TFTP service");
+    m_PSTStatus.SetWindowText("start download server");
     StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
     return 0;
 }
@@ -802,8 +806,15 @@ int CDownloadDlg::TelnetPST() {
 
     SOCKET sock = CreateSocket(dev->GetIpAddr().c_str());
     if ( sock == INVALID_SOCKET) {
-        m_PSTStatus.SetWindowText("Can not setup telnet session");
-        TFTPDownload();
+        if (dc->GetSuperMode()) {
+        msg = "Can not setup telnet session, start download server.";
+            b_download = true;
+            TFTPDownload();
+        } else {
+        msg = "Can not setup telnet session";
+        }
+        m_PSTStatus.SetWindowText(msg.GetString());
+        SLOGD(msg.GetString());
         return ERROR_INVALID_HANDLE;
     }
 
@@ -850,7 +861,7 @@ int CDownloadDlg::TelnetPST() {
     msg.Format("Device custom id is %s", customId.c_str());
     m_PSTStatus.SetWindowText(msg);
 
-    if (m_pCoordinator->GetSuperMode() == FALSE) {
+    if (dc->GetSuperMode() == FALSE) {
         if ( customId != m_Config.GetFirmwareCustomId()) {
             m_PSTStatus.SetWindowText("Custom ID is not matched.");
             closesocket(sock);

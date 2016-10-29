@@ -143,13 +143,17 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
 		sprintf(macaddr, "%02x-%02x-%02x-%02x-%02x-%02x",
 			   pMib->table[i].bPhysAddr[0],pMib->table[i].bPhysAddr[1],
 			   pMib->table[i].bPhysAddr[2],pMib->table[i].bPhysAddr[3],
-			   pMib->table[i].bPhysAddr[4],pMib->table[i].bPhysAddr[5]
-		);
+			   pMib->table[i].bPhysAddr[4],pMib->table[i].bPhysAddr[5]);
+
+        LOGD("%-20s  %-25s  %-20s",ipaddr,macaddr, pType);
+        if (strcmp("00-00-00-00-00-00", macaddr) == 0 ||
+            strcmp("ff-ff-ff-ff-ff-ff", macaddr) == 0)
+            continue;
+
         if ( MIB_IPNET_TYPE_DYNAMIC == pMib->table[i].dwType)
             pType = "Dynamic";
         else if (MIB_IPNET_TYPE_STATIC == pMib->table[i].dwType)
             pType = "Static";
-        LOGD("%-20s  %-25s  %-20s",ipaddr,macaddr, pType);
         if (strcmp(ip, ipaddr) == 0) {
             mac = macaddr;
             result = TRUE;
@@ -537,7 +541,7 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
         pInfo = pInfo->Next;
     }
 
-    LOGE("Can not update adapter %s information", netCard.DeviceDesc);
+    LOGE("Can not update adapter %s information", netCard.DeviceDesc.c_str());
 
 GETADAPTEROUT:
     if (pIpAdapterInfo) {
@@ -1066,6 +1070,8 @@ BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
         return FALSE;
     }
 
+    LOGD("Change IP Address, IP:%s, Gateway:%s, SubnetMask:%s",
+            ip, gateway, subnetMask);
     if (m_NicToggle== NIC_NETSH_TOGGLE) {
         CString command;
         m_IsChangingIp = TRUE;
@@ -1201,13 +1207,13 @@ int NicManager::ExecuteCommand(LPSTR command, LPSTR parameter) {
     ExeInfo.lpDirectory = NULL;
     ExeInfo.hInstApp = NULL;
 
-    LOGE("Before execute");
+    //LOGE("Before execute");
     ShellExecuteEx(&ExeInfo);
 
     //等待进程结束
     WaitForSingleObject(ExeInfo.hProcess, m_Timeout * 3/*INFINITE*/);
 
-    LOGE("execute done");
+    //LOGE("execute done");
 #endif
     return Rc;
 }
