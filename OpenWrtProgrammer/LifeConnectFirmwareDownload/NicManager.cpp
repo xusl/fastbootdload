@@ -858,6 +858,7 @@ void NicManager::EnumNetCards()
     }
     if(!mNicList.empty()) {
         m_DefaultNic = mNicList.front();
+        m_DefaultNicOrigin = m_DefaultNic;
     }
 
     SetupDiDestroyDeviceInfoList(hDevInfo);
@@ -873,6 +874,7 @@ BOOL NicManager::SetDefaultNic(DWORD id) {
     for (it = mNicList.begin(); it != mNicList.end(); ++it) {
         if (id == it->Id) {
             m_DefaultNic = *it;
+            m_DefaultNicOrigin = *it;
             LOGD("Update default NIC %s", m_DefaultNic.DeviceDesc.c_str());
             return TRUE;
         }

@@ -190,6 +190,7 @@ BEGIN_MESSAGE_MAP(CDownloadDlg, CDialogEx)
     ON_BN_CLICKED(IDC_DISABLE_CHECK, &CDownloadDlg::OnBnClickedDisableCheck)
     ON_BN_CLICKED(IDC_CHANGE_NIC, &CDownloadDlg::OnBnClickedChangeNic)
     ON_WM_CLOSE()
+    ON_BN_CLICKED(IDCANCEL, &CDownloadDlg::OnBnClickedCancel)
 END_MESSAGE_MAP()
 
 
@@ -1832,4 +1833,12 @@ void CDownloadDlg::OnClose()
 
     mNic.RestoreDefaultNic();
     CDialogEx::OnClose();
+}
+
+
+void CDownloadDlg::OnBnClickedCancel()
+{
+    // TODO: Add your control notification handler code here
+    mNic.RestoreDefaultNic();
+    CDialogEx::OnCancel();
 }
