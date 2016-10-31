@@ -410,7 +410,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
         //    pThis->SniffNetwork( ip_addr.GetString());
         //}
 #ifdef TPST
-        if ( (dc->IsEmpty() == FALSE) && (pThis->b_download == FALSE || ipAddress.size() == 0)) {
+        if ( (dc->IsEmpty()) && (pThis->b_download == FALSE || ipAddress.size() == 0)) {
             LOGD("b_download %d, ipAddress %s", pThis->b_download, ipAddress.c_str());
 /*
             if(!nic.IsInvalid() || !nic.mEnableDHCP) {
@@ -742,9 +742,8 @@ void CDownloadDlg::OnBnClickedStart() {
 #ifdef _WIN64
 	//if (!IsWow64()) {
 	//	AfxMessageBox("This is x64 Build, please use win32 build");
-    //    return FALSE;
+    //    return;
 	//}
-
 #else// _WIN32
 	if (IsWow64() && m_Config.GetNicToggle() == NIC_SETUPDI_TOGGLE) {
 		AfxMessageBox("This is win32 Build, please use x86 build, OR Set 0 to NICToggle in Config.ini");
@@ -875,7 +874,7 @@ int CDownloadDlg::TelnetPST() {
             return -2;
         }
         if (buildId >= m_Config.GetFirmwareBuildId()) {
-            m_PSTStatus.SetWindowText("Pakcage build ID is less than device firmware build ID.");
+            m_PSTStatus.SetWindowText("Pakcage's build ID LESS than or EQUAL to device's.");
             closesocket(sock);
             b_download = false;
             MessageBeep(MB_ICONERROR);
