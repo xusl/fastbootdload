@@ -28,7 +28,7 @@ void XmlParser::Parse(PCCH pXmlBuf, unsigned int size) {
     HRESULT hr;
     VARIANT_BOOL bFlag;
     int bomSize = SkipBOM(pXmlBuf);
-    int len = strlen(pXmlBuf);
+    size_t len = strlen(pXmlBuf);
 
     XML_Value.clear();
 

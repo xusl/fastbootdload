@@ -130,7 +130,11 @@ CDownloadDlg::CDownloadDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CDownloadDlg::IDD, pParent),
 	mWSAInitialized(FALSE),
 	m_LogText(""),
-	m_DialgoTitle("LifeConnect TPST")
+#ifdef _WIN64
+	m_DialgoTitle("LifeConnect TPST (x64)")
+#else
+	m_DialgoTitle("LifeConnect TPST (win32)")
+#endif
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
     m_pCoordinator = new DeviceCoordinator;
@@ -396,7 +400,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 
     pThis->SetInformation(HOST_NIC, NULL);
     NetCardStruct nic =nm->GetDefaultNic();
-    DeviceCoordinator * dc = GetDeviceCoodinator();
+    DeviceCoordinator * dc = pThis->GetDeviceCoodinator();
 
     for(;;) {
         //for (int i = from; i <= to; i++)
@@ -740,9 +744,8 @@ void CDownloadDlg::OnBnClickedStart() {
 	//	AfxMessageBox("This is x64 Build, please use win32 build");
     //    return FALSE;
 	//}
-#endif
 
-#ifdef _WIN32
+#else// _WIN32
 	if (IsWow64() && m_Config.GetNicToggle() == NIC_SETUPDI_TOGGLE) {
 		AfxMessageBox("This is win32 Build, please use x86 build, OR Set 0 to NICToggle in Config.ini");
          return;
@@ -826,7 +829,7 @@ int CDownloadDlg::TelnetPST() {
     b_download = true;
     telnet tn(sock);
 
-    LOGE("negotiate");
+    LOGE("telnet negotiate");
     tn.send_command(NULL, result);
     //UpdateMessage(result.c_str());
     tn.send_command(NULL, result);
@@ -849,9 +852,9 @@ int CDownloadDlg::TelnetPST() {
     }
 #endif
 
-    dev->TickWatchDog();
-    tn.send_command(CMD_OS_VERSION, osVersion);
-    SetInformation(DEV_OS_VERSION, osVersion.c_str());
+    //dev->TickWatchDog();
+    //tn.send_command(CMD_OS_VERSION, osVersion);
+    //SetInformation(DEV_OS_VERSION, osVersion.c_str());
 
     dev->TickWatchDog();
     m_PSTStatus.SetWindowText("Get device firmware version");
