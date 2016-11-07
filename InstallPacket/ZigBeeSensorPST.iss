@@ -15,8 +15,9 @@ AppSupportURL=www.jrdcom.com
 AppUpdatesURL=www.jrdcom.com
 DefaultDirName={pf}\ZigBee Sensor Flash Programmer
 DefaultGroupName=ZigBee Sensor Flash Programmer
+OutputDir= .\
 AllowNoIcons=yes
-OutputBaseFilename=setup
+OutputBaseFilename=ZigBee Sensor Flash Programmer
 Compression=lzma
 SolidCompression=yes
 
