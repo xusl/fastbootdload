@@ -318,7 +318,7 @@ BOOL CDownloadDlg::OnInitDialog()
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
-VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
+BOOL CDownloadDlg::CleanDevice(const char *const ipAddr) {
     list<DWORD> ids;
     CString msg;
     CDevLabel *dev = NULL;
@@ -332,7 +332,7 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
 #endif
 
     if (dev == NULL || FALSE == dev->CheckRemovable()) {
-        return;
+        return FALSE;
     }
 
     msg.Format("Remove device %s ", ipAddr);
@@ -368,21 +368,25 @@ VOID CDownloadDlg::CleanDevice(const char *const ipAddr) {
 
     MessageBeep(MB_ICONWARNING);
     m_pCoordinator->RemoveDevice(dev);
-    StopTftpd32Services ();
-    //todo:: close telnet socket?????
+
+    if (m_Config.GetRunMode() ==RUNMODE_ONCE)
+        StopWork(FALSE);
+    else
+        StopTftpd32Services ();
+    return TRUE;
 }
 
 DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
     BOOL result = FALSE;
-    ConfigIni conf;
+    ConfigIni* conf;
     string ipAddress;
     NicManager *nm;
     CString msg;
     int    mode;
 
-    pThis->GetConfig(conf);
-    mode = conf.GetRunMode();
+    conf = pThis->GetConfig();
+    mode = conf->GetRunMode();
 
     nm = pThis->GetNicManager();
     nm->UpdateIP();
@@ -417,7 +421,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
         //}
 #ifdef TPST
         if ( (dc->IsEmpty()) && (pThis->b_download == FALSE || ipAddress.size() == 0)) {
-            LOGD("b_download %d, ipAddress %s", pThis->b_download, ipAddress.c_str());
+//            LOGD("b_download %d, ipAddress %s", pThis->b_download, ipAddress.c_str());
 /*
             if(!nic.IsInvalid() || !nic.mEnableDHCP) {
             nm->EnableDhcp();
@@ -462,6 +466,10 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                 pThis->TelnetPST();
                 nic =nm->GetDefaultNic();
                 Sleep(TIMER_ELAPSE);
+            } else if (mode == RUNMODE_ONCE) {
+                pThis->StopWork(FALSE);
+                pThis->SetInformation(PTS_STATUS, "None device found, stop working.");
+                break;
             } else {
                 Sleep(SHORT_TIMER_ELAPSE);
             }
@@ -470,14 +478,18 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                 ipAddress = nic.mGateway;
             }
             LOGD("Watchdog bite %d", ipAddress.c_str());
-            //result = pThis->SniffNetwork("Monitor tick", ipAddress.c_str());
-            pThis->CleanDevice(ipAddress.c_str());
-            Sleep(TIMER_ELAPSE);
+            result = pThis->CleanDevice(ipAddress.c_str());
+            if (result && (mode == RUNMODE_ONCE)){
+                pThis->SetInformation(PTS_STATUS,"Device updated, stop working.");
+                break;
+            } else{
+                Sleep(TIMER_ELAPSE);
+            }
         }
 #else
         result = pThis->SniffNetwork("HDT", ipAddress.c_str());
         if (result) {
-                pThis->TelnetPST();
+            pThis->TelnetPST();
         }
 #endif
     }
@@ -496,14 +508,6 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
     msg.Format(_T("%s sniff device %s"), tag, pcIpAddr);
     UpdateMessage(msg);
     SetInformation(HOST_NIC, NULL);
-
-#ifdef DESKTOP_TEST
-    if (pcIpAddr == mHostIPAddr || pcIpAddr == mHostGWAddr )
-    {
-        LOGD("SKip host %s", pcIpAddr);
-        return FALSE;
-    }
-#endif
 
 //unfortunately, uboot do not response PING message.
 /*
@@ -711,24 +715,53 @@ void CDownloadDlg::OnBnClickedButtonBrowse() {
 #endif
 }
 
+VOID CDownloadDlg::StartWork() {
+    LOGI("Start PST");
+    SetUIStatus(FALSE);
+    ClearMessage();
+    is_downloading=TRUE;
+    b_download = false;
+    //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
+    //m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
+    //Schedule();
+    //Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
+    m_NetworkSnifferThreadHandle = CreateThread(NULL,
+                                        0,
+                                        NetworkSniffer,
+                                        this,
+                                        0,
+                                        &m_NetworkSnifferThreadID);
+}
+
+VOID CDownloadDlg::StopWork(BOOL killSiffer) {
+   if (killSiffer) {
+       TerminateThread(m_NetworkSnifferThreadHandle, 1);
+   }
+
+   StopTftpd32Services ();
+   SetUIStatus(TRUE);
+   is_downloading = false;
+   m_pCoordinator->Reset();
+   m_TransferFileList.DeleteAllItems();
+   m_DeviceIpAddress.SetWindowText("");
+   m_DeviceOSVersion.SetWindowText("");
+   m_DeviceFWVersion.SetWindowText("");
+   m_PSTStatus.SetWindowText("");
+}
+
+VOID CDownloadDlg::SetUIStatus(BOOL enable) {
+    GetDlgItem(ID_Start)->SetWindowText(enable ? "Start" : "Stop");
+    GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(enable);
+    m_RomPathStaticText.EnableWindow(enable);
+    m_ExitButton.EnableWindow(enable);
+    m_ChangeNic.EnableWindow(enable);
+}
+
 void CDownloadDlg::OnBnClickedStart() {
     if(is_downloading) {
         if (b_download == false && mNic.IsChangingIp() == FALSE) {
-            TerminateThread(m_NetworkSnifferThreadHandle, 1);
-            StopTftpd32Services ();
-            GetDlgItem(ID_Start)->SetWindowText("Start");
-            GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(true);
-            m_RomPathStaticText.EnableWindow(true);
-            m_ExitButton.EnableWindow();
-            m_ChangeNic.EnableWindow();
-            is_downloading = false;
-            m_pCoordinator->Reset();
-            m_TransferFileList.DeleteAllItems();
-           m_DeviceIpAddress.SetWindowText("");
-           m_DeviceOSVersion.SetWindowText("");
-           m_DeviceFWVersion.SetWindowText("");
-           m_PSTStatus.SetWindowText("");
-        LOGW("Stop PST");
+            StopWork(TRUE);
+            LOGW("Stop PST");
         } else {
          ::MessageBox(NULL,
             _T("Tool is working now."),
@@ -753,29 +786,11 @@ void CDownloadDlg::OnBnClickedStart() {
 	//}
 #else// _WIN32
 	if (IsWow64() && m_Config.GetNicToggle() == NIC_SETUPDI_TOGGLE) {
-		AfxMessageBox("This is win32 Build, please use x86 build, OR Set 0 to NICToggle in Config.ini");
+		AfxMessageBox("This is win32 Build, please use x64 build");
          return;
 	}
 #endif
-
-    LOGI("Start PST");
-    GetDlgItem(ID_Start)->SetWindowText("Stop");
-    GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
-    m_RomPathStaticText.EnableWindow(false);
-    m_ExitButton.EnableWindow(FALSE);
-    m_ChangeNic.EnableWindow(FALSE);
-
-    ClearMessage();
-
-    is_downloading=TRUE;
-    b_download = false;
-
-    //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
-    //m_pCoordinator->AddDevice(CDevLabel(string("FC-4D-D4-D2-BA-84"), string("192.168.1.10")) , NULL);
-    //Schedule();
-    //Server_Listen_Thread=CreateThread(NULL,0,Thread_Server_Listen,this,0,&Server_Listen_Thread_ID);
-
-    m_NetworkSnifferThreadHandle = CreateThread(NULL,0,NetworkSniffer,this,0,&m_NetworkSnifferThreadID);
+    StartWork();
 }
 
 int CDownloadDlg::TFTPDownload() {
@@ -834,7 +849,7 @@ int CDownloadDlg::TelnetPST() {
     SetInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
 
     b_download = true;
-    telnet tn(sock);
+    telnet tn(sock, m_Config.GetTelnetTimeoutMs(), m_Config.GetVerbose());
 
     LOGE("start telnet negotiate");
     tn.send_command(NULL, result);
@@ -949,8 +964,6 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
 
     telnet tn(sock);
     string result;
-    ConfigIni conf;
-    pThis->GetConfig(conf);
 
  //   tn.receive_telnet_data(buf, BUFSIZE);
   //  pThis->UpdateMessage(buf);
@@ -1767,7 +1780,8 @@ void CDownloadDlg::UpdateMessage(CString errormsg){
     if (m_LogText.GetLength() != 0) {
         m_LogText += "\r\n";
     }
-    LOGD("%s", errormsg.GetString());
+
+    SLOGD(errormsg.GetString());
     //::SetDlgItemText(AfxGetApp()->m_pMainWnd->m_hWnd,IDC_Error_Message, msg);
     nLen = m_MessageControl.GetWindowTextLength();
     m_MessageControl.SetWindowText(m_LogText);
@@ -1789,12 +1803,14 @@ VOID CDownloadDlg::SetInformation(int type, LPCTSTR lpszString) {
         break;
     case PTS_STATUS:
         m_PSTStatus.SetWindowText(lpszString);
+        UpdateMessage(lpszString);
         break;
     case HOST_NIC: {
             NetCardStruct nic = mNic.GetDefaultNic();
             CString nicInfo;
             nicInfo.Format("%s, %s ", nic.mConnectionName.c_str(), nic.mIPAddress.c_str());
             m_NicInformation.SetWindowText(nicInfo.GetString());
+            UpdateMessage(nicInfo);
         }
         break;
 

@@ -59,12 +59,15 @@ protected:
   BOOL  mWSAInitialized;
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
   BOOL SniffNetwork(const char * const tag, const char * const pcIpAddr);
+  VOID StartWork();
+  VOID StopWork(BOOL killSiffer);
+  VOID SetUIStatus(BOOL enable);
   int TelnetPST();
   int TFTPDownload();
   void UpdateMessage(CString msg);
   void ClearMessage(void);
   VOID SetInformation(int type, LPCTSTR lpszString);
-  VOID CleanDevice(const char *const ipAddr);
+  BOOL CleanDevice(const char *const ipAddr);
 //void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
 //char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
 //BOOL BuildUpdateCommand(CString file, CString &cmd);
@@ -73,9 +76,9 @@ protected:
 #ifdef MULTI_DEVICE_FEATURE
   DWORD Schedule();
 #endif
-  DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;};
-  NicManager * GetNicManager() { return &mNic;};
-  VOID GetConfig(ConfigIni & conf) { conf = m_Config;};
+  DeviceCoordinator * GetDeviceCoodinator() { return m_pCoordinator;}
+  NicManager * GetNicManager() { return &mNic;}
+  ConfigIni* GetConfig() { return  &m_Config;}
 
   int TFTPNew (const struct S_TftpTrfNew *pTrf);
   int TFTPEnd (struct S_TftpTrfEnd *pTrf);

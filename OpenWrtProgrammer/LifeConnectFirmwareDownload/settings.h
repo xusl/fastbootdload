@@ -112,6 +112,7 @@ public:
     int            GetNicToggle() const { return m_NicToggle;}
     int            GetToggleTimeoutMs() const { return m_ToggleTimeoutMs;}
     int            GetRunMode() { return m_RunMode;}
+    bool           GetVerbose() { return (m_Verbose != 0);}
     BOOL           ParseExternalVersion(string &extVersion, string& customId, string& version, string& buildId);
     const char * const GetNetworkSegment() {  return m_NetworkSegment;};
     const char * const GetLoginUser() { return  m_User;};
@@ -166,6 +167,7 @@ private:
     int                     m_TelnetTimeoutMs;
     int                     m_NicToggle;
     int                     m_ToggleTimeoutMs;
+    int                     m_Verbose;
 #if USE_SIMPLE_CONFIG
     char                    m_FirmwareCustomId[FW_CUSTOMID_LEN];
     char                    m_FirmwareBuildId[FW_BUILDID_LEN];

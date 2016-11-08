@@ -39,7 +39,6 @@ struct S_Tftpd32Settings sSettings =
 	  TRUE,					 // IPv4
 	  TRUE,					 // IPv6
 
-	  // unsaved
 	  100,                   // Max Simultaneous Transfers
 	  ".",                   // Working Directory
 	  2000,                  // refresh Interval
@@ -79,7 +78,7 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
 	char dir[_MAX_DIR];
 	char filename[MAX_PATH] = {0};
     char buffer[CONFIG_BUFFER_LEN] = {0};
-	SYSTEMTIME time;
+//	SYSTEMTIME time;
 
 //	GetCurrentDirectory(MAX_PATH, currdir);
 	GetModuleFileName(NULL, path_buffer, MAX_PATH);
@@ -112,23 +111,29 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
 
     //telnet section
     m_TelnetTimeoutMs = GetPrivateProfileInt(TELNET_SECTION, _T("TimeoutMs"), 6000, lpFileName);
+    if (m_TelnetTimeoutMs < 3000) {
+        LOGE("TelnetTimeoutMs %d, is too samll", m_TelnetTimeoutMs);
+    } else {
+        LOGE("TelnetTimeoutMs is %d", m_TelnetTimeoutMs);
+    }
     GetPrivateProfileString(TELNET_SECTION, _T("User"), "root",
                         m_User, USER_LEN_MAX, lpFileName);
-    GetPrivateProfileString(TELNET_SECTION, _T("Password"), "root",
+    GetPrivateProfileString(TELNET_SECTION, _T("Password"), "passowrd",
                         m_Passwd, PASSWD_LEN_MAX, lpFileName);
+    m_Verbose = GetPrivateProfileInt(TELNET_SECTION,_T("Verbose"), 0, lpFileName);
 
     memset(buffer, 0, sizeof buffer);
     GetPrivateProfileString(TELNET_SECTION, _T("Login"), "false",
                         buffer, CONFIG_BUFFER_LEN, lpFileName);
-    if (stricmp(buffer, "false") == 0)
+    if (_stricmp(buffer, "false") == 0)
         m_Login = FALSE;
-    if (stricmp(buffer, "true") == 0)
+    if (_stricmp(buffer, "true") == 0)
         m_Login = TRUE;
 
     //app section
     m_bWork = GetPrivateProfileInt(APP_SECTION,_T("autowork"), 0, lpFileName);
     GetPrivateProfileString(APP_SECTION, RUNMODE, APP_RM_ONCE, buffer, MAX_PATH, lpFileName);
-    if (stricmp(buffer, APP_RM_CYCLE) == 0)
+    if (_stricmp(buffer, APP_RM_CYCLE) == 0)
         m_RunMode = RUNMODE_CYCLE;
     else
         m_RunMode = RUNMODE_ONCE;
@@ -160,8 +165,7 @@ int ConfigIni::SetPackageDir(const char* config, BOOL updateConfig) {
     AssignPackageDir(config);
     if (updateConfig)
         WritePrivateProfileString(APP_SECTION, PKG_PATH, pkg_dir, m_ConfigPath.GetString());
-    strncpy(sSettings.szWorkingDirectory, pkg_dir, sizeof sSettings.szWorkingDirectory);
-
+    strncpy_s(sSettings.szWorkingDirectory, pkg_dir, sizeof sSettings.szWorkingDirectory);
 
     DestroyFirmwareFiles();
     ReadFirmwareFiles(pkg_dir);
@@ -175,7 +179,7 @@ VOID ConfigIni::AssignPackageDir(const char *dir) {
         LOGE("DIR is null or it is too long");
         return;
     }
-    strncpy(pkg_dir, dir, data_len);
+    strncpy_s(pkg_dir, dir, data_len);
         if (pkg_dir[data_len - 1] != _T('\\') ) {
         if ( data_len > MAX_PATH - 2) {
             LOGE("bad package directory in the section path.");
@@ -312,7 +316,7 @@ BOOL ConfigIni::AddFirmwareFiles(const char* const file, BOOL dummy){
 
     if (dummy == FALSE) {
         LOGI("add file %s", file);
-        m_FirmwareFiles.push_back(strdup(file));
+        m_FirmwareFiles.push_back(_strdup(file));
     }
     return TRUE;
 }

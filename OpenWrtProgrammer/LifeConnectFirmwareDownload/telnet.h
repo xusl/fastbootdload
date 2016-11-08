@@ -366,6 +366,7 @@ class telnet {
 protected:
   bool verbose;
   curl_socket_t sockfd;
+  int timeout;
   int please_negotiate;
   int already_negotiated;
   int telnet_cmd_negotiate;
@@ -386,7 +387,7 @@ protected:
   TelnetReceive telrcv_state;
 
   public:
-     telnet(curl_socket_t sock);
+     telnet(curl_socket_t sock, int to, bool verb);
      ~telnet();
 
      int receive_telnet_data(char *buffer, ssize_t len);

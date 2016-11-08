@@ -905,7 +905,7 @@ while(true) {
   return rc;
 }
 
-telnet::telnet(curl_socket_t sock) {
+telnet::telnet(curl_socket_t sock, int to, bool verb) {
     memset(us, CURL_NO, sizeof us);
     memset(usq, CURL_NO, sizeof usq);
     memset(us_preferred, CURL_NO, sizeof us_preferred);
@@ -919,7 +919,8 @@ telnet::telnet(curl_socket_t sock) {
     //struct SessionHandle *data = conn->data;
     //curl_socket_t sockfd = conn->sock[FIRSTSOCKET];
     sockfd = sock;
-    verbose = true;
+    verbose = verb;
+    timeout = to;
 
     telrcv_state = CURL_TS_DATA;
 
@@ -945,8 +946,7 @@ telnet::telnet(curl_socket_t sock) {
     //subopt_ttype[31] = 0; /* String termination */
     //us_preferred[CURL_TELOPT_TTYPE] = CURL_YES;
 
-    int TimeOut = 3000;//设置接收超时6秒
-    setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&TimeOut,sizeof(TimeOut));
+    setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&timeout,sizeof(timeout));
     //SOCKET_ERROR
 }
 
@@ -954,7 +954,7 @@ int telnet::receive_telnet_data(char *buffer, ssize_t len) {
     CURLcode code;
     ssize_t nread;
     char buf[BUFSIZE] = {0};
-    int rl;
+//    int rl;
     int retry = 0;
 
     memset(buffer, 0, len);
