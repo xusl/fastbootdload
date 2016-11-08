@@ -15,8 +15,8 @@ AppSupportURL=www.jrdcom.com
 AppUpdatesURL=www.jrdcom.com
 DefaultDirName={pf}\LifeConnectPST
 DefaultGroupName=LifeConnectPST
-OutputDir= .\
-OutputBaseFilename=LifeConnectPST-1.3
+;OutputDir= .\
+OutputBaseFilename=LifeConnectPST-setup
 SetupIconFile=..\OpenWrtProgrammer\LifeConnectFirmwareDownload\res\LifeConnectFirmwareDownload.ico
 Compression=lzma
 SolidCompression=yes
@@ -25,6 +25,7 @@ SolidCompression=yes
 ; 64-bit Program Files directory and the 64-bit view of the registry.
 ; On all other architectures it will install in "32-bit mode".
 ArchitecturesInstallIn64BitMode=x64
+PrivilegesRequired=admin
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

@@ -379,8 +379,10 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     string ipAddress;
     NicManager *nm;
     CString msg;
-    pThis->UpdateMessage(_T("Search Life Connect..., please wait..."));
+    int    mode;
+
     pThis->GetConfig(conf);
+    mode = conf.GetRunMode();
 
     nm = pThis->GetNicManager();
     nm->UpdateIP();
@@ -401,6 +403,10 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     pThis->SetInformation(HOST_NIC, NULL);
     NetCardStruct nic =nm->GetDefaultNic();
     DeviceCoordinator * dc = pThis->GetDeviceCoodinator();
+
+    LOGD("Search LifeConnect through %s (%s) at mode %s", nic.mNicDesc.c_str(),
+                        nic.mConnectionName.c_str(),
+                        mode == RUNMODE_CYCLE ? APP_RM_CYCLE : APP_RM_ONCE);
 
     for(;;) {
         //for (int i = from; i <= to; i++)
@@ -707,7 +713,6 @@ void CDownloadDlg::OnBnClickedButtonBrowse() {
 
 void CDownloadDlg::OnBnClickedStart() {
     if(is_downloading) {
-        LOGW("Tool is working now.");
         if (b_download == false && mNic.IsChangingIp() == FALSE) {
             TerminateThread(m_NetworkSnifferThreadHandle, 1);
             StopTftpd32Services ();
@@ -723,6 +728,7 @@ void CDownloadDlg::OnBnClickedStart() {
            m_DeviceOSVersion.SetWindowText("");
            m_DeviceFWVersion.SetWindowText("");
            m_PSTStatus.SetWindowText("");
+        LOGW("Stop PST");
         } else {
          ::MessageBox(NULL,
             _T("Tool is working now."),
@@ -731,6 +737,7 @@ void CDownloadDlg::OnBnClickedStart() {
         }
         return;
     }
+
     if(m_Config.IsPackageChecked() == FALSE) {
          ::MessageBox(NULL,
             _T("Please select correct package or check Config.ini!"),
@@ -751,6 +758,7 @@ void CDownloadDlg::OnBnClickedStart() {
 	}
 #endif
 
+    LOGI("Start PST");
     GetDlgItem(ID_Start)->SetWindowText("Stop");
     GetDlgItem(IDC_BUTTON_Browse)->EnableWindow(false);
     m_RomPathStaticText.EnableWindow(false);
@@ -828,7 +836,7 @@ int CDownloadDlg::TelnetPST() {
     b_download = true;
     telnet tn(sock);
 
-    LOGE("telnet negotiate");
+    LOGE("start telnet negotiate");
     tn.send_command(NULL, result);
     //UpdateMessage(result.c_str());
     tn.send_command(NULL, result);
@@ -858,6 +866,15 @@ int CDownloadDlg::TelnetPST() {
     dev->TickWatchDog();
     m_PSTStatus.SetWindowText("Get device firmware version");
     tn.send_command(CMD_FW_VERSION, fwVersion);
+
+    if (fwVersion.length() == 0) {
+        m_PSTStatus.SetWindowText("Can not get firmware version");
+        closesocket(sock);
+        b_download = false;
+        MessageBeep(MB_ICONERROR);
+        return -4;
+    }
+
     SetInformation(DEV_FW_VERSION, fwVersion.c_str());
 
     LOGE("device firmware is %s ", fwVersion.c_str());

@@ -102,6 +102,7 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
      ULONG nSize = 0;
      DWORD dwRet = 0;
      BOOL result = FALSE;
+     BOOL outputTitle = FALSE;
 
      ASSERT(ip != NULL);
 
@@ -129,7 +130,6 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
         return FALSE;
     }
 
-	LOGD("Internet Address      Physical Address         Type");
     for (unsigned int i = 0; i < pMib->dwNumEntries; i++) {
 		char ipaddr[20] = {0}, macaddr[20] = {0};
         char *pType = "Unknown";
@@ -145,7 +145,6 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
 			   pMib->table[i].bPhysAddr[2],pMib->table[i].bPhysAddr[3],
 			   pMib->table[i].bPhysAddr[4],pMib->table[i].bPhysAddr[5]);
 
-        LOGD("%-20s  %-25s  %-20s",ipaddr,macaddr, pType);
         if (strcmp("00-00-00-00-00-00", macaddr) == 0 ||
             strcmp("ff-ff-ff-ff-ff-ff", macaddr) == 0)
             continue;
@@ -154,12 +153,22 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
             pType = "Dynamic";
         else if (MIB_IPNET_TYPE_STATIC == pMib->table[i].dwType)
             pType = "Static";
+
+        if (!outputTitle) {
+        	LOGD("Internet Address      Physical Address             Type");
+            outputTitle = TRUE;
+        }
+       LOGD("%-20s  %-25s  %-20s",ipaddr,macaddr, pType);
+
         if (strcmp(ip, ipaddr) == 0) {
             mac = macaddr;
             result = TRUE;
             break;
         }
     }
+
+    if (FALSE == result)
+        LOGW("none device found from arp table");
 
     free(pMib);
     return result;
@@ -181,14 +190,11 @@ int NicManager::ResolveIpMac(const char *DestIpString, string & mac)
         LOGE("invalid destination IP address.");
         return 1;
     }
+
     mac.clear();
-
     DestIp = inet_addr(DestIpString);
-
     memset(&MacAddr, 0xff, sizeof (MacAddr));
-
     //LOGE("Sending ARP request for IP address: %s", DestIpString);
-
     dwRetVal = SendARP(DestIp, SrcIp, &MacAddr, &PhysAddrLen);
 
     if (dwRetVal == NO_ERROR) {
@@ -274,6 +280,7 @@ BOOL NicManager::GetConnectedState() {
             0 == memcmp(m_DefaultNic.mPhysAddr, pRow->bPhysAddr, sizeof pRow->bPhysAddr)) {
             operStatus = pRow->dwOperStatus;
             LOGD("Get %s status %d", pRow->bDescr, operStatus);
+            break;
         }
     }
 

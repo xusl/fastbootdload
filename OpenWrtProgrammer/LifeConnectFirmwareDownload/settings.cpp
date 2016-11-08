@@ -127,6 +127,12 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
 
     //app section
     m_bWork = GetPrivateProfileInt(APP_SECTION,_T("autowork"), 0, lpFileName);
+    GetPrivateProfileString(APP_SECTION, RUNMODE, APP_RM_ONCE, buffer, MAX_PATH, lpFileName);
+    if (stricmp(buffer, APP_RM_CYCLE) == 0)
+        m_RunMode = RUNMODE_CYCLE;
+    else
+        m_RunMode = RUNMODE_ONCE;
+
     data_len = GetPrivateProfileString(APP_SECTION,
                                        PKG_CONFIG,
                                        _T("config.xml"),

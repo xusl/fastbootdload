@@ -79,6 +79,12 @@ extern struct S_Tftpd32Settings sSettings;          // The settings,used anywher
 #define NETWORK_SECTION         _T("Network")
 #define PKG_PATH                _T("PackagePath")
 #define PKG_CONFIG              _T("PackageConfig")
+#define RUNMODE                 _T("RunMode")
+
+#define APP_RM_ONCE            "once"
+#define APP_RM_CYCLE           "cycle"
+#define RUNMODE_ONCE           0
+#define RUNMODE_CYCLE          1
 
 static const int FIRMWARE_NUM_MAX = 32;
 static const int FIRMWARE_NAME_LEN = MAX_PATH;
@@ -105,6 +111,7 @@ public:
     int            SetPackageDir(const char* config, BOOL updateConfig);
     int            GetNicToggle() const { return m_NicToggle;}
     int            GetToggleTimeoutMs() const { return m_ToggleTimeoutMs;}
+    int            GetRunMode() { return m_RunMode;}
     BOOL           ParseExternalVersion(string &extVersion, string& customId, string& version, string& buildId);
     const char * const GetNetworkSegment() {  return m_NetworkSegment;};
     const char * const GetLoginUser() { return  m_User;};
@@ -155,6 +162,7 @@ private:
     int                     m_HostIPStart;
     int                     m_HostIPEnd;
     BOOL                    m_Login;
+    int                     m_RunMode;
     int                     m_TelnetTimeoutMs;
     int                     m_NicToggle;
     int                     m_ToggleTimeoutMs;
