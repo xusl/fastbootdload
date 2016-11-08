@@ -297,7 +297,7 @@ BOOL CDownloadDlg::OnInitDialog()
     m_pCoordinator->SetDownloadFirmware(m_Config.GetFirmwareFiles());
 
     mNic.EnumNetCards();
-    SetInformation(HOST_NIC, NULL);
+    SetInformation(HOST_NIC, "");
     if (mNic.GetNicNum() <= 1)
         m_ChangeNic.ShowWindow(SW_HIDE);
 
@@ -319,7 +319,6 @@ BOOL CDownloadDlg::OnInitDialog()
 }
 
 BOOL CDownloadDlg::CleanDevice(const char *const ipAddr) {
-    list<DWORD> ids;
     CString msg;
     CDevLabel *dev = NULL;
 
@@ -340,12 +339,10 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr) {
         msg += "for work timeout.";
     else
         msg += "for update finish.";
-    UpdateMessage(msg);
-    m_PSTStatus.SetWindowText(msg);
-
-    dev->GetTransferIDs(ids);
 
 #ifdef MULTI_DEVICE_FEATURE
+    list<DWORD> ids;
+    dev->GetTransferIDs(ids);
     list<DWORD>::iterator it;
     for (it = ids.begin(); it != ids.end(); ++it) {
         LVFINDINFO  LvInfo;
@@ -362,8 +359,6 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr) {
     m_TransferFileList.DeleteAllItems();
 #endif
 
-    LOGD("Remove device, download finished");
-
     b_download = false;
 
     MessageBeep(MB_ICONWARNING);
@@ -373,6 +368,7 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr) {
         StopWork(FALSE);
     else
         StopTftpd32Services ();
+    SetPtsText(msg);
     return TRUE;
 }
 
@@ -404,7 +400,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     ipAddress = "192.168.1.1";
 #endif
 
-    pThis->SetInformation(HOST_NIC, NULL);
+    pThis->SetInformation(HOST_NIC, "");
     NetCardStruct nic =nm->GetDefaultNic();
     DeviceCoordinator * dc = pThis->GetDeviceCoodinator();
 
@@ -432,7 +428,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 */
             if (nm->GetConnectedState() == FALSE) {
                 Sleep(TIMER_ELAPSE);
-                pThis->SetInformation(PTS_STATUS,
+                pThis->SetPtsText(
                     "No network connection, please check whether cable inserted.");
                 continue;
             }
@@ -468,7 +464,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                 Sleep(TIMER_ELAPSE);
             } else if (mode == RUNMODE_ONCE) {
                 pThis->StopWork(FALSE);
-                pThis->SetInformation(PTS_STATUS, "None device found, stop working.");
+                pThis->SetPtsText( "None device found, stop working.");
                 break;
             } else {
                 Sleep(SHORT_TIMER_ELAPSE);
@@ -480,7 +476,6 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             LOGD("Watchdog bite %d", ipAddress.c_str());
             result = pThis->CleanDevice(ipAddress.c_str());
             if (result && (mode == RUNMODE_ONCE)){
-                pThis->SetInformation(PTS_STATUS,"Device updated, stop working.");
                 break;
             } else{
                 Sleep(TIMER_ELAPSE);
@@ -507,7 +502,7 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
 
     msg.Format(_T("%s sniff device %s"), tag, pcIpAddr);
     UpdateMessage(msg);
-    SetInformation(HOST_NIC, NULL);
+    SetInformation(HOST_NIC, "");
 
 //unfortunately, uboot do not response PING message.
 /*
@@ -520,14 +515,14 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
     if (0 != mNic.ResolveIpMac(pcIpAddr, mac) &&
        !mNic.CheckIpInArpTable(pcIpAddr, mac)) {
         msg.Format("can not find device assigned IP %s . ", pcIpAddr);
-        m_PSTStatus.SetWindowText(msg);
+        SetPtsText( msg);
         CleanDevice(pcIpAddr);
         return FALSE;
     }
 
     if (!m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL)) {
         msg.Format("%s have alread been add into device manager", pcIpAddr);
-        m_PSTStatus.SetWindowText(msg);
+        SetPtsText( msg);
         CleanDevice(pcIpAddr);
         return FALSE;
     }
@@ -793,20 +788,33 @@ void CDownloadDlg::OnBnClickedStart() {
     StartWork();
 }
 
+#define DEVICE_DOWNLOAD_IP   "192.168.1.1"
+#define DEFAULT_SERVER_IP    "192.168.1.10"
 int CDownloadDlg::TFTPDownload() {
     CString msg;
+    string mac;
+    int  waitCount = 0;
+
     NetCardStruct nic = mNic.GetDefaultNic();
-    if (nic.mIPAddress != "192.168.1.10") {
+    if (nic.mIPAddress != DEFAULT_SERVER_IP) {
         msg.Format("NIC IP now is %s, change to the default IP", nic.mIPAddress.c_str());
-        m_PSTStatus.SetWindowText(msg);
-        mNic.SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
-        SetInformation(HOST_NIC, NULL);
-        msg.Format("NIC change to the default IP.");
-        UpdateMessage(msg);
+        SetPtsText( msg);
+        mNic.SetIP(DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP, "255.255.255.0");
+        SetInformation(HOST_NIC, "");
     }
-    m_PSTStatus.SetWindowText("start download server");
+
+    if (0 != mNic.ResolveIpMac(DEVICE_DOWNLOAD_IP, mac) &&
+       !mNic.CheckIpInArpTable(DEVICE_DOWNLOAD_IP, mac)) {
+       Sleep(2000);
+       if (waitCount ++ >= 5) {
+            SetPtsText( "Lost device, abort update.");
+            return -1;
+       }
+    }
+
+    SetPtsText( "start download server");
     StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
-    return 0;
+    return NO_ERROR;
 }
 #define COMMAND_UPDATE "send_data 254 0 0 7 0 1 0\n"
 //#define CMD_REBOOT      "send_data 254 0 0 5 0 0 0\n"
@@ -827,22 +835,20 @@ int CDownloadDlg::TelnetPST() {
 
     CDevLabel *dev = dc->GetValidDevice();
     if (dev == NULL) {
-        m_PSTStatus.SetWindowText("There is none device in the network.");
+        SetPtsText( "There is none device in the network.");
         return 2;
     }
 
     SOCKET sock = CreateSocket(dev->GetIpAddr().c_str());
     if ( sock == INVALID_SOCKET) {
         if (dc->GetSuperMode()) {
-        msg = "Can not setup telnet session, start download server.";
+            SetPtsText("Can not setup connection, start download server.");
             b_download = true;
-            TFTPDownload();
+            return TFTPDownload();
         } else {
-        msg = "Can not setup telnet session";
+            SetPtsText( "Can not create session");
+            return ERROR_INVALID_HANDLE;
         }
-        m_PSTStatus.SetWindowText(msg.GetString());
-        SLOGD(msg.GetString());
-        return ERROR_INVALID_HANDLE;
     }
 
     dev->SetStatus(DEVICE_COMMAND);
@@ -879,11 +885,11 @@ int CDownloadDlg::TelnetPST() {
     //SetInformation(DEV_OS_VERSION, osVersion.c_str());
 
     dev->TickWatchDog();
-    m_PSTStatus.SetWindowText("Get device firmware version");
+    SetPtsText( "Get device firmware version");
     tn.send_command(CMD_FW_VERSION, fwVersion);
 
     if (fwVersion.length() == 0) {
-        m_PSTStatus.SetWindowText("Can not get firmware version");
+        SetPtsText( "Can not get firmware version");
         closesocket(sock);
         b_download = false;
         MessageBeep(MB_ICONERROR);
@@ -892,21 +898,18 @@ int CDownloadDlg::TelnetPST() {
 
     SetInformation(DEV_FW_VERSION, fwVersion.c_str());
 
-    LOGE("device firmware is %s ", fwVersion.c_str());
     m_Config.ParseExternalVersion(fwVersion, customId, versionCode, buildId);
-    msg.Format("Device custom id is %s", customId.c_str());
-    m_PSTStatus.SetWindowText(msg);
 
     if (dc->GetSuperMode() == FALSE) {
         if ( customId != m_Config.GetFirmwareCustomId()) {
-            m_PSTStatus.SetWindowText("Custom ID is not matched.");
+            SetPtsText( "Custom ID is not matched.");
             closesocket(sock);
             b_download = false;
             MessageBeep(MB_ICONERROR);
             return -2;
         }
         if (buildId >= m_Config.GetFirmwareBuildId()) {
-            m_PSTStatus.SetWindowText("Pakcage's build ID LESS than or EQUAL to device's.");
+            SetPtsText( "Pakcage's build ID LESS than or EQUAL to device's.");
             closesocket(sock);
             b_download = false;
             MessageBeep(MB_ICONERROR);
@@ -920,7 +923,7 @@ int CDownloadDlg::TelnetPST() {
         }
 
         if (i == 3) {
-            m_PSTStatus.SetWindowText("Request download failed. Other device is block!");
+            SetPtsText( "Request download failed. Other device is block!");
             closesocket(sock);
             b_download = false;
             return -3;
@@ -928,13 +931,12 @@ int CDownloadDlg::TelnetPST() {
         Sleep(5000);
     }
 
+    SetPtsText( "Set download mode");
     tn.send_command(COMMAND_UPDATE, result, false);
+    SetPtsText( "Let device enters download mode");
     tn.send_command(CMD_REBOOT, result, false);
-    m_PSTStatus.SetWindowText("Device enter download mode");
     closesocket(sock);
-    TFTPDownload();
-
-    return NO_ERROR;
+    return TFTPDownload();
 }
 
 DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
@@ -1790,10 +1792,17 @@ void CDownloadDlg::UpdateMessage(CString errormsg){
     m_MessageControl.SetFocus();
 }
 
+VOID CDownloadDlg::SetPtsText(LPCTSTR lpszString) {
+    ASSERT(lpszString != NULL);
+    m_PSTStatus.SetWindowText(lpszString);
+    UpdateMessage(lpszString);
+}
 VOID CDownloadDlg::SetInformation(int type, LPCTSTR lpszString) {
+    ASSERT(lpszString != NULL);
     switch(type) {
     case DEV_FW_VERSION:
         m_DeviceFWVersion.SetWindowText(lpszString);
+        LOGD("device firmware is %s ", lpszString);
         break;
     case DEV_OS_VERSION:
         m_DeviceOSVersion.SetWindowText(lpszString);
@@ -1802,8 +1811,7 @@ VOID CDownloadDlg::SetInformation(int type, LPCTSTR lpszString) {
         m_DeviceIpAddress.SetWindowText(lpszString);
         break;
     case PTS_STATUS:
-        m_PSTStatus.SetWindowText(lpszString);
-        UpdateMessage(lpszString);
+        SetPtsText(lpszString);
         break;
     case HOST_NIC: {
             NetCardStruct nic = mNic.GetDefaultNic();
@@ -1869,7 +1877,7 @@ void CDownloadDlg::OnBnClickedChangeNic()
     dlg.SetNicManager(mNic);
     INT_PTR nResponse = dlg.DoModal();
     if (nResponse == IDOK) {
-      SetInformation(HOST_NIC, NULL);
+      SetInformation(HOST_NIC, "");
     } else if (nResponse == IDCANCEL) {
     }
 }
