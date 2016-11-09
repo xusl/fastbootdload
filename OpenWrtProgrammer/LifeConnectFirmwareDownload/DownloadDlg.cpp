@@ -318,7 +318,7 @@ BOOL CDownloadDlg::OnInitDialog()
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
-BOOL CDownloadDlg::CleanDevice(const char *const ipAddr) {
+BOOL CDownloadDlg::CleanDevice(const char *const ipAddr, BOOL killSniff) {
     CString msg;
     CDevLabel *dev = NULL;
 
@@ -365,7 +365,7 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr) {
     m_pCoordinator->RemoveDevice(dev);
 
     if (m_Config.GetRunMode() ==RUNMODE_ONCE)
-        StopWork(FALSE);
+        StopWork(killSniff);
     else
         StopTftpd32Services ();
     SetPtsText(msg);
@@ -409,12 +409,6 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                         mode == RUNMODE_CYCLE ? APP_RM_CYCLE : APP_RM_ONCE);
 
     for(;;) {
-        //for (int i = from; i <= to; i++)
-        //{
-        //    CString ip_addr;
-        //    ip_addr.Format("%s.%d", segment, i);
-        //    pThis->SniffNetwork( ip_addr.GetString());
-        //}
 #ifdef TPST
         if ( (dc->IsEmpty()) && (pThis->b_download == FALSE || ipAddress.size() == 0)) {
 //            LOGD("b_download %d, ipAddress %s", pThis->b_download, ipAddress.c_str());
@@ -428,10 +422,10 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 */
             if (nm->GetConnectedState() == FALSE) {
                 Sleep(TIMER_ELAPSE);
-                pThis->SetPtsText(
-                    "No network connection, please check whether cable inserted.");
+                pThis->SetPtsText("No network connection, please check whether cable inserted.");
                 continue;
             }
+
             if ((!nic.IsInvalid()) &&
                 ((nic.mGateway == "192.168.1.1") || (nic.mGateway == "192.168.237.1"))) {
                 result = pThis->SniffNetwork("Default policy", nic.mGateway.c_str());
@@ -459,22 +453,25 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             }
             if (result) {
                 LOGD("Start update device %s", ipAddress.c_str());
-                pThis->TelnetPST();
-                nic =nm->GetDefaultNic();
-                Sleep(TIMER_ELAPSE);
+                if (0 == pThis->TelnetPST() ) {
+                    nic =nm->GetDefaultNic();
+                } else if (mode == RUNMODE_ONCE) {
+                     pThis->CleanDevice(ipAddress.c_str(), FALSE);
+                    break;
+                }
             } else if (mode == RUNMODE_ONCE) {
                 pThis->StopWork(FALSE);
                 pThis->SetPtsText( "None device found, stop working.");
                 break;
             } else {
-                Sleep(SHORT_TIMER_ELAPSE);
+                Sleep(TIMER_ELAPSE);
             }
         } else {
             if (!nic.IsInvalid()) {
                 ipAddress = nic.mGateway;
             }
             LOGD("Watchdog bite %d", ipAddress.c_str());
-            result = pThis->CleanDevice(ipAddress.c_str());
+            result = pThis->CleanDevice(ipAddress.c_str(), FALSE);
             if (result && (mode == RUNMODE_ONCE)){
                 break;
             } else{
@@ -516,14 +513,12 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
        !mNic.CheckIpInArpTable(pcIpAddr, mac)) {
         msg.Format("can not find device assigned IP %s . ", pcIpAddr);
         SetPtsText( msg);
-        CleanDevice(pcIpAddr);
         return FALSE;
     }
 
     if (!m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL)) {
-        msg.Format("%s have alread been add into device manager", pcIpAddr);
+        msg.Format("%s have alread been add into device manager", mac.c_str());
         SetPtsText( msg);
-        CleanDevice(pcIpAddr);
         return FALSE;
     }
     msg.Format(_T("Found device mac :%s, ip: %s"), mac.c_str(), pcIpAddr);
@@ -728,8 +723,8 @@ VOID CDownloadDlg::StartWork() {
                                         &m_NetworkSnifferThreadID);
 }
 
-VOID CDownloadDlg::StopWork(BOOL killSiffer) {
-   if (killSiffer) {
+VOID CDownloadDlg::StopWork(BOOL killSniff) {
+   if (killSniff) {
        TerminateThread(m_NetworkSnifferThreadHandle, 1);
    }
 
@@ -1447,14 +1442,16 @@ int CDownloadDlg::TFTPNew (const struct S_TftpTrfNew *pTrf)
 
     TFTPReporting (pTftpGuiFirst);
 
-    m_PSTStatus.SetWindowText("Device get firmware");
-
     struct subStats stat;
     stat.stat =pTrf->stat;
     stat.dwTransferId = pTrf->dwTransferId;
     time_t dNow;
     time(&dNow);
     TFTPStat(&stat, dNow);
+
+    CString msg;
+    msg.Format("Start download file %s", pTftpGui->filename);
+    SetPtsText(msg);
 
     return 0;
 } // GuiNewTrf
@@ -1488,9 +1485,11 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
      if (dev != NULL)
          result = dev->IsDownloadFinish();
 
-    if (result) {
+    if (result && b_download) {
         MessageBeep(MB_ICONINFORMATION);
-        m_PSTStatus.SetWindowText("Device updated.");
+        SetPtsText("Device updated.");
+        if (RUNMODE_ONCE == m_Config.GetRunMode())
+            CleanDevice(mNic.GetDefaultNic().mGateway.c_str(), TRUE);
         b_download = false;
     }
 
@@ -1508,7 +1507,7 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
     // free allocation
     free (pTftpGui->filename);
     free (pTftpGui);
-    LOGD ("GUI: transfer destroyed\n");
+    LOGD ("GUI: transfer destroyed");
 
     // recall TFTPReporting : it will notice the process
     TFTPReporting (pTftpGuiFirst);

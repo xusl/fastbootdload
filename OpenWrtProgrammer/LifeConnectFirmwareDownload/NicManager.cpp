@@ -108,7 +108,7 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
 
     dwRet = GetIpNetTable(NULL, &nSize, TRUE);
     if (dwRet == ERROR_NO_DATA || nSize == 0) {
-        LOGE("There are date in arp table, return %d, size %d", dwRet, nSize);
+        LOGE("There are no data in arp table, return %d, size %d", dwRet, nSize);
         return FALSE;
     }
     if (dwRet != ERROR_INSUFFICIENT_BUFFER && dwRet != NO_ERROR) {
@@ -208,9 +208,10 @@ int NicManager::ResolveIpMac(const char *DestIpString, string & mac)
                     _snprintf(Buffer, BUFFER_LEN, "%.2X:", (int) bPhysAddr[i]);
                 mac += Buffer;
             }
+            LOGD("Sniff device with mac: %s", mac.c_str());
             return 0;
         } else {
-            LOGE("Warning: SendArp completed successfully, but returned length=0\n");
+            LOGE("Warning: SendArp completed successfully, but returned length=0");
         }
     } else {
         const char * errstr = "";

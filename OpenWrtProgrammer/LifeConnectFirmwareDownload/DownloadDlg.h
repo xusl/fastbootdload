@@ -60,7 +60,7 @@ protected:
   SOCKET CreateSocket(const char *ip_addr,  u_short port = TELNET_PORT);
   BOOL SniffNetwork(const char * const tag, const char * const pcIpAddr);
   VOID StartWork();
-  VOID StopWork(BOOL killSiffer);
+  VOID StopWork(BOOL killSniff);
   VOID SetUIStatus(BOOL enable);
   int TelnetPST();
   int TFTPDownload();
@@ -68,7 +68,7 @@ protected:
   void ClearMessage(void);
   VOID SetInformation(int type, LPCTSTR lpszString);
   VOID SetPtsText(LPCTSTR lpszString);
-  BOOL CleanDevice(const char *const ipAddr);
+  BOOL CleanDevice(const char *const ipAddr, BOOL killSniff);
 //void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
 //char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
 //BOOL BuildUpdateCommand(CString file, CString &cmd);

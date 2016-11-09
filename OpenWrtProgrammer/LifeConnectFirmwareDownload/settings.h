@@ -63,7 +63,7 @@ extern struct S_Tftpd32Settings sSettings;          // The settings,used anywher
 #define  LOOPBACK_STRING        "127.0.0.1"
 #define  DIR_TEXT_FILE          "dir.txt"
 
-#  define TFTP_TIMEOUT            3
+#  define TFTP_TIMEOUT            13
 #  define TFTP_RETRANSMIT         6
 #  define TFTPD32_DEF_LOG_LEVEL   8
 #  define TFTP_DEFPORT           69

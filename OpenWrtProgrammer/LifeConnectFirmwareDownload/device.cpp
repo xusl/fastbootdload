@@ -41,6 +41,8 @@ BOOL DeviceCoordinator::Reset() {
         //*it = NULL;
     }
     mDevintfList.clear();
+    //todo test
+    //mMacRecords.clear();
     return TRUE;
 }
 

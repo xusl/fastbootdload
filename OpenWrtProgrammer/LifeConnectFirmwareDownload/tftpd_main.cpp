@@ -53,7 +53,7 @@ int GetIPv4Address (const char *szIf, char *szIP)
 {
 ULONG outBufLen;
 IP_ADAPTER_ADDRESSES       *pAddresses=NULL, *pCurrAddresses;
-//IP_ADAPTER_UNICAST_ADDRESS *pUnicast;
+IP_ADAPTER_UNICAST_ADDRESS *pUnicast;
 int Rc;
 char szBuf [MAX_ADAPTER_DESCRIPTION_LENGTH+4];
 
@@ -595,12 +595,12 @@ static int ResetSockEvent (SOCKET s, HANDLE hEv)
 void TftpdMain (void *param)
 {
     int Rc;
-//    int parse;
+    int parse;
     HANDLE hSocketEvent = INVALID_HANDLE_VALUE;
     struct LL_TftpInfo *pTftp;
     // events : either socket event or wake up by another thread
     enum { E_TFTP_SOCK=0, E_TFTP_WAKE, E_TFTP_EV_NB };
-//    HANDLE tObjects [E_TFTP_EV_NB];
+    HANDLE tObjects [E_TFTP_EV_NB];
 
     // creates socket and starts permanent threads
     if (pTftpFirst==NULL)  CreatePermanentThreads ();
@@ -657,8 +657,9 @@ void TftpdMain (void *param)
             // ResetSockEvent (sListenerSocket, hSocketEvent);
             break;
 
-        case WAIT_FAILED:
-        case WAIT_ABANDONED:
+        //case WAIT_FAILED:
+        //case WAIT_ABANDONED:
+        case -1:
             LOGE("WaitForSingleObject error %d", LastErrorText());
             break;
         }   // switch
