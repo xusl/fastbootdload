@@ -372,6 +372,12 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr, BOOL killSniff) {
     return TRUE;
 }
 
+/*
+* Two important note:
+* 1. Life Connect will detect internet connection, so it alway changes ip from 192.168.1.1 to 192.168.237.1
+*   when it connect to a host pc, not a router.
+* 2. reboot sometimes may not take affect, so tools start tftp server, but none fetch file request.
+*/
 DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
     BOOL result = FALSE;
@@ -826,6 +832,7 @@ int CDownloadDlg::TelnetPST() {
     string versionCode;
     string buildId;
     string result;
+    int i = 0;
     DeviceCoordinator * dc = GetDeviceCoodinator();
 
     CDevLabel *dev = dc->GetValidDevice();
@@ -912,7 +919,7 @@ int CDownloadDlg::TelnetPST() {
         }
     }
 
-    for (int i = 0; i < 3; i++) {
+    for (i = 0; i < 3; i++) {
         if (dc->RequestDownloadPermission(dev)) {
             break;
         }
@@ -923,13 +930,37 @@ int CDownloadDlg::TelnetPST() {
             b_download = false;
             return -3;
         }
-        Sleep(5000);
+        Sleep(3000);
     }
 
     SetPtsText( "Set download mode");
     tn.send_command(COMMAND_UPDATE, result, false);
+
     SetPtsText( "Let device enters download mode");
     tn.send_command(CMD_REBOOT, result, false);
+
+    //IMPORTANT: reboot sent, connect may not reboot actually.
+    for (i = 0; i < 3; i++) {
+        string mac;
+        if (0 == mNic.ResolveIpMac(dev->GetIpAddr().c_str(), mac) ||
+           mNic.CheckIpInArpTable(dev->GetIpAddr().c_str(), mac)) {
+           if (mac == dev->GetMac()) {
+               LOGE("Device is not response reboot command");
+               tn.send_command(CMD_REBOOT, result, false);
+           } else {
+                break;
+           }
+        } else {
+            break;
+        }
+    }
+    if (i >= 3) {
+        SetPtsText( "Device does not reboot! Exit updating.");
+        closesocket(sock);
+        b_download = false;
+     return -5;
+   }
+
     closesocket(sock);
     return TFTPDownload();
 }

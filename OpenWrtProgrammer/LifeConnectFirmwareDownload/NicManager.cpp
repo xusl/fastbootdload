@@ -526,6 +526,7 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
         goto GETADAPTEROUT;
     }
 
+    LOGE("try to get adapter %s information", netCard.mAdapterName.c_str());
     PIP_ADAPTER_INFO pInfo=pIpAdapterInfo;
     //PIP_ADDR_STRING current = pIpAdapterInfo->CurrentIpAddress;
     while (pInfo) {
@@ -534,6 +535,7 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
         //do {
         //    //if (pInfo->Type == MIB_IF_TYPE_ETHERNET)
         //    // if(device_ip.find(segment) != -1)
+        LOGE("Enumerate '%s' information", pIpAdapterInfo->AdapterName);
         if (netCard.mAdapterName == pIpAdapterInfo->AdapterName) {
             netCard.mNicDesc = pInfo->Description;
             netCard.mIPAddress =pIpAddrString->IpAddress.String;
@@ -549,7 +551,7 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
         pInfo = pInfo->Next;
     }
 
-    LOGE("Can not update adapter %s information", netCard.DeviceDesc.c_str());
+    LOGE("ERROR:: Can not update adapter %s information!", netCard.DeviceDesc.c_str());
 
 GETADAPTEROUT:
     if (pIpAdapterInfo) {
@@ -701,6 +703,7 @@ BOOL NicManager::RegReadConnectName(const string & adapter, string& name) {
         name = (char *)value;
         result = TRUE;
     } else {
+        LOGE("Query value for 'Name' failed");
         result = FALSE;
     }
     RegCloseKey(hKey);
@@ -853,10 +856,12 @@ void NicManager::EnumNetCards()
             if (result)
             {
                 RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
-                RegReadConnectName(nic.mAdapterName, nic.mConnectionName);
+                result = RegReadConnectName(nic.mAdapterName, nic.mConnectionName);
             }
-            if (result)
+            if (result) {
+                LOGE("Add nic %s, %s", nic.mConnectionName.c_str(), nic.mNicDesc.c_str());
                 mNicList.push_back(nic);
+            }
         }
 
         if (driver != NULL) {
