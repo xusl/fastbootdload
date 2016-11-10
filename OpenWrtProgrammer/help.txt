@@ -1,0 +1,38 @@
+SetAdapterIpAddress
+
+
+
+REM 设置静态IP
+netsh int ip set address name="本地连接" source=static 192.168.1.10 255.255.255.0 192.168.1.1 1 
+netsh int ip set address name="本地连接" source=static 192.168.237.10 255.255.255.0 192.168.237.1 1 
+netsh int ip set dns name="本地连接" source=static addr=192.168.1.1 register=PRIMARY
+
+REM 设置动态获取IP
+netsh int ip set addr "本地连接" dhcp 
+netsh int ip set dns "本地连接" dhcp
+
+
+
+Search Life Connect..., please wait...
+sniff ip: 192.168.1.1
+Change IP Address, IP:192.168.237.10, Gateway:192.168.237.1, SubnetMask:255.255.255.0
+sniff ip: 192.168.237.1
+Found device mac :42:C3:6B:5F:88:B2, ip: 192.168.237.1
+Change IP Address, IP:192.168.1.10, Gateway:192.168.1.1, SubnetMask:255.255.255.0
+Monitor tick
+sniff ip: 192.168.1.1
+sniff ip: 192.168.1.1
+Change IP Address, IP:192.168.237.10, Gateway:192.168.237.1, SubnetMask:255.255.255.0
+sniff ip: 192.168.237.1
+
+15:41:14Search Life Connect..., please wait...
+15:41:14Default policy sniff device 192.168.1.1
+15:41:14Change IP Address, IP:192.168.237.10, Gateway:192.168.237.1, SubnetMask:255.255.255.0
+15:41:27Policy 2 sniff device 192.168.237.1
+15:41:27Found device mac :62:B6:21:ED:29:40, ip: 192.168.237.1
+15:41:59Change IP Address, IP:192.168.1.10, Gateway:192.168.1.1, SubnetMask:255.255.255.0
+15:42:14Monitor tick sniff device 192.168.1.1
+15:42:29Default policy sniff device 192.168.1.1
+15:42:29Change IP Address, IP:192.168.237.10, Gateway:192.168.237.1, SubnetMask:255.255.255.0
+15:42:42Policy 2 sniff device 192.168.237.1
+15:42:43Remove device 192.168.237.1 for update finish.

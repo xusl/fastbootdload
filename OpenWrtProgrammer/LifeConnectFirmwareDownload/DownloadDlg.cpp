@@ -846,7 +846,7 @@ int CDownloadDlg::TFTPDownload() {
         }
     }
        if (waitCount >= 5) {
-        SetPtsText( "Lost device, abort update.");
+        SetPtsText( "Lost device, abort updating.");
         return -1;
    }
 
@@ -930,7 +930,7 @@ int CDownloadDlg::TelnetPST() {
     tn.send_command(CMD_FW_VERSION, fwVersion);
 
     if (fwVersion.length() == 0) {
-        SetPtsText( "Can not get firmware version");
+        SetPtsText( "Cannot get firmware version");
         closesocket(sock);
         b_download = false;
         MessageBeep(MB_ICONERROR);
@@ -950,7 +950,7 @@ int CDownloadDlg::TelnetPST() {
             return -2;
         }
         if (buildId >= m_Config.GetFirmwareBuildId()) {
-            SetPtsText( "Pakcage's build ID LESS than or EQUAL to device's.");
+            SetPtsText( "Package's build ID LESS than or EQUAL to device's.");
             closesocket(sock);
             b_download = false;
             MessageBeep(MB_ICONERROR);
