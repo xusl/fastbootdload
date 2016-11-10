@@ -534,7 +534,7 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
         //do {
         //    //if (pInfo->Type == MIB_IF_TYPE_ETHERNET)
         //    // if(device_ip.find(segment) != -1)
-        if (netCard.mAdapterName == pIpAdapterInfo->AdapterName) {
+        if (netCard.mAdapterName == pInfo->AdapterName) {
             netCard.mNicDesc = pInfo->Description;
             netCard.mIPAddress =pIpAddrString->IpAddress.String;
             netCard.mGateway = pGateway->IpAddress.String;
@@ -544,7 +544,7 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
             delete pIpAdapterInfo;
             return TRUE;
         }
-        LOGE(" '%s' is not match target '%s'", pIpAdapterInfo->AdapterName, netCard.mAdapterName.c_str());
+        LOGE(" '%s'(%s) is not match target '%s'", pInfo->AdapterName, pInfo->Description, netCard.mAdapterName.c_str());
         //    pIpAddrString=pIpAddrString->Next;
         //    pGateway = pGateway->Next;
         //} while (pIpAddrString && pGateway);
@@ -722,7 +722,7 @@ int NicManager::RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue
     }
     strcpy(pData, lpValue);
     pData[cbData - 1] = '\0';
-    RegSetValueEx(hKey, lpValueName, 0, REG_MULTI_SZ, (const BYTE *)pData, cbData);
+    RegSetValueEx(hKey, lpValueName, 0, REG_MULTI_SZ, (const BYTE *)pData, (DWORD)cbData);
 
     free(pData);
     return 0;
