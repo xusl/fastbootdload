@@ -92,6 +92,7 @@ private:
     BOOL RegReadConnectName(const string & adapter, string& name);
     BOOL RegReadAdapter(const char* driver, string &adapter);
     bool NetCardStateChange(NetCardStruct &netCard, bool Enabled);
+    BOOL UpdateNic();
     BOOL SwitchNic(NetCardStruct &netCard, bool Enabled);
     ULONG GetRegistryProperty(HDEVINFO DeviceInfoSet,
                                       PSP_DEVINFO_DATA DeviceInfoData,

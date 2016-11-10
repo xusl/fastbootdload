@@ -1086,6 +1086,28 @@ BOOL NicManager::UpdateIP() {
     return result;
 }
 
+BOOL NicManager::UpdateNic() {
+    //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
+    //if(!NotifyDHCPIPChange(lpszAdapterName, nIndex))
+    //  return FALSE;
+
+    //通过禁用启用网卡实现IP立即生效
+    m_IsChangingIp = TRUE;
+    if( !NetCardStateChange(m_DefaultNic, FALSE) ) {
+        LOGE("Disable NIC %s failed", m_DefaultNic.mNicDesc.c_str());
+        m_IsChangingIp = FALSE;
+        return FALSE;
+    }
+    Sleep(100);
+    if (!NetCardStateChange(m_DefaultNic,TRUE) ) {
+        LOGE("Disable NIC %s failed", m_DefaultNic.mNicDesc.c_str());
+        m_IsChangingIp = FALSE;
+        return FALSE;
+    }
+
+    m_IsChangingIp = FALSE;
+    return TRUE;
+}
 // Start an explorer window, directory is Tftpd32's default directory
 BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
 {
@@ -1117,23 +1139,10 @@ BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
             return FALSE;
         }
 
-        //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
-        //if(!NotifyIPChange(lpszAdapterName, nIndex, pIPAddress, pNetMask))
-        //  return FALSE;
-
-        //通过禁用启用网卡实现IP立即生效
-        m_IsChangingIp = TRUE;
-        if( !NetCardStateChange(m_DefaultNic, FALSE) ) {
-            LOGE("Disable NIC %s failed", m_DefaultNic.mNicDesc.c_str());
+        if( !UpdateNic()) {
+            LOGE("SetIP: UpdateNic failed");
             return FALSE;
         }
-        Sleep(100);
-        if (!NetCardStateChange(m_DefaultNic,TRUE) ) {
-            LOGE("Disable NIC %s failed", m_DefaultNic.mNicDesc.c_str());
-            return FALSE;
-        }
-
-        m_IsChangingIp = FALSE;
 
         if (updateIp == FALSE)
             return TRUE;
@@ -1159,6 +1168,7 @@ BOOL NicManager::EnableDhcp(BOOL updateIp) {
         LOGE("There are no valid NIC");
         return FALSE;
     }
+    LOGE("EnableDhcp");
     if (m_NicToggle == NIC_NETSH_TOGGLE) {
         CString command;
 
@@ -1184,16 +1194,10 @@ BOOL NicManager::EnableDhcp(BOOL updateIp) {
             return FALSE;
         }
 
-        //通知IP地址的改变(此方法会造成栈溢出问题，而且对于设置dhcp的立即生效没有作用，故舍弃)
-        //if(!NotifyDHCPIPChange(lpszAdapterName, nIndex))
-        //  return FALSE;
-
-        //通过禁用启用网卡实现IP立即生效
-        m_IsChangingIp = TRUE;
-        NetCardStateChange(m_DefaultNic,FALSE);
-        Sleep(100);
-        NetCardStateChange(m_DefaultNic,TRUE);
-        m_IsChangingIp = FALSE;
+        if( !UpdateNic()) {
+            LOGE("EnableDhcp: update NIC Failed");
+            return FALSE;
+        }
 
         if (updateIp == FALSE)
             return TRUE;

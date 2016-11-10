@@ -396,7 +396,7 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr, BOOL killSniff, BOOL up
         StopWork(killSniff);
     else
         StopTftpd32Services ();
-    SetPtsText(msg);
+    //SetPtsText(msg);
     return TRUE;
 }
 
@@ -557,10 +557,10 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
     if (!m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL)) {
         msg.Format("%s have alread been add into device manager", mac.c_str());
         SetPtsText( msg);
-        return FALSE;
+    } else {
+        msg.Format(_T("Found device mac :%s, ip: %s"), mac.c_str(), pcIpAddr);
+        UpdateMessage(msg);
     }
-    msg.Format(_T("Found device mac :%s, ip: %s"), mac.c_str(), pcIpAddr);
-    UpdateMessage(msg);
     //Schedule();
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
     //WaitForSingleObject(m_SyncSemaphore, TIMER_ELAPSE);//INFINITE);
@@ -747,6 +747,10 @@ VOID CDownloadDlg::StartWork() {
     LOGI("Start PST");
     SetUIStatus(FALSE);
     ClearMessage();
+    m_DeviceIpAddress.SetWindowText("");
+    m_DeviceOSVersion.SetWindowText("");
+    m_DeviceFWVersion.SetWindowText("");
+    m_PSTStatus.SetWindowText("");
     is_downloading=TRUE;
     b_download = false;
     //SetTimer(TIMER_EVT_SCHEDULE, TIMER_ELAPSE, NULL);
@@ -771,10 +775,6 @@ VOID CDownloadDlg::StopWork(BOOL killSniff) {
    is_downloading = false;
    m_pCoordinator->Reset();
    m_TransferFileList.DeleteAllItems();
-   m_DeviceIpAddress.SetWindowText("");
-   m_DeviceOSVersion.SetWindowText("");
-   m_DeviceFWVersion.SetWindowText("");
-   m_PSTStatus.SetWindowText("");
 }
 
 VOID CDownloadDlg::SetUIStatus(BOOL enable) {
@@ -874,18 +874,20 @@ int CDownloadDlg::TelnetPST() {
 
     CDevLabel *dev = dc->GetValidDevice();
     if (dev == NULL) {
-        SetPtsText( "There is none device in the network.");
+        SetPtsText( "There is none device needs to update.");
+        if (m_Config.GetRunMode() ==RUNMODE_ONCE)
+            StopWork(FALSE);
         return 2;
     }
 
     SOCKET sock = CreateSocket(dev->GetIpAddr().c_str());
     if ( sock == INVALID_SOCKET) {
         if (dc->GetSuperMode()) {
-            SetPtsText("Can not setup connection, start download server.");
+            SetPtsText("Can not connects to device, start download server.");
             b_download = true;
             return TFTPDownload();
         } else {
-            SetPtsText( "Can not create session");
+            SetPtsText( "Can not connects to device");
             return ERROR_INVALID_HANDLE;
         }
     }

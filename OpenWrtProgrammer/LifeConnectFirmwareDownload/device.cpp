@@ -152,7 +152,7 @@ BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,  CDevLabel** intfs) {
     LOGD("Enter DeviceCoordinator::AddDevice");
 
     map <string, bool, greater<string>>::iterator Rit = mMacRecords.find(dev.GetMac());
-    if ( Rit != mMacRecords.end() /*&& mMacRecords[dev.GetMac()]*/) {
+    if ( Rit != mMacRecords.end() && mMacRecords[dev.GetMac()]) {
         LOGI("device %s have already updated.", dev.GetMac().c_str());
         return FALSE;
     }
@@ -227,7 +227,9 @@ BOOL DeviceCoordinator::RemoveDevice(CDevLabel* const & devIntf)  {
     LOGE("RemoveDevice !");
     EnterCriticalSection(&mCriticalSection);
     mDevintfList.remove(devIntf);
-    mMacRecords[devIntf->GetMac()] = true;
+
+    if (devIntf->GetStatus() == DEVICE_FINISH)
+        mMacRecords[devIntf->GetMac()] = true;
     delete devIntf;
     LeaveCriticalSection(&mCriticalSection);
     return TRUE;
@@ -236,7 +238,8 @@ BOOL DeviceCoordinator::RemoveDevice(CDevLabel* const & devIntf)  {
     list<CDevLabel*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
         CDevLabel *item = *it;
-        mMacRecords[item->GetMac()] = true;
+        if (item->GetStatus() == DEVICE_FINISH)
+            mMacRecords[item->GetMac()] = true;
         delete item;
     }
 
