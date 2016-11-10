@@ -68,7 +68,7 @@ protected:
   void ClearMessage(void);
   VOID SetInformation(int type, LPCTSTR lpszString);
   VOID SetPtsText(LPCTSTR lpszString);
-  BOOL CleanDevice(const char *const ipAddr, BOOL killSniff);
+  BOOL CleanDevice(const char *const ipAddr, BOOL killSniff, BOOL updateUI);
 //void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
 //char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
 //BOOL BuildUpdateCommand(CString file, CString &cmd);

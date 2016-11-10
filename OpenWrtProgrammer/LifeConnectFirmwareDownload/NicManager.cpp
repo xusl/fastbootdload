@@ -526,7 +526,6 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
         goto GETADAPTEROUT;
     }
 
-    LOGE("try to get adapter %s information", netCard.mAdapterName.c_str());
     PIP_ADAPTER_INFO pInfo=pIpAdapterInfo;
     //PIP_ADDR_STRING current = pIpAdapterInfo->CurrentIpAddress;
     while (pInfo) {
@@ -535,16 +534,17 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
         //do {
         //    //if (pInfo->Type == MIB_IF_TYPE_ETHERNET)
         //    // if(device_ip.find(segment) != -1)
-        LOGE("Enumerate '%s' information", pIpAdapterInfo->AdapterName);
         if (netCard.mAdapterName == pIpAdapterInfo->AdapterName) {
             netCard.mNicDesc = pInfo->Description;
             netCard.mIPAddress =pIpAddrString->IpAddress.String;
             netCard.mGateway = pGateway->IpAddress.String;
             netCard.mEnableDHCP = pInfo->DhcpEnabled;
             memcpy(netCard.mPhysAddr, pInfo->Address, sizeof netCard.mPhysAddr);
+            LOGE("Update '%s' IP '%s' dhcp %d", pInfo->Description, pIpAddrString->IpAddress.String, pInfo->DhcpEnabled);
             delete pIpAdapterInfo;
             return TRUE;
         }
+        LOGE(" '%s' is not match target '%s'", pIpAdapterInfo->AdapterName, netCard.mAdapterName.c_str());
         //    pIpAddrString=pIpAddrString->Next;
         //    pGateway = pGateway->Next;
         //} while (pIpAddrString && pGateway);
@@ -1013,15 +1013,17 @@ bool NicManager::NetCardStateChange(NetCardStruct &NetCard, bool Enabled)
     //    LOGE("DevInst is NULL");
     //}
     /*
-    In Win7 x64, must use x64 build. Otherwise it works inproperly.
+    In Win7 x64, must use x64 build. Otherwise it always failed.
     */
     if (!SetupDiCallClassInstaller(DIF_PROPERTYCHANGE, hDevInfo, &diData)) {
         LOGE("SetupDiCallClassInstaller error: 0x%X", GetLastError());
         goto NICSTATUSCHANGEOUT;
     }
 
-    if (CM_Get_DevNode_Status(&Status, &error, diData.DevInst,0) == CR_SUCCESS)
+    if (CM_Get_DevNode_Status(&Status, &error, diData.DevInst,0) == CR_SUCCESS) {
         NetCard.Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error);
+        LOGE("CM_Get_DevNode_Status error: 0x%X", GetLastError());
+    }
     result = true;
 
 NICSTATUSCHANGEOUT:
@@ -1115,6 +1117,7 @@ BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
         NetCardStateChange(m_DefaultNic, FALSE);
         Sleep(100);
         NetCardStateChange(m_DefaultNic,TRUE);
+        LOGE("NetCardStateChange done");
         m_IsChangingIp = FALSE;
 
         if (updateIp == FALSE)

@@ -111,7 +111,7 @@ public:
 protected:
 	DECLARE_MESSAGE_MAP()
 
-private:    
+private:
   CStatic m_AboutVersion;
 public:
     virtual BOOL OnInitDialog();
@@ -344,7 +344,7 @@ BOOL CDownloadDlg::OnInitDialog()
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
-BOOL CDownloadDlg::CleanDevice(const char *const ipAddr, BOOL killSniff) {
+BOOL CDownloadDlg::CleanDevice(const char *const ipAddr, BOOL killSniff, BOOL updateUI) {
     CString msg;
     CDevLabel *dev = NULL;
 
@@ -356,15 +356,17 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr, BOOL killSniff) {
     }
 #endif
 
-    if (dev == NULL || FALSE == dev->CheckRemovable()) {
+    if (dev == NULL || (updateUI == FALSE && FALSE == dev->CheckRemovable())) {
         return FALSE;
     }
 
+/*
     msg.Format("Remove device %s ", ipAddr);
     if (dev->GetStatus() != DEVICE_FINISH)
         msg += "for work timeout.";
     else
         msg += "for update finish.";
+*/
 
 #ifdef MULTI_DEVICE_FEATURE
     list<DWORD> ids;
@@ -460,24 +462,20 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 
             if ((!nic.IsInvalid()) &&
                 ((nic.mGateway == "192.168.1.1") || (nic.mGateway == "192.168.237.1"))) {
-                result = pThis->SniffNetwork("Default policy", nic.mGateway.c_str());
+                result = pThis->SniffNetwork("Policy default", nic.mGateway.c_str());
                 if (result)
                     ipAddress = nic.mGateway;
             }
 
             if (result == FALSE && nic.mGateway != "192.168.1.1") {
-                msg.Format("Change IP Address, IP:%s, Gateway:%s, SubnetMask:%s",
-                    "192.168.1.10", "192.168.1.1", "255.255.255.0");
-                pThis->UpdateMessage(msg);
+                pThis->UpdateMessage("Change IP 192.168.1.10, Gateway 192.168.1.1");
                 nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
                 result = pThis->SniffNetwork("Policy 1", "192.168.1.1");
                 if (result)
                     ipAddress = "192.168.1.1";
             }
             if ( result == FALSE && nic.mGateway != "192.168.237.1") {
-                msg.Format("Change IP Address, IP:%s, Gateway:%s, SubnetMask:%s",
-                    "192.168.237.10", "192.168.237.1", "255.255.255.0");
-                pThis->UpdateMessage(msg);
+                pThis->UpdateMessage("Change IP 192.168.237.10, Gateway 192.168.237.1");
                 nm->SetIP("192.168.237.10", "192.168.237.1", "255.255.255.0");
                 result = pThis->SniffNetwork("Policy 2", "192.168.237.1");
                 if (result)
@@ -488,7 +486,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                 if (0 == pThis->TelnetPST() ) {
                     nic =nm->GetDefaultNic();
                 } else if (mode == RUNMODE_ONCE) {
-                     pThis->CleanDevice(ipAddress.c_str(), FALSE);
+                     pThis->CleanDevice(ipAddress.c_str(), FALSE, TRUE);
                     break;
                 }
             } else if (mode == RUNMODE_ONCE) {
@@ -503,7 +501,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                 ipAddress = nic.mGateway;
             }
             LOGD("Watchdog bite %d", ipAddress.c_str());
-            result = pThis->CleanDevice(ipAddress.c_str(), FALSE);
+            result = pThis->CleanDevice(ipAddress.c_str(), FALSE, FALSE);
             if (result && (mode == RUNMODE_ONCE)){
                 break;
             } else{
@@ -824,20 +822,25 @@ int CDownloadDlg::TFTPDownload() {
 
     NetCardStruct nic = mNic.GetDefaultNic();
     if (nic.mIPAddress != DEFAULT_SERVER_IP) {
-        msg.Format("NIC IP now is %s, change to the default IP", nic.mIPAddress.c_str());
+        msg.Format("Now IP is %s, change to the default IP", nic.mIPAddress.c_str());
         SetPtsText( msg);
         mNic.SetIP(DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP, "255.255.255.0");
         SetInformation(HOST_NIC, "");
     }
 
-    if (0 != mNic.ResolveIpMac(DEVICE_DOWNLOAD_IP, mac) &&
-       !mNic.CheckIpInArpTable(DEVICE_DOWNLOAD_IP, mac)) {
-       Sleep(2000);
-       if (waitCount ++ >= 5) {
-            SetPtsText( "Lost device, abort update.");
-            return -1;
-       }
+    for (; waitCount < 5; waitCount++) {
+        if (0 != mNic.ResolveIpMac(DEVICE_DOWNLOAD_IP, mac) &&
+           !mNic.CheckIpInArpTable(DEVICE_DOWNLOAD_IP, mac)) {
+           LOGE("can not found device, wait 2000");
+           Sleep(2000);
+        } else {
+          break;
+        }
     }
+       if (waitCount >= 5) {
+        SetPtsText( "Lost device, abort update.");
+        return -1;
+   }
 
     SetPtsText( "start download server");
     StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
@@ -1546,7 +1549,7 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
         MessageBeep(MB_ICONINFORMATION);
         SetPtsText("Device updated.");
         if (RUNMODE_ONCE == m_Config.GetRunMode())
-            CleanDevice(mNic.GetDefaultNic().mGateway.c_str(), TRUE);
+            CleanDevice(mNic.GetDefaultNic().mGateway.c_str(), TRUE, TRUE);
         b_download = false;
     }
 
