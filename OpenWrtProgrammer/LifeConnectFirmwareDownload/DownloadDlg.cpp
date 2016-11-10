@@ -455,9 +455,15 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             }
 */
             if (nm->GetConnectedState() == FALSE) {
-                Sleep(TIMER_ELAPSE);
-                pThis->SetPtsText("No network connection, please check whether cable inserted.");
-                continue;
+                if (mode == RUNMODE_ONCE) {
+                    pThis->StopWork(FALSE);
+                    pThis->SetPtsText("No network connection, please check whether cable inserted.");
+                    break;
+                } else {
+                    pThis->SetPtsText("No network connection, please check whether cable inserted.");
+                    Sleep(TIMER_ELAPSE);
+                    continue;
+                }
             }
 
             if ((!nic.IsInvalid()) &&
@@ -469,15 +475,17 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
 
             if (result == FALSE && nic.mGateway != "192.168.1.1") {
                 pThis->UpdateMessage("Change IP 192.168.1.10, Gateway 192.168.1.1");
-                nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
-                result = pThis->SniffNetwork("Policy 1", "192.168.1.1");
+                result = nm->SetIP("192.168.1.10", "192.168.1.1", "255.255.255.0");
+                if (result)
+                    result = pThis->SniffNetwork("Policy 1", "192.168.1.1");
                 if (result)
                     ipAddress = "192.168.1.1";
             }
             if ( result == FALSE && nic.mGateway != "192.168.237.1") {
                 pThis->UpdateMessage("Change IP 192.168.237.10, Gateway 192.168.237.1");
-                nm->SetIP("192.168.237.10", "192.168.237.1", "255.255.255.0");
-                result = pThis->SniffNetwork("Policy 2", "192.168.237.1");
+                result = nm->SetIP("192.168.237.10", "192.168.237.1", "255.255.255.0");
+                if (result)
+                    result = pThis->SniffNetwork("Policy 2", "192.168.237.1");
                 if (result)
                     ipAddress = "192.168.237.1";
             }
@@ -527,7 +535,7 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
     string mac;
     ASSERT(pcIpAddr != NULL && tag != NULL);
 
-    msg.Format(_T("%s sniff device %s"), tag, pcIpAddr);
+    msg.Format(_T("%s: sniff device %s"), tag, pcIpAddr);
     UpdateMessage(msg);
     SetInformation(HOST_NIC, "");
 
@@ -541,7 +549,7 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
 */
     if (0 != mNic.ResolveIpMac(pcIpAddr, mac) &&
        !mNic.CheckIpInArpTable(pcIpAddr, mac)) {
-        msg.Format("can not find device assigned IP %s . ", pcIpAddr);
+        msg.Format("can not find device (%s ).", pcIpAddr);
         SetPtsText( msg);
         return FALSE;
     }

@@ -108,7 +108,7 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
 
     dwRet = GetIpNetTable(NULL, &nSize, TRUE);
     if (dwRet == ERROR_NO_DATA || nSize == 0) {
-        LOGE("There are no data in arp table, return %d, size %d", dwRet, nSize);
+        LOGE("no data in arp table, return %d, size %d", dwRet, nSize);
         return FALSE;
     }
     if (dwRet != ERROR_INSUFFICIENT_BUFFER && dwRet != NO_ERROR) {
@@ -711,7 +711,7 @@ BOOL NicManager::RegReadConnectName(const string & adapter, string& name) {
 }
 
 int NicManager::RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue) {
-    int cbData;
+    size_t cbData;
     CHAR *pData = NULL;
     ASSERT(lpValue != NULL);
     cbData = strlen(lpValue) + 2;
@@ -1022,8 +1022,10 @@ bool NicManager::NetCardStateChange(NetCardStruct &NetCard, bool Enabled)
 
     if (CM_Get_DevNode_Status(&Status, &error, diData.DevInst,0) == CR_SUCCESS) {
         NetCard.Disabled = (Status & DN_HAS_PROBLEM) && (CM_PROB_DISABLED == error);
+    } else {
         LOGE("CM_Get_DevNode_Status error: 0x%X", GetLastError());
     }
+
     result = true;
 
 NICSTATUSCHANGEOUT:
@@ -1053,7 +1055,14 @@ BOOL NicManager::UpdateIP() {
             it->mGateway,
             it->mEnableDHCP);
 */
-        result = GetNicInfo(*it) && result;
+        result = GetNicInfo(*it);
+        if ( result == FALSE) {
+            LOGE("update NIC(%s) failured", it->mNicDesc.c_str());
+            return FALSE;
+        }
+        if (it->Id == m_DefaultNic.Id) {
+            m_DefaultNic = *it;
+        }
     }
 
 /*
@@ -1063,7 +1072,7 @@ BOOL NicManager::UpdateIP() {
         m_DefaultNic.mGateway,
         m_DefaultNic.mEnableDHCP);
    */
-    result = GetNicInfo(m_DefaultNic) && result;
+    //result = GetNicInfo(m_DefaultNic) && result;
 
 #ifdef NIC_IPUPDATE_TEST
     for (it = mNicList.begin(); it != mNicList.end(); ++it) {
@@ -1104,7 +1113,7 @@ BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
         return rc == 0;
     } else if (m_NicToggle == NIC_SETUPDI_TOGGLE)  {
         if(!RegSetIP(m_DefaultNic.mAdapterName, ip, subnetMask, gateway, 0)) {
-            LOGE("RegSetIP failed");
+            LOGE("RegSetIP %s failed", m_DefaultNic.mNicDesc.c_str());
             return FALSE;
         }
 
@@ -1114,18 +1123,23 @@ BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
 
         //通过禁用启用网卡实现IP立即生效
         m_IsChangingIp = TRUE;
-        NetCardStateChange(m_DefaultNic, FALSE);
+        if( !NetCardStateChange(m_DefaultNic, FALSE) ) {
+            LOGE("Disable NIC %s failed", m_DefaultNic.mNicDesc.c_str());
+            return FALSE;
+        }
         Sleep(100);
-        NetCardStateChange(m_DefaultNic,TRUE);
-        LOGE("NetCardStateChange done");
+        if (!NetCardStateChange(m_DefaultNic,TRUE) ) {
+            LOGE("Disable NIC %s failed", m_DefaultNic.mNicDesc.c_str());
+            return FALSE;
+        }
+
         m_IsChangingIp = FALSE;
 
         if (updateIp == FALSE)
             return TRUE;
 
         Sleep(m_Timeout);
-        UpdateIP();
-        return TRUE;
+        return UpdateIP();
     } /* else if (m_NicToggle == NIC_SETIF_TOGGLE)  {
         SwitchNic(m_DefaultNic, FALSE);
         if(!RegSetIP(m_DefaultNic.mAdapterName, ip, subnetMask, gateway, 0)) {
@@ -1190,8 +1204,10 @@ BOOL NicManager::EnableDhcp(BOOL updateIp) {
             Sleep(5000);
             result = UpdateIP();
         } while(i++< 4 && !result);
+        return result;
     }
-    return TRUE;
+    LOGE("Unspport method %d", m_NicToggle);
+    return FALSE;
 }
 
 int NicManager::ExecuteCommand(LPSTR command, LPSTR parameter) {
