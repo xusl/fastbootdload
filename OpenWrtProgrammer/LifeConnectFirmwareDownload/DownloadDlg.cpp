@@ -13,6 +13,7 @@
 #include <dbt.h>
 #include "telnet.h"
 #include "tftp.h"
+#include "VersionInfo.h"
 
 using namespace std;
 
@@ -109,6 +110,11 @@ public:
 // Implementation
 protected:
 	DECLARE_MESSAGE_MAP()
+
+private:    
+  CStatic m_AboutVersion;
+public:
+    virtual BOOL OnInitDialog();
 };
 
 CAboutDlg::CAboutDlg() : CDialogEx(CAboutDlg::IDD)
@@ -118,10 +124,30 @@ CAboutDlg::CAboutDlg() : CDialogEx(CAboutDlg::IDD)
 void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+    DDX_Control(pDX,  IDC_ABOUT_VERSION, m_AboutVersion);
 }
 
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
 END_MESSAGE_MAP()
+
+BOOL CAboutDlg::OnInitDialog()
+{
+	char path_buffer[MAX_PATH] = {0};
+
+	GetModuleFileName(NULL, path_buffer, MAX_PATH);
+
+    CDialogEx::OnInitDialog();
+
+    // TODO:  Add extra initialization here
+    CVersionInfo vi;
+    //AfxGetApp()->m_pszExeName/*m_pszAppName*/
+    vi.GetVersionInfo(path_buffer, "040904B0", "ProductVersion");
+    CString version = "Version ";
+    version += vi.m_strVersionInfo;
+    m_AboutVersion.SetWindowText(version);
+    return TRUE;  // return TRUE unless you set the focus to a control
+    // EXCEPTION: OCX Property Pages should return FALSE
+}
 
 
 // CDownloadDlg dialog

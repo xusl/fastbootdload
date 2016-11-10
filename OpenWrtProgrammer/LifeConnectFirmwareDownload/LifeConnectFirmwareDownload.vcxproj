@@ -209,6 +209,7 @@
     <ClInclude Include="telnet.h" />
     <ClInclude Include="Tftp.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="VersionInfo.h" />
     <ClInclude Include="XmlParser.h" />
   </ItemGroup>
   <ItemGroup>
@@ -234,6 +235,7 @@
     <ClCompile Include="tftpd_util.cpp" />
     <ClCompile Include="tftp_dbg.cpp" />
     <ClCompile Include="utils.cpp" />
+    <ClCompile Include="VersionInfo.cpp" />
     <ClCompile Include="XmlParser.cpp" />
   </ItemGroup>
   <ItemGroup>
