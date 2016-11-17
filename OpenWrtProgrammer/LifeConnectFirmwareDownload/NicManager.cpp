@@ -1147,8 +1147,40 @@ BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
         if (updateIp == FALSE)
             return TRUE;
 
-        Sleep(m_Timeout);
-        return UpdateIP();
+#if 0
+        int i = 0;
+        if (i++ * 3000 < m_Timeout ) {
+            Sleep(3000);
+            if (UpdateIP())
+                return TRUE;
+            LOGE("Can not get IP now");
+        }
+#else
+      OVERLAPPED overlap;
+      DWORD ret;
+
+      HANDLE hand = NULL;
+      overlap.hEvent = WSACreateEvent();
+
+      ret = NotifyAddrChange(&hand, &overlap);
+
+      if (ret != NO_ERROR)
+      {
+        if (WSAGetLastError() != WSA_IO_PENDING)
+        {
+          LOGE("NotifyAddrChange error...%d", WSAGetLastError());
+          return FALSE;
+        }
+      }
+
+      if ( WaitForSingleObject(overlap.hEvent, m_Timeout/*INFINITE*/) == WAIT_OBJECT_0 ) {
+        LOGE("IP Address table changed");
+        UpdateIP();
+        return TRUE;
+      }
+      LOGE("timeout, no notification of address change");
+#endif
+        return FALSE;
     } /* else if (m_NicToggle == NIC_SETIF_TOGGLE)  {
         SwitchNic(m_DefaultNic, FALSE);
         if(!RegSetIP(m_DefaultNic.mAdapterName, ip, subnetMask, gateway, 0)) {

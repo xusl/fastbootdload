@@ -930,11 +930,8 @@ int CDownloadDlg::TelnetPST() {
     tn.send_command(CMD_FW_VERSION, fwVersion);
 
     if (fwVersion.length() == 0) {
-        SetPtsText( "Cannot get firmware version");
-        closesocket(sock);
-        b_download = false;
-        MessageBeep(MB_ICONERROR);
-        return -4;
+        msg =  "Cannot get firmware version";
+        goto TELPSTERR;
     }
 
     SetInformation(DEV_FW_VERSION, fwVersion.c_str());
@@ -943,18 +940,12 @@ int CDownloadDlg::TelnetPST() {
 
     if (dc->GetSuperMode() == FALSE) {
         if ( customId != m_Config.GetFirmwareCustomId()) {
-            SetPtsText( "Custom ID is not matched.");
-            closesocket(sock);
-            b_download = false;
-            MessageBeep(MB_ICONERROR);
-            return -2;
+            msg = "Custom ID is not matched.";
+            goto TELPSTERR;
         }
         if (buildId >= m_Config.GetFirmwareBuildId()) {
-            SetPtsText( "Package's build ID LESS than or EQUAL to device's.");
-            closesocket(sock);
-            b_download = false;
-            MessageBeep(MB_ICONERROR);
-            return -3;
+            msg = "Package's build ID LESS than or EQUAL to device's.";
+            goto TELPSTERR;
         }
     }
 
@@ -964,44 +955,51 @@ int CDownloadDlg::TelnetPST() {
         }
 
         if (i == 3) {
-            SetPtsText( "Request download failed. Other device is block!");
-            closesocket(sock);
-            b_download = false;
-            return -3;
+            msg = "Request download failed. Other device is block!";
+            goto TELPSTERR;
         }
         Sleep(3000);
     }
 
     SetPtsText( "Set download mode");
+    dev->TickWatchDog();
     tn.send_command(COMMAND_UPDATE, result, false);
 
     SetPtsText( "Let device enters download mode");
+    dev->TickWatchDog();
     tn.send_command(CMD_REBOOT, result, false);
 
-    //IMPORTANT: reboot sent, connect may not reboot actually.
-    for (i = 0; i < 3; i++) {
-        string mac;
-        if (0 == mNic.ResolveIpMac(dev->GetIpAddr().c_str(), mac) ||
-           mNic.CheckIpInArpTable(dev->GetIpAddr().c_str(), mac)) {
-           if (mac == dev->GetMac()) {
-               LOGE("Device is not response reboot command");
-               tn.send_command(CMD_REBOOT, result, false);
-           } else {
-                break;
-           }
-        } else {
-            break;
-        }
-    }
-    if (i >= 3) {
-        SetPtsText( "Device does not reboot! Exit updating.");
-        closesocket(sock);
-        b_download = false;
-     return -5;
-   }
+/*
+after send reboot command
+C:\WinDDK\7600.16385.1>arp -a
 
+Interface: 169.254.74.103 --- 0x70002
+  Internet Address      Physical Address      Type
+  192.168.237.1         0e-e0-f0-19-18-92     dynamic
+
+C:\WinDDK\7600.16385.1>ipconfig
+
+Windows IP Configuration
+
+
+Ethernet adapter 本地连接:
+
+        Connection-specific DNS Suffix  . :
+        Autoconfiguration IP Address. . . : 169.254.74.103
+        Subnet Mask . . . . . . . . . . . : 255.255.0.0
+        Default Gateway . . . . . . . . . :
+
+*/
+    Sleep(3000);
     closesocket(sock);
     return TFTPDownload();
+
+TELPSTERR:
+    SetPtsText(msg.GetString());
+    closesocket(sock);
+    b_download = false;
+    MessageBeep(MB_ICONERROR);
+    return 1;
 }
 
 DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
