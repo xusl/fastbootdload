@@ -492,10 +492,24 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             }
             if (result) {
                 LOGD("Start update device %s", ipAddress.c_str());
-                if (0 == pThis->TelnetPST() ) {
-                    nic =nm->GetDefaultNic();
-                } else if (mode == RUNMODE_ONCE) {
-                     pThis->CleanDevice(ipAddress.c_str(), FALSE, TRUE);
+                int code = pThis->TelnetPST();
+                if (NO_ERROR == code ) {
+                    if (0 == pThis->TFTPDownload(TRUE))
+                        nic =nm->GetDefaultNic();
+                    else {
+                       code = pThis->TFTPDownload(TRUE);
+                    }
+                } else if (ERROR_OPEN_FAILED == code) {
+                    if (dc->GetSuperMode()) {
+                        pThis->SetPtsText("Can not connects to device, start download server.");
+                        pThis->b_download = true;
+                        code = pThis->TFTPDownload(FALSE);
+                    } else {
+                        pThis->SetPtsText( "Can not connects to device");
+                    }
+                }
+                if (mode == RUNMODE_ONCE && code != NO_ERROR) {
+                    pThis->CleanDevice(ipAddress.c_str(), FALSE, TRUE);
                     break;
                 }
             } else if (mode == RUNMODE_ONCE) {
@@ -845,7 +859,7 @@ void CDownloadDlg::OnBnClickedStart() {
 
 #define DEVICE_DOWNLOAD_IP   "192.168.1.1"
 #define DEFAULT_SERVER_IP    "192.168.1.10"
-int CDownloadDlg::TFTPDownload() {
+int CDownloadDlg::TFTPDownload(BOOL again) {
     CString msg;
     string mac;
     int  waitCount = 0;
@@ -854,8 +868,7 @@ int CDownloadDlg::TFTPDownload() {
     if (nic.mIPAddress != DEFAULT_SERVER_IP) {
         msg.Format("Now IP is %s, change to the default IP", nic.mIPAddress.c_str());
         SetPtsText( msg);
-        mNic.SetIP(DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP, "255.255.255.0");
-        SetInformation(HOST_NIC, "");
+        mNic.SetIP(DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP, "255.255.255.0", !again);
     }
 
     for (; waitCount < 10; waitCount++) {
@@ -867,11 +880,18 @@ int CDownloadDlg::TFTPDownload() {
           break;
         }
     }
-       if (waitCount >= 10) {
-        SetPtsText( "Lost device, abort updating.");
+   if (waitCount >= 10) {
+        if (again) {
+            mNic.SetIP(nic.mIPAddress.c_str(), nic.mGateway.c_str(), nic.mSubnetMask.c_str(), !again);
+            SetPtsText( "Lost device, try again.");
+        } else {
+            SetPtsText( "Lost device, abort updating.");
+        }
         return -1;
    }
 
+    mNic.UpdateIP();
+    SetInformation(HOST_NIC, "");
     SetPtsText( "start download server");
     StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
     return NO_ERROR;
@@ -899,19 +919,12 @@ int CDownloadDlg::TelnetPST() {
         SetPtsText( "There is none device needs to update.");
         if (m_Config.GetRunMode() ==RUNMODE_ONCE)
             StopWork(FALSE);
-        return 2;
+        return ERROR_INVALID_HANDLE;
     }
 
     SOCKET sock = CreateSocket(dev->GetIpAddr().c_str());
     if ( sock == INVALID_SOCKET) {
-        if (dc->GetSuperMode()) {
-            SetPtsText("Can not connects to device, start download server.");
-            b_download = true;
-            return TFTPDownload();
-        } else {
-            SetPtsText( "Can not connects to device");
-            return ERROR_INVALID_HANDLE;
-        }
+        return ERROR_OPEN_FAILED;
     }
 
     dev->SetStatus(DEVICE_COMMAND);
@@ -1013,16 +1026,16 @@ Ethernet adapter 本地连接:
 
 */
     LOGE("wait for device reboot");
-    Sleep(3000);
+    Sleep(500);
     closesocket(sock);
-    return TFTPDownload();
+    return NO_ERROR;
 
 TELPSTERR:
     SetPtsText(msg.GetString());
     closesocket(sock);
     b_download = false;
     MessageBeep(MB_ICONERROR);
-    return 1;
+    return ERROR_GEN_FAILURE;
 }
 
 DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
