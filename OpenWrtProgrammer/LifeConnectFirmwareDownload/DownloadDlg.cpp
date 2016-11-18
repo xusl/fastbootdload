@@ -273,13 +273,18 @@ BOOL CDownloadDlg::OnInitDialog()
     CButton* versionCheck = (CButton *)GetDlgItem(IDC_DISABLE_CHECK);
     versionCheck->SetIcon(icon);
 
-    m_TransferFileList.InsertColumn(FD_PEER,     _T("Peer"), LVCFMT_LEFT, 130);
-    m_TransferFileList.InsertColumn(FD_FILE,     _T("File"), LVCFMT_LEFT, 180);
-    m_TransferFileList.InsertColumn(FD_START,    _T("Start"), LVCFMT_LEFT, 80);
-    m_TransferFileList.InsertColumn(FD_PROGRESS, _T("Progress"), LVCFMT_LEFT, 60);
-    m_TransferFileList.InsertColumn(FD_BYTES,    _T("Bytes"), LVCFMT_LEFT, 100);
-    m_TransferFileList.InsertColumn(FD_TOTAL,    _T("Total"), LVCFMT_LEFT, 100);
-    m_TransferFileList.InsertColumn(FD_TIMEOUT,  _T("Timeout"), LVCFMT_LEFT, 80);
+    m_TransferFileList.SetExtendedStyle(LVS_EX_GRIDLINES |
+                                    LVS_EX_FULLROWSELECT |
+                                    LVS_EX_COLUMNSNAPPOINTS |
+                                    LVS_EX_BORDERSELECT);
+
+    m_TransferFileList.InsertColumn(FD_PEER,     _T("Peer"), LVCFMT_CENTER, 130);
+    m_TransferFileList.InsertColumn(FD_FILE,     _T("File"), LVCFMT_CENTER, 250);
+    m_TransferFileList.InsertColumn(FD_START,    _T("Start"), LVCFMT_CENTER, 80);
+    m_TransferFileList.InsertColumn(FD_PROGRESS, _T("Progress"), LVCFMT_CENTER, 100);
+    m_TransferFileList.InsertColumn(FD_BYTES,    _T("Bytes"), LVCFMT_CENTER, 100);
+    m_TransferFileList.InsertColumn(FD_TOTAL,    _T("Total"), LVCFMT_CENTER, 100);
+    m_TransferFileList.InsertColumn(FD_TIMEOUT,  _T("Timeout"), LVCFMT_CENTER, 80);
 
 /*
   CFont * font = emphasize->GetFont();
@@ -492,12 +497,20 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
             }
             if (result) {
                 LOGD("Start update device %s", ipAddress.c_str());
-                int code = pThis->TelnetPST();
+                CDevLabel *dev = NULL;
+                int code = pThis->TelnetPST(&dev);
                 if (NO_ERROR == code ) {
-                    if (0 == pThis->TFTPDownload(TRUE))
-                        nic =nm->GetDefaultNic();
-                    else {
-                       code = pThis->TFTPDownload(TRUE);
+                    code = pThis->TFTPDownload(TRUE);
+                    if (NO_ERROR != code && dev != NULL) {
+                      if (pThis->SniffNetwork("Policy again", ipAddress.c_str())) {
+                          dev->SetStatus(DEVICE_ARRIVE);
+                           code = pThis->TelnetPST(NULL);
+                           if (NO_ERROR == code ) {
+                               code = pThis->TFTPDownload(FALSE);
+                           }
+                      }
+                    } else {
+                        LOGE("return error %d, dev 0x%x", code, dev);
                     }
                 } else if (ERROR_OPEN_FAILED == code) {
                     if (dc->GetSuperMode()) {
@@ -508,7 +521,9 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                         pThis->SetPtsText( "Can not connects to device");
                     }
                 }
-                if (mode == RUNMODE_ONCE && code != NO_ERROR) {
+                if (code == NO_ERROR) {
+                    nic =nm->GetDefaultNic();
+                } else if (mode == RUNMODE_ONCE ) {
                     pThis->CleanDevice(ipAddress.c_str(), FALSE, TRUE);
                     break;
                 }
@@ -882,8 +897,8 @@ int CDownloadDlg::TFTPDownload(BOOL again) {
     }
    if (waitCount >= 10) {
         if (again) {
-            mNic.SetIP(nic.mIPAddress.c_str(), nic.mGateway.c_str(), nic.mSubnetMask.c_str(), !again);
             SetPtsText( "Lost device, try again.");
+            mNic.SetIP(nic.mIPAddress.c_str(), nic.mGateway.c_str(), nic.mSubnetMask.c_str(), !again);
         } else {
             SetPtsText( "Lost device, abort updating.");
         }
@@ -903,7 +918,7 @@ int CDownloadDlg::TFTPDownload(BOOL again) {
 //#define CMD_OS_VERSION  "cat /proc/version \n"
 #define CMD_OS_VERSION  "uname -r\n"
 
-int CDownloadDlg::TelnetPST() {
+int CDownloadDlg::TelnetPST(CDevLabel **ppDev) {
     CString msg;
     string osVersion;
     string fwVersion;
@@ -920,6 +935,9 @@ int CDownloadDlg::TelnetPST() {
         if (m_Config.GetRunMode() ==RUNMODE_ONCE)
             StopWork(FALSE);
         return ERROR_INVALID_HANDLE;
+    }
+    if (ppDev != NULL) {
+        *ppDev = dev;
     }
 
     SOCKET sock = CreateSocket(dev->GetIpAddr().c_str());
@@ -1041,7 +1059,7 @@ TELPSTERR:
 DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
 #ifdef TPST
-    pThis->TelnetPST();
+    pThis->TelnetPST(NULL);
     return 0;
 #else
     CString cmd;
@@ -1845,6 +1863,7 @@ int CDownloadDlg::TFTPReporting (const struct S_TftpGui *pTftpGuiFirst)
         if (add)
         {
             itemPos = TFTPItemAdd (&m_TransferFileList, pTftpGui, Ark);
+            m_TransferFileList.SetSelectionMark(itemPos);
         } // create transfers
         m_pCoordinator->RefreshFirmwareTransfer(pTftpGui->stg_addr,
                 pTftpGui->filename, add);

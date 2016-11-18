@@ -62,7 +62,7 @@ protected:
   VOID StartWork();
   VOID StopWork(BOOL killSniff);
   VOID SetUIStatus(BOOL enable);
-  int TelnetPST();
+  int TelnetPST(CDevLabel **ppDev);
   int TFTPDownload(BOOL again);
   void UpdateMessage(CString msg);
   void ClearMessage(void);
