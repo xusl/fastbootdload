@@ -149,7 +149,7 @@ BOOL DeviceCoordinator::SetDownloadFirmware(list<char *> firmware) {
 BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,  CDevLabel** intfs) {
     CDevLabel* newDevIntf = NULL;
 
-    LOGD("Enter DeviceCoordinator::AddDevice");
+    //LOGD("Enter DeviceCoordinator::AddDevice");
 
     map <string, bool, greater<string>>::iterator Rit = mMacRecords.find(dev.GetMac());
     if ( Rit != mMacRecords.end() && mMacRecords[dev.GetMac()]) {
@@ -194,10 +194,7 @@ if (IsEmpty() == FALSE) {
     newDevIntf->SetFirmware(mpFirmware);
     mDevintfList.push_back(newDevIntf);
     LeaveCriticalSection(&mCriticalSection);
-    LOGI("add device %s (ip:%s, dlip:%s) into coordinator.",
-        newDevIntf->GetMac().c_str(),
-        newDevIntf->GetIpAddr().c_str(),
-        newDevIntf->GetDownloadIpAddr().c_str());
+    LOGI("add device %s into coordinator.", newDevIntf->GetMac().c_str());
 #endif
 
     if (intfs != NULL) {
@@ -372,8 +369,9 @@ VOID CDevLabel::Dump(const char *tag) {
 bool CDevLabel::SetFirmware(list<char *> pFirmware) {
     list<char *>::iterator it;
     for (it = pFirmware.begin(); it != pFirmware.end(); ++it) {
-        LOGD("ADD FILE %s", *it);
-        mFirmwareStatus.insert(pair<string, DWORD>(basename(*it), INVALID_TRANSFERID));
+        const char * file = basename(*it);
+        //LOGD("ADD FILE %s", file);
+        mFirmwareStatus.insert(pair<string, DWORD>(file, INVALID_TRANSFERID));
     }
     return true;
 }

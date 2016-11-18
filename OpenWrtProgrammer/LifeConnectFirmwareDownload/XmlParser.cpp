@@ -96,6 +96,7 @@ void XmlParser::Parse(const char * xmlPath) {
     HRESULT hr;
     VARIANT_BOOL bFlag;
     XML_Value.clear();
+    LOGD("Parse file %s", xmlPath);
     hr = spDoc->load(CComVariant(xmlPath), &bFlag);
     DoParse(spDoc);
 }
@@ -204,7 +205,7 @@ bool XmlParser::ElementHandler(CString& name, CComBSTR &value) {
     const char * pname = name.GetString();
     const char * pvalue = value_text.GetString();
 
-    LOGI("Name: %s,  Value:%s", pname, pvalue);
+    //LOGD("Name: %s,  Value:%s", pname, pvalue);
 
     //PCHAR pname = WideStrToMultiStr(name.GetBuffer(0));
     //PCHAR pvalue = WideStrToMultiStr(value_text.GetBuffer(0));

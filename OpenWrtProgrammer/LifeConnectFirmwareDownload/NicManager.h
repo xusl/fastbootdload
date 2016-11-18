@@ -17,6 +17,7 @@ class  NetCardStruct
 {
 public:
     DWORD    Id;         // Íø¿¨Éè±¸ºÅ
+    DWORD    dwIfIndex;
     string   DeviceDesc;     // Íø¿¨Ãû
     string   mNicDesc;
     string   driver;
@@ -39,6 +40,7 @@ public:
 
     VOID Reset() {
       Id = -1;
+      dwIfIndex = -1;
       memset(mPhysAddr, 0, sizeof mPhysAddr);
       //mPhysAddr.clear();
       DeviceDesc.clear();
@@ -81,6 +83,7 @@ public:
     BOOL GetConnectedState();
     BOOL CheckIpInArpTable(const char *ip, string & mac);
     int ResolveIpMac(const char *DestIpString, string & mac);
+    int FlushArp();
     bool Ping(const char *ip_addr);
 
 private:
@@ -93,6 +96,7 @@ private:
     BOOL RegReadAdapter(const char* driver, string &adapter);
     bool NetCardStateChange(NetCardStruct &netCard, bool Enabled);
     BOOL UpdateNic();
+    BOOL WaitAddrChanged();
     BOOL SwitchNic(NetCardStruct &netCard, bool Enabled);
     ULONG GetRegistryProperty(HDEVINFO DeviceInfoSet,
                                       PSP_DEVINFO_DATA DeviceInfoData,

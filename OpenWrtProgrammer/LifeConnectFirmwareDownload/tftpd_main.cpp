@@ -695,7 +695,7 @@ void TftpdMain (void *param)
 
     Rc = closesocket (tftpThreadMonitor.skt);
     tftpThreadMonitor.skt=INVALID_SOCKET;
-    WSACloseEvent (hSocketEvent);
+    //WSACloseEvent (hSocketEvent);
 
     LOGE ("main TFTP thread ends here");
     _endthread ();

@@ -155,10 +155,10 @@ BOOL NicManager::CheckIpInArpTable(const char *ip, string & mac)
             pType = "Static";
 
         if (!outputTitle) {
-        	LOGD("Internet Address      Physical Address             Type");
+        	LOGD("Internet Address      Physical Address             Type    Index");
             outputTitle = TRUE;
         }
-       LOGD("%-20s  %-25s  %-20s",ipaddr,macaddr, pType);
+       LOGD("%-20s  %-25s  %-20s   %d",ipaddr,macaddr, pType, pMib->table[i].dwIndex);
 
         if (strcmp(ip, ipaddr) == 0) {
             mac = macaddr;
@@ -248,6 +248,47 @@ int NicManager::ResolveIpMac(const char *DestIpString, string & mac)
 
     return dwRetVal;
 }
+
+int NicManager::FlushArp()
+{
+    PIP_ADAPTER_INFO pAdapterInfo;
+    PIP_ADAPTER_INFO pAdapter = NULL;
+    DWORD dwRetVal = 0;
+    ULONG ulOutBufLen;
+    pAdapterInfo=(PIP_ADAPTER_INFO)malloc(sizeof(IP_ADAPTER_INFO));
+    if (pAdapterInfo == NULL) {
+        LOGE("Out of Memory");
+        return FALSE;
+    }
+
+    ulOutBufLen = sizeof(IP_ADAPTER_INFO);
+    // 第一次调用GetAdapterInfo获取ulOutBufLen大小
+    if (GetAdaptersInfo( pAdapterInfo, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW)
+    {
+        free(pAdapterInfo);
+        pAdapterInfo = (IP_ADAPTER_INFO *) malloc (ulOutBufLen);
+        if (pAdapterInfo == NULL) {
+            LOGE("Out of Memory");
+            return FALSE;
+        }
+    }
+
+    if ((dwRetVal = GetAdaptersInfo( pAdapterInfo, &ulOutBufLen)) == NO_ERROR)
+    {
+        pAdapter = pAdapterInfo;
+        while (pAdapter)
+        {
+            dwRetVal = FlushIpNetTable(pAdapter->Index);
+
+            pAdapter = pAdapter->Next;
+        }
+    }
+
+    free(pAdapterInfo);
+
+    return TRUE ;
+}
+
 
 BOOL NicManager::GetConnectedState() {
     DWORD flag;
@@ -484,28 +525,6 @@ void CIpChangeDlg::GetConnectNames()
 }
 
 //
-void NotifyAddrChangeTest()
-{
-  OVERLAPPED overlap;
-  DWORD ret;
-
-  HANDLE hand = NULL;
-  overlap.hEvent = WSACreateEvent();
-
-  ret = NotifyAddrChange(&hand, &overlap);
-
-  if (ret != NO_ERROR)
-  {
-    if (WSAGetLastError() != WSA_IO_PENDING)
-    {
-      printf("NotifyAddrChange error...%d\n", WSAGetLastError());
-      return;
-    }
-  }
-
-  if ( WaitForSingleObject(overlap.hEvent, INFINITE) == WAIT_OBJECT_0 )
-    printf("IP Address table changed..\n");
-}
 #endif
 
 BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
@@ -539,7 +558,9 @@ BOOL NicManager::GetNicInfo(NetCardStruct &netCard) {
             netCard.mIPAddress =pIpAddrString->IpAddress.String;
             netCard.mGateway = pGateway->IpAddress.String;
             netCard.mEnableDHCP = pInfo->DhcpEnabled;
+            netCard.dwIfIndex = pInfo->Index;
             memcpy(netCard.mPhysAddr, pInfo->Address, sizeof netCard.mPhysAddr);
+            LOGE("xxxxxxx Index %d, ComboIndex: %d", pInfo->Index, pInfo->ComboIndex);
             LOGE("Update '%s' IP '%s' dhcp %d", pInfo->Description, pIpAddrString->IpAddress.String, pInfo->DhcpEnabled);
             delete pIpAdapterInfo;
             return TRUE;
@@ -1108,6 +1129,38 @@ BOOL NicManager::UpdateNic() {
     m_IsChangingIp = FALSE;
     return TRUE;
 }
+
+BOOL NicManager::WaitAddrChanged()
+{
+  OVERLAPPED overlap;
+  DWORD ret;
+
+  HANDLE hand = NULL;
+  overlap.hEvent = WSACreateEvent();
+
+  ret = NotifyAddrChange(&hand, &overlap);
+
+  if (ret != NO_ERROR)
+  {
+    if (WSAGetLastError() != WSA_IO_PENDING)
+    {
+      LOGE("NotifyAddrChange error...%d", WSAGetLastError());
+      return FALSE;
+    }
+  }
+
+  if ( WaitForSingleObject(overlap.hEvent, m_Timeout/*INFINITE*/) == WAIT_OBJECT_0 ) {
+    LOGE("IP Address table changed");
+    WSACloseEvent (overlap.hEvent);
+    return TRUE;
+  }
+  WSACloseEvent (overlap.hEvent);
+  LOGE("timeout %d, no notification of address change", m_Timeout);
+  return FALSE;
+}
+
+
+
 // Start an explorer window, directory is Tftpd32's default directory
 BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
 {
@@ -1156,29 +1209,11 @@ BOOL NicManager::SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp)
             LOGE("Can not get IP now");
         }
 #else
-      OVERLAPPED overlap;
-      DWORD ret;
-
-      HANDLE hand = NULL;
-      overlap.hEvent = WSACreateEvent();
-
-      ret = NotifyAddrChange(&hand, &overlap);
-
-      if (ret != NO_ERROR)
-      {
-        if (WSAGetLastError() != WSA_IO_PENDING)
-        {
-          LOGE("NotifyAddrChange error...%d", WSAGetLastError());
-          return FALSE;
+        if (WaitAddrChanged()) {
+            UpdateIP();
+            return TRUE;
         }
-      }
 
-      if ( WaitForSingleObject(overlap.hEvent, m_Timeout/*INFINITE*/) == WAIT_OBJECT_0 ) {
-        LOGE("IP Address table changed");
-        UpdateIP();
-        return TRUE;
-      }
-      LOGE("timeout, no notification of address change");
 #endif
         return FALSE;
     } /* else if (m_NicToggle == NIC_SETIF_TOGGLE)  {

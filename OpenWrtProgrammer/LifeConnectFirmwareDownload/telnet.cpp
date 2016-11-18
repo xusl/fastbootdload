@@ -963,7 +963,7 @@ int telnet::receive_telnet_data(char *buffer, ssize_t len) {
         /* read data from network */
         memset(buf, 0, sizeof buf);
         code = Curl_read(sockfd, buf, CURLMIN(BUFSIZE, len) - 1, &nread);
-        LOGD("read %d bytes", nread);
+        //LOGD("read %d bytes", nread);
         /* read would've blocked. Loop again */
         if(code == CURLE_AGAIN) {
             continue;
@@ -977,7 +977,7 @@ int telnet::receive_telnet_data(char *buffer, ssize_t len) {
         }
 
         if (telnet_cmd_negotiate){
-            LOGD("read:: %s", buf);
+            LOGD("read(%d bytes): %s",nread, buf);
             if (len > 0) {
                 int rl = CURLMIN(nread, len);
                 strncpy(buffer, buf, rl);

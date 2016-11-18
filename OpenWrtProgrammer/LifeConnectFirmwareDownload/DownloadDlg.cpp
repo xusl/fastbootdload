@@ -397,6 +397,7 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr, BOOL killSniff, BOOL up
     else
         StopTftpd32Services ();
     //SetPtsText(msg);
+    mNic.FlushArp();
     return TRUE;
 }
 
@@ -547,12 +548,33 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
         return FALSE;
     }
 */
+
+   int waitCount = 0;
+
+   for (; waitCount < 5; waitCount++) {
+        if (0 != mNic.ResolveIpMac(pcIpAddr, mac) /*&&
+           !mNic.CheckIpInArpTable(pcIpAddr, mac) */) {
+           LOGE("can not found device, wait 2000");
+           Sleep(2000);
+        } else {
+          break;
+        }
+   }
+
+   if (waitCount >= 5) {
+        msg.Format("can not find device (%s ).", pcIpAddr);
+        SetPtsText( msg);
+        return FALSE;
+    }
+
+#if 0
     if (0 != mNic.ResolveIpMac(pcIpAddr, mac) &&
        !mNic.CheckIpInArpTable(pcIpAddr, mac)) {
         msg.Format("can not find device (%s ).", pcIpAddr);
         SetPtsText( msg);
         return FALSE;
     }
+#endif
 
     if (!m_pCoordinator->AddDevice(CDevLabel(mac, string(pcIpAddr)) , NULL)) {
         msg.Format("%s have alread been add into device manager", mac.c_str());
@@ -836,16 +858,16 @@ int CDownloadDlg::TFTPDownload() {
         SetInformation(HOST_NIC, "");
     }
 
-    for (; waitCount < 5; waitCount++) {
-        if (0 != mNic.ResolveIpMac(DEVICE_DOWNLOAD_IP, mac) &&
-           !mNic.CheckIpInArpTable(DEVICE_DOWNLOAD_IP, mac)) {
+    for (; waitCount < 10; waitCount++) {
+        if (0 != mNic.ResolveIpMac(DEVICE_DOWNLOAD_IP, mac) /*&&
+           !mNic.CheckIpInArpTable(DEVICE_DOWNLOAD_IP, mac)*/) {
            LOGE("can not found device, wait 2000");
            Sleep(2000);
         } else {
           break;
         }
     }
-       if (waitCount >= 5) {
+       if (waitCount >= 10) {
         SetPtsText( "Lost device, abort updating.");
         return -1;
    }
@@ -990,6 +1012,7 @@ Ethernet adapter 本地连接:
         Default Gateway . . . . . . . . . :
 
 */
+    LOGE("wait for device reboot");
     Sleep(3000);
     closesocket(sock);
     return TFTPDownload();
@@ -1553,14 +1576,6 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
      if (dev != NULL)
          result = dev->IsDownloadFinish();
 
-    if (result && b_download) {
-        MessageBeep(MB_ICONINFORMATION);
-        SetPtsText("Device updated.");
-        if (RUNMODE_ONCE == m_Config.GetRunMode())
-            CleanDevice(mNic.GetDefaultNic().mGateway.c_str(), TRUE, TRUE);
-        b_download = false;
-    }
-
     // detach leaf
     if (pTftpPrev != NULL)
         pTftpPrev->next = pTftpGui->next ;
@@ -1579,6 +1594,14 @@ int CDownloadDlg::TFTPEnd (struct S_TftpTrfEnd *pTrf)
 
     // recall TFTPReporting : it will notice the process
     TFTPReporting (pTftpGuiFirst);
+
+    if (result && b_download) {
+        MessageBeep(MB_ICONINFORMATION);
+        SetPtsText("Device updated.");
+        if (RUNMODE_ONCE == m_Config.GetRunMode())
+            CleanDevice(mNic.GetDefaultNic().mGateway.c_str(), TRUE, TRUE);
+        b_download = false;
+    }
     return 0;
 } // TFTPEnd
 
