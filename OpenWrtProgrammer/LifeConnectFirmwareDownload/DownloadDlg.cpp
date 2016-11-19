@@ -273,9 +273,9 @@ BOOL CDownloadDlg::OnInitDialog()
     CButton* versionCheck = (CButton *)GetDlgItem(IDC_DISABLE_CHECK);
     versionCheck->SetIcon(icon);
 
-    m_TransferFileList.SetExtendedStyle(LVS_EX_GRIDLINES |
+    m_TransferFileList.SetExtendedStyle(//LVS_EX_GRIDLINES |
                                     LVS_EX_FULLROWSELECT |
-                                    LVS_EX_COLUMNSNAPPOINTS |
+                                    //LVS_EX_COLUMNSNAPPOINTS |
                                     LVS_EX_BORDERSELECT);
 
     m_TransferFileList.InsertColumn(FD_PEER,     _T("Peer"), LVCFMT_CENTER, 130);
@@ -581,8 +581,8 @@ BOOL CDownloadDlg::SniffNetwork(const char * const tag, const char * const pcIpA
    int waitCount = 0;
 
    for (; waitCount < 5; waitCount++) {
-        if (0 != mNic.ResolveIpMac(pcIpAddr, mac) /*&&
-           !mNic.CheckIpInArpTable(pcIpAddr, mac) */) {
+        if (0 != mNic.ResolveIpMac(pcIpAddr, mac) &&
+           !mNic.CheckIpInArpTable(pcIpAddr, mac) ) {
            LOGE("can not found device, wait 2000");
            Sleep(2000);
         } else {
@@ -883,12 +883,14 @@ int CDownloadDlg::TFTPDownload(BOOL again) {
     if (nic.mIPAddress != DEFAULT_SERVER_IP) {
         msg.Format("Now IP is %s, change to the default IP", nic.mIPAddress.c_str());
         SetPtsText( msg);
-        mNic.SetIP(DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP, "255.255.255.0", !again);
+        mNic.SetIP(DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP, "255.255.255.0");
+        SetInformation(HOST_NIC, "");
     }
 
+#if 1
     for (; waitCount < 10; waitCount++) {
-        if (0 != mNic.ResolveIpMac(DEVICE_DOWNLOAD_IP, mac) /*&&
-           !mNic.CheckIpInArpTable(DEVICE_DOWNLOAD_IP, mac)*/) {
+        if (0 != mNic.ResolveIpMac(DEVICE_DOWNLOAD_IP, mac) &&
+           !mNic.CheckIpInArpTable(DEVICE_DOWNLOAD_IP, mac)) {
            LOGE("can not found device, wait 2000");
            Sleep(2000);
         } else {
@@ -898,15 +900,15 @@ int CDownloadDlg::TFTPDownload(BOOL again) {
    if (waitCount >= 10) {
         if (again) {
             SetPtsText( "Lost device, try again.");
-            mNic.SetIP(nic.mIPAddress.c_str(), nic.mGateway.c_str(), nic.mSubnetMask.c_str(), !again);
+            mNic.SetIP(nic.mIPAddress.c_str(), nic.mGateway.c_str(), nic.mSubnetMask.c_str());
         } else {
             SetPtsText( "Lost device, abort updating.");
         }
         return -1;
    }
+#endif
 
-    mNic.UpdateIP();
-    SetInformation(HOST_NIC, "");
+    //mNic.UpdateIP();
     SetPtsText( "start download server");
     StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
     return NO_ERROR;

@@ -7,7 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{89B6FB07-6797-4204-8855-80DD85E95B86}
 AppName=LifeConnectPST
-AppVersion=1.3
+AppVersion=1.4.0.0
 ;AppVerName=LifeConnectPST 1.3
 AppPublisher=JRD (Shenzhen), Inc.
 AppPublisherURL=www.jrdcom.com
@@ -43,6 +43,7 @@ Source: "..\OpenWrtProgrammer\LifeConnectFirmwareDownload\Config.ini"; DestDir: 
 Name: "{group}\LifeConnectPST"; Filename: "{app}\LifeConnectPST.exe"
 Name: "{commondesktop}\LifeConnectPST"; Filename: "{app}\LifeConnectPST.exe"; Tasks: desktopicon
 
-[Run]
-Filename: "{app}\LifeConnectPST.exe"; Description: "{cm:LaunchProgram,LifeConnectPST}"; Flags: nowait postinstall skipifsilent
+;remove , for x64 platform work inproperly.
+;[Run]
+;Filename: "{app}\LifeConnectPST.exe"; Description: "{cm:LaunchProgram,LifeConnectPST}"; Flags: nowait postinstall skipifsilent
 
