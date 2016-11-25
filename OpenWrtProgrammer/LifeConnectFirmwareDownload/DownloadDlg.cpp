@@ -908,7 +908,8 @@ int CDownloadDlg::TFTPDownload(BOOL again) {
    }
 #endif
 
-    //mNic.UpdateIP();
+    mNic.UpdateIP();
+    SetInformation(HOST_NIC, "");
     SetPtsText( "start download server");
     StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
     return NO_ERROR;
@@ -995,12 +996,37 @@ int CDownloadDlg::TelnetPST(CDevLabel **ppDev) {
 
     if (dc->GetSuperMode() == FALSE) {
         if ( customId != m_Config.GetFirmwareCustomId()) {
-            msg = "Custom ID is not matched.";
+            msg = "Customer ID of device and package are not matched.";
             goto TELPSTERR;
         }
         if (buildId >= m_Config.GetFirmwareBuildId()) {
-            msg = "Package's build ID LESS than or EQUAL to device's.";
+            msg = "Device firmware is the lastest version.";
             goto TELPSTERR;
+        }
+    } else {
+        if ( customId != m_Config.GetFirmwareCustomId()) {
+            int result = ::MessageBox(NULL,
+                                  _T("Customer ID of device and package are not matched. Press 'Ok' to continue, press 'Cancel' to abort?"),
+                                  _T("Confirm"),
+                                  MB_OKCANCEL | MB_ICONQUESTION | MB_TASKMODAL);
+            if (result == IDOK) {
+                LOGE("Confirm to update device when customer ID of device and package are not matched.");
+            } else {
+                msg = "Customer ID of device and package are not matched.";
+                goto TELPSTERR;
+            }
+        }
+        if (buildId >= m_Config.GetFirmwareBuildId()) {
+            int result = ::MessageBox(NULL,
+                                  _T("Device firmware is the lastest version. Press 'Ok' to continue, press 'Cancel' to abort?"),
+                                  _T("Confirm"),
+                                  MB_OKCANCEL | MB_ICONQUESTION | MB_TASKMODAL);
+            if (result == IDOK) {
+                LOGE("Confirm to update when Device firmware is the lastest version.");
+            } else {
+                msg = "Device firmware is the lastest version.";
+                goto TELPSTERR;
+            }
         }
     }
 
@@ -1965,7 +1991,7 @@ void CDownloadDlg::OnBnClickedDisableCheck()
         int result = ::MessageBox(NULL,
                                   _T("Enbale version check?"),
                                   _T("Information"),
-                                  MB_OKCANCEL | MB_ICONQUESTION);
+                                  MB_OKCANCEL | MB_ICONQUESTION | MB_TASKMODAL);
         if (result == IDOK) {
             SetIcon(m_hIcon, TRUE);
             SetIcon(m_hIcon, FALSE);
