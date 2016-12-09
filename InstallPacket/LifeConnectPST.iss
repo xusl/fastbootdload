@@ -7,7 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{89B6FB07-6797-4204-8855-80DD85E95B86}
 AppName=LifeConnectPST
-AppVersion=1.4.0.0
+AppVersion=1.5.0.0
 ;AppVerName=LifeConnectPST 1.3
 AppPublisher=JRD (Shenzhen), Inc.
 AppPublisherURL=www.jrdcom.com
