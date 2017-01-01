@@ -9,10 +9,10 @@
 
 // CSettingsDlg 对话框
 
-IMPLEMENT_DYNAMIC(CSettingsDlg, CDialog)
+IMPLEMENT_DYNAMIC(CSettingsDlg, CDialogEx)
 
 CSettingsDlg::CSettingsDlg(CWnd* pParent /*=NULL*/)
-	: CDialog(CSettingsDlg::IDD, pParent),
+	: CDialogEx(CSettingsDlg::IDD, pParent),
 	m_pSchedule(NULL),
   m_pFlashdirect(NULL),
   m_pForceupdate(NULL)
@@ -28,7 +28,7 @@ CSettingsDlg::~CSettingsDlg()
 
 void CSettingsDlg::DoDataExchange(CDataExchange* pDX)
 {
-	CDialog::DoDataExchange(pDX);
+	CDialogEx::DoDataExchange(pDX);
   if (m_pSchedule != NULL) {
     DDX_Check(pDX, IDC_SCHE_REMOVE, *m_pSchedule);
   }
@@ -62,7 +62,7 @@ BOOL CSettingsDlg::SetForeUpdateData(int *pData){
   return TRUE;
 }
 
-BEGIN_MESSAGE_MAP(CSettingsDlg, CDialog)
+BEGIN_MESSAGE_MAP(CSettingsDlg, CDialogEx)
 	ON_NOTIFY_EX_RANGE(TTN_NEEDTEXT,0,0xFFFF,&CSettingsDlg::OnToolTipNotify)
 	ON_WM_SIZE()
 	ON_BN_CLICKED(IDC_CHECK_FORCEUPDATE, &CSettingsDlg::OnBnClickedCheckForceupdate)
@@ -104,8 +104,8 @@ END_MESSAGE_MAP()
 // CSettingsDlg 消息处理程序
 
 BOOL CSettingsDlg::OnInitDialog()
-	{
-	CDialog::OnInitDialog();
+{
+	CDialogEx::OnInitDialog();
 
   //Why ? this will disable tip
   //CWnd * handle = GetDlgItem(IDC_STATIC_SETTING);
@@ -116,7 +116,7 @@ BOOL CSettingsDlg::OnInitDialog()
   //EnableTrackingToolTips();
 	EnableToolTips();
 	return TRUE;  // return TRUE unless you set the focus to a control
-	}
+}
 
 
 void CSettingsDlg::OnBnClickedCheckForceupdate()
@@ -125,7 +125,7 @@ void CSettingsDlg::OnBnClickedCheckForceupdate()
    if (pBtn != NULL)
    {
 	   *m_pForceupdate = pBtn->GetCheck();
-	   WritePrivateProfileString(L"app",L"forceupdate",*m_pForceupdate?L"1":L"0",m_pParent->m_ConfigPath.GetBuffer());
+//	   WritePrivateProfileString(L"app",L"forceupdate",*m_pForceupdate?L"1":L"0",m_pParent->m_ConfigPath.GetBuffer());
    }
 }
 

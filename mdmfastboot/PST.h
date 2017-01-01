@@ -18,9 +18,9 @@ typedef struct FlashImageInfo {
     wchar_t *partition;
     char *partition_str;
     wchar_t *lpath;
-	void *data;
-	unsigned size;
-	bool need_download;
+	  void *data;
+	  unsigned size;
+	  bool need_download;
 }FlashImageInfo;
 
 class flash_image{
@@ -51,6 +51,8 @@ class flash_image{
     int GetDiagDlImgSize();
     int GetFbDlImgSize();
 
+    int SetPartitionDownloadFlag(CString partition, boolean flag);
+
      bool AddFileBuffer(const wchar_t *partition, const wchar_t *pkgPath, const wchar_t *filName);
      map<string,FileBufStruct> GetFileBuffer() { return m_dlFileBuffer;};
 
@@ -64,6 +66,7 @@ class flash_image{
     BOOL reset(BOOL free_only);
 
   private:
+    CString  mAppConfigFile;  //todo , will change to project config, for app will support many projects
     FlashImageInfo *image_list;
     FlashImageInfo *image_last;
     wchar_t pkg_dir[MAX_PATH];

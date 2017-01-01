@@ -33,6 +33,8 @@ flash_image::flash_image(const wchar_t* config):
     return ;
   }
 
+  mAppConfigFile = config;
+
   data_len = GetPrivateProfileString(PKG_SECTION,
                                      PKG_PATH,
                                      GetAppPath(path).GetString(),
@@ -187,8 +189,6 @@ int flash_image::read_fastboot_config(const wchar_t* config) {
   return 0;
 }
 
-
-
 int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write, const wchar_t* config)
 {
   FlashImageInfo* img = NULL;
@@ -302,8 +302,9 @@ const wchar_t * flash_image::get_package_qcn_path(void) {
 }
 
 BOOL flash_image::set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL release) {
-    if(dir == NULL) {
-        ERROR("Bad Parameter.");
+    if(dir == NULL || !PathFileExists(dir)) {
+        ERROR("%S%S", dir == NULL ? _T("Null parameter") : dir,
+                      dir == NULL ? _T("") : _T(" is not exist!"));
         return FALSE;
     }
 
@@ -315,7 +316,7 @@ BOOL flash_image::set_package_dir(const wchar_t * dir, const wchar_t* config, BO
     wcscpy(pkg_dir, dir);
 
     if (config != NULL)
-    WritePrivateProfileString(PKG_SECTION, PKG_PATH, dir ,config);
+        WritePrivateProfileString(PKG_SECTION, PKG_PATH, dir ,config);
 
 #if 0
     if(release) {
@@ -522,6 +523,10 @@ BOOL flash_image::set_download_flag(CString strPartitionName, bool bDownload) {
 		if (0 == wcscmp(img->partition, strPartitionName.GetBuffer()))
 		{
 			img->need_download = bDownload;
+            WritePrivateProfileString(PARTITIONTBL_DL,
+                              strPartitionName.GetBuffer(),
+                              bDownload?L"1":L"0",
+                              mAppConfigFile.GetBuffer());
 			bRet = 1;
 			break;
 		}

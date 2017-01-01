@@ -207,6 +207,7 @@ const char * basename(const char * f_name);
 CString GetFileNameFromFullPath(CString FullPath);
 void get_my_path(char *s, size_t maxLen);
 CString GetAppPath(CString & sPath );
+CString GetDirName(CString path);
 void sleep(int seconds);
 long long now(void);
 PWCH MultiStrToWideStr(PCCH pc);

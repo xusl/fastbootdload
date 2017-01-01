@@ -111,6 +111,9 @@
     <ClCompile Include="..\src\ConfigIni.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="PasswordEnterDlg.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DlWorker.h">
@@ -152,6 +155,9 @@
     <ClInclude Include="PST.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="PasswordEnterDlg.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="res\mdmfastboot.ico">
@@ -161,6 +167,15 @@
       <Filter>资源文件</Filter>
     </None>
     <None Include="ReadMe.txt" />
+    <None Include="res\mdmfastboot1.ico">
+      <Filter>资源文件</Filter>
+    </None>
+    <None Include="res\lock.ico">
+      <Filter>资源文件</Filter>
+    </None>
+    <None Include="res\unlock.ico">
+      <Filter>资源文件</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="mdmfastboot.rc">

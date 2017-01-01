@@ -1,5 +1,5 @@
 #pragma once
-
+#include "afxdialogex.h"
 enum {
 SETTING_FORCEUPDATE = 0,
 SETTING_REMOVE,
@@ -8,7 +8,7 @@ SETTING_REMOVE,
 
 class CmdmfastbootDlg;
 
-class CSettingsDlg : public CDialog
+class CSettingsDlg : public CDialogEx
 {
 	DECLARE_DYNAMIC(CSettingsDlg)
 

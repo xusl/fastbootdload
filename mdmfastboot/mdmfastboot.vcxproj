@@ -280,6 +280,7 @@
     <ClCompile Include="..\src\log.cpp" />
     <ClCompile Include="mdmfastboot.cpp" />
     <ClCompile Include="mdmfastbootDlg.cpp" />
+    <ClCompile Include="PasswordEnterDlg.cpp" />
     <ClCompile Include="PortStateUI.cpp" />
     <ClCompile Include="PST.cpp" />
     <ClCompile Include="qcnlib\QcnParser.cpp" />
@@ -303,6 +304,7 @@
     <ClInclude Include="fastbootflash.h" />
     <ClInclude Include="mdmfastboot.h" />
     <ClInclude Include="mdmfastbootDlg.h" />
+    <ClInclude Include="PasswordEnterDlg.h" />
     <ClInclude Include="PST.h" />
     <ClInclude Include="qcnlib\QcnParser.h" />
     <ClInclude Include="Resource.h" />
@@ -311,9 +313,12 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="res\lock.ico" />
     <None Include="res\mdmfastboot.ico" />
     <None Include="res\mdmfastboot.rc2" />
     <None Include="ReadMe.txt" />
+    <None Include="res\mdmfastboot1.ico" />
+    <None Include="res\unlock.ico" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="mdmfastboot.rc" />

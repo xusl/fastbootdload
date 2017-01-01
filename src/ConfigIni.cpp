@@ -122,3 +122,49 @@ ConfigIni::~ConfigIni() {
   if(log_tag) delete log_tag;
   if(log_level) delete log_level;
 }
+
+void ConfigIni:: ScanDir (const wchar_t *szDirectory)
+{
+    HANDLE      hFind;
+    WIN32_FIND_DATA  FindData;
+    wchar_t     szFileSpec [_MAX_PATH + 5];
+    FILETIME    FtLocal;
+    SYSTEMTIME  SysTime;
+    wchar_t        szLine [256];
+    wchar_t        szDate [sizeof "jj/mm/aaaa"];
+
+    szFileSpec [_MAX_PATH - 1] = 0;
+    lstrcpyn (szFileSpec, szDirectory, _MAX_PATH);
+//    lstrcat (szFileSpec, "\\*.*");
+    lstrcat (szFileSpec, _T("\\*config.ini"));
+    hFind = FindFirstFile (szFileSpec, &FindData);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    do {
+        // display only files, skip directories
+        if (FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue;
+#if 0
+        FileTimeToLocalFileTime (& FindData.ftCreationTime, & FtLocal);
+        FileTimeToSystemTime (& FtLocal, & SysTime);
+        GetDateFormat (LOCALE_SYSTEM_DEFAULT,
+                       DATE_SHORTDATE,
+                       & SysTime,
+                       NULL,
+                       szDate, sizeof szDate);
+        szDate [sizeof "jj/mm/aaaa" - 1]=0;    // truncate date
+        FindData.cFileName[62] = 0;      // truncate file name if needed
+        // dialog structure allow up to 64 char
+        wsprintf (szLine, "%s\t%s\t%d",
+                  FindData.cFileName, szDate, FindData.nFileSizeLow);
+#endif
+        LOGD("Find file %S", FindData.cFileName);
+
+    }
+    while (FindNextFile (hFind, & FindData));
+
+    FindClose (hFind);
+
+}

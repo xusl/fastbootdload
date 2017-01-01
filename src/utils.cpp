@@ -68,6 +68,20 @@ CString GetAppPath(CString & sPath )
 	return sPath;
 }
 
+CString GetDirName(CString path) {
+    CString dirName = _T("");
+    wchar_t drive[_MAX_DRIVE];
+	wchar_t dir[_MAX_DIR];
+
+//	GetCurrentDirectory(MAX_PATH, currdir);
+	_wsplitpath_s(path.GetString(), drive, _MAX_DRIVE, dir, _MAX_DIR, 0, 0, 0, 0);
+
+	dirName = drive;
+	dirName += dir;
+
+	return dirName;
+}
+
 void get_my_path(char *exe, size_t maxLen)
 {
     char  *r;

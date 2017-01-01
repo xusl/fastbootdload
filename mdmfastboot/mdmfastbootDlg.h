@@ -25,6 +25,8 @@
 #include <ConfigIni.h>
 #include "XmlParser.h"
 
+//#define INLINE_SETTING
+
 enum
 {
 	// UI Messages
@@ -84,15 +86,6 @@ protected:
  friend CSettingsDlg;
 
  public:
-  //configuration
-  BOOL m_pack_img;
-  BOOL m_fix_port_map;
-  BOOL m_flashdirect;
-  BOOL m_forceupdate; // do not check version, if not exist config.xml or version rule is not match
-  int m_nPort;
-  int m_nPortRow;
-  int switch_timeout;
-  int work_timeout;
   CString m_strModuleName;
 
 	//CThreadPool<CDlWorker> m_dlWorkerPool;
@@ -100,11 +93,14 @@ protected:
 
   ConfigIni   mAppConf;
   XmlParser   m_LocalConfigXml;
-  flash_image *m_image;
-  UsbWorkData* m_workdata[PORT_NUM_MAX];
-  CListCtrl  *m_imglist;
+  flash_image  *m_image;
+  UsbWorkData *m_workdata[PORT_NUM_MAX];
+  CListCtrl   *m_imglist;
+  CComboBox   *m_project;
   //CListCtrl  *m_port;
+#ifdef INLINE_SETTING
   CSettingsDlg m_SetDlg;
+#endif
   vector<CDevLabel> m_WorkDev;
   DeviceCoordinator mDevCoordinator;
 
@@ -132,7 +128,7 @@ public:
   BOOL RejectCDROM(VOID);
   BOOL HandleComDevice(VOID);
   BOOL EnumerateAdbDevice(VOID);
-  BOOL ScheduleDeviceWork(BOOL flashdirect);
+  BOOL ScheduleDeviceWork();
   BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);
   BOOL UpdatePackageInfo(BOOL update = TRUE);
@@ -155,7 +151,9 @@ public:
     static UINT RunDevicePST(LPVOID wParam);
 
 private:
+#ifdef INLINE_SETTING
     BOOL InitSettingDlg(void);
+#endif
     UsbWorkData * FindUsbWorkData(wchar_t *devPath);
     BOOL IsHaveUsbWork(void);
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);

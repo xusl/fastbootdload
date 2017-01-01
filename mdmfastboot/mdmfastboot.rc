@@ -68,7 +68,10 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDR_MAINFRAME           ICON                    "res\\mdmfastboot.ico"
+IDR_MAINFRAME           ICON                    "F:\\fastbootdload\\mdmfastboot\\res\\mdmfastboot.ico"
+IDI_SUPERMODE           ICON                    "res\\mdmfastboot1.ico"
+IDI_LOCK                ICON                    "res\\lock.ico"
+IDI_UNLOCK              ICON                    "res\\unlock.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -96,7 +99,7 @@ BEGIN
     DEFPUSHBUTTON   "Start",IDC_BTN_START,441,323,40,13
     PUSHBUTTON      "Exit",IDCANCEL,540,323,40,13
     PUSHBUTTON      "Stop",IDC_BTN_STOP,496,323,40,13
-    PUSHBUTTON      "Setting",IDC_SETTING,392,323,40,13,NOT WS_VISIBLE
+    PUSHBUTTON      "Setting",IDC_SETTING,86,280,40,13
     GROUPBOX        "Package Information",IDC_GRP_PKG_INFO,4,6,117,237
     LTEXT           "FW Ver:",IDC_STATIC_FRM_VER_MAIN,8,33,33,12
     LTEXT           "QCN Ver:",IDC_STATIC_QCN_VER_MAIN,8,48,33,12
@@ -110,6 +113,8 @@ BEGIN
     CONTROL         "",IDC_IMAGE_LIST,"SysListView32",LVS_LIST | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOLABELWRAP | LVS_ALIGNLEFT | LVS_NOSORTHEADER | WS_BORDER,6,94,113,143,WS_EX_LEFTSCROLLBAR
     LTEXT           "PST",IDC_TPST_VERSION,10,20,13,9
     EDITTEXT        IDC_EDIT_PTS_VERSION,42,18,74,12,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY
+    COMBOBOX        IDC_CB_PLATFORM,82,304,48,30,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Platform",IDC_STATIC_PLATFORM,84,294,36,8
 END
 
 IDD_PORT_STATE DIALOGEX 0, 0, 277, 137
@@ -141,8 +146,20 @@ BEGIN
     CONTROL         "Force Update",IDC_CHECK_FORCEUPDATE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,18,117,16
     CONTROL         "Emergy Update",IDC_FASTBOOT_ONLY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,36,116,16
     CONTROL         "Schedule Manual",IDC_SCHE_REMOVE,"Button",BS_AUTOCHECKBOX | BS_BITMAP | BS_MULTILINE | WS_TABSTOP,14,54,81,16
-    CONTROL         "",IDC_SPIN1,"msctls_updown32",UDS_WRAP | UDS_ARROWKEYS | UDS_HORZ | NOT WS_VISIBLE,14,75,10,14
+    CONTROL         "",IDC_SPIN1,"msctls_updown32",UDS_WRAP | UDS_ARROWKEYS | UDS_HORZ | NOT WS_VISIBLE,14,75,90,14
     GROUPBOX        "Setting",IDC_STATIC_SETTING,9,7,146,99
+END
+
+IDD_ENTER_PASSWORD DIALOGEX 0, 0, 201, 123
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,39,93,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,93,93,50,14
+    LTEXT           "Please enter password:",IDC_STATIC,43,21,109,21
+    EDITTEXT        IDC_EDIT_PASSWORD,53,46,77,14,ES_AUTOHSCROLL
+    LTEXT           "",IDC_CAPSLOCK_PROMPT,42,72,108,15
 END
 
 
@@ -223,6 +240,14 @@ BEGIN
         TOPMARGIN, 7
         BOTTOMMARGIN, 106
     END
+
+    IDD_ENTER_PASSWORD, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 194
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 116
+    END
 END
 #endif    // APSTUDIO_INVOKED
 
@@ -244,6 +269,21 @@ BEGIN
         MENUITEM "&Help",                       ID_HELP
         MENUITEM "&About",                      ID_ABOUT
     END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog Info
+//
+
+IDD_MDMFASTBOOT_DIALOG DLGINIT
+BEGIN
+    IDC_CB_PLATFORM, 0x403, 5, 0
+0x4848, 0x3037, "\000" 
+    IDC_CB_PLATFORM, 0x403, 5, 0
+0x4848, 0x3034, "\000" 
+    0
 END
 
 

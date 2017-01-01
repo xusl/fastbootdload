@@ -28,11 +28,11 @@ public:
     BOOL         GetAutoWorkFlag(void) { return m_bWork; };
     BOOL         GetAfterSaleMode(void) { return m_pack_img;};
     int          GetUiPortTotalCount(void) { return m_nPort;};
-     int         GetUiPortRowCount(void) { return m_nPortRow;};
+    int          GetUiPortRowCount(void) { return m_nPortRow;};
     int          GetPSTWorkTimeout(void) { return work_timeout;};
 
-
 private:
+    void         ScanDir (const wchar_t *szDirectory);
 
 private:
     CString                 m_ConfigPath;

@@ -251,6 +251,7 @@ DeviceInterfaces *DeviceCoordinator::GetValidDevice() {
             return item;
         }
     }
+    LOGE("None device found");
     return NULL;
 }
 
@@ -330,11 +331,11 @@ VOID DeviceCoordinator::Dump(VOID) {
     list<DeviceInterfaces*>::iterator it;
     LOGI("DeviceCoordinator::===================================BEGIN");
     DeviceInterfaces* item ;
-        for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
-item = *it;
-item->Dump("dump device");
+    for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
+        item = *it;
+        item->Dump("dump device");
     }
-        LOGI("DeviceCoordinator::===================================END");
+    LOGI("DeviceCoordinator::===================================END");
 }
 
 //\\?\usbstor#disk&ven_onetouch&prod_link4&rev_2.31#6&21c8898b&1&0123456789abcdef&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b}
@@ -345,11 +346,12 @@ item->Dump("dump device");
 // so , device id reduces , "6&21c8898b&1&0"
 //the last "0" is the port, assign by windows.
 CDevLabel::CDevLabel(const wchar_t * devPath,
-                     const wchar_t* parentIdPrefix, bool useParentIdPrefix, const wchar_t * name):
-    mPortNum(~1),
-    mEffectiveSn(~1),
-    mEffectivePort (~1)
-{
+                     const wchar_t* parentIdPrefix,
+                     bool useParentIdPrefix,
+                     const wchar_t * name):
+mPortNum(~1),
+mEffectiveSn(~1),
+mEffectivePort (~1) {
     SetServiceName(name);
     CopyDeviceDescPath(devPath, parentIdPrefix);
     mUseParentIdPrefix = useParentIdPrefix;
@@ -372,8 +374,8 @@ CDevLabel::CDevLabel(const wchar_t * devPath,
         len = sne - snb - 1;
         wcsncpy_s(mDevId, DEV_ID_LEN, snb, len);
 
-    mEffectiveSn = usb_host_sn(devPath);
-    mEffectivePort = usb_host_sn_port(devPath);
+        mEffectiveSn = usb_host_sn(devPath);
+        mEffectivePort = usb_host_sn_port(devPath);
     } else {
         LOGE("Can not get invalid device id");
     }
@@ -382,11 +384,11 @@ CDevLabel::CDevLabel(const wchar_t * devPath,
     if (mUseParentIdPrefix && parentIdPrefix != NULL) {
         SetMatchId(parentIdPrefix);
     } else if (wcslen(mDevId) > 0) {
-      wchar_t *sne = ( wchar_t*)wcsrchr(mDevId , L'&');
-      if (sne != NULL)
-          wcsncpy_s(mMatchId, DEV_ID_LEN, mDevId, sne - mDevId);
-      else
-        LOGE("Can not find '&' in dev path.");
+        wchar_t *sne = ( wchar_t*)wcsrchr(mDevId , L'&');
+        if (sne != NULL)
+            wcsncpy_s(mMatchId, DEV_ID_LEN, mDevId, sne - mDevId);
+        else
+            LOGE("Can not find '&' in dev path.");
     }else {
         LOGE("Can not get invalid device id");
     }

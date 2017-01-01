@@ -14,6 +14,11 @@
 #define IDD_PORT_STATE                  129
 #define IDR_MENU_MAIN                   130
 #define IDD_SETTINGS                    132
+#define IDI_SUPERMODE                   134
+#define IDI_ICON2                       135
+#define IDI_LOCK                        135
+#define IDI_UNLOCK                      136
+#define IDD_ENTER_PASSWORD              139
 #define IDC_BTN_STOP                    1000
 #define IDC_ST_TITLE                    1001
 #define IDC_STATIC_USERDATA_VER         1002
@@ -51,6 +56,10 @@
 #define IDC_TPST_VERSION                1041
 #define IDC_EDIT_PTS_VERSION            1042
 #define IDC_VERSION_GROUP               1043
+#define IDC_CB_PLATFORM                 1044
+#define IDC_STATIC_PLATFORM             1045
+#define IDC_EDIT_PASSWORD               1046
+#define IDC_CAPSLOCK_PROMPT             1047
 #define ID_ABOUT_ABOUT                  32771
 #define ID_HELP_HELP                    32772
 #define ID_ABOUT_                       32773
@@ -62,9 +71,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        133
+#define _APS_NEXT_RESOURCE_VALUE        140
 #define _APS_NEXT_COMMAND_VALUE         32777
-#define _APS_NEXT_CONTROL_VALUE         1044
+#define _APS_NEXT_CONTROL_VALUE         1048
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
