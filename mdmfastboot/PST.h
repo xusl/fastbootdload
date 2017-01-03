@@ -6,6 +6,7 @@
 #include "device.h"
 #include <XmlParser.h>
 #include <ConfigIni.h>
+#include "adb_dev_register.h"
 
 using namespace std;
 
@@ -190,16 +191,49 @@ class UsbWorkData{
     BOOL            update_qcn;
 } ;
 
-
-#if 0
+#if 1
 class PSTManager {
-  CString m_ConfigPath;
-  ConfigIni   mAppConf;
-  XmlParser   m_LocalConfigXml;
-  flash_image  *m_image;
-  UsbWorkData *m_workdata[PORT_NUM_MAX];
+public:
+  PSTManager(AFX_THREADPROC pfnThreadProc);
+  ~PSTManager();
+  BOOL Initialize(CWnd *hWnd);
+  BOOL IsWork() { return m_bWork; }
+  VOID SetWork(BOOL work) { m_bWork = work; }
+  BOOL IsAfterSaleMode() { return mAppConf.GetAfterSaleMode(); }
+  BOOL IsSuperMode() { return mAppConf.GetFlashDirectFlag() || mAppConf.GetForceUpdateFlag(); }
+  UINT GetPortRows() { return mAppConf.GetUiPortRowCount(); }
+  CPortStateUI* GetPortUI(UINT index);
+  UsbWorkData *FindUsbWorkData(wchar_t *devPath);
+  BOOL FlashDeviceDone(UsbWorkData * data);
+  BOOL IsHaveUsbWork(void);
+  BOOL ScheduleDeviceWork();
+  BOOL Reset();
 
-  vector<CDevLabel> m_WorkDev;
-  DeviceCoordinator mDevCoordinator;
-}
+  BOOL RejectCDROM(VOID);
+  BOOL HandleComDevice(VOID);
+  BOOL EnumerateAdbDevice(VOID);
+  BOOL HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
+  BOOL HandleDeviceArrived(wchar_t *devPath);
+
+  int GetPortNum();
+  flash_image* GetProjectPackage() { return m_image;}
+  BOOL ChangePackage(const wchar_t * dir);
+  const wchar_t * GetPackage() { return m_image->get_package_dir();}
+  BOOL SetDownload(CString partition, bool bDownload) {
+    return m_image->set_download_flag(partition, bDownload);
+  }
+
+private:
+
+private:
+  ConfigIni          mAppConf;
+  XmlParser          m_LocalConfigXml;
+  flash_image       *m_image;
+  UsbWorkData       *m_workdata[PORT_NUM_MAX];
+
+  vector<CDevLabel>  m_WorkDev;
+  DeviceCoordinator  mDevCoordinator;
+  AFX_THREADPROC     mThreadProc;
+  volatile BOOL      m_bWork;
+};
 #endif

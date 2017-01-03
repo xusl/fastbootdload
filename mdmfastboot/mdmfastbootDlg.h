@@ -18,8 +18,6 @@
 #include "adbhost.h"
 #include "SettingsDlg.h"
 #include "qcnlib/QcnParser.h"
-#include "adb_dev_register.h"
-#include "scsicmd.h"
 #include "diagcmd.h"
 #include "jrddiagcmd.h"
 #include <ConfigIni.h>
@@ -62,7 +60,6 @@ protected:
 	HICON m_hIcon;
   BOOL m_bInit;
   BOOL m_UpdateDownloadFlag;
-  volatile BOOL m_bWork;
   unsigned int m_updated_number;
 
  friend CSettingsDlg;
@@ -70,21 +67,14 @@ protected:
  public:
   CString m_strModuleName;
 
+  PSTManager mPSTManager;
 	//CThreadPool<CDlWorker> m_dlWorkerPool;
-  CString m_ConfigPath;
-
-  ConfigIni   mAppConf;
-  XmlParser   m_LocalConfigXml;
-  flash_image  *m_image;
-  UsbWorkData *m_workdata[PORT_NUM_MAX];
   CListCtrl   *m_imglist;
   CComboBox   *m_project;
   //CListCtrl  *m_port;
 #ifdef INLINE_SETTING
   CSettingsDlg m_SetDlg;
 #endif
-  vector<CDevLabel> m_WorkDev;
-  DeviceCoordinator mDevCoordinator;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -107,15 +97,9 @@ public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	//afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
 
-  BOOL RejectCDROM(VOID);
-  BOOL HandleComDevice(VOID);
-  BOOL EnumerateAdbDevice(VOID);
-  BOOL ScheduleDeviceWork();
   BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);
   BOOL UpdatePackageInfo(BOOL update = TRUE);
-  BOOL HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
-  BOOL HandleDeviceArrived(wchar_t *devPath);
 
   BOOL SetupDevice(int evt);
   static void CALLBACK DeviceEventTimerProc(HWND hWnd,  UINT nMsg,  UINT_PTR nIDEvent,  DWORD dwTime);
@@ -136,11 +120,7 @@ private:
 #ifdef INLINE_SETTING
     BOOL InitSettingDlg(void);
 #endif
-    UsbWorkData * FindUsbWorkData(wchar_t *devPath);
-    BOOL IsHaveUsbWork(void);
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
-    BOOL InitSettingConfig(void);
-	  void UpdatePackage();
 
 public:
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);

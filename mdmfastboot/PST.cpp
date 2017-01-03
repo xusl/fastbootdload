@@ -4,6 +4,7 @@
 
 #include "usb_adb.h"
 
+#include "scsicmd.h"
 #include "resource.h"
 #include "qcnlib/QcnParser.h"
 #include <msxml.h>
@@ -12,6 +13,384 @@
 #include "PST.h"
 
 #include "PortStateUI.h"
+
+#include <ImgUnpack.h>
+
+PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
+    mThreadProc(pfnThreadProc),
+	mDevCoordinator(),
+	m_WorkDev()
+{
+    //construct update software package. get configuration about partition information.
+    mAppConf.ReadConfigIni();
+    StartLogging(mAppConf.GetLogFilePath(), mAppConf.GetLogLevel(), mAppConf.GetLogTag());
+
+    m_LocalConfigXml.Parse(mAppConf.GetPkgConfXmlPath());
+    m_bWork = mAppConf.GetAutoWorkFlag();
+
+    //if (NULL!=m_image) {
+    //    delete m_image;
+    //}
+    m_image = new flash_image(mAppConf.GetAppConfIniPath());
+
+    for (int i = 0; i < sizeof m_workdata/ sizeof m_workdata[0]; i++) {
+      m_workdata[i] = NULL;
+    }
+
+   //test
+
+    //unsigned int size;
+    //void *data = load_file(mAppConf.GetPkgConfXmlPath(), &size);
+    //XmlParser parser1;
+    //parser1.Parse((PCCH)data, size);
+    //parser1.Parse("<?wsx version \"1.0\" ?><smil> \
+    //         <media src = \"welcome1.asf\"/>cdcddddddddd</smil>");
+    LOGE(" xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+
+    string refs;
+    m_LocalConfigXml.getElementsByTagName(L"RECOVERYFS", refs);
+    LOGE("RECOVERYFS value %sxxxxxxxxxxxxxxxxxxxxx", refs.c_str());
+
+    ImgUnpack img;
+    img.UnpackDlImg(mAppConf.GetPkgDlImgPath(),mAppConf.GetAppConfIniPath());
+}
+
+
+BOOL PSTManager::Initialize(CWnd *hWnd) {
+  for (int i = 0; i < sizeof m_workdata/ sizeof m_workdata[0]; i++) {
+    m_workdata[i] = new UsbWorkData(i, hWnd, &mDevCoordinator, &mAppConf, &m_LocalConfigXml, m_image);
+  }
+  return TRUE;
+}
+
+PSTManager::~PSTManager() {
+  for (int i = 0; i < GetPortNum(); i++) {
+    if (m_workdata[i] != NULL) {
+       delete m_workdata[i];
+       m_workdata[i] = NULL;
+    }
+  }
+  if (m_image != NULL) {
+    delete m_image;
+    m_image = NULL;
+  }
+}
+
+int PSTManager::GetPortNum() {
+    return min(sizeof m_workdata/ sizeof m_workdata[0], mAppConf.GetUiPortTotalCount());
+}
+
+CPortStateUI* PSTManager::GetPortUI(UINT index) {
+    if (index >= GetPortNum()) {
+        LOGE("index(%d) is exceed port number (%d)", index, GetPortNum());
+        return NULL;
+    }
+
+    return m_workdata[index]->pCtl;
+}
+
+BOOL PSTManager::IsHaveUsbWork(void) {
+  UsbWorkData* workdata;
+  int i= 0;
+  for (; i < GetPortNum(); i++) {
+    workdata = m_workdata[i];
+    if (!workdata->IsIdle())
+        return TRUE ;
+  }
+  return FALSE;
+}
+
+BOOL PSTManager::FlashDeviceDone(UsbWorkData * data) {
+    if (data == NULL) {
+        LOGE("error, null parameter");
+        return FALSE;
+    }
+
+    data->Finish();
+    if (NULL == mDevCoordinator.IsEmpty()) {
+       // AfxMessageBox(L"All devices is updated!");
+    }
+
+    if (!mAppConf.GetPortDevFixedFlag()) {
+        // schedule next port now, and when  app receice device remove event,
+        // the current finished port is not in workdata set, for new device in the
+        // same port can not bootstrap in 1 seconds, even when there are no more
+        // idle device in other physical port.
+        //BUT THIS PRESUME IS NEED TEST.
+        sleep(10);
+
+        //data->Clean(mDevCoordinator.IsEmpty());
+        ScheduleDeviceWork();
+    }
+    return TRUE;
+}
+/*
+* get usbworkdata by usb_sn, the device is in switch or in working
+* or done, but not idle.
+*/
+UsbWorkData * PSTManager::FindUsbWorkData(wchar_t *devPath) {
+    DeviceInterfaces* devIntf;
+
+    if(!mDevCoordinator.GetDevice(devPath, &devIntf)) {
+        return NULL;
+    }
+
+    // first search the before, for switch device.
+    for ( int i= 0; i < GetPortNum(); i++) {
+        DeviceInterfaces* item = m_workdata[i]->mActiveDevIntf;
+        if (item == NULL)
+            continue;
+
+        if (item->MatchDevPath(devPath)&&
+            (m_workdata[i]->GetStatus() != USB_STAT_IDLE))
+            return m_workdata[i];
+    }
+
+    return NULL;
+}
+
+BOOL PSTManager::ScheduleDeviceWork() {
+    BOOL flashdirect = mAppConf.GetFlashDirectFlag();
+    if (!m_bWork) {
+        // INFO("do not work now.");
+        return FALSE;
+    }
+
+    /*
+     * Get usbworkdata that in free or in switch.
+     * fix_map means whether logical port (portstatui) fix map physical port.
+     * this feature will be useful when multiport port download, it help operator
+     * to make sure whether the device in a specific is flashed.
+     */
+    DeviceInterfaces* idleDev;
+    UsbWorkData* workdata;
+    LOGD("==========Begin ScheduleDeviceWork==============");
+
+    for (int i=0; i < GetPortNum(); i++) {
+        workdata = m_workdata[i];
+        DeviceInterfaces* item = workdata->mMapDevIntf;
+        if (item == NULL)
+            item = workdata->mActiveDevIntf;
+
+        if (workdata->GetStatus() == USB_STAT_WORKING)
+            continue;
+
+        while(NULL != (idleDev = mDevCoordinator.GetValidDevice())) {
+            idleDev->Dump(__FUNCTION__);
+            if (workdata->GetStatus() == USB_STAT_SWITCH) {
+                ASSERT(item != NULL);
+                if (!item->Match(idleDev))
+                    continue;
+
+                workdata->SetDevSwitchEvt(flashdirect);
+                break;
+            }
+
+            if (mAppConf.GetPortDevFixedFlag() == FALSE || item == NULL || item->Match(idleDev)) {
+                workdata->Start(idleDev, mThreadProc, mAppConf.GetPSTWorkTimeout(), flashdirect);
+                break;
+            }
+        }
+    }
+    LOGD("==========END ScheduleDeviceWork==============");
+
+    return TRUE;
+}
+
+BOOL PSTManager::Reset() {
+    for (int i= 0; i < GetPortNum(); i++) {
+        m_workdata[i]->Reset();
+      }
+    return TRUE;
+}
+
+BOOL PSTManager::ChangePackage(const wchar_t * dir) {
+  if (m_image->set_package_dir(dir ))//m_PackagePath.GetBuffer(/*MAX_PATH*/)))
+    		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
+    	m_image->ReadPackage();
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+BOOL PSTManager::EnumerateAdbDevice(VOID) {
+    usb_handle* handle;
+    vector<CDevLabel> AdbDev;
+    vector<CDevLabel> FbDev;
+    vector<CDevLabel>::iterator iter;
+    BOOL success = FALSE;
+    bool match = false;
+
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_USBCCGP, AdbDev, true);
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_WINUSB, FbDev, false);
+
+    //GetDevLabelByGUID(&GUID_DEVINTERFACE_ADB, SRV_USBCCGP, AdbDev, true);
+    //GetDevLabelByGUID(&GUID_DEVINTERFACE_ADB, SRV_WINUSB, FbDev, false);
+
+    find_devices(mAppConf.GetFlashDirectFlag());
+    handle = usb_handle_enum_init();
+    for (; handle != NULL; handle = usb_handle_next(handle)) {
+        match = false;
+        for (iter = AdbDev.begin(); iter != AdbDev.end();  ++ iter){
+            CDevLabel adb(handle->interface_name);
+            if (iter->Match(&adb)) {
+            //if (iter->MatchDevPath(handle->interface_name)) {
+                iter->Dump("adb interface");
+                if (!mDevCoordinator.AddDevice(*iter, DEVTYPE_ADB, &handle->dev_intfs))
+                    continue;
+
+                handle->dev_intfs->SetAdbHandle(handle);
+                success = TRUE;
+                match = true;
+                break;
+            }
+        }
+        if(match)
+            continue;
+        //fastboot
+        for (iter = FbDev.begin(); iter != FbDev.end(); ++ iter){
+            CDevLabel fb(handle->interface_name);
+            if (iter->Match(&fb)) {
+            //if (iter->MatchDevPath(handle->interface_name)) {
+                iter->Dump("fastboot interface");
+                if(!mDevCoordinator.AddDevice(*iter, DEVTYPE_FASTBOOT, &handle->dev_intfs))
+                    continue;
+                handle->dev_intfs->SetFastbootHandle(handle);
+                success = TRUE;
+                usb_dev_t status = handle->dev_intfs->GetDeviceStatus();
+                if ((mAppConf.GetFlashDirectFlag() && status == DEVICE_PLUGIN) ||
+                    status == DEVICE_PST ||
+                    status == DEVICE_CHECK) {
+                    handle->dev_intfs->SetDeviceStatus(DEVICE_FLASH);
+                }
+                break;
+            }
+        }
+    }
+
+    AdbDev.clear();
+    FbDev.clear();
+
+#if 0
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_ADB, SRV_WINUSB, devicePath, false);
+    for (iter = devicePath.begin();iter != devicePath.end(); ++ iter){
+        LOGI("class %S %S",iter->GetParentIdPrefix(), iter->GetDevPath());
+    }
+#endif
+    if (success)
+        ScheduleDeviceWork();
+    return success;
+}
+
+BOOL PSTManager::HandleComDevice(VOID) {
+    vector<CDevLabel> devicePath;
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
+    //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
+    //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
+    vector<CDevLabel>::iterator iter;
+    DeviceInterfaces* devintf;
+    BOOL success = FALSE;
+
+    for (iter = devicePath.begin(); iter != devicePath.end();++iter) {
+        iter->Dump(__FUNCTION__);
+        if(mDevCoordinator.AddDevice(*iter, DEVTYPE_DIAGPORT, NULL))
+            success = TRUE;
+    }
+    devicePath.clear();
+    if (success)
+        ScheduleDeviceWork();
+    return success;
+}
+
+BOOL PSTManager::RejectCDROM(VOID){
+    vector<CDevLabel> devicePath;
+    vector<CDevLabel>::iterator iter;
+    CSCSICmd scsi = CSCSICmd();
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_CDROM, SRV_CDROM, devicePath, false);
+
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath, false);
+
+    for(iter = devicePath.begin();iter != devicePath.end(); ++ iter) {
+        CString path = iter->GetDevPath();
+        iter->Dump( __FUNCTION__ " : " __FILE__);
+        if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
+            //LOGI("Fix DISK %S:", path);
+            continue;
+        }
+        path.MakeUpper();
+        if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1) {
+            //LOGI("USB Stor %S is not alcatel",path);
+            continue;
+        }
+
+#if 0
+        int  devSize = m_WorkDev.size();
+        for(int j=0; j < devSize; j++) {
+            if (*iter == m_WorkDev[j]) {
+                LOGI("Device is have handle, %S", path);
+                continue;
+            }
+        }
+#endif
+
+        //scsi.SwitchToDebugDevice(path);
+        scsi.SwitchToTPSTDeivce(path);
+        //m_WorkDev.push_back(*iter);
+    }
+    devicePath.clear();
+    return TRUE;
+}
+
+
+BOOL PSTManager::HandleDeviceArrived(wchar_t *devPath) {
+
+    return TRUE;
+    //ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+    UsbWorkData * data = FindUsbWorkData(devPath);
+    if (data == NULL) {
+        LOGD("Can not find usbworkdata for %S", devPath);
+        return FALSE;
+    }
+    data->SetSwitchedStatus();
+    return TRUE;
+}
+
+BOOL PSTManager::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam) {
+    //ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
+    UsbWorkData * data = FindUsbWorkData(pDevInf->dbcc_name);
+    if (data == NULL) {
+        LOGD("Can not find usbworkdata for %S", pDevInf->dbcc_name);
+        return FALSE;
+    }
+
+    UINT stat = data->GetStatus();
+    if (stat == USB_STAT_WORKING) {
+        // the device is plugin off when in working, that is because some accident.
+        //the accident power-off in switch is handle by the timer.
+        //thread pool notify , exit
+        if (data->work != NULL)
+            data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
+
+        data->hWnd->KillTimer( (UINT_PTR)data);
+        usb_close(data->usb);
+    } else if (stat == USB_STAT_FINISH) {
+        if (!mAppConf.GetPortDevFixedFlag()) {
+            ERROR("We do not set m_fix_port_map, "
+                  "but in device remove event we can found usb work data");
+            return TRUE;
+        }
+    } else if (stat == USB_STAT_ERROR) {
+        //usb_close(data->usb);
+    } else {
+        return TRUE;
+    }
+
+    data->Clean(mDevCoordinator.IsEmpty());
+    ScheduleDeviceWork();
+
+    return TRUE;
+}
 
 UsbWorkData::UsbWorkData(int index, CWnd* dlg, DeviceCoordinator *coordinator,
     ConfigIni *appConf, XmlParser *xmlParser, flash_image* package) {

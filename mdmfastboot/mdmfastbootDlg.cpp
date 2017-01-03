@@ -10,7 +10,6 @@
 #include "usb_vendors.h"
 #include "DiagPST.h"
 #include "AdbPST.h"
-#include <ImgUnpack.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -56,8 +55,7 @@ END_MESSAGE_MAP()
 // CmdmfastbootDlg 对话框
 CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CmdmfastbootDlg::IDD, pParent),
-	m_WorkDev(),
-	mDevCoordinator()
+    mPSTManager(CmdmfastbootDlg::RunDevicePST)
 {
   m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
   m_bInit = FALSE;
@@ -66,20 +64,10 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
 #ifdef INLINE_SETTING
   m_SetDlg.m_pParent = this;
 #endif
-  m_image = NULL;
-  InitSettingConfig();
-  for (int i = 0; i < mAppConf.GetUiPortTotalCount(); i++) {
-    m_workdata[i] = NULL;
-  }
 }
 
 CmdmfastbootDlg::~CmdmfastbootDlg() {
-  for (int i = 0; i < mAppConf.GetUiPortTotalCount(); i++) {
-    if (m_workdata[i] != NULL) {
-       delete m_workdata[i];
-       m_workdata[i] = NULL;
-    }
-  }
+//delete mPSTManager;
 }
 
 void CmdmfastbootDlg::DoDataExchange(CDataExchange* pDX)
@@ -130,16 +118,15 @@ void CmdmfastbootDlg::OnAbout()
 	dlgAbout.DoModal();
 }
 
-
 BOOL CmdmfastbootDlg::SetPortDialogs(int x, int y,  int w, int h)
 {
   //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
   int r, c, pw, ph;
   CPortStateUI*  port;
   int R_NUM, C_NUM;
-  int portsNum = mAppConf.GetUiPortTotalCount();
+  int portsNum = mPSTManager.GetPortNum();
 
-  R_NUM = mAppConf.GetUiPortRowCount();
+  R_NUM = mPSTManager.GetPortRows();// mAppConf.GetUiPortRowCount();
   C_NUM = portsNum / R_NUM;
 
   if (R_NUM * C_NUM < portsNum) {
@@ -153,7 +140,8 @@ BOOL CmdmfastbootDlg::SetPortDialogs(int x, int y,  int w, int h)
     for (c = 0; c < C_NUM; c++) {
       if (r * C_NUM + c >= portsNum) break;
 
-      port = m_workdata[r * C_NUM + c]->pCtl;
+      port = mPSTManager.GetPortUI(r * C_NUM + c);// m_workdata[r * C_NUM + c]->pCtl;
+      if (port == NULL) continue;
       port->SetWindowPos(0,
                          x + c * pw,
                          y + r * ph,
@@ -178,7 +166,7 @@ BOOL CmdmfastbootDlg::SetDlgItemPos(UINT nID, int x, int y) {
   handle->GetClientRect(&rect);
   //w = x + rect.right - rect.left;
   //h = y +  rect.bottom - rect.top;
-  if (IDC_EDIT_PACKAGE_PATH == nID && mAppConf.GetUiPortTotalCount() == 1) {
+  if (IDC_EDIT_PACKAGE_PATH == nID && mPSTManager.GetPortNum() == 1) {
     w = rect.right < 300 ? 300 : rect.right;
   }
   w = rect.right < 100 ? 100 : rect.right;
@@ -187,47 +175,17 @@ BOOL CmdmfastbootDlg::SetDlgItemPos(UINT nID, int x, int y) {
   return TRUE;
 }
 
-
-BOOL CmdmfastbootDlg::IsHaveUsbWork(void) {
-  UsbWorkData* workdata;
-  int i= 0;
-  for (; i < mAppConf.GetUiPortTotalCount(); i++) {
-    workdata = m_workdata[i];
-    if (!workdata->IsIdle())
-        return TRUE ;
-  }
-  return FALSE;
-}
-
-/*
-* get usbworkdata by usb_sn, the device is in switch or in working
-* or done, but not idle.
-*/
-UsbWorkData * CmdmfastbootDlg::FindUsbWorkData(wchar_t *devPath) {
-    DeviceInterfaces* devIntf;
-
-    if(!mDevCoordinator.GetDevice(devPath, &devIntf)) {
-        return NULL;
-    }
-
-    // first search the before, for switch device.
-    for ( int i= 0; i < mAppConf.GetUiPortTotalCount(); i++) {
-        DeviceInterfaces* item = m_workdata[i]->mActiveDevIntf;
-        if (item == NULL)
-            continue;
-
-        if (item->MatchDevPath(devPath)&&
-            (m_workdata[i]->GetStatus()  != USB_STAT_IDLE))
-            return m_workdata[i];
-    }
-
-    return NULL;
-}
-
 BOOL CmdmfastbootDlg::UpdatePackageInfo(BOOL update) {
-    const wchar_t * qcn = m_image->get_package_qcn_path();
-    const FlashImageInfo* img = m_image->image_enum_init();
+    flash_image       *m_image = mPSTManager.GetProjectPackage();
+    const wchar_t     *qcn = NULL;
+    const FlashImageInfo *img = NULL;
     int item = 0;
+
+    if (m_image == NULL)
+        return FALSE;
+
+    img = m_image->image_enum_init();
+    qcn = m_image->get_package_qcn_path();
 
     m_UpdateDownloadFlag = update;
 
@@ -269,7 +227,7 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(BOOL update) {
     m_image->get_pkg_fw_ver(m_FwVer);
 
     wchar_t moduleName[MAX_PATH];
-    GetPrivateProfileString(L"app",L"module",L"M850",moduleName, MAX_PATH,m_ConfigPath);
+    //GetPrivateProfileString(L"app",L"module",L"M850",moduleName, MAX_PATH,m_ConfigPath);
     m_strModuleName = moduleName;
     if (-1 != m_strModuleName.Find(L"M850"))
     {
@@ -288,12 +246,12 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(BOOL update) {
 }
 
 BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
-    if(!bforce && m_bWork == bwork) {
+    if(!bforce && mPSTManager.IsWork() == bwork) {
         WARN("Do not need to chage status.");
         return FALSE;
     }
 
-    if (m_bWork && IsHaveUsbWork()) {
+    if (mPSTManager.IsWork() && mPSTManager.IsHaveUsbWork()) {
         int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
                                  MB_YESNO|MB_DEFBUTTON2);
         if (IDYES!=iRet)
@@ -303,9 +261,7 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
     }
 
     if (bwork) {
-        for (int i= 0; i < mAppConf.GetUiPortTotalCount(); i++) {
-            m_workdata[i]->Reset();
-        }
+        mPSTManager.Reset();
     }
 
     GetDlgItem(IDC_BTN_START)->EnableWindow(!bwork);
@@ -314,43 +270,13 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
     GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
 
 #ifdef INLINE_SETTING
-    if (mAppConf.GetAfterSaleMode() == FALSE) {
+    if (!mPSTManager.IsAfterSaleMode()) {
         m_SetDlg.EnableSettings(!bwork);
     }
 #endif
-    m_bWork = bwork;
+    mPSTManager.SetWork(bwork);
     return TRUE;
 
-}
-
-BOOL CmdmfastbootDlg::InitSettingConfig()
-{
-    //construct update software package. get configuration about partition information.
-    mAppConf.ReadConfigIni();
-    StartLogging(mAppConf.GetLogFilePath(), mAppConf.GetLogLevel(), mAppConf.GetLogTag());
-    m_bWork = mAppConf.GetAutoWorkFlag();
-    if (NULL!=m_image) {
-        delete m_image;
-    }
-    m_image = new flash_image(mAppConf.GetAppConfIniPath());
-
-    //unsigned int size;
-    //void *data = load_file(mAppConf.GetPkgConfXmlPath(), &size);
-    //XmlParser parser1;
-    //parser1.Parse((PCCH)data, size);
-    //parser1.Parse("<?wsx version \"1.0\" ?><smil> \
-    //         <media src = \"welcome1.asf\"/>cdcddddddddd</smil>");
-    LOGE(" xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-
-    m_LocalConfigXml.Parse(mAppConf.GetPkgConfXmlPath());
-    string refs;
-    m_LocalConfigXml.getElementsByTagName(L"RECOVERYFS", refs);
-    LOGE("RECOVERYFS value %sxxxxxxxxxxxxxxxxxxxxx", refs.c_str());
-
-    ImgUnpack img;
-    img.UnpackDlImg(mAppConf.GetPkgDlImgPath(),mAppConf.GetAppConfIniPath());
-
-    return TRUE;
 }
 
 #ifdef INLINE_SETTING
@@ -363,7 +289,7 @@ BOOL CmdmfastbootDlg::InitSettingDlg(void) {
     //          WS_CHILD | WS_VISIBLE | DS_CENTER, 0);
     //m_SetDlg.EnableWindow(TRUE);
 
-    if (!mAppConf.GetAfterSaleMode())
+    if (!mPSTManager.IsAfterSaleMode())
       return FALSE;
 
     m_SetDlg.SetFlashDirectData(&m_flashdirect);
@@ -409,7 +335,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
   // 设置此对话框的图标。当应用程序主窗口不是对话框时，框架将自动
   //  执行此操作
-  if (mAppConf.GetFlashDirectFlag() || mAppConf.GetForceUpdateFlag() ){
+  if (mPSTManager.IsSuperMode()){
       SetIcon(m_hIcon, TRUE);			// 设置大图标
       SetIcon(m_hIcon, FALSE);		// 设置小图标
   } else {
@@ -430,9 +356,10 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   InitSettingDlg();
 #endif
 
-  for (int i = 0; i < mAppConf.GetUiPortTotalCount(); i++) {
-    m_workdata[i] = new UsbWorkData(i, this, &mDevCoordinator, &mAppConf, &m_LocalConfigXml, m_image);
-  }
+  //for (int i = 0; i < mAppConf.GetUiPortTotalCount(); i++) {
+  //  m_workdata[i] = new UsbWorkData(i, this, &mDevCoordinator, &mAppConf, &m_LocalConfigXml, m_image);
+  //}
+  mPSTManager.Initialize(this);
   //SetUpDevice(NULL, 0, &GUID_DEVCLASS_USB,  _T("USB"));
   //SetUpAdbDevice(NULL, 0);
 
@@ -455,17 +382,17 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 280);
   m_imglist->SetExtendedStyle(m_imglist->GetExtendedStyle() |LVS_EX_CHECKBOXES);//设置控件有勾选功能
 
-  if (mAppConf.GetAfterSaleMode()) {
+  if (mPSTManager.IsAfterSaleMode()) {
     GetDlgItem(IDC_BTN_BROWSE)->ShowWindow(SW_HIDE);
     GetDlgItem(IDC_EDIT_PACKAGE_PATH)->ShowWindow(SW_HIDE);
     GetDlgItem(IDC_STATIC_PKG)->ShowWindow(SW_HIDE);
   }
-  m_PackagePath = m_image->get_package_dir();
+  m_PackagePath = mPSTManager.GetPackage();
   UpdatePackageInfo(FALSE);
 
   //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回87,因为构造函数中m_hWnd还没被初始化为有效值.
   RegisterAdbDeviceNotification(m_hWnd);
-  SetWorkStatus(m_bWork, TRUE);
+  SetWorkStatus(mPSTManager.IsWork(), TRUE);
   adb_usb_init();
 
   if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
@@ -560,16 +487,14 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
                 LOGI("device arrive, DBT_DEVTYP_PORT");
                 //SetTimer(TIMER_EVT_COMPORT, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
                 //HandleDeviceArrived(pDevInf->dbcc_name);
-                if(HandleComDevice())
-                    ScheduleDeviceWork();
+                mPSTManager.HandleComDevice();
                 break;
             }
         case DBT_DEVTYP_DEVICEINTERFACE:
             LOGI("device arrive, DBT_DEVTYP_DEVICEINTERFACE");
             //SetTimer(TIMER_EVT_USBADB, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
             //HandleDeviceArrived(pDevInf->dbcc_name);
-            if(EnumerateAdbDevice())
-                ScheduleDeviceWork();
+            mPSTManager.EnumerateAdbDevice();
 
             break;
         }
@@ -577,7 +502,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
         switch (phdr->dbch_devicetype) {
         case DBT_DEVTYP_DEVICEINTERFACE:
             {
-                HandleDeviceRemoved(pDevInf, dwData);
+                mPSTManager.HandleDeviceRemoved(pDevInf, dwData);
                 break;
             }
         case DBT_DEVTYP_VOLUME:
@@ -598,54 +523,6 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
     return TRUE;
 }
 
-BOOL CmdmfastbootDlg::HandleDeviceArrived(wchar_t *devPath) {
-
-    return TRUE;
-    //ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
-    UsbWorkData * data = FindUsbWorkData(devPath);
-    if (data == NULL) {
-        LOGD("Can not find usbworkdata for %S", devPath);
-        return FALSE;
-    }
-    data->SetSwitchedStatus();
-    return TRUE;
-}
-
-BOOL CmdmfastbootDlg::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam) {
-    //ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
-    UsbWorkData * data = FindUsbWorkData(pDevInf->dbcc_name);
-    if (data == NULL) {
-        LOGD("Can not find usbworkdata for %S", pDevInf->dbcc_name);
-        return FALSE;
-    }
-
-    UINT stat = data->GetStatus();
-    if (stat == USB_STAT_WORKING) {
-        // the device is plugin off when in working, that is because some accident.
-        //the accident power-off in switch is handle by the timer.
-        //thread pool notify , exit
-        if (data->work != NULL)
-            data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
-
-        KillTimer((UINT_PTR)data);
-        usb_close(data->usb);
-    } else if (stat == USB_STAT_FINISH) {
-        if (!mAppConf.GetPortDevFixedFlag()) {
-            ERROR("We do not set m_fix_port_map, "
-                  "but in device remove event we can found usb work data");
-            return TRUE;
-        }
-    } else if (stat == USB_STAT_ERROR) {
-        //usb_close(data->usb);
-    } else {
-        return TRUE;
-    }
-
-    data->Clean(mDevCoordinator.IsEmpty());
-    ScheduleDeviceWork();
-
-    return TRUE;
-}
 
 LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 {
@@ -685,25 +562,8 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
             prompt.Format(_T("Update device sucessfully, elapse %.3fSeconds"), data->GetElapseSeconds());
             data->pCtl->SetInfo(PROMPT_TITLE, prompt);
         }
-
-        data->Finish();
         m_updated_number ++;
-        if (NULL == mDevCoordinator.IsEmpty()) {
-           // AfxMessageBox(L"All devices is updated!");
-        }
-
-        if (!mAppConf.GetPortDevFixedFlag()) {
-            // schedule next port now, and when  app receice device remove event,
-            // the current finished port is not in workdata set, for new device in the
-            // same port can not bootstrap in 1 seconds, even when there are no more
-            // idle device in other physical port.
-            //BUT THIS PRESUME IS NEED TEST.
-            sleep(10);
-
-            //data->Clean(mDevCoordinator.IsEmpty());
-            ScheduleDeviceWork();
-        }
-
+        mPSTManager.FlashDeviceDone(data);
         break;
 
     case TITLE:
@@ -733,8 +593,8 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
 
   LOGW("%s switch device timeout", data->mActiveDevIntf->GetDevTag());
   return ;
-
-  if (data->GetStatus()  == USB_STAT_SWITCH) {
+#if 0 //comment @2017.1.3
+  if (data->GetStatus() == USB_STAT_SWITCH) {
     //remove_switch_device(nIDEvent);
   } else if (data->GetStatus()  == USB_STAT_WORKING){
     if (data->work != NULL) //Delete, or ExitInstance
@@ -745,150 +605,25 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
   data->Clean(mDevCoordinator.IsEmpty());
   ScheduleDeviceWork();
   //KillTimer((UINT_PTR)data);
-}
-
-
-BOOL CmdmfastbootDlg::EnumerateAdbDevice(VOID) {
-    usb_handle* handle;
-    vector<CDevLabel> AdbDev;
-    vector<CDevLabel> FbDev;
-    vector<CDevLabel>::iterator iter;
-    BOOL success = FALSE;
-    bool match = false;
-
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_USBCCGP, AdbDev, true);
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_WINUSB, FbDev, false);
-
-    //GetDevLabelByGUID(&GUID_DEVINTERFACE_ADB, SRV_USBCCGP, AdbDev, true);
-    //GetDevLabelByGUID(&GUID_DEVINTERFACE_ADB, SRV_WINUSB, FbDev, false);
-
-    find_devices(mAppConf.GetFlashDirectFlag());
-    handle = usb_handle_enum_init();
-    for (; handle != NULL; handle = usb_handle_next(handle)) {
-        match = false;
-        for (iter = AdbDev.begin(); iter != AdbDev.end();  ++ iter){
-            CDevLabel adb(handle->interface_name);
-            if (iter->Match(&adb)) {
-            //if (iter->MatchDevPath(handle->interface_name)) {
-                iter->Dump("adb interface");
-                if (!mDevCoordinator.AddDevice(*iter, DEVTYPE_ADB, &handle->dev_intfs))
-                    continue;
-
-                handle->dev_intfs->SetAdbHandle(handle);
-                success = TRUE;
-                match = true;
-                break;
-            }
-        }
-        if(match)
-            continue;
-        //fastboot
-        for (iter = FbDev.begin(); iter != FbDev.end(); ++ iter){
-            CDevLabel fb(handle->interface_name);
-            if (iter->Match(&fb)) {
-            //if (iter->MatchDevPath(handle->interface_name)) {
-                iter->Dump("fastboot interface");
-                if(!mDevCoordinator.AddDevice(*iter, DEVTYPE_FASTBOOT, &handle->dev_intfs))
-                    continue;
-                handle->dev_intfs->SetFastbootHandle(handle);
-                success = TRUE;
-                usb_dev_t status = handle->dev_intfs->GetDeviceStatus();
-                if ((mAppConf.GetFlashDirectFlag() && status == DEVICE_PLUGIN) ||
-                    status == DEVICE_PST ||
-                    status == DEVICE_CHECK) {
-                    handle->dev_intfs->SetDeviceStatus(DEVICE_FLASH);
-                }
-                break;
-            }
-        }
-    }
-
-    AdbDev.clear();
-    FbDev.clear();
-
-#if 0
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_ADB, SRV_WINUSB, devicePath, false);
-    for (iter = devicePath.begin();iter != devicePath.end(); ++ iter){
-        LOGI("class %S %S",iter->GetParentIdPrefix(), iter->GetDevPath());
-    }
 #endif
-    return success;
 }
 
-BOOL CmdmfastbootDlg::HandleComDevice(VOID) {
-    vector<CDevLabel> devicePath;
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
-    //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
-    //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
-    vector<CDevLabel>::iterator iter;
-    DeviceInterfaces* devintf;
-    BOOL success = FALSE;
-
-    for (iter = devicePath.begin(); iter != devicePath.end();++iter) {
-        iter->Dump(__FUNCTION__);
-        if(mDevCoordinator.AddDevice(*iter, DEVTYPE_DIAGPORT, NULL))
-            success = TRUE;
-    }
-    devicePath.clear();
-    return success;
-}
-
-BOOL CmdmfastbootDlg::RejectCDROM(VOID){
-    vector<CDevLabel> devicePath;
-    vector<CDevLabel>::iterator iter;
-    CSCSICmd scsi = CSCSICmd();
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_CDROM, SRV_CDROM, devicePath, false);
-
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath, false);
-
-    for(iter = devicePath.begin();iter != devicePath.end(); ++ iter) {
-        CString path = iter->GetDevPath();
-        iter->Dump( __FUNCTION__ " : " __FILE__);
-        if (path.Find(_T("\\\\?\\usbstor#")) == -1) {
-            //LOGI("Fix DISK %S:", path);
-            continue;
-        }
-        path.MakeUpper();
-        if (path.Find(_T("ONETOUCH")) == -1 && path.Find(_T("ALCATEL")) == -1) {
-            //LOGI("USB Stor %S is not alcatel",path);
-            continue;
-        }
-
-#if 0
-        int  devSize = m_WorkDev.size();
-        for(int j=0; j < devSize; j++) {
-            if (*iter == m_WorkDev[j]) {
-                LOGI("Device is have handle, %S", path);
-                continue;
-            }
-        }
-#endif
-
-        //scsi.SwitchToDebugDevice(path);
-        scsi.SwitchToTPSTDeivce(path);
-        //m_WorkDev.push_back(*iter);
-    }
-    devicePath.clear();
-    return TRUE;
-}
 
 BOOL CmdmfastbootDlg::SetupDevice(int evt) {
     switch(evt) {
     case TIMER_EVT_ADBKILLED:
-        RejectCDROM();
-        if(EnumerateAdbDevice() || HandleComDevice())
-            ScheduleDeviceWork();
+        mPSTManager.RejectCDROM();
+        if(!mPSTManager.EnumerateAdbDevice())
+            mPSTManager.HandleComDevice();
         break;
     case TIMER_EVT_REJECTCDROM:
-        RejectCDROM();
+        mPSTManager.RejectCDROM();
         break;
     case TIMER_EVT_COMPORT:
-        if(HandleComDevice())
-            ScheduleDeviceWork();
+        mPSTManager.HandleComDevice();
         break;
     case TIMER_EVT_USBADB:
-        if(EnumerateAdbDevice())
-            ScheduleDeviceWork();
+        mPSTManager.EnumerateAdbDevice();
         break;
     default:
         break;
@@ -896,7 +631,7 @@ BOOL CmdmfastbootDlg::SetupDevice(int evt) {
     // if (evt != TIMER_EVT_REJECTCDROM)
     //     ScheduleDeviceWork();
 
-    mDevCoordinator.Dump();
+    //mDevCoordinator.Dump();
     return TRUE;
 }
  void CALLBACK CmdmfastbootDlg::DeviceEventTimerProc(
@@ -1003,55 +738,6 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
 }
 
 
-BOOL CmdmfastbootDlg::ScheduleDeviceWork() {
-    BOOL flashdirect = mAppConf.GetFlashDirectFlag();
-    if (!m_bWork) {
-        // INFO("do not work now.");
-        return FALSE;
-    }
-
-    /*
-     * Get usbworkdata that in free or in switch.
-     * fix_map means whether logical port (portstatui) fix map physical port.
-     * this feature will be useful when multiport port download, it help operator
-     * to make sure whether the device in a specific is flashed.
-     */
-    DeviceInterfaces* idleDev;
-    UsbWorkData* workdata;
-    LOGD("==========Begin ScheduleDeviceWork==============");
-
-    for (int i=0; i < mAppConf.GetUiPortTotalCount(); i++) {
-        workdata = m_workdata[i];
-        DeviceInterfaces* item = workdata->mMapDevIntf;
-        if (item == NULL)
-            item = workdata->mActiveDevIntf;
-
-        if (workdata->GetStatus() == USB_STAT_WORKING)
-            continue;
-
-        while(NULL != (idleDev = mDevCoordinator.GetValidDevice())) {
-            idleDev->Dump(__FUNCTION__);
-            if (workdata->GetStatus() == USB_STAT_SWITCH) {
-                ASSERT(item != NULL);
-                if (!item->Match(idleDev))
-                    continue;
-
-                workdata->SetDevSwitchEvt(flashdirect);
-                break;
-            }
-
-            if (mAppConf.GetPortDevFixedFlag() == FALSE || item == NULL || item->Match(idleDev)) {
-                workdata->Start(idleDev, CmdmfastbootDlg::RunDevicePST, mAppConf.GetPSTWorkTimeout(), flashdirect);
-                break;
-            }
-        }
-    }
-    LOGD("==========END ScheduleDeviceWork==============");
-
-    return TRUE;
-}
-
-
 void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
   int dx, dy, dw, dh;
@@ -1072,9 +758,9 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 
     GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
 
-    if (mAppConf.GetUiPortTotalCount() == 1) {
+    if (mPSTManager.GetPortNum() == 1) {
       dx = rect.right + 20;
-      if (mAppConf.GetAfterSaleMode()) {
+      if (mPSTManager.IsAfterSaleMode()) {
         dy = cy - 100;
         SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
         SetDlgItemPos(IDCANCEL, dx + 120, dy);
@@ -1118,7 +804,7 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 
 #ifdef INLINE_SETTING
       dy = rect.bottom + 20;
-      if (mAppConf.GetAfterSaleMode() == FALSE) {
+      if (!mPSTManager.IsAfterSaleMode()) {
         m_SetDlg.SetWindowPos(NULL, rect.left, dy, 280, 220, 0);
       }
 	  //m_SetDlg.ShowWindow(SW_HIDE);   //hide set dialog by zhanghao 20160112
@@ -1229,7 +915,12 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
     pMalloc->Release();
   }
 
-  UpdatePackage();
+    if (mPSTManager.ChangePackage(m_PackagePath.GetString()))
+    		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
+    	UpdatePackageInfo();
+    } else {
+        AfxMessageBox(L"Package path is not change!", MB_ICONEXCLAMATION);
+    }
 }
 
 void CmdmfastbootDlg::OnBnClickedStart()
@@ -1256,16 +947,14 @@ void CmdmfastbootDlg::OnBnClickedButtonStop()
 	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_ENABLED);
 	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_ENABLED);
     SetWorkStatus(FALSE, FALSE);
-    for (int i= 0; i < mAppConf.GetUiPortTotalCount(); i++) {
-        m_workdata[i]->Reset();
-      }
+    mPSTManager.Reset();
 }
 
 void CmdmfastbootDlg::OnClose()
 {
   //CDialog::OnClose();
 
-  if (IsHaveUsbWork())
+  if (mPSTManager.IsHaveUsbWork())
   {
     int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
     MB_YESNO|MB_DEFBUTTON2);
@@ -1281,7 +970,7 @@ void CmdmfastbootDlg::OnBnClickedCancel()
 {
   DWORD dwExitCode = 0;
 
-  if (IsHaveUsbWork())
+  if (mPSTManager.IsHaveUsbWork())
   {
     int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
                     MB_YESNO|MB_DEFBUTTON2);
@@ -1301,8 +990,7 @@ void CmdmfastbootDlg::OnDestroy()
 	::RemoveProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP);	//for single instance
 	//Shutdown the thread pool
 	//m_dlWorkerPool.Shutdown();
-  delete m_image;
-
+ 
 	StopLogging();
 }
 
@@ -1388,21 +1076,10 @@ void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 	if (bSelectStatChange)
 	{
 		strPartitionName = m_imglist->GetItemText(pNMLV->iItem, 0);
-		m_image->set_download_flag(strPartitionName, bSelected);
+		mPSTManager.SetDownload(strPartitionName, bSelected);
 	}
 
 	*pResult = 0;
-}
-
-void CmdmfastbootDlg::UpdatePackage()
-{
-    if (m_image->set_package_dir(m_PackagePath.GetBuffer(/*MAX_PATH*/)))
-    		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
-    	m_image->ReadPackage();
-    	UpdatePackageInfo();
-    } else {
-        AfxMessageBox(L"Package path is not change!", MB_ICONEXCLAMATION);
-	}
 }
 
 void CmdmfastbootDlg::OnFileM850()
@@ -1410,7 +1087,7 @@ void CmdmfastbootDlg::OnFileM850()
 	CopyFile(L".\\mdmconfig_M850.ini", L".\\mdmconfig.ini", FALSE);
 	GetMenu()->GetSubMenu(0)->CheckMenuItem(0,MF_BYPOSITION|MF_CHECKED);
 	GetMenu()->GetSubMenu(0)->CheckMenuItem(1,MF_BYPOSITION|MF_UNCHECKED);
-	InitSettingConfig();
+//	InitSettingConfig();
 //	UpdatePackage();
 }
 
@@ -1419,6 +1096,6 @@ void CmdmfastbootDlg::OnFileM801()
 	CopyFile(L".\\mdmconfig_M801.ini", L".\\mdmconfig.ini", FALSE);
 	GetMenu()->GetSubMenu(0)->CheckMenuItem(1,MF_BYPOSITION|MF_CHECKED);
 	GetMenu()->GetSubMenu(0)->CheckMenuItem(0,MF_BYPOSITION|MF_UNCHECKED);
-	InitSettingConfig();
+//	InitSettingConfig();
 //	UpdatePackage();
 }
