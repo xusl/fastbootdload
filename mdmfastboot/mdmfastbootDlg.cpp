@@ -5,7 +5,6 @@
 #include "log.h"
 #include "mdmfastboot.h"
 #include "mdmfastbootDlg.h"
-#include "usb_adb.h"
 #include "fastbootflash.h"
 #include "adbhost.h"
 #include "usb_vendors.h"
@@ -53,220 +52,6 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialog)
 END_MESSAGE_MAP()
 
-UsbWorkData::UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator,
-    ConfigIni *appConf, XmlParser *xmlParser) {
-    hWnd = dlg;
-    pCtl = new CPortStateUI;
-    pCtl->Create(IDD_PORT_STATE, dlg);
-    pCtl->Init(index);
-    memset(mName, 0, sizeof mName);
-    _snwprintf_s(mName, WORK_NAME_LEN, _T("Work Port %d"), index);
-    mDevSwitchEvt = ::CreateEvent(NULL,TRUE,FALSE,mName);
-    ASSERT(mDevSwitchEvt != NULL);
-    pCoordinator = coordinator;
-    mPAppConf = appConf;
-    mPLocalConfigXml = xmlParser;
-    mActiveDevIntf = NULL;
-    mMapDevIntf = NULL;
-    Clean(TRUE);
-}
-
-UsbWorkData::~UsbWorkData() {
-    DELETE_IF(pCtl);
-    if (NULL != mMapDevIntf) {
-        mMapDevIntf->DeleteMemory();
-        delete mMapDevIntf;
-    }
-    ::CloseHandle(mDevSwitchEvt);
-}
-
-DWORD  UsbWorkData::WaitForDevSwitchEvt(DWORD dwMilliseconds) {
-    SwitchDev(0);
-    return ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);
-}
-
-DWORD  UsbWorkData::SetDevSwitchEvt(BOOL flashdirect) {
-
-    stat = USB_STAT_WORKING;
-      usb = mActiveDevIntf->GetUsbHandle(flashdirect);
-  usb_set_work(usb, TRUE);
-  mActiveDevIntf->SetAttachStatus(true);
-
-      ::SetEvent(mDevSwitchEvt);
-    return 0;
-}
-
-BOOL UsbWorkData::IsIdle() {
-    //if (stat == USB_STAT_SWITCH || stat == USB_STAT_WORKING)
-    if (stat == USB_STAT_WORKING)
-        return FALSE;
-    return TRUE;
-}
-
-BOOL UsbWorkData::Clean(BOOL noCleanUI) {
-  usb = NULL;
-  if (mActiveDevIntf != NULL) {
-    pCoordinator->RemoveDevice(mActiveDevIntf);
-    mActiveDevIntf = NULL;
-  }
-  if (mDevSwitchEvt != NULL)
-      ::ResetEvent(mDevSwitchEvt);
-  stat = USB_STAT_IDLE;
-  work = NULL;
-  update_qcn = FALSE;
-  partition_nr = 0;
-  //start_time_tick = -1;
-  ZeroMemory(flash_partition, sizeof(flash_partition));
-  if(!noCleanUI)
-      pCtl->Reset();
-  return TRUE;
-}
-
-BOOL UsbWorkData::Reset(VOID) {
-    LOGD("Do reset");
-    if (stat == USB_STAT_WORKING) {
-      if (work != NULL) //Delete, or ExitInstance
-        work->PostThreadMessage( WM_QUIT, NULL, NULL );
-      //usb_close(usb);
-      //hWnd->KillTimer((UINT_PTR)this);
-    } else if (stat == USB_STAT_SWITCH) {
-      //remove_switch_device(workdata->usb_sn);
-      //hWnd->KillTimer((UINT_PTR)this);
-    } else if (stat == USB_STAT_FINISH) {
-      ;
-    } else if (stat == USB_STAT_ERROR) {
-      usb_close(usb);
-    } else {
-      return FALSE;
-    }
-    start_time_tick = -1;
-
-    Clean(TRUE);
-    return TRUE;
-}
-
-BOOL UsbWorkData::Abort(VOID) {
-    stat = USB_STAT_ERROR;
-    //hWnd->KillTimer((UINT_PTR)this);
-    return TRUE;
-}
-
-BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, UINT nElapse, BOOL flashdirect) {
-    ASSERT(pDevIntf != NULL);
-    mActiveDevIntf = pDevIntf;
-    LOGD("Start thread to work!");
-
-  //TODO::
-  usb = mActiveDevIntf->GetUsbHandle(flashdirect);
-  usb_set_work(usb, TRUE);
-  mActiveDevIntf->SetAttachStatus(true);
-  stat = USB_STAT_WORKING;
-  start_time_tick = now();
-  pCtl->Reset();
-  work = AfxBeginThread(CmdmfastbootDlg::RunDevicePST, this);
-
-  if (work != NULL) {
-    INFO("Schedule work for %s with timeout %d seconds!", mActiveDevIntf->GetDevTag(), nElapse);
-    work->m_bAutoDelete = TRUE;
-    // hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);
-  } else {
-    LOGE("%s : Can not begin thread!", mActiveDevIntf->GetDevTag());
-    usb_set_work(usb, FALSE);
-    Clean();
-  }
-    return TRUE;
-}
-
-BOOL UsbWorkData::Finish(VOID) {
-  stat = USB_STAT_FINISH;
-  if ( mMapDevIntf == NULL  &&
-     mActiveDevIntf  != NULL &&
-     mActiveDevIntf->GetDiagIntf() != NULL &&
-     mActiveDevIntf->GetFastbootIntf() != NULL) {
-    mMapDevIntf = new DeviceInterfaces();
-    mMapDevIntf->SetDiagIntf(*mActiveDevIntf->GetDiagIntf());
-    mMapDevIntf->SetFastbootIntf(*mActiveDevIntf->GetFastbootIntf());
-  }
-  usb_close(usb);
-  Clean(TRUE);
-
-  //data->work = NULL;
-  //KILL work timer.
-  //hWnd->KillTimer((UINT_PTR)this);
-  return TRUE;
-}
-
-
-BOOL UsbWorkData::SwitchDev(UINT nElapse) {
-  usb_close(usb);
-  usb = NULL;
-  work = NULL;
-  stat = USB_STAT_SWITCH;
-  mActiveDevIntf->SetAttachStatus(false);
-
-  /*Set switch timeout*/
-  //hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);
-    return TRUE;
-}
-
-BOOL UsbWorkData::SetSwitchedStatus() {
-    if ( stat == USB_STAT_SWITCH) {
-        LOGI("Kill switch timer");
-        //hWnd->KillTimer((UINT_PTR)this);
-        stat = USB_STAT_SWITCHED;
-    } else {
-        Log("device does not in switch mode");
-    }
-    return TRUE;
-}
-
-/*invoke in work thread*/
-UINT UsbWorkData::ui_text_msg(UI_INFO_TYPE info_type, PCCH msg) {
-  UIInfo* info = new UIInfo;
-
-  //if (FLASH_DONE && data->hWnd->m_fix_port_map)
-  //  sleep(1);
-
-  info->infoType = info_type;
-  info->sVal = msg;
-  hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
-                          (WPARAM)info,
-                          (LPARAM)this);
-  return 0;
-}
-
-/*invoke in UI thread.*/
-BOOL UsbWorkData::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
-{
-    pCtl->SetInfo(infoType, strInfo);
-    return TRUE;
-};
-
-UINT UsbWorkData::SetProgress(int progress) {
-    UIInfo* info = new UIInfo;
-    info->infoType = PROGRESS_VAL;
-    info->iVal = progress;
-    hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
-                  (WPARAM)info,
-                  (LPARAM)this);
-    return 0;
-}
-
-float UsbWorkData::GetElapseSeconds() {
-    if (start_time_tick == -1)
-        return 0.0;
-/*
-     long long elapse = now() - start_time_tick;
-     int int_part = elapse / MILLS_SECONDS;
-     int float_part = (elapse % MILLS_SECONDS) / MICRO_SECONDS;
-     float dd = ((float)(now() - start_time_tick)) / MILLS_SECONDS;
-*/
-     return ((float)(now() - start_time_tick)) / MILLS_SECONDS;
-}
-BOOL UsbWorkData::Log(const char * msg) {
-    LOGI("%s::%s", GetDevTag() , msg);
-    return TRUE;
-}
 
 // CmdmfastbootDlg ¶Ô»°¿ò
 CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
@@ -646,7 +431,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 #endif
 
   for (int i = 0; i < mAppConf.GetUiPortTotalCount(); i++) {
-    m_workdata[i] = new UsbWorkData(i, this, &mDevCoordinator, &mAppConf, &m_LocalConfigXml);
+    m_workdata[i] = new UsbWorkData(i, this, &mDevCoordinator, &mAppConf, &m_LocalConfigXml, m_image);
   }
   //SetUpDevice(NULL, 0, &GUID_DEVCLASS_USB,  _T("USB"));
   //SetUpAdbDevice(NULL, 0);
@@ -1137,13 +922,13 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
     int result;
     usb_dev_t status ;
 
-    if (data == NULL ||  data->hWnd == NULL || data->hWnd->m_image == NULL) {
+    if (data == NULL ||  data->hWnd == NULL || data->mProjectPackage == NULL) {
         data->ui_text_msg(FLASH_DONE, "Bad parameter");
         return -1;
     }
 
     dev = data->mActiveDevIntf;
-    img = data->hWnd->m_image;
+    img = data->mProjectPackage;
     status = dev->GetDeviceStatus();
 
     data->ui_text_msg(TITLE, dev->GetDevTag());
@@ -1156,7 +941,7 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
         if(result)
             result = pst.Calculate_length();
         if(result)
-            result = pst.DownloadPrg(data->hWnd->mAppConf.GetAppConfIniPath());
+            result = pst.DownloadPrg(data->mPAppConf->GetAppConfIniPath());
         if(result) {
             uint32 diagsize = img->GetDiagDlImgSize();
             uint32 fbsize = img->GetFbDlImgSize();
@@ -1181,7 +966,7 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
     }
 
     if (status == DEVICE_CHECK) {
-        AdbPST pst(data->hWnd->mAppConf.GetForceUpdateFlag(), m_module_name);
+        AdbPST pst(data->mPAppConf->GetForceUpdateFlag(), m_module_name);
         pst.DoPST(data, img, dev);
     } else if (status == DEVICE_FLASH) {
         fastboot fb(handle);
@@ -1256,7 +1041,7 @@ BOOL CmdmfastbootDlg::ScheduleDeviceWork() {
             }
 
             if (mAppConf.GetPortDevFixedFlag() == FALSE || item == NULL || item->Match(idleDev)) {
-                workdata->Start(idleDev, mAppConf.GetPSTWorkTimeout(), flashdirect);
+                workdata->Start(idleDev, CmdmfastbootDlg::RunDevicePST, mAppConf.GetPSTWorkTimeout(), flashdirect);
                 break;
             }
         }
@@ -1611,13 +1396,9 @@ void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CmdmfastbootDlg::UpdatePackage()
 {
-    if (m_image->set_package_dir(m_PackagePath.GetBuffer(/*MAX_PATH*/),
-                             mAppConf.GetAppConfIniPath()))
+    if (m_image->set_package_dir(m_PackagePath.GetBuffer(/*MAX_PATH*/)))
     		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
-    	if (NULL!=m_image) {
-    		delete m_image;
-    	}
-    	m_image =  new flash_image(/*m_ConfigPath.GetString()*/mAppConf.GetAppConfIniPath());
+    	m_image->ReadPackage();
     	UpdatePackageInfo();
     } else {
         AfxMessageBox(L"Package path is not change!", MB_ICONEXCLAMATION);
@@ -1630,7 +1411,7 @@ void CmdmfastbootDlg::OnFileM850()
 	GetMenu()->GetSubMenu(0)->CheckMenuItem(0,MF_BYPOSITION|MF_CHECKED);
 	GetMenu()->GetSubMenu(0)->CheckMenuItem(1,MF_BYPOSITION|MF_UNCHECKED);
 	InitSettingConfig();
-	UpdatePackage();
+//	UpdatePackage();
 }
 
 void CmdmfastbootDlg::OnFileM801()
@@ -1639,5 +1420,5 @@ void CmdmfastbootDlg::OnFileM801()
 	GetMenu()->GetSubMenu(0)->CheckMenuItem(1,MF_BYPOSITION|MF_CHECKED);
 	GetMenu()->GetSubMenu(0)->CheckMenuItem(0,MF_BYPOSITION|MF_UNCHECKED);
 	InitSettingConfig();
-	UpdatePackage();
+//	UpdatePackage();
 }

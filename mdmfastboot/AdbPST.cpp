@@ -37,13 +37,13 @@ BOOL AdbPST::DoPST(UsbWorkData* data, flash_image* img, DeviceInterfaces *dev) {
     } else {
         if (INVALID_FILE_ATTRIBUTES == GetFileAttributes(conf_file)) {
             data->ui_text_msg(ADB_CHK_ABORT, "no config.xml in the package, abort!");
-            return -1;
+            return FALSE;
         }
 
         conf_file_char = WideStrToMultiStr(conf_file);
         if (conf_file_char == NULL) {
             data->ui_text_msg(ADB_CHK_ABORT, "out of memory, abort!");
-            return -1;
+            return FALSE;
         }
 
         adb.sync_push(conf_file_char, "/tmp/config.xml");
@@ -53,16 +53,19 @@ BOOL AdbPST::DoPST(UsbWorkData* data, flash_image* img, DeviceInterfaces *dev) {
         result = adb_hw_check(adb,data);
         if (result != 0) {
             data->ui_text_msg(ADB_CHK_ABORT, "hardware check failed, abort!");
-            return -1;
+            return FALSE;
         }
 
         result = adb_sw_version_cmp(adb,data);
         if (result < 0) {
             data->ui_text_msg(ADB_CHK_ABORT, "firmware version check failed, abort!");
-            return -1;
+            return FALSE;
         } else if (result ==0) {
+            DeviceInterfaces *dev = data->mActiveDevIntf;
+            dev->SetDeviceStatus(DEVICE_REMOVED);
+
             data->ui_text_msg(FLASH_DONE, "firmware is the NEWEST. DO NOT UPDATE.");
-            return 0;
+            return TRUE;
         }
     }
 
@@ -258,7 +261,7 @@ UINT AdbPST::sw_version_parse(UsbWorkData* data,PCCH key, PCCH value) {
 
     for (i =0; i < count && data->partition_nr < PARTITION_NUM_MAX; i++) {
         data->flash_partition[data->partition_nr] =
-            data->hWnd->m_image->get_partition_info(*(partition+i), NULL, NULL);
+            data->mProjectPackage->get_partition_info(*(partition+i), NULL, NULL);
         if (data->flash_partition[data->partition_nr] != NULL) {
             data->partition_nr++;
         } else {

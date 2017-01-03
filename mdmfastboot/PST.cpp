@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "usb_adb.h"
+
 #include "resource.h"
 #include "qcnlib/QcnParser.h"
 #include <msxml.h>
@@ -10,6 +12,223 @@
 #include "PST.h"
 
 #include "PortStateUI.h"
+
+UsbWorkData::UsbWorkData(int index, CWnd* dlg, DeviceCoordinator *coordinator,
+    ConfigIni *appConf, XmlParser *xmlParser, flash_image* package) {
+    hWnd = dlg;
+    pCtl = new CPortStateUI;
+    pCtl->Create(IDD_PORT_STATE, dlg);
+    pCtl->Init(index);
+    memset(mName, 0, sizeof mName);
+    _snwprintf_s(mName, WORK_NAME_LEN, _T("Work Port %d"), index);
+    mDevSwitchEvt = ::CreateEvent(NULL,TRUE,FALSE,mName);
+    ASSERT(mDevSwitchEvt != NULL);
+    pCoordinator = coordinator;
+    mPAppConf = appConf;
+    mPLocalConfigXml = xmlParser;
+    mProjectPackage = package;
+    mActiveDevIntf = NULL;
+    mMapDevIntf = NULL;
+    Clean(TRUE);
+}
+
+UsbWorkData::~UsbWorkData() {
+    DELETE_IF(pCtl);
+    if (NULL != mMapDevIntf) {
+        mMapDevIntf->DeleteMemory();
+        delete mMapDevIntf;
+    }
+    ::CloseHandle(mDevSwitchEvt);
+}
+
+DWORD  UsbWorkData::WaitForDevSwitchEvt(DWORD dwMilliseconds) {
+    SwitchDev(0);
+    return ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);
+}
+
+DWORD  UsbWorkData::SetDevSwitchEvt(BOOL flashdirect) {
+
+    stat = USB_STAT_WORKING;
+      usb = mActiveDevIntf->GetUsbHandle(flashdirect);
+  usb_set_work(usb, TRUE);
+  mActiveDevIntf->SetAttachStatus(true);
+
+      ::SetEvent(mDevSwitchEvt);
+    return 0;
+}
+
+BOOL UsbWorkData::IsIdle() {
+    //if (stat == USB_STAT_SWITCH || stat == USB_STAT_WORKING)
+    if (stat == USB_STAT_WORKING)
+        return FALSE;
+    return TRUE;
+}
+
+BOOL UsbWorkData::Clean(BOOL noCleanUI) {
+  usb = NULL;
+  if (mActiveDevIntf != NULL) {
+    pCoordinator->RemoveDevice(mActiveDevIntf);
+    mActiveDevIntf = NULL;
+  }
+  if (mDevSwitchEvt != NULL)
+      ::ResetEvent(mDevSwitchEvt);
+  stat = USB_STAT_IDLE;
+  work = NULL;
+  update_qcn = FALSE;
+  partition_nr = 0;
+  //start_time_tick = -1;
+  ZeroMemory(flash_partition, sizeof(flash_partition));
+  if(!noCleanUI)
+      pCtl->Reset();
+  return TRUE;
+}
+
+BOOL UsbWorkData::Reset(VOID) {
+    LOGD("Do reset");
+    if (stat == USB_STAT_WORKING) {
+      if (work != NULL) //Delete, or ExitInstance
+        work->PostThreadMessage( WM_QUIT, NULL, NULL );
+      //usb_close(usb);
+      //hWnd->KillTimer((UINT_PTR)this);
+    } else if (stat == USB_STAT_SWITCH) {
+      //remove_switch_device(workdata->usb_sn);
+      //hWnd->KillTimer((UINT_PTR)this);
+    } else if (stat == USB_STAT_FINISH) {
+      ;
+    } else if (stat == USB_STAT_ERROR) {
+      usb_close(usb);
+    } else {
+      return FALSE;
+    }
+    start_time_tick = -1;
+
+    Clean(TRUE);
+    return TRUE;
+}
+
+BOOL UsbWorkData::Abort(VOID) {
+    stat = USB_STAT_ERROR;
+    //hWnd->KillTimer((UINT_PTR)this);
+    return TRUE;
+}
+
+BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, AFX_THREADPROC pfnThreadProc, UINT nElapse, BOOL flashdirect) {
+    ASSERT(pDevIntf != NULL);
+    mActiveDevIntf = pDevIntf;
+    LOGD("Start thread to work!");
+
+  //TODO::
+  usb = mActiveDevIntf->GetUsbHandle(flashdirect);
+  usb_set_work(usb, TRUE);
+  mActiveDevIntf->SetAttachStatus(true);
+  stat = USB_STAT_WORKING;
+  start_time_tick = now();
+  pCtl->Reset();
+  work = AfxBeginThread(pfnThreadProc, this);
+
+  if (work != NULL) {
+    INFO("Schedule work for %s with timeout %d seconds!", mActiveDevIntf->GetDevTag(), nElapse);
+    work->m_bAutoDelete = TRUE;
+    // hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);
+  } else {
+    LOGE("%s : Can not begin thread!", mActiveDevIntf->GetDevTag());
+    usb_set_work(usb, FALSE);
+    Clean();
+  }
+    return TRUE;
+}
+
+BOOL UsbWorkData::Finish(VOID) {
+  stat = USB_STAT_FINISH;
+  if ( mMapDevIntf == NULL  &&
+     mActiveDevIntf  != NULL &&
+     mActiveDevIntf->GetDiagIntf() != NULL &&
+     mActiveDevIntf->GetFastbootIntf() != NULL) {
+    mMapDevIntf = new DeviceInterfaces();
+    mMapDevIntf->SetDiagIntf(*mActiveDevIntf->GetDiagIntf());
+    mMapDevIntf->SetFastbootIntf(*mActiveDevIntf->GetFastbootIntf());
+  }
+  usb_close(usb);
+  Clean(TRUE);
+
+  //data->work = NULL;
+  //KILL work timer.
+  //hWnd->KillTimer((UINT_PTR)this);
+  return TRUE;
+}
+
+
+BOOL UsbWorkData::SwitchDev(UINT nElapse) {
+  usb_close(usb);
+  usb = NULL;
+  work = NULL;
+  stat = USB_STAT_SWITCH;
+  mActiveDevIntf->SetAttachStatus(false);
+
+  /*Set switch timeout*/
+  //hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);
+    return TRUE;
+}
+
+BOOL UsbWorkData::SetSwitchedStatus() {
+    if ( stat == USB_STAT_SWITCH) {
+        LOGI("Kill switch timer");
+        //hWnd->KillTimer((UINT_PTR)this);
+        stat = USB_STAT_SWITCHED;
+    } else {
+        Log("device does not in switch mode");
+    }
+    return TRUE;
+}
+
+/*invoke in work thread*/
+UINT UsbWorkData::ui_text_msg(UI_INFO_TYPE info_type, PCCH msg) {
+  UIInfo* info = new UIInfo;
+
+  //if (FLASH_DONE && data->hWnd->m_fix_port_map)
+  //  sleep(1);
+
+  info->infoType = info_type;
+  info->sVal = msg;
+  hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                          (WPARAM)info,
+                          (LPARAM)this);
+  return 0;
+}
+
+/*invoke in UI thread.*/
+BOOL UsbWorkData::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
+{
+    pCtl->SetInfo(infoType, strInfo);
+    return TRUE;
+};
+
+UINT UsbWorkData::SetProgress(int progress) {
+    UIInfo* info = new UIInfo;
+    info->infoType = PROGRESS_VAL;
+    info->iVal = progress;
+    hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                  (WPARAM)info,
+                  (LPARAM)this);
+    return 0;
+}
+
+float UsbWorkData::GetElapseSeconds() {
+    if (start_time_tick == -1)
+        return 0.0;
+/*
+     long long elapse = now() - start_time_tick;
+     int int_part = elapse / MILLS_SECONDS;
+     int float_part = (elapse % MILLS_SECONDS) / MICRO_SECONDS;
+     float dd = ((float)(now() - start_time_tick)) / MILLS_SECONDS;
+*/
+     return ((float)(now() - start_time_tick)) / MILLS_SECONDS;
+}
+BOOL UsbWorkData::Log(const char * msg) {
+    LOGI("%s::%s", GetDevTag() , msg);
+    return TRUE;
+}
+
 
 flash_image::flash_image(const wchar_t* config):
   image_list(NULL),
@@ -25,15 +244,24 @@ flash_image::flash_image(const wchar_t* config):
   mDiagDlImgSize(0),
   mFbDlImgSize(0)
 {
+    mAppConfigFile = config;
+    ReadPackage();
+}
+
+flash_image::~flash_image() {
+  reset(TRUE);
+}
+
+
+BOOL flash_image::ReadPackage() {
+  const wchar_t* config = mAppConfigFile.GetString();
   CString path;
   int data_len;
 
   if (config == NULL) {
     ERROR("not specified config file name");
-    return ;
+    return FALSE;
   }
-
-  mAppConfigFile = config;
 
   data_len = GetPrivateProfileString(PKG_SECTION,
                                      PKG_PATH,
@@ -45,7 +273,7 @@ flash_image::flash_image(const wchar_t* config):
   if (pkg_dir[data_len - 1] != L'\\' ) {
     if ( data_len > MAX_PATH - 2) {
     ERROR("bad package directory in the section path.");
-        return ;
+        return FALSE;
     }
     pkg_dir[data_len] = L'\\';
     pkg_dir[data_len + 1] = L'\0';
@@ -61,12 +289,8 @@ flash_image::flash_image(const wchar_t* config):
   read_fastboot_config(config);
   read_diagpst_config(config);
   read_package_version(pkg_conf_file);
+  return TRUE;
 }
-
-flash_image::~flash_image() {
-  reset(TRUE);
-}
-
 
 int flash_image::read_diagpst_config(const wchar_t* config) {
   wchar_t partition_tbl[PARTITION_TBL_LEN] = {0};
@@ -159,7 +383,7 @@ int flash_image::read_fastboot_config(const wchar_t* config) {
         add_image(imgs[i], imgs[i+1], TRUE, config);
     }
 
-    set_package_dir(GetAppPath(path).GetString(), config);
+    set_package_dir(GetAppPath(path).GetString());
     return 0;
   }
 
@@ -301,7 +525,7 @@ const wchar_t * flash_image::get_package_qcn_path(void) {
   return pkg_qcn_file;
 }
 
-BOOL flash_image::set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL release) {
+BOOL flash_image::set_package_dir(const wchar_t * dir) {
     if(dir == NULL || !PathFileExists(dir)) {
         ERROR("%S%S", dir == NULL ? _T("Null parameter") : dir,
                       dir == NULL ? _T("") : _T(" is not exist!"));
@@ -314,17 +538,7 @@ BOOL flash_image::set_package_dir(const wchar_t * dir, const wchar_t* config, BO
     }
 
     wcscpy(pkg_dir, dir);
-
-    if (config != NULL)
-        WritePrivateProfileString(PKG_SECTION, PKG_PATH, dir ,config);
-
-#if 0
-    if(release) {
-        reset(FALSE);
-        read_config(config);
-        read_package_version(PKG_CONFIG_XML);
-    }
-#endif
+    WritePrivateProfileString(PKG_SECTION, PKG_PATH, dir, mAppConfigFile.GetString());
 
     return TRUE;
 }

@@ -9,6 +9,26 @@
 
 using namespace std;
 
+
+enum
+{
+	// UI Messages
+	UI_MESSAGE_BASE = (WM_USER + 1000),
+	UI_MESSAGE_UPDATE_PROGRESS_INFO,
+	UI_MESSAGE_UPDATE_PACKAGE_INFO,
+	UI_MESSAGE_DEVICE_INFO,
+};
+
+enum
+{
+  USB_STAT_IDLE,
+  USB_STAT_WORKING,
+  USB_STAT_SWITCH,
+  USB_STAT_SWITCHED,
+  USB_STAT_FINISH,
+  USB_STAT_ERROR,
+};
+
 static const int PARTITION_NUM_MAX = 32;
 static const int PARTITION_NAME_LEN = 32;
 static const int PARTITION_TBL_LEN = PARTITION_NUM_MAX * PARTITION_NAME_LEN;
@@ -39,7 +59,7 @@ class flash_image{
     BOOL qcn_cmds_enum_init (char *cmd);
     const char* qcn_cmds_enum_next (unsigned int index);
 
-    BOOL set_package_dir(const wchar_t * dir, const wchar_t* config, BOOL reset=FALSE);
+    BOOL set_package_dir(const wchar_t * dir);
     BOOL get_pkg_a5sw_sys_ver(CString &version);
     BOOL get_pkg_a5sw_usr_ver(CString &version);
     BOOL get_pkg_a5sw_kern_ver(CString &version);
@@ -50,6 +70,7 @@ class flash_image{
     int read_diagpst_config(const wchar_t* config);
     int GetDiagDlImgSize();
     int GetFbDlImgSize();
+    BOOL ReadPackage();
 
     int SetPartitionDownloadFlag(CString partition, boolean flag);
 
@@ -123,14 +144,14 @@ class CPortStateUI;
 
 class UsbWorkData{
   public:
-    UsbWorkData(int index, CmdmfastbootDlg *dlg, DeviceCoordinator *coordinator,
-      ConfigIni *appConf, XmlParser *xmlParser);
+    UsbWorkData(int index, CWnd* pParentWnd, DeviceCoordinator *coordinator,
+      ConfigIni *appConf, XmlParser *xmlParser, flash_image* package);
     ~UsbWorkData();
     BOOL Clean(BOOL noCleanUI=TRUE);
     BOOL IsIdle();
     BOOL Reset(VOID);
     BOOL Abort(VOID);
-    BOOL Start(DeviceInterfaces* devIntf, UINT nElapse, BOOL flashdirect);
+    BOOL Start(DeviceInterfaces* devIntf, AFX_THREADPROC pfnThreadProc, UINT nElapse, BOOL flashdirect);
     BOOL Finish(VOID);
     BOOL SwitchDev(UINT nElapse);
     BOOL SetSwitchedStatus();
@@ -154,7 +175,7 @@ class UsbWorkData{
     int             stat;
 
   public:
-    CmdmfastbootDlg  *hWnd;
+    CWnd/*CmdmfastbootDlg*/  *hWnd;
     CPortStateUI     *pCtl;
     CWinThread       *work;
     usb_handle       *usb;
@@ -164,7 +185,21 @@ class UsbWorkData{
     FlashImageInfo const *flash_partition[PARTITION_NUM_MAX];
     ConfigIni      *mPAppConf;
     XmlParser      *mPLocalConfigXml;
+    flash_image    *mProjectPackage;
     short           partition_nr;
     BOOL            update_qcn;
 } ;
 
+
+#if 0
+class PSTManager {
+  CString m_ConfigPath;
+  ConfigIni   mAppConf;
+  XmlParser   m_LocalConfigXml;
+  flash_image  *m_image;
+  UsbWorkData *m_workdata[PORT_NUM_MAX];
+
+  vector<CDevLabel> m_WorkDev;
+  DeviceCoordinator mDevCoordinator;
+}
+#endif
