@@ -168,3 +168,31 @@ void ConfigIni:: ScanDir (const wchar_t *szDirectory)
     FindClose (hFind);
 
 }
+
+BOOL ConfigIni::GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency) {
+    if (filename == NULL || size == 0) {
+        LOGE("Bad parameter");
+        return FALSE;
+    }
+
+   const wchar_t  *prg = PST_NPRG;
+   // wchar_t     filename[MAX_PATH];
+    TResult     result = EOK;
+
+    if (emergency)
+        prg = PST_ENPRG;
+
+    int data_len = GetPrivateProfileString(DIAGPST_SECTION,
+                                           prg,
+                                           NULL,
+                                           filename,
+                                           size,//MAX_PATH,
+                                           m_ConfigPath.GetString());
+
+    if (data_len == 0) {
+        LOGE("Can not found prg file %S in configuration file %S.", prg, m_ConfigPath.GetString());
+        return FALSE;
+    }
+
+    return TRUE;
+}

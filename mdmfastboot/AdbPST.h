@@ -8,6 +8,7 @@ class AdbPST
 public:
     AdbPST(BOOL force_mode, MODULE_NAME module);
     ~AdbPST(void);
+    BOOL Reboot(UsbWorkData* data, DeviceInterfaces *dev);
     BOOL DoPST(UsbWorkData* data, flash_image* img, DeviceInterfaces *dev);
 
 private:

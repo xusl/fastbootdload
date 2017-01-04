@@ -19,6 +19,13 @@ AdbPST::~AdbPST(void)
 {
 }
 
+BOOL AdbPST::Reboot(UsbWorkData* data, DeviceInterfaces *dev) {
+    usb_handle * handle = data->usb;
+    adbhost adb(handle , dev->GetDevId());
+    adb.shell("reboot-bootloader", NULL, NULL);
+    return TRUE;
+}
+
 BOOL AdbPST::DoPST(UsbWorkData* data, flash_image* img, DeviceInterfaces *dev) {
     usb_handle * handle = data->usb;
     adbhost adb(handle , dev->GetDevId());

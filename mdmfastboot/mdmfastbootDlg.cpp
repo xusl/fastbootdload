@@ -674,13 +674,9 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
         if(result)
             result = pst.RunTimeDiag();
         if(result)
-            result = pst.Calculate_length();
-        if(result)
-            result = pst.DownloadPrg(data->mPAppConf->GetAppConfIniPath());
+            result = pst.DownloadPrg(data->mPAppConf);
         if(result) {
-            uint32 diagsize = img->GetDiagDlImgSize();
-            uint32 fbsize = img->GetFbDlImgSize();
-            result = pst.DownloadImages(((diagsize + fbsize ) * 100)/fbsize, 0);
+            result = pst.DownloadImages(img);
         }
         if(result) {
             dev->SetDeviceStatus(DEVICE_FLASH);
@@ -990,7 +986,7 @@ void CmdmfastbootDlg::OnDestroy()
 	::RemoveProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP);	//for single instance
 	//Shutdown the thread pool
 	//m_dlWorkerPool.Shutdown();
- 
+
 	StopLogging();
 }
 

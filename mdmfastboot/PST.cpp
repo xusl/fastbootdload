@@ -57,7 +57,7 @@ PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
 
 
 BOOL PSTManager::Initialize(CWnd *hWnd) {
-  for (int i = 0; i < sizeof m_workdata/ sizeof m_workdata[0]; i++) {
+  for (int i = 0; i < GetPortNum(); i++) {
     m_workdata[i] = new UsbWorkData(i, hWnd, &mDevCoordinator, &mAppConf, &m_LocalConfigXml, m_image);
   }
   return TRUE;

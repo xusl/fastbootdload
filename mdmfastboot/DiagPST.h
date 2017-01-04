@@ -46,10 +46,9 @@ public:
     virtual void initCustDataInfo();
     virtual bool DownloadCheck();
     virtual bool RunTimeDiag();
-    virtual bool DownloadImages(uint8 ratio, uint8 base);
+    virtual bool DownloadImages(flash_image *img);
     virtual bool DownloadCustomerInfo();
-    virtual bool DownloadPrg(const wchar_t* config);
-    virtual bool Calculate_length();
+    virtual bool DownloadPrg(ConfigIni* config);
 
 private:
     virtual bool SwitchOfflineMode();
@@ -64,6 +63,7 @@ private:
     virtual bool GenerateFTFiles();
     virtual bool SetFuncFive();
     virtual bool StorePIC();
+    virtual uint32 CalculateImageLength();
 
     bool RequestFirmwarVerAndMobileIdNormalMode();
     bool RequestExternalVersion();
@@ -82,7 +82,6 @@ private:
     SAHARACmd                       *m_sahara;
     UsbWorkData                     *m_Worker;
     map<string,FileBufStruct>        m_dlFileBuffer;
-    uint32                           Software_size;
     TDLImgInfoType                  *m_pDLImgInfo;
     TCustDataInfoType               *m_pCustdataInfo;
     XmlParser                       *m_LocalConfigXml;

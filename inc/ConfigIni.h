@@ -30,6 +30,7 @@ public:
     int          GetUiPortTotalCount(void) { return m_nPort;};
     int          GetUiPortRowCount(void) { return m_nPortRow;};
     int          GetPSTWorkTimeout(void) { return work_timeout;};
+    BOOL         GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency);
 
 private:
     void         ScanDir (const wchar_t *szDirectory);
