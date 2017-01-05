@@ -140,8 +140,8 @@ void CLog::StartLogging
 #endif
 	//this->mask = mask;
 
-    log_tags_init(tags);
-	log_level_init(mask);
+    SetLogTags(tags);
+	SetLogLevel(mask);
 
 	INFO("=================== Start logging =================");
 }
@@ -278,7 +278,7 @@ int CLog::AdbTraceMask() {
  * mask from it. note that '1' and 'all' are special cases to
  * enable all tracing
  */
-void CLog::log_tags_init(const char*  p)
+void CLog::SetLogTags(const char*  p)
 {
     //const char*  p = getenv("ADB_TRACE");
     const char*  q;
@@ -343,7 +343,7 @@ void CLog::log_tags_init(const char*  p)
  * mask from it. note that '1' and 'all' are special cases to
  * enable all tracing
  */
-void CLog::log_level_init(const char*  p)
+void CLog::SetLogLevel(const char*  p)
 {
     const char*  q;
 
@@ -458,6 +458,13 @@ void StartLogging(const wchar_t* fname,
 #endif
 
 	//RedirectStdIO(fname);
+}
+void SetLogging(const char* mask, const char* tags) {
+ #ifdef FEATURE_LOG_SYS
+	g_pLogInstance = CLog::GetInstance();
+    g_pLogInstance->SetLogTags(tags);
+	g_pLogInstance->SetLogLevel(mask);
+#endif
 }
 
 //-----------------------------------------------------------------------------

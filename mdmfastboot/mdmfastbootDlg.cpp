@@ -185,7 +185,7 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(BOOL update) {
         return FALSE;
 
     img = m_image->image_enum_init();
-    qcn = m_image->get_package_qcn_path();
+    qcn = mPSTManager.get_package_qcn_path();
 
     m_UpdateDownloadFlag = update;
 
@@ -659,7 +659,7 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
     usb_dev_t status;
     BOOL useAdb = TRUE;
     BOOL flashdirect = TRUE;
-    ConfigIni      *config;
+    AppConfig      *config;
 
     if (data == NULL ||  !data->CheckValid()) {
         data->ui_text_msg(FLASH_DONE, "Bad parameter");
@@ -955,7 +955,7 @@ void CmdmfastbootDlg::OnBnClickedStart()
 {
 	if (m_imglist->GetItemCount()<1)
 	{
-		AfxMessageBox(L"Please select a valid package directory!",MB_OK);
+		AfxMessageBox(L"Please select a valid package directory!", MB_OK);
 		return;
 	}
 	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_DISABLED|MF_GRAYED);

@@ -19,47 +19,51 @@
 PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
     mThreadProc(pfnThreadProc),
 	mDevCoordinator(),
-	m_WorkDev()
+	m_WorkDev(),
+	m_image(NULL)
 {
     //construct update software package. get configuration about partition information.
     mAppConf.ReadConfigIni();
-    StartLogging(mAppConf.GetLogFilePath(), mAppConf.GetLogLevel(), mAppConf.GetLogTag());
+    //StartLogging(mAppConf.GetLogFilePath(), mAppConf.GetLogLevel(), mAppConf.GetLogTag());
 
-    m_LocalConfigXml.Parse(mAppConf.GetPkgConfXmlPath());
     m_bWork = mAppConf.GetAutoWorkFlag();
 
     //if (NULL!=m_image) {
     //    delete m_image;
     //}
-    m_image = new flash_image(mAppConf.GetAppConfIniPath());
+
+    ProjectConfig config;
+    m_LocalConfigXml.Parse(mAppConf.GetPkgConfXmlPath());
+    mAppConf.SetProjectCode(m_LocalConfigXml.GetProjectCode());
+    m_image = new flash_image(&mAppConf);
 
     for (int i = 0; i < sizeof m_workdata/ sizeof m_workdata[0]; i++) {
       m_workdata[i] = NULL;
     }
 
-   //test
-
-    //unsigned int size;
-    //void *data = load_file(mAppConf.GetPkgConfXmlPath(), &size);
-    //XmlParser parser1;
-    //parser1.Parse((PCCH)data, size);
-    //parser1.Parse("<?wsx version \"1.0\" ?><smil> \
-    //         <media src = \"welcome1.asf\"/>cdcddddddddd</smil>");
-    LOGE(" xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-
-    string refs;
-    m_LocalConfigXml.getElementsByTagName(L"RECOVERYFS", refs);
-    LOGE("RECOVERYFS value %sxxxxxxxxxxxxxxxxxxxxx", refs.c_str());
-
-    ImgUnpack img;
-    img.UnpackDlImg(mAppConf.GetPkgDlImgPath(),mAppConf.GetAppConfIniPath());
+    //ImgUnpack img;
+    //img.UnpackDlImg(mAppConf.GetPkgDlImgPath(),mAppConf.GetAppConfIniPath());
 }
 
+
+BOOL PSTManager::ChangePackage(const wchar_t * dir) {
+  if (mAppConf.SetPackageDir(dir))//m_PackagePath.GetBuffer(/*MAX_PATH*/)))
+    		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
+
+        m_LocalConfigXml.Parse(mAppConf.GetPkgConfXmlPath());
+        mAppConf.SetProjectCode(m_LocalConfigXml.GetProjectCode());
+    	m_image->ReadPackage();
+        return TRUE;
+    }
+
+    return FALSE;
+}
 
 BOOL PSTManager::Initialize(CWnd *hWnd) {
   for (int i = 0; i < GetPortNum(); i++) {
     m_workdata[i] = new UsbWorkData(i, hWnd, &mAppConf, &m_LocalConfigXml, m_image);
   }
+  //mAppConf.ScanDir();
   return TRUE;
 }
 
@@ -204,15 +208,6 @@ BOOL PSTManager::Reset() {
     return TRUE;
 }
 
-BOOL PSTManager::ChangePackage(const wchar_t * dir) {
-  if (m_image->set_package_dir(dir ))//m_PackagePath.GetBuffer(/*MAX_PATH*/)))
-    		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
-    	m_image->ReadPackage();
-        return TRUE;
-    }
-
-    return FALSE;
-}
 
 BOOL PSTManager::EnumerateAdbDevice(VOID) {
     usb_handle* handle;
@@ -423,7 +418,7 @@ BOOL PSTManager::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPA
 }
 
 UsbWorkData::UsbWorkData(int index, CWnd* dlg,
-    ConfigIni *appConf, XmlParser *xmlParser, flash_image* package) {
+    AppConfig *appConf, PackageConfig *xmlParser, flash_image* package) {
     hWnd = dlg;
     pCtl = new CPortStateUI;
     pCtl->Create(IDD_PORT_STATE, dlg);
@@ -644,8 +639,7 @@ BOOL UsbWorkData::Log(const char * msg) {
     return TRUE;
 }
 
-
-flash_image::flash_image(const wchar_t* config):
+flash_image::flash_image(AppConfig *appConfig):
   image_list(NULL),
   image_last(NULL),
   a5sw_kern_ver("Unknown"),
@@ -659,7 +653,7 @@ flash_image::flash_image(const wchar_t* config):
   mDiagDlImgSize(0),
   mFbDlImgSize(0)
 {
-    mAppConfigFile = config;
+    mAppConfig = appConfig;
     ReadPackage();
 }
 
@@ -669,45 +663,20 @@ flash_image::~flash_image() {
 
 
 BOOL flash_image::ReadPackage() {
-  const wchar_t* config = mAppConfigFile.GetString();
-  CString path;
-  int data_len;
+    CString path;
+    int data_len;
 
-  if (config == NULL) {
-    ERROR("not specified config file name");
-    return FALSE;
-  }
-
-  data_len = GetPrivateProfileString(PKG_SECTION,
-                                     PKG_PATH,
-                                     GetAppPath(path).GetString(),
-                                     pkg_dir,
-                                     MAX_PATH,
-                                     config);
-
-  if (pkg_dir[data_len - 1] != L'\\' ) {
-    if ( data_len > MAX_PATH - 2) {
-    ERROR("bad package directory in the section path.");
-        return FALSE;
-    }
-    pkg_dir[data_len] = L'\\';
-    pkg_dir[data_len + 1] = L'\0';
-    data_len++;
-    }
-
-  wcsncpy(pkg_conf_file, pkg_dir, data_len+1);
-  wcsncat(pkg_conf_file, PKG_CONFIG_XML, sizeof(pkg_conf_file) / sizeof(pkg_conf_file[0]) - data_len);
-
-  wcsncpy(pkg_qcn_file, pkg_dir, data_len+1);
-  wcsncat(pkg_qcn_file, PKG_STATIC_QCN, sizeof(pkg_qcn_file) / sizeof(pkg_qcn_file[0]) - data_len);
-
-  read_fastboot_config(config);
-  read_diagpst_config(config);
-  read_package_version(pkg_conf_file);
-  return TRUE;
+    ProjectConfig projectConfig;
+    mAppConfig->GetProjectConfig(projectConfig);
+    const wchar_t *projectConfigFile = projectConfig.GetConfigPath().GetString();
+    const wchar_t* pkg_dir = mAppConfig->GetUpdateImgPkgDir();
+    read_fastboot_config(projectConfigFile, pkg_dir);
+    read_diagpst_config(projectConfigFile, pkg_dir);
+    //read_package_version(mAppConfig->pkg_conf_file);
+    return TRUE;
 }
 
-int flash_image::read_diagpst_config(const wchar_t* config) {
+int flash_image::read_diagpst_config(const wchar_t* config, const wchar_t* pkg_dir) {
   wchar_t partition_tbl[PARTITION_TBL_LEN] = {0};
   wchar_t filename[MAX_PATH];
   wchar_t *partition;
@@ -758,7 +727,7 @@ int flash_image::read_diagpst_config(const wchar_t* config) {
   return 0;
 }
 
-int flash_image::read_fastboot_config(const wchar_t* config) {
+int flash_image::read_fastboot_config(const wchar_t* config, const wchar_t* pkg_dir) {
   wchar_t partition_tbl[PARTITION_TBL_LEN] = {0};
   wchar_t filename[MAX_PATH];
   wchar_t *partition;
@@ -798,7 +767,7 @@ int flash_image::read_fastboot_config(const wchar_t* config) {
         add_image(imgs[i], imgs[i+1], TRUE, config);
     }
 
-    set_package_dir(GetAppPath(path).GetString());
+    //set_package_dir(GetAppPath(path).GetString());
     return 0;
   }
 
@@ -927,19 +896,7 @@ int flash_image::GetFbDlImgSize() {
     return mFbDlImgSize;
 }
 
-const wchar_t * flash_image::get_package_dir(void) {
-    return pkg_dir;
-}
-
-const wchar_t * flash_image::get_package_config(void) {
-    return pkg_conf_file;
-}
-
-
-const wchar_t * flash_image::get_package_qcn_path(void) {
-  return pkg_qcn_file;
-}
-
+#if 0
 BOOL flash_image::set_package_dir(const wchar_t * dir) {
     if(dir == NULL || !PathFileExists(dir)) {
         ERROR("%S%S", dir == NULL ? _T("Null parameter") : dir,
@@ -957,6 +914,7 @@ BOOL flash_image::set_package_dir(const wchar_t * dir) {
 
     return TRUE;
 }
+#endif
 
 const FlashImageInfo* flash_image::get_partition_info(wchar_t *partition, void **ppdata, unsigned *psize) {
   FlashImageInfo* img;
@@ -1005,17 +963,17 @@ BOOL flash_image::qcn_cmds_enum_init (char *cmd) {
       }
   }
 
-  if (nv_buffer == NULL)
-   {
-  QcnParser chQcn;
+    if (nv_buffer == NULL)
+    {
+        QcnParser chQcn;
 
-  if (chQcn.OpenDocument(pkg_qcn_file) == FALSE)
-  {
-    return FALSE;
-  }
-  return chQcn.GetNVWriteCommands(nv_cmd, &nv_buffer, &nv_num);
- // chQcn.PutNVWriteCommands(nvBuf, dwLens);
-  }
+        if (chQcn.OpenDocument(mAppConfig->GetPkgQcnPath()) == FALSE)
+        {
+        return FALSE;
+        }
+        return chQcn.GetNVWriteCommands(nv_cmd, &nv_buffer, &nv_num);
+        // chQcn.PutNVWriteCommands(nvBuf, dwLens);
+    }
 
     return TRUE;
 }
@@ -1151,11 +1109,14 @@ BOOL flash_image::set_download_flag(CString strPartitionName, bool bDownload) {
 	for(;img != NULL; ) {
 		if (0 == wcscmp(img->partition, strPartitionName.GetBuffer()))
 		{
+            ProjectConfig projectConfig;
+            mAppConfig->GetProjectConfig(projectConfig);
+            const wchar_t *projectConfigFile = projectConfig.GetConfigPath().GetString();
 			img->need_download = bDownload;
             WritePrivateProfileString(PARTITIONTBL_DL,
-                              strPartitionName.GetBuffer(),
+                              strPartitionName.GetString(),
                               bDownload?L"1":L"0",
-                              mAppConfigFile.GetBuffer());
+                              projectConfigFile);
 			bRet = 1;
 			break;
 		}

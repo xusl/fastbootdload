@@ -272,15 +272,16 @@ vector<string> XmlParser::getCompareList() {
     return m_mandatoryCompArray;
 }
 
-ConfigXml::ConfigXml() {
+PackageConfig::PackageConfig():
+    XmlParser() {
     ;
 }
 
-ConfigXml::~ConfigXml() {
+PackageConfig::~PackageConfig() {
     ;
 }
 
-bool ConfigXml::ElementHandler(CString& name, CComBSTR& value) {
-
-        return true;
-}
+//bool ConfigXml::ElementHandler(CString& name, CComBSTR& value) {
+//
+//       return true;
+//}

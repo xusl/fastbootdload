@@ -9,16 +9,36 @@ using namespace std;
 
 static const int PORT_NUM_MAX = 9;
 
+class ProjectConfig {
+  public:
+    ProjectConfig(CString configFile = _T("\\."));
+    ~ProjectConfig();
+    BOOL  ReadConfig();
+    BOOL  IsValid() { return mIsValidConfig; }
+    CString GetConfigPath() { return mProjectConfigPath; }
+    CString GetProjectCode() { return mCode; }
+    CString GetPlatform() { return mPlatform; }
+    CString GetVersion() { return mVersion; }
+    BOOL  GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency);
 
-class ConfigIni{
+  private:
+    CString mProjectConfigPath;
+    CString mCode;
+    CString mPlatform;
+    CString mVersion;
+    BOOL   mIsValidConfig;
+};
+
+class AppConfig{
 public:
-    ConfigIni();
-    ~ConfigIni();
+    AppConfig();
+    ~AppConfig();
     BOOL         ReadConfigIni(const wchar_t * ini = L"mdmconfig.ini");
     const wchar_t *GetUpdateImgPkgDir(void) { return pkg_dir;};
     const wchar_t *GetAppConfIniPath(void) { return m_ConfigPath.GetString();};
     const wchar_t *GetPkgDlImgPath(void) {return pkg_dlimg_file;};
     const wchar_t *GetPkgConfXmlPath(void) {return pkg_conf_file;};
+    const wchar_t *GetPkgQcnPath(void) {return pkg_qcn_file;};
     const wchar_t *GetLogFilePath(void) {return log_file;};
     const char  *GetLogTag(void) { return log_tag;};
     const char  *GetLogLevel(void) { return log_level;};
@@ -35,8 +55,16 @@ public:
     this is indicate that use debug mode and use adb command reboot-bootloader to enter fastboot.
     */
     BOOL         IsUseAdb() { return m_UseAdb; }
+
+    BOOL         SetProjectCode(string &projectCode);
+    BOOL         GetProjectConfig(ProjectConfig& config) {
+      config = mProjectConfig;
+      return TRUE;
+    }
+    BOOL         SetPackageDir(const wchar_t * dir);
 private:
     void         ScanDir (const wchar_t *szDirectory);
+    void         SetupPackageInformation();
 
 private:
     CString                 m_ConfigPath;
@@ -57,5 +85,7 @@ private:
     wchar_t                 pkg_conf_file[MAX_PATH];
     wchar_t                 pkg_dlimg_file[MAX_PATH];
     wchar_t                 pkg_qcn_file[MAX_PATH];
+    map<CString, ProjectConfig> m_SupportProject;
+    ProjectConfig           mProjectConfig;
     CString m_strModuleName;
 };

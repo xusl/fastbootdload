@@ -19,7 +19,7 @@ void DiagPSTDownloadState(void *data, int port, string msg) {
         worker->ui_text_msg(PROMPT_TEXT, msg.c_str());
 }
 
-DiagPST::DiagPST(UsbWorkData * worker, XmlParser *xmlParser, map<string,FileBufStruct> & filebuffer):
+DiagPST::DiagPST(UsbWorkData * worker, PackageConfig *xmlParser, map<string,FileBufStruct> & filebuffer):
     m_iMobileId(0),
     m_FirmwareVersion(""),
     m_blDownloadMode(false),
@@ -707,7 +707,7 @@ bool DiagPST::RunTimeDiag() {
 }
 
 
-bool DiagPST::DownloadPrg(ConfigIni* config) {
+bool DiagPST::DownloadPrg(AppConfig* config) {
     /* download PRG */
     TImgBufType *pPrgImg = &m_pDLImgInfo->prg;
     wchar_t     filename[MAX_PATH];

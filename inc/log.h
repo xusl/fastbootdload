@@ -88,10 +88,9 @@ public:
 public:
 	static CLog* GetInstance(void);
 
-private:
 	CLog();
-  void log_tags_init(const char* tags);
-  void log_level_init(const char* p);
+  void SetLogTags(const char* tags);
+  void SetLogLevel(const char* p);
 
 private:
 	static CLog* pLogInstance;
@@ -175,7 +174,8 @@ void fatal_errno(const char *fmt, ...);
 /*redirect stderr to adb.log*/
 void RedirectStdIO(void);
 
-void StartLogging(const wchar_t* fname, const char* mask, const char* tags);
+void StartLogging(const wchar_t* fname, const char* mask="all", const char* tags="all");
+void SetLogging(const char* mask, const char* tags);
 void StopLogging(void);
 
 //-----------------------------------------------------------------------------

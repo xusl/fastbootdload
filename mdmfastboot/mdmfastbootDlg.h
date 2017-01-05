@@ -21,7 +21,6 @@
 #include "diagcmd.h"
 #include "jrddiagcmd.h"
 #include <ConfigIni.h>
-#include "XmlParser.h"
 
 //#define INLINE_SETTING
 

@@ -6,7 +6,7 @@
 #include <ConfigIni.h>
 
 
-ConfigIni::ConfigIni() :
+AppConfig::AppConfig() :
         log_file(NULL),
         log_tag(NULL),
         log_level(NULL),
@@ -18,7 +18,8 @@ ConfigIni::ConfigIni() :
         switch_timeout(300),
         work_timeout(600),
         m_nPort(1),
-        m_nPortRow(1)
+        m_nPortRow(1),
+        mProjectConfig(_T("\\."))
 {
    m_UseAdb = TRUE;
    memset(pkg_conf_file, 0, sizeof pkg_conf_file);
@@ -26,7 +27,7 @@ ConfigIni::ConfigIni() :
    memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
 }
 
-BOOL ConfigIni::ReadConfigIni(const wchar_t * ini){
+BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
   LPCTSTR lpFileName;
   int data_len;
   wchar_t log_conf[MAX_PATH]= {0};
@@ -51,8 +52,7 @@ BOOL ConfigIni::ReadConfigIni(const wchar_t * ini){
   data_len = GetPrivateProfileString(L"log",L"level",NULL,log_conf,MAX_PATH,lpFileName);
   if (data_len) log_level = WideStrToMultiStr(log_conf);
 
-
-  //StartLogging(log_file, log_level, log_tag);
+  StartLogging(log_file, log_level, log_tag);
   //construct update software package. get configuration about partition information.
   //if (NULL!=m_image)
   //    delete m_image;
@@ -85,22 +85,50 @@ BOOL ConfigIni::ReadConfigIni(const wchar_t * ini){
     m_forceupdate = TRUE; /*Now fw build system can not handle config.xml, so set it to true*/
   }
 
-    data_len = GetPrivateProfileString(PKG_SECTION,
-                                     PKG_PATH,
-                                     GetAppPath(appPath).GetString(),
-                                     pkg_dir,
-                                     MAX_PATH,
-                                     lpFileName);
+  ScanDir(appPath.GetString());
+  SetupPackageInformation();
+  return TRUE;
+}
 
-  if (pkg_dir[data_len - 1] != L'\\' ) {
-    if ( data_len > MAX_PATH - 2) {
-    LOGE("bad package directory in the section path.");
+BOOL AppConfig::SetPackageDir(const wchar_t * dir) {
+    if(dir == NULL || !PathFileExists(dir)) {
+        ERROR("%S%S", dir == NULL ? _T("Null parameter") : dir,
+                      dir == NULL ? _T("") : _T(" is not exist!"));
         return FALSE;
     }
-    pkg_dir[data_len] = L'\\';
-    pkg_dir[data_len + 1] = L'\0';
-    data_len++;
+
+    if (wcscmp(dir, pkg_dir) == 0) {
+        INFO("Package directory is not changed.");
+        return FALSE;
     }
+
+    wcscpy(pkg_dir, dir);
+    WritePrivateProfileString(PKG_SECTION, PKG_PATH, dir, m_ConfigPath.GetString());
+    SetupPackageInformation();
+    return TRUE;
+}
+
+void AppConfig::SetupPackageInformation() {
+  size_t data_len;
+CString appPath= L".\\";
+//TODO?? , how to determined invalid package.
+    data_len = GetPrivateProfileString(PKG_SECTION,
+                                         PKG_PATH,
+                                         GetAppPath(appPath).GetString(),
+                                         pkg_dir,
+                                         MAX_PATH,
+                                         m_ConfigPath.GetString());
+
+      if (pkg_dir[data_len - 1] != L'\\' ) {
+        if ( data_len > MAX_PATH - 2) {
+        LOGE("bad package directory in the section path.");
+            return ;
+        }
+        pkg_dir[data_len] = L'\\';
+        pkg_dir[data_len + 1] = L'\0';
+        data_len++;
+      }
+
 
   memset(pkg_conf_file, 0, sizeof pkg_conf_file);
   wcsncpy(pkg_conf_file, pkg_dir, data_len+1);
@@ -114,24 +142,23 @@ BOOL ConfigIni::ReadConfigIni(const wchar_t * ini){
 
   memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
   for (int i = 0; i < COUNTOF(candidate); i++) {
-  wcsncpy(pkg_dlimg_file, pkg_dir, data_len+1);
-  wcsncat(pkg_dlimg_file, candidate[i], COUNTOF(pkg_dlimg_file) - data_len);
-  if(GetFileAttributes(pkg_dlimg_file) != INVALID_FILE_ATTRIBUTES) {
-    break;
-  } else {
-  memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
+      wcsncpy(pkg_dlimg_file, pkg_dir, data_len+1);
+      wcsncat(pkg_dlimg_file, candidate[i], COUNTOF(pkg_dlimg_file) - data_len);
+      if(GetFileAttributes(pkg_dlimg_file) != INVALID_FILE_ATTRIBUTES) {
+          break;
+      } else {
+          memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
+      }
   }
-  }
-    return TRUE;
 }
 
-ConfigIni::~ConfigIni() {
+AppConfig::~AppConfig() {
   if(log_file) free(log_file);
   if(log_tag) delete log_tag;
   if(log_level) delete log_level;
 }
 
-void ConfigIni:: ScanDir (const wchar_t *szDirectory)
+void AppConfig:: ScanDir (const wchar_t *szDirectory)
 {
     HANDLE      hFind;
     WIN32_FIND_DATA  FindData;
@@ -144,9 +171,10 @@ void ConfigIni:: ScanDir (const wchar_t *szDirectory)
     szFileSpec [_MAX_PATH - 1] = 0;
     lstrcpyn (szFileSpec, szDirectory, _MAX_PATH);
 //    lstrcat (szFileSpec, "\\*.*");
-    lstrcat (szFileSpec, _T("\\*config.ini"));
+    lstrcat (szFileSpec, _T("\\*ProjectConfig.ini"));
     hFind = FindFirstFile (szFileSpec, &FindData);
     if (hFind == INVALID_HANDLE_VALUE) {
+        LOGE("scan dir initialize failed");
         return;
     }
 
@@ -169,15 +197,29 @@ void ConfigIni:: ScanDir (const wchar_t *szDirectory)
                   FindData.cFileName, szDate, FindData.nFileSizeLow);
 #endif
         LOGD("Find file %S", FindData.cFileName);
-
+        CString configFile = szDirectory;
+        configFile += _T("\\");
+        configFile += FindData.cFileName;
+        ProjectConfig projectConfig(configFile);
+        if (projectConfig.ReadConfig())
+            m_SupportProject.insert(std::pair<CString, ProjectConfig>(projectConfig.GetProjectCode(), projectConfig));
     }
     while (FindNextFile (hFind, & FindData));
-
     FindClose (hFind);
-
 }
 
-BOOL ConfigIni::GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency) {
+
+BOOL AppConfig::SetProjectCode(string &projectCode) {
+    CString code( projectCode.c_str() );
+    map<CString,ProjectConfig>::iterator iter=m_SupportProject.find(code);
+    if(iter!=m_SupportProject.end()) {
+        mProjectConfig = m_SupportProject.at(code);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+BOOL AppConfig::GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency) {
     if (filename == NULL || size == 0) {
         LOGE("Bad parameter");
         return FALSE;
@@ -203,4 +245,95 @@ BOOL ConfigIni::GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency) {
     }
 
     return TRUE;
+}
+
+
+#define PROJECT_SECTION         _T("project") //L"pst_diag"
+ProjectConfig::ProjectConfig(CString configFile):
+    mProjectConfigPath(configFile),
+    mCode(_T("NullProjectCode")),
+    mPlatform(_T("NullProjectPlatform")),
+    mVersion(_T("NullProjectVersion")),
+    mIsValidConfig(FALSE)
+{
+}
+
+BOOL ProjectConfig::ReadConfig() {
+     WCHAR     buffer[MAX_PATH] = {0};
+     int data_len;
+     PCTSTR configFile = mProjectConfigPath.GetString();
+    if (configFile == NULL)
+        return FALSE;
+
+    if (!PathFileExists(configFile))
+        return FALSE;
+
+     data_len =  GetPrivateProfileString(PROJECT_SECTION,
+                           _T("code"),
+                           NULL,
+                           buffer,
+                           MAX_PATH,
+                           configFile);
+   if (data_len == 0) {
+        return FALSE;
+    }
+     mCode = buffer;
+
+     memset(buffer, 0, sizeof buffer);
+     data_len = GetPrivateProfileString(PROJECT_SECTION,
+                           _T("platform"),
+                           NULL,
+                           buffer,
+                           MAX_PATH,
+                           configFile);
+        if (data_len == 0) {
+        return FALSE;
+    }
+     mPlatform = buffer;
+
+     memset(buffer, 0, sizeof buffer);
+     data_len = GetPrivateProfileString(PROJECT_SECTION,
+                           _T("version"),
+                           NULL,
+                           buffer,
+                           MAX_PATH,
+                           configFile);
+        if (data_len == 0) {
+        return FALSE;
+    }
+     mVersion = buffer;
+     mIsValidConfig = TRUE;
+     return TRUE;
+}
+
+ProjectConfig::~ProjectConfig() {
+    ;
+}
+BOOL ProjectConfig::GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency) {
+    if (filename == NULL || size == 0) {
+        LOGE("Bad parameter");
+        return FALSE;
+    }
+
+   const wchar_t  *prg = PST_NPRG;
+   // wchar_t     filename[MAX_PATH];
+    TResult     result = EOK;
+
+    if (emergency)
+        prg = PST_ENPRG;
+
+    int data_len = GetPrivateProfileString(DIAGPST_SECTION,
+                                           prg,
+                                           NULL,
+                                           filename,
+                                           size,//MAX_PATH,
+                                           mProjectConfigPath.GetString());
+
+    if (data_len == 0) {
+        LOGE("Can not found prg file %S in configuration file %S.", prg, mProjectConfigPath.GetString());
+        return FALSE;
+    }
+
+    return TRUE;
+
 }

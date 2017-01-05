@@ -45,29 +45,23 @@ typedef struct FlashImageInfo {
 
 class flash_image{
   public:
-    flash_image(const wchar_t* config_file);
+    flash_image(AppConfig *appConfig);
     ~flash_image();
     const FlashImageInfo* get_partition_info(wchar_t *partition, void **ppdata, unsigned *psize);
     const FlashImageInfo* image_enum_init (void) ;
     const FlashImageInfo* image_enum_next (const FlashImageInfo* img);
-    const wchar_t * get_package_dir(void);
-    //config.xml file path
-    const wchar_t * get_package_config(void);
-    //static qcn file path
-    const wchar_t * get_package_qcn_path(void);
 
     BOOL qcn_cmds_enum_init (char *cmd);
     const char* qcn_cmds_enum_next (unsigned int index);
 
-    BOOL set_package_dir(const wchar_t * dir);
     BOOL get_pkg_a5sw_sys_ver(CString &version);
     BOOL get_pkg_a5sw_usr_ver(CString &version);
     BOOL get_pkg_a5sw_kern_ver(CString &version);
     BOOL get_pkg_fw_ver(CString &version);
     BOOL get_pkg_qcn_ver(CString &version);
 	  BOOL set_download_flag(CString strPartitionName, bool bDownload);
-    int read_fastboot_config(const wchar_t* config);
-    int read_diagpst_config(const wchar_t* config);
+    int read_fastboot_config(const wchar_t* config, const wchar_t* pkg_dir);
+    int read_diagpst_config(const wchar_t* config, const wchar_t* pkg_dir);
     int GetDiagDlImgSize();
     int GetFbDlImgSize();
     BOOL ReadPackage();
@@ -87,12 +81,9 @@ class flash_image{
     BOOL reset(BOOL free_only);
 
   private:
-    CString  mAppConfigFile;  //todo , will change to project config, for app will support many projects
+    AppConfig *mAppConfig;
     FlashImageInfo *image_list;
     FlashImageInfo *image_last;
-    wchar_t pkg_dir[MAX_PATH];
-    wchar_t pkg_conf_file[MAX_PATH];
-    wchar_t pkg_qcn_file[MAX_PATH];
     unsigned int nv_num;
     char ** nv_buffer;
     char * nv_cmd;
@@ -145,7 +136,7 @@ class CPortStateUI;
 class UsbWorkData{
   public:
     UsbWorkData(int index, CWnd* pParentWnd,
-      ConfigIni *appConf, XmlParser *xmlParser, flash_image* package);
+      AppConfig *appConf, PackageConfig *xmlParser, flash_image* package);
     ~UsbWorkData();
     BOOL Clean(BOOL noCleanUI=TRUE);
     BOOL IsIdle();
@@ -165,7 +156,7 @@ class UsbWorkData{
     BOOL SetInfo(UI_INFO_TYPE infoType, CString strInfo);
     BOOL Log(const char * msg);
     int GetStatus() { return stat;};
-    XmlParser *GetXmlParser() { return mPLocalConfigXml;};
+    PackageConfig *GetXmlParser() { return mPLocalConfigXml;};
     BOOL CheckValid() {
       return hWnd != NULL && mProjectPackage != NULL && mPAppConf != NULL ;
     }
@@ -186,8 +177,8 @@ class UsbWorkData{
     DeviceInterfaces*  mActiveDevIntf;
     DeviceInterfaces*  mMapDevIntf;
     FlashImageInfo const *flash_partition[PARTITION_NUM_MAX];
-    ConfigIni      *mPAppConf;
-    XmlParser      *mPLocalConfigXml;
+    AppConfig      *mPAppConf;
+    PackageConfig      *mPLocalConfigXml;
     flash_image    *mProjectPackage;
     short           partition_nr;
     BOOL            update_qcn;
@@ -219,16 +210,28 @@ public:
   int GetPortNum();
   flash_image* GetProjectPackage() { return m_image;}
   BOOL ChangePackage(const wchar_t * dir);
-  const wchar_t * GetPackage() { return m_image->get_package_dir();}
+  const wchar_t * GetPackage() { return mAppConf.GetUpdateImgPkgDir();}
   BOOL SetDownload(CString partition, bool bDownload) {
     return m_image->set_download_flag(partition, bDownload);
   }
+  const wchar_t * get_package_dir(void) {
+    return mAppConf.GetUpdateImgPkgDir();
+  }
+  //config.xml file path
+  const wchar_t * get_package_config(void) {
+    return mAppConf.GetPkgConfXmlPath();
+  }
+    //static qcn file path
+  const wchar_t * get_package_qcn_path(void) {
+    return mAppConf.GetPkgQcnPath();
+  }
+
 
 private:
 
 private:
-  ConfigIni          mAppConf;
-  XmlParser          m_LocalConfigXml;
+  AppConfig          mAppConf;
+  PackageConfig          m_LocalConfigXml;
   flash_image       *m_image;
   UsbWorkData       *m_workdata[PORT_NUM_MAX];
 

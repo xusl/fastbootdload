@@ -30,7 +30,7 @@ typedef struct
 class DiagPST
 {
 public:
-    DiagPST(UsbWorkData * worker, XmlParser *xmlParser, map<string,FileBufStruct> &filebuffer);
+    DiagPST(UsbWorkData * worker, PackageConfig *xmlParser, map<string,FileBufStruct> &filebuffer);
     ~DiagPST(void);
 
 
@@ -48,7 +48,7 @@ public:
     virtual bool RunTimeDiag();
     virtual bool DownloadImages(flash_image *img);
     virtual bool DownloadCustomerInfo();
-    virtual bool DownloadPrg(ConfigIni* config);
+    virtual bool DownloadPrg(AppConfig* config);
     bool  IsEmergencyDownloadMode () { return m_blDownloadMode;}
 
 private:
@@ -85,7 +85,7 @@ private:
     map<string,FileBufStruct>        m_dlFileBuffer;
     TDLImgInfoType                  *m_pDLImgInfo;
     TCustDataInfoType               *m_pCustdataInfo;
-    XmlParser                       *m_LocalConfigXml;
+    PackageConfig                       *m_LocalConfigXml;
 
     bool                            m_blDownloadMode;
     bool                            m_bRestore;

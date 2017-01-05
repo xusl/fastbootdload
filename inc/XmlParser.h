@@ -37,11 +37,29 @@ private:
     vector<string>           m_mandatoryCompArray;
 };
 
-class ConfigXml:  public XmlParser {
-  public:
-    ConfigXml();
-    ~ConfigXml();
+//test
 
-  private:
-    virtual bool              ElementHandler(CString& name, CComBSTR &value);
+//unsigned int size;
+//void *data = load_file(mAppConf.GetPkgConfXmlPath(), &size);
+//XmlParser parser1;
+//parser1.Parse((PCCH)data, size);
+//parser1.Parse("<?wsx version \"1.0\" ?><smil> \
+//         <media src = \"welcome1.asf\"/>cdcddddddddd</smil>");
+//LOGE(" xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+
+//string refs;
+//m_LocalConfigXml.getElementsByTagName(L"RECOVERYFS", refs);
+//LOGE("RECOVERYFS value %sxxxxxxxxxxxxxxxxxxxxx", refs.c_str());
+class PackageConfig:  public XmlParser {
+  public:
+    PackageConfig();
+    ~PackageConfig();
+    string GetProjectCode() { return get_XML_Value("Project_Code");}
+    string GetCURef() { return get_XML_Value("CURef"); }
+    string GetVersion() { return get_XML_Value("External_Ver");}
+    string GetCustomerCode() { return get_XML_Value("Customer_Code");}
+    string GetFlashType() { return get_XML_Value("Flash_Code");}
+
+ // private:
+ //   virtual bool              ElementHandler(CString& name, CComBSTR &value);
 };
