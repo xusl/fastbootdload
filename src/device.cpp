@@ -278,7 +278,10 @@ BOOL DeviceCoordinator::GetDevice(const wchar_t * const devPath, DeviceInterface
     return FALSE;
 }
 
-BOOL DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type, DeviceInterfaces** intfs) {
+BOOL DeviceCoordinator::AddDevice(CDevLabel& dev,
+                                 TDevType type,
+                                 BOOL ignoreAttachStatus,
+                                 DeviceInterfaces** intfs) {
     DeviceInterfaces* newDevIntf = NULL;
     DeviceInterfaces temp;
     temp.SetIntf(dev, type);
@@ -291,7 +294,7 @@ BOOL DeviceCoordinator::AddDevice(CDevLabel& dev, TDevType type, DeviceInterface
 
     if (it != mDevintfList.end()) {
         newDevIntf = *it;
-        if((*it)->GetAttachStatus()) {
+        if((*it)->GetAttachStatus() && !ignoreAttachStatus) {
             LOGI("the exit device is attached, do not update the device");
             return FALSE;
         } else {

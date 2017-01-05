@@ -251,7 +251,7 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
         return FALSE;
     }
 
-    if (mPSTManager.IsWork() && mPSTManager.IsHaveUsbWork()) {
+    if (!bwork && mPSTManager.IsWork() && mPSTManager.IsHaveUsbWork()) {
         int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
                                  MB_YESNO|MB_DEFBUTTON2);
         if (IDYES!=iRet)
@@ -264,6 +264,7 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
         mPSTManager.Reset();
     }
 
+	m_imglist->EnableWindow(!bwork);
     GetDlgItem(IDC_BTN_START)->EnableWindow(!bwork);
     GetDlgItem(IDCANCEL)->EnableWindow(!bwork);
     GetDlgItem(IDC_BTN_BROWSE)->EnableWindow(!bwork);
@@ -398,7 +399,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
     SetTimer(TIMER_EVT_ADBKILLED, 1000, &DeviceEventTimerProc);
   } else {
-  SetupDevice(TIMER_EVT_ADBKILLED);
+    SetupDevice(TIMER_EVT_ADBKILLED);
   }
 
   return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
@@ -655,16 +656,22 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
     flash_image  *img;
     DeviceInterfaces *dev;
     int result;
-    usb_dev_t status ;
+    usb_dev_t status;
+    BOOL useAdb = TRUE;
+    BOOL flashdirect = TRUE;
+    ConfigIni      *config;
 
-    if (data == NULL ||  data->hWnd == NULL || data->mProjectPackage == NULL) {
+    if (data == NULL ||  !data->CheckValid()) {
         data->ui_text_msg(FLASH_DONE, "Bad parameter");
         return -1;
     }
 
     dev = data->mActiveDevIntf;
     img = data->mProjectPackage;
+    config = data->mPAppConf;
     status = dev->GetDeviceStatus();
+    useAdb = config->IsUseAdb();
+    flashdirect = config->GetFlashDirectFlag();
 
     data->ui_text_msg(TITLE, dev->GetDevTag());
     if (status == DEVICE_PLUGIN) {
@@ -673,10 +680,34 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
         bool result = pst.DownloadCheck();
         if(result)
             result = pst.RunTimeDiag();
-        if(result)
-            result = pst.DownloadPrg(data->mPAppConf);
-        if(result) {
-            result = pst.DownloadImages(img);
+
+        if(result || pst.IsEmergencyDownloadMode()) {
+            if (!pst.IsEmergencyDownloadMode() && useAdb) {
+                int count = 0;
+                do {
+                    if (count != 0)
+                        SLEEP(3000);
+                    data->UpdateUsbHandle(FALSE, flashdirect);
+                }while(data->usb == NULL && count++ < 5);
+            }
+            /*
+            * If device enter TPST status, we does not find adb device.
+            */
+            if (!pst.IsEmergencyDownloadMode() && useAdb && data->usb != NULL) {
+                    AdbPST adbPST(config->GetForceUpdateFlag(), m_module_name);
+                    adbPST.Reboot(data, dev);
+                //} else {
+                //    result = FALSE;
+                //    LOGE("There are no adb device when use adb reboot");
+                //}
+            } else {
+                result = pst.DownloadPrg(data->mPAppConf);
+                if(result) {
+                    result = pst.DownloadImages(img);
+                }
+            }
+        } else {
+            LOGE("download check failed");
         }
         if(result) {
             dev->SetDeviceStatus(DEVICE_FLASH);
@@ -686,7 +717,7 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
             data->ui_text_msg(FLASH_DONE, "Diag PST occur error! Please check log");
             return 0;
         }
-        //dev->SetDeviceStatus(DEVICE_CHECK);
+
     }
 
     handle = data->usb;
@@ -698,7 +729,8 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
 
     if (status == DEVICE_CHECK) {
         AdbPST pst(data->mPAppConf->GetForceUpdateFlag(), m_module_name);
-        pst.DoPST(data, img, dev);
+//        pst.DoPST(data, img, dev);
+
     } else if (status == DEVICE_FLASH) {
         fastboot fb(handle);
         FlashImageInfo const * image;
@@ -926,7 +958,6 @@ void CmdmfastbootDlg::OnBnClickedStart()
 		AfxMessageBox(L"Please select a valid package directory!",MB_OK);
 		return;
 	}
-	m_imglist->EnableWindow(FALSE);
 	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_DISABLED|MF_GRAYED);
 	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_DISABLED|MF_GRAYED);
 	if (SetWorkStatus(TRUE, FALSE)) {
@@ -939,7 +970,6 @@ void CmdmfastbootDlg::OnBnClickedStart()
 
 void CmdmfastbootDlg::OnBnClickedButtonStop()
 {
-	m_imglist->EnableWindow(TRUE);
 	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_ENABLED);
 	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_ENABLED);
     SetWorkStatus(FALSE, FALSE);

@@ -31,7 +31,10 @@ public:
     int          GetUiPortRowCount(void) { return m_nPortRow;};
     int          GetPSTWorkTimeout(void) { return work_timeout;};
     BOOL         GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency);
-
+    /*
+    this is indicate that use debug mode and use adb command reboot-bootloader to enter fastboot.
+    */
+    BOOL         IsUseAdb() { return m_UseAdb; }
 private:
     void         ScanDir (const wchar_t *szDirectory);
 
@@ -46,6 +49,7 @@ private:
     int                     m_nPortRow;
     int                     switch_timeout;
     int                     work_timeout;
+    BOOL                    m_UseAdb;
     wchar_t                 *log_file;
     char                    *log_tag;
     char                    *log_level;

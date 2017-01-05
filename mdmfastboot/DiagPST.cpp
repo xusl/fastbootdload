@@ -733,7 +733,7 @@ bool DiagPST::DownloadPrg(ConfigIni* config) {
 
     SetPromptMsg("download PRG: %s", fn);
 
-    /*
+    /*  NOTE::
        if device in debug mode, it will enter tpst mode, and the com port of diag is changed.
        */
     m_sahara->SwitchToDLoadMode();

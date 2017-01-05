@@ -58,7 +58,7 @@ PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
 
 BOOL PSTManager::Initialize(CWnd *hWnd) {
   for (int i = 0; i < GetPortNum(); i++) {
-    m_workdata[i] = new UsbWorkData(i, hWnd, &mDevCoordinator, &mAppConf, &m_LocalConfigXml, m_image);
+    m_workdata[i] = new UsbWorkData(i, hWnd, &mAppConf, &m_LocalConfigXml, m_image);
   }
   return TRUE;
 }
@@ -222,6 +222,11 @@ BOOL PSTManager::EnumerateAdbDevice(VOID) {
     BOOL success = FALSE;
     bool match = false;
 
+    if (!m_bWork) {
+        INFO("!!!!do not work now.");
+        return FALSE;
+    }
+
     GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_USBCCGP, AdbDev, true);
     GetDevLabelByGUID(&GUID_DEVINTERFACE_USB_DEVICE, SRV_WINUSB, FbDev, false);
 
@@ -237,7 +242,10 @@ BOOL PSTManager::EnumerateAdbDevice(VOID) {
             if (iter->Match(&adb)) {
             //if (iter->MatchDevPath(handle->interface_name)) {
                 iter->Dump("adb interface");
-                if (!mDevCoordinator.AddDevice(*iter, DEVTYPE_ADB, &handle->dev_intfs))
+                if (!mDevCoordinator.AddDevice(*iter,
+                                            DEVTYPE_ADB,
+                                            mAppConf.IsUseAdb(),
+                                            &handle->dev_intfs))
                     continue;
 
                 handle->dev_intfs->SetAdbHandle(handle);
@@ -254,7 +262,10 @@ BOOL PSTManager::EnumerateAdbDevice(VOID) {
             if (iter->Match(&fb)) {
             //if (iter->MatchDevPath(handle->interface_name)) {
                 iter->Dump("fastboot interface");
-                if(!mDevCoordinator.AddDevice(*iter, DEVTYPE_FASTBOOT, &handle->dev_intfs))
+                if(!mDevCoordinator.AddDevice(*iter,
+                                            DEVTYPE_FASTBOOT,
+                                            mAppConf.IsUseAdb(),
+                                            &handle->dev_intfs))
                     continue;
                 handle->dev_intfs->SetFastbootHandle(handle);
                 success = TRUE;
@@ -285,6 +296,12 @@ BOOL PSTManager::EnumerateAdbDevice(VOID) {
 
 BOOL PSTManager::HandleComDevice(VOID) {
     vector<CDevLabel> devicePath;
+
+    if (!m_bWork) {
+        INFO("!!!!do not work now.");
+        return FALSE;
+    }
+
     GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
     //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
     //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
@@ -294,7 +311,10 @@ BOOL PSTManager::HandleComDevice(VOID) {
 
     for (iter = devicePath.begin(); iter != devicePath.end();++iter) {
         iter->Dump(__FUNCTION__);
-        if(mDevCoordinator.AddDevice(*iter, DEVTYPE_DIAGPORT, NULL))
+        if(mDevCoordinator.AddDevice(*iter,
+                                   DEVTYPE_DIAGPORT,
+                                   mAppConf.IsUseAdb(),
+                                   NULL))
             success = TRUE;
     }
     devicePath.clear();
@@ -307,8 +327,13 @@ BOOL PSTManager::RejectCDROM(VOID){
     vector<CDevLabel> devicePath;
     vector<CDevLabel>::iterator iter;
     CSCSICmd scsi = CSCSICmd();
-    GetDevLabelByGUID(&GUID_DEVINTERFACE_CDROM, SRV_CDROM, devicePath, false);
 
+    if (!m_bWork) {
+        INFO("!!!!do not work now.");
+        return FALSE;
+    }
+
+    GetDevLabelByGUID(&GUID_DEVINTERFACE_CDROM, SRV_CDROM, devicePath, false);
     GetDevLabelByGUID(&GUID_DEVINTERFACE_DISK, SRV_DISK, devicePath, false);
 
     for(iter = devicePath.begin();iter != devicePath.end(); ++ iter) {
@@ -333,9 +358,13 @@ BOOL PSTManager::RejectCDROM(VOID){
             }
         }
 #endif
-
-        //scsi.SwitchToDebugDevice(path);
-        scsi.SwitchToTPSTDeivce(path);
+        if (mAppConf.IsUseAdb()) {
+            scsi.SwitchToDebugDevice(path);
+            LOGE("Swtich to debug mode");
+        } else {
+            scsi.SwitchToTPSTDeivce(path);
+            LOGE("Swtich to TPST mode");
+        }
         //m_WorkDev.push_back(*iter);
     }
     devicePath.clear();
@@ -344,8 +373,7 @@ BOOL PSTManager::RejectCDROM(VOID){
 
 
 BOOL PSTManager::HandleDeviceArrived(wchar_t *devPath) {
-
-    return TRUE;
+#if 0
     //ASSERT(lstrlen(pDevInf->dbcc_name) > 4);
     UsbWorkData * data = FindUsbWorkData(devPath);
     if (data == NULL) {
@@ -353,6 +381,7 @@ BOOL PSTManager::HandleDeviceArrived(wchar_t *devPath) {
         return FALSE;
     }
     data->SetSwitchedStatus();
+#endif
     return TRUE;
 }
 
@@ -386,13 +415,14 @@ BOOL PSTManager::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPA
         return TRUE;
     }
 
+    mDevCoordinator.RemoveDevice(data->mActiveDevIntf);
     data->Clean(mDevCoordinator.IsEmpty());
     ScheduleDeviceWork();
 
     return TRUE;
 }
 
-UsbWorkData::UsbWorkData(int index, CWnd* dlg, DeviceCoordinator *coordinator,
+UsbWorkData::UsbWorkData(int index, CWnd* dlg,
     ConfigIni *appConf, XmlParser *xmlParser, flash_image* package) {
     hWnd = dlg;
     pCtl = new CPortStateUI;
@@ -402,7 +432,6 @@ UsbWorkData::UsbWorkData(int index, CWnd* dlg, DeviceCoordinator *coordinator,
     _snwprintf_s(mName, WORK_NAME_LEN, _T("Work Port %d"), index);
     mDevSwitchEvt = ::CreateEvent(NULL,TRUE,FALSE,mName);
     ASSERT(mDevSwitchEvt != NULL);
-    pCoordinator = coordinator;
     mPAppConf = appConf;
     mPLocalConfigXml = xmlParser;
     mProjectPackage = package;
@@ -421,18 +450,18 @@ UsbWorkData::~UsbWorkData() {
 }
 
 DWORD  UsbWorkData::WaitForDevSwitchEvt(DWORD dwMilliseconds) {
-    SwitchDev(0);
+    SwitchDev(dwMilliseconds);
     return ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);
 }
 
 DWORD  UsbWorkData::SetDevSwitchEvt(BOOL flashdirect) {
-
     stat = USB_STAT_WORKING;
-      usb = mActiveDevIntf->GetUsbHandle(flashdirect);
-  usb_set_work(usb, TRUE);
-  mActiveDevIntf->SetAttachStatus(true);
-
-      ::SetEvent(mDevSwitchEvt);
+    if (mActiveDevIntf != NULL) {
+      UpdateUsbHandle(TRUE, flashdirect);
+      usb_set_work(usb, TRUE);
+      mActiveDevIntf->SetAttachStatus(true);
+    }
+    ::SetEvent(mDevSwitchEvt);
     return 0;
 }
 
@@ -446,7 +475,6 @@ BOOL UsbWorkData::IsIdle() {
 BOOL UsbWorkData::Clean(BOOL noCleanUI) {
   usb = NULL;
   if (mActiveDevIntf != NULL) {
-    pCoordinator->RemoveDevice(mActiveDevIntf);
     mActiveDevIntf = NULL;
   }
   if (mDevSwitchEvt != NULL)
@@ -491,13 +519,21 @@ BOOL UsbWorkData::Abort(VOID) {
     return TRUE;
 }
 
+BOOL UsbWorkData::UpdateUsbHandle(BOOL force, BOOL flashdirect) {
+    if (force || usb == NULL) {
+      usb = mActiveDevIntf->GetUsbHandle(flashdirect);
+      return TRUE;
+    }
+    return FALSE;
+}
+
 BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, AFX_THREADPROC pfnThreadProc, UINT nElapse, BOOL flashdirect) {
     ASSERT(pDevIntf != NULL);
     mActiveDevIntf = pDevIntf;
     LOGD("Start thread to work!");
 
-  //TODO::
-  usb = mActiveDevIntf->GetUsbHandle(flashdirect);
+  UpdateUsbHandle(TRUE, flashdirect);
+
   usb_set_work(usb, TRUE);
   mActiveDevIntf->SetAttachStatus(true);
   stat = USB_STAT_WORKING;
@@ -553,7 +589,7 @@ BOOL UsbWorkData::SetSwitchedStatus() {
     if ( stat == USB_STAT_SWITCH) {
         LOGI("Kill switch timer");
         //hWnd->KillTimer((UINT_PTR)this);
-        stat = USB_STAT_SWITCHED;
+        stat = USB_STAT_WORKING;
     } else {
         Log("device does not in switch mode");
     }

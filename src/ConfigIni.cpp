@@ -6,14 +6,22 @@
 #include <ConfigIni.h>
 
 
-ConfigIni::ConfigIni() : log_file(NULL), log_tag(NULL), log_level(NULL),
-m_pack_img(FALSE),m_fix_port_map(TRUE), m_flashdirect(TRUE),
-m_forceupdate(FALSE), m_bWork(FALSE),
-switch_timeout(300), work_timeout(600),
-m_nPort(1), m_nPortRow(1)
+ConfigIni::ConfigIni() :
+        log_file(NULL),
+        log_tag(NULL),
+        log_level(NULL),
+        m_pack_img(FALSE),
+        m_fix_port_map(TRUE),
+        m_flashdirect(TRUE),
+        m_forceupdate(FALSE),
+        m_bWork(FALSE),
+        switch_timeout(300),
+        work_timeout(600),
+        m_nPort(1),
+        m_nPortRow(1)
 {
-
-  memset(pkg_conf_file, 0, sizeof pkg_conf_file);
+   m_UseAdb = TRUE;
+   memset(pkg_conf_file, 0, sizeof pkg_conf_file);
    memset(pkg_qcn_file, 0, sizeof pkg_qcn_file);
    memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
 }

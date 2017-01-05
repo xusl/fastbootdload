@@ -49,6 +49,7 @@ public:
     virtual bool DownloadImages(flash_image *img);
     virtual bool DownloadCustomerInfo();
     virtual bool DownloadPrg(ConfigIni* config);
+    bool  IsEmergencyDownloadMode () { return m_blDownloadMode;}
 
 private:
     virtual bool SwitchOfflineMode();

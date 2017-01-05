@@ -25,7 +25,6 @@ enum
   USB_STAT_IDLE,
   USB_STAT_WORKING,
   USB_STAT_SWITCH,
-  USB_STAT_SWITCHED,
   USB_STAT_FINISH,
   USB_STAT_ERROR,
 };
@@ -145,7 +144,7 @@ class CPortStateUI;
 
 class UsbWorkData{
   public:
-    UsbWorkData(int index, CWnd* pParentWnd, DeviceCoordinator *coordinator,
+    UsbWorkData(int index, CWnd* pParentWnd,
       ConfigIni *appConf, XmlParser *xmlParser, flash_image* package);
     ~UsbWorkData();
     BOOL Clean(BOOL noCleanUI=TRUE);
@@ -167,9 +166,12 @@ class UsbWorkData{
     BOOL Log(const char * msg);
     int GetStatus() { return stat;};
     XmlParser *GetXmlParser() { return mPLocalConfigXml;};
+    BOOL CheckValid() {
+      return hWnd != NULL && mProjectPackage != NULL && mPAppConf != NULL ;
+    }
+    BOOL UpdateUsbHandle(BOOL force, BOOL flashdirect);
 
   private:
-    DeviceCoordinator *pCoordinator;
     long long       start_time_tick;
     HANDLE          mDevSwitchEvt;
     wchar_t         mName[WORK_NAME_LEN];
@@ -191,7 +193,6 @@ class UsbWorkData{
     BOOL            update_qcn;
 } ;
 
-#if 1
 class PSTManager {
 public:
   PSTManager(AFX_THREADPROC pfnThreadProc);
@@ -236,4 +237,3 @@ private:
   AFX_THREADPROC     mThreadProc;
   volatile BOOL      m_bWork;
 };
-#endif
