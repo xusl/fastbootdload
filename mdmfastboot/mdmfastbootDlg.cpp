@@ -783,6 +783,8 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 
   if (m_bInit) {
     RECT rect;
+    RECT pkgInfoRect;
+    GetDlgItem(IDC_GRP_PKG_INFO)->GetWindowRect(&pkgInfoRect);
 
     GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
 
@@ -799,12 +801,16 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
         dw = cx - dx - 10;
         dh = cy -dy - 120;
       } else {
+        RECT rectPkgPath;
         dy = cy - 50;
-        SetDlgItemPos(IDC_BTN_BROWSE, cx - 80, dy);
-        SetDlgItemPos(IDC_EDIT_PACKAGE_PATH, 60, dy);
-        SetDlgItemPos(IDC_STATIC_PKG, 00, dy);
+//        dy = pkgInfoRect.bottom + 60;
+        SetDlgItemPos(IDC_STATIC_PKG, 10, dy);
+        SetDlgItemPos(IDC_EDIT_PACKAGE_PATH, 80, dy);
+        GetDlgItem(IDC_EDIT_PACKAGE_PATH)->GetWindowRect(&rectPkgPath);
+        SetDlgItemPos(IDC_BTN_BROWSE, rectPkgPath.right + 10 /* cx - 80*/, dy);
 
         dy = cy - 100;
+        //dy = pkgInfoRect.bottom + 10;
         SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
         SetDlgItemPos(IDCANCEL, dx + 120, dy);
         SetDlgItemPos(IDC_BTN_START, dx , dy);

@@ -52,6 +52,7 @@ BOOL PSTManager::ChangePackage(const wchar_t * dir) {
 
         m_LocalConfigXml.Parse(mAppConf.GetPkgConfXmlPath());
         mAppConf.SetProjectCode(m_LocalConfigXml.GetProjectCode());
+        m_image->reset(FALSE);
     	m_image->ReadPackage();
         return TRUE;
     }
@@ -658,7 +659,7 @@ flash_image::flash_image(AppConfig *appConfig):
 }
 
 flash_image::~flash_image() {
-  reset(TRUE);
+  //reset(TRUE);
 }
 
 
@@ -1154,6 +1155,7 @@ BOOL flash_image::reset(BOOL free_only) {
     }
 
     image_list = NULL;
+    image_last = NULL;
 
     if (!free_only) {
       a5sw_kern_ver=("Unknown"),
@@ -1169,13 +1171,15 @@ BOOL flash_image::reset(BOOL free_only) {
       FREE_IF (nv_cmd);
     }
 
-          std::map<string,FileBufStruct>::iterator it;
+  std::map<string,FileBufStruct>::iterator it;
     for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++)
     {
         FREE_IF(it->second.strFileBuf);
- FREE_IF(it->second.strFileName);
+         FREE_IF(it->second.strFileName);
     }
 
+  mDiagDlImgSize = 0;
+  mFbDlImgSize = 0;
 	return TRUE;
 }
 

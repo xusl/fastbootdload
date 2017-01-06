@@ -8,16 +8,23 @@
 ;
 ;===========================================================
 [Setup]
-AppName=mdmfastboot
-AppVerName=mdmfastboot
+AppName=TPST-CPE
+AppVerName=1.0.0.1
 AppPublisher=JRD
-DefaultDirName={pf}\JRD\mdmfastboot
-DefaultGroupName=JRD\mdmfastboot
+DefaultDirName={pf}\JRD\TPST-CPE
+DefaultGroupName=JRD\TPST-CPE
 DisableProgramGroupPage=yes
 OutputDir= .\
-OutputBaseFilename=mdmfastboot_Setup
+OutputBaseFilename=TPST-CPE_Setup
+SetupIconFile=..\mdmfastboot\res\mdmfastboot.ico
+Compression=lzma
 SolidCompression=yes
-
+; "ArchitecturesInstallIn64BitMode=x64" requests that the install be
+; done in "64-bit mode" on x64, meaning it should use the native
+; 64-bit Program Files directory and the 64-bit view of the registry.
+; On all other architectures it will install in "32-bit mode".
+ArchitecturesInstallIn64BitMode=x64
+PrivilegesRequired=admin
 
 [Languages]
 Name: "En"; MessagesFile: "Default.isl"
@@ -27,23 +34,27 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 
 [Files]
-Source: "fastbootdownload\*"; DestDir: "{app}";Flags: ignoreversion allowunsafefiles; Permissions:everyone-full
+Source: "..\x64\Release\mdmfastboot.exe"; DestDir: "{app}"; Flags: ignoreversion; DestName: "TPST-CPE.exe"; Check: Is64BitInstallMode
+Source: "..\x64\Release\*.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: Is64BitInstallMode
+Source: "..\Win32\Release\mdmfastboot.exe"; DestDir: "{app}"; Flags: ignoreversion; DestName: "TPST-CPE.exe"; Check: not Is64BitInstallMode
+Source: "..\Win32\Release\*.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: not Is64BitInstallMode
+Source: "..\mdmfastboot\configs\*"; DestDir: "{app}";Flags: ignoreversion allowunsafefiles; Permissions:everyone-full
 
 [Icons]
-Name: "{group}\mdmfastboot"; IconFilename: {app}\Icon.ico;Filename: "{app}\mdmfastboot.exe"; WorkingDir: "{app}"
-Name: "{group}\{cm:UninstallProgram,mdmfastboot}"; IconFilename: {app}\Icon.ico;Filename: "{uninstallexe}"
-Name: "{userdesktop}\mdmfastboot"; Filename: "{app}\mdmfastboot.exe"; IconFilename: {app}\Icon.ico;Tasks: desktopicon
+Name: "{group}\TPST-CPE"; IconFilename: {app}\Icon.ico;Filename: "{app}\TPST-CPE.exe"; WorkingDir: "{app}"
+Name: "{group}\{cm:UninstallProgram,TPST-CPE}"; IconFilename: {app}\Icon.ico;Filename: "{uninstallexe}"
+Name: "{userdesktop}\TPST-CPE"; Filename: "{app}\TPST-CPE.exe"; IconFilename: {app}\Icon.ico;Tasks: desktopicon
 
 [Run]
-Filename: "{app}\mdmfastboot.exe"; Description: "{cm:LaunchProgram,mdmfastboot}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\TPST-CPE.exe"; Description: "{cm:LaunchProgram,TPST-CPE}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
 Root: HKLM; Subkey: "Software\JRD"; Flags: createvalueifdoesntexist
-Root: HKLM; Subkey: "Software\JRD\mdmfastboot"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\JRD\mdmfastboot"; ValueType: string; ValueName: "Path"; ValueData: "{app}"
-Root: HKLM; Subkey: "Software\JRD\mdmfastboot"; ValueType: string; ValueName: "Version"; ValueData: "mdmfastboot"
-Root: HKLM; Subkey: "Software\JRD\mdmfastboot"; ValueType: dword; ValueName: "VersionNum"; ValueData: "0000"
-Root: HKLM; Subkey: "Software\JRD\mdmfastboot"; ValueType: string; ValueName: "Release Date"; ValueData: "2013/08/09"
+Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: string; ValueName: "Path"; ValueData: "{app}"
+Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: string; ValueName: "Version"; ValueData: "1.0.0.1"
+Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: dword; ValueName: "VersionNum"; ValueData: "0001"
+Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: string; ValueName: "Release Date"; ValueData: "2017/01/06"
 
 [UninstallDelete]
 ;Type: files; Name: "{app}\*.log"
@@ -61,8 +72,8 @@ var
 begin
    Result:= TRUE;
    
-  Res_1 := CheckForMutexes('mdmfastboot_Install_Mutex');
-  Res_0 := CheckForMutexes('mdmfastboot_Running_MUTEX');
+  Res_1 := CheckForMutexes('TPST-CPE_Install_Mutex');
+  Res_0 := CheckForMutexes('TPST-CPE_Running_MUTEX');
   
   if Res_0 or Res_1 then
     begin
@@ -71,10 +82,10 @@ begin
       Result := FALSE;
     end else
     begin
-      CreateMutex('mdmfastboot_Install_Mutex');
+      CreateMutex('TPST-CPE_Install_Mutex');
       Result := TRUE;    
       //read the version
-      if RegQueryStringValue(HKEY_LOCAL_MACHINE, 'Software\JRD\mdmfastboot',
+      if RegQueryStringValue(HKEY_LOCAL_MACHINE, 'Software\JRD\TPST-CPE',
          'Version', Version) then
       begin
         // Successfully read the value
@@ -82,10 +93,10 @@ begin
         if MsgBox(Version,mbConfirmation,MB_YESNO) = IDYES then
         begin
          //read the path
-         if RegQueryStringValue(HKEY_LOCAL_MACHINE, 'Software\JRD\mdmfastboot',
+         if RegQueryStringValue(HKEY_LOCAL_MACHINE, 'Software\JRD\TPST-CPE',
          'Path', strPath) then
           begin
-             CreateMutex('mdmfastboot_Uninstall_Anymore_Mutex');
+             CreateMutex('TPST-CPE_Uninstall_Anymore_Mutex');
              // Successfully read the value
              strPath:= strPath + '\unins000.exe';
              Exec(ExpandConstant(strPath), '', '', SW_SHOW,
@@ -104,9 +115,9 @@ var
   Res_1: Boolean;
   Res_2: Boolean;
 begin
-  Res_0 := CheckForMutexes('mdmfastboot_Running_MUTEX');
-  Res_1 := CheckForMutexes('mdmfastboot_Install_Mutex');
-  Res_2 := CheckForMutexes('mdmfastboot_Uninstall_Anymore_Mutex');
+  Res_0 := CheckForMutexes('TPST-CPE_Running_MUTEX');
+  Res_1 := CheckForMutexes('TPST-CPE_Install_Mutex');
+  Res_2 := CheckForMutexes('TPST-CPE_Uninstall_Anymore_Mutex');
   
   if Res_2 then
   begin
