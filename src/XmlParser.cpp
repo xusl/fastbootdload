@@ -285,3 +285,91 @@ PackageConfig::~PackageConfig() {
 //
 //       return true;
 //}
+#if 0
+void flash_image::read_package_version(const wchar_t * package_conf){
+  CComPtr<MSXML2::IXMLDOMDocument> spDoc;
+  CComPtr<MSXML2::IXMLDOMNodeList> spNodeList;
+  CComPtr<MSXML2::IXMLDOMElement> spElement;
+  CComBSTR strTagName;
+  VARIANT_BOOL bFlag;
+  long lCount;
+  HRESULT hr;
+
+  ::CoInitialize(NULL);
+  hr = spDoc.CoCreateInstance(__uuidof(MSXML2::DOMDocument));    //创建文档对象
+  hr = spDoc->load(CComVariant(package_conf), &bFlag);       //load xml文件
+  hr = spDoc->get_documentElement(&spElement);   //获取根结点
+  if (spElement == NULL) {
+    ERROR("No %S exist", package_conf);
+    return;
+    }
+  hr = spElement->get_tagName(&strTagName);
+
+  //cout << "------TagName------" << CString(strTagName) << endl;
+
+  hr = spElement->get_childNodes(&spNodeList);   //获取子结点列表
+  hr = spNodeList->get_length(&lCount);
+
+  for (long i=0; i<lCount; ++i) {
+    CComVariant varNodeValue;
+    CComPtr<MSXML2::IXMLDOMNode> spNode;
+    MSXML2::DOMNodeType NodeType;
+    CComPtr<MSXML2::IXMLDOMNodeList> spChildNodeList;
+
+    hr = spNodeList->get_item(i, &spNode);         //获取结点
+    hr = spNode->get_nodeType(&NodeType);     //获取结点信息的类型
+
+    if (NODE_ELEMENT == NodeType) {
+      long childLen;
+      hr = spNode->get_childNodes(&spChildNodeList);
+      hr = spChildNodeList->get_length(&childLen);
+
+      //cout << "------NodeList------" << endl;
+
+      for (int j=0; j<childLen; ++j) {
+        CComPtr<MSXML2::IXMLDOMNode> spChildNode;
+        CComBSTR value;
+        CComBSTR name;
+
+        hr = spChildNodeList->get_item(j, &spChildNode);
+        hr = spChildNode->get_nodeName(&name);            //获取结点名字
+        hr = spChildNode->get_text(&value);                //获取结点的值
+        //cout << CString(name) << endl;
+        //cout << CString(value) << endl << endl;
+
+        //parse_pkg_sw(CString(name), CString(value));
+
+        spChildNode.Release();
+      }
+    }
+
+    spNode.Release();
+    spChildNodeList.Release();
+  }
+
+  spNodeList.Release();
+  spElement.Release();
+  spDoc.Release();
+  ::CoUninitialize();
+}
+
+ int flash_image::parse_pkg_sw(CString & node, CString & text) {
+    if (node == L"Linux_Kernel_Ver")
+        a5sw_kern_ver = text;
+
+    else if (node == L"Linux_SYS_Ver")
+        a5sw_sys_ver = text;
+
+    else if (node == L"Linux_UserData_Ver")
+        a5sw_usr_ver = text;
+
+    else if (node == L"Q6_Resource_Ver")
+        fw_ver = text;
+
+    else if (node == L"QCN")
+        qcn_ver = text;
+
+    return 0;
+}
+#endif
+

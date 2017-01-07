@@ -30,9 +30,8 @@ typedef struct
 class DiagPST
 {
 public:
-    DiagPST(UsbWorkData * worker, PackageConfig *xmlParser, map<string,FileBufStruct> &filebuffer);
+    DiagPST(UsbWorkData * worker, map<string,FileBufStruct> &filebuffer);
     ~DiagPST(void);
-
 
     bool EraseSimlock();
     bool checkIfFlashTypeMatchNormalMode();
@@ -71,8 +70,6 @@ private:
     VOID SetPromptMsg(const char *fmt,  ...);
     BOOL StringSplit(char * content, PCHAR lineDelim, std::vector<string>& dataOut);
 
-
-
 private:
     CPacket                         *m_DLLPacket;
     CCustData                       *m_pCustdata;
@@ -85,8 +82,6 @@ private:
     map<string,FileBufStruct>        m_dlFileBuffer;
     TDLImgInfoType                  *m_pDLImgInfo;
     TCustDataInfoType               *m_pCustdataInfo;
-    PackageConfig                       *m_LocalConfigXml;
-
     bool                            m_blDownloadMode;
     bool                            m_bRestore;
     bool                            m_bForceMode;

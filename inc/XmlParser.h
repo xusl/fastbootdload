@@ -54,11 +54,11 @@ class PackageConfig:  public XmlParser {
   public:
     PackageConfig();
     ~PackageConfig();
-    string GetProjectCode() { return get_XML_Value("Project_Code");}
-    string GetCURef() { return get_XML_Value("CURef"); }
-    string GetVersion() { return get_XML_Value("External_Ver");}
-    string GetCustomerCode() { return get_XML_Value("Customer_Code");}
-    string GetFlashType() { return get_XML_Value("Flash_Code");}
+    CString GetProjectCode() { return CString(get_XML_Value("Project_Code").c_str());}
+    CString GetCURef() { return CString(get_XML_Value("CURef").c_str()); }
+    CString GetVersion() { return CString(get_XML_Value("External_Ver").c_str());}
+    CString GetCustomerCode() { return CString(get_XML_Value("Customer_Code").c_str());}
+    CString GetFlashType() { return CString(get_XML_Value("Flash_Code").c_str());}
 
  // private:
  //   virtual bool              ElementHandler(CString& name, CComBSTR &value);

@@ -19,6 +19,7 @@
 #pragma comment(lib, "User32.lib")
 
 MODULE_NAME CmdmfastbootDlg::m_module_name;
+#define BROWER_PACKAGE _T("Browser...")
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -72,13 +73,15 @@ CmdmfastbootDlg::~CmdmfastbootDlg() {
 
 void CmdmfastbootDlg::DoDataExchange(CDataExchange* pDX)
 {
-	CDialog::DoDataExchange(pDX);
+    CDialog::DoDataExchange(pDX);
     //DDX_Control(pDX, IDC_CB_PLATFORM, m_project);
 
-	DDX_Text(pDX, IDC_EDIT_PACKAGE_PATH, m_PackagePath);
-	DDX_Text(pDX, IDC_EDIT_FRM_VER_MAIN, m_FwVer);
-	DDX_Text(pDX, IDC_EDIT_QCN_VER_MAIN, m_QCNVer);
-	DDX_Text(pDX, IDC_EDIT_LINUX_VER_MAIN, m_LinuxVer);
+    //DDX_Text(pDX, IDC_EDIT_PACKAGE_PATH, m_PackagePath);
+    //DDX_Text(pDX, IDC_EDIT_CUSTOMER_PKG, m_FwVer);
+    //DDX_Text(pDX, IDC_EDIT_VERSION_PKG, m_QCNVer);
+    //DDX_Text(pDX, IDC_EDIT_CUREF_PKG, m_LinuxVer);
+
+    DDX_Control(pDX, IDC_CB_PACKAGE_PATH, m_PackageHistory);
 }
 
 BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
@@ -92,7 +95,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_WM_TIMER()
 	ON_WM_GETMINMAXINFO()
 	ON_MESSAGE(UI_MESSAGE_DEVICE_INFO, &CmdmfastbootDlg::OnDeviceInfo)
-	ON_BN_CLICKED(IDC_BTN_BROWSE, &CmdmfastbootDlg::OnBnClickedBtnBrowse)
+	//ON_BN_CLICKED(IDC_BTN_BROWSE, &CmdmfastbootDlg::OnBnClickedBtnBrowse)
 	ON_BN_CLICKED(IDC_BTN_START, &CmdmfastbootDlg::OnBnClickedStart)
 	ON_COMMAND(ID_ABOUT, &CmdmfastbootDlg::OnAbout)
 	ON_COMMAND(ID_HELP, &CmdmfastbootDlg::OnHelp)
@@ -105,6 +108,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_IMAGE_LIST, &CmdmfastbootDlg::OnLvnItemchanged)
 	ON_COMMAND(ID_FILE_M850, &CmdmfastbootDlg::OnFileM850)
 	ON_COMMAND(ID_FILE_M801, &CmdmfastbootDlg::OnFileM801)
+    ON_CBN_SELCHANGE(IDC_CB_PACKAGE_PATH, &CmdmfastbootDlg::OnSelchangeCbPackagePath)
 END_MESSAGE_MAP()
 
 void CmdmfastbootDlg::OnHelp()
@@ -166,7 +170,7 @@ BOOL CmdmfastbootDlg::SetDlgItemPos(UINT nID, int x, int y) {
   handle->GetClientRect(&rect);
   //w = x + rect.right - rect.left;
   //h = y +  rect.bottom - rect.top;
-  if (IDC_EDIT_PACKAGE_PATH == nID && mPSTManager.GetPortNum() == 1) {
+  if (IDC_CB_PACKAGE_PATH == nID && mPSTManager.GetPortNum() == 1) {
     w = rect.right < 300 ? 300 : rect.right;
   }
   w = rect.right < 100 ? 100 : rect.right;
@@ -179,13 +183,18 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(BOOL update) {
     flash_image       *m_image = mPSTManager.GetProjectPackage();
     const wchar_t     *qcn = NULL;
     const FlashImageInfo *img = NULL;
+    AppConfig         *appConfig = mPSTManager.GetAppConfig();
+    PackageConfig     *pkgConfig ;
     int item = 0;
 
-    if (m_image == NULL)
+    if (m_image == NULL || appConfig == NULL) {
+        LOGE("Bad paramerter");
         return FALSE;
+    }
+    pkgConfig = appConfig->GetPackageConfig();
 
     img = m_image->image_enum_init();
-    qcn = mPSTManager.get_package_qcn_path();
+    qcn = appConfig->GetPkgQcnPath();
 
     m_UpdateDownloadFlag = update;
 
@@ -222,9 +231,10 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(BOOL update) {
         img = m_image->image_enum_next(img);
     }
 
-    m_image->get_pkg_a5sw_kern_ver(m_LinuxVer);
-    m_image->get_pkg_qcn_ver(m_QCNVer);
-    m_image->get_pkg_fw_ver(m_FwVer);
+    GetDlgItem(IDC_EDIT_CUSTOMER_PKG)->SetWindowText(pkgConfig->GetCustomerCode());
+    GetDlgItem(IDC_EDIT_VERSION_PKG)->SetWindowText(pkgConfig->GetVersion());
+    GetDlgItem(IDC_EDIT_CUREF_PKG)->SetWindowText(pkgConfig->GetCURef());
+    GetDlgItem(IDC_EDIT_PROJECT_PKG)->SetWindowText(pkgConfig->GetProjectCode());
 
     wchar_t moduleName[MAX_PATH];
     //GetPrivateProfileString(L"app",L"module",L"M850",moduleName, MAX_PATH,m_ConfigPath);
@@ -267,7 +277,6 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
 	m_imglist->EnableWindow(!bwork);
     GetDlgItem(IDC_BTN_START)->EnableWindow(!bwork);
     GetDlgItem(IDCANCEL)->EnableWindow(!bwork);
-    GetDlgItem(IDC_BTN_BROWSE)->EnableWindow(!bwork);
     GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
 
 #ifdef INLINE_SETTING
@@ -346,13 +355,6 @@ BOOL CmdmfastbootDlg::OnInitDialog()
       SetIcon(hIcon, FALSE);
   }
 
-  m_project = (CComboBox *)GetDlgItem(IDC_CB_PLATFORM);
-  m_project->ResetContent();
-  int result = m_project->AddString(_T("HH70"));
-//  if (result != CB_ERR && result != CB_ERRSPACE)
-//    m_project->SetItemDataPtr(result, 0);
-  m_project->AddString(_T("HH40"));
-  m_project->SetCurSel(0);//SelectString(0, );
 #ifdef INLINE_SETTING
   InitSettingDlg();
 #endif
@@ -383,9 +385,25 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   m_imglist->InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 280);
   m_imglist->SetExtendedStyle(m_imglist->GetExtendedStyle() |LVS_EX_CHECKBOXES);//设置控件有勾选功能
 
+  //m_PackageList = (CComboBox *)GetDlgItem(IDC_CB_PACKAGE_PATH);
+  m_PackageHistory.ResetContent();
+
+  list<CString> history;
+  int result = CB_OKAY;
+  mPSTManager.GetPackageHistory(history);
+  list<CString>::iterator it = history.begin();
+  for (; it != history.end(); it++) {
+    result = m_PackageHistory.AddString(*it);
+    if (result != CB_ERR && result != CB_ERRSPACE)
+      m_PackageHistory.SetItemDataPtr(result, NULL);
+  }
+  result = m_PackageHistory.AddString(_T("Browser..."));
+  m_PackageHistory.SetItemDataPtr(result, BROWER_PACKAGE);
+  if (result != CB_ERR && result != CB_ERRSPACE)
+      m_PackageHistory.SetCurSel(0);//SelectString(0, );
+
   if (mPSTManager.IsAfterSaleMode()) {
-    GetDlgItem(IDC_BTN_BROWSE)->ShowWindow(SW_HIDE);
-    GetDlgItem(IDC_EDIT_PACKAGE_PATH)->ShowWindow(SW_HIDE);
+    GetDlgItem(IDC_CB_PACKAGE_PATH)->ShowWindow(SW_HIDE);
     GetDlgItem(IDC_STATIC_PKG)->ShowWindow(SW_HIDE);
   }
   m_PackagePath = mPSTManager.GetPackage();
@@ -662,7 +680,7 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
     AppConfig      *config;
 
     if (data == NULL ||  !data->CheckValid()) {
-        data->ui_text_msg(FLASH_DONE, "Bad parameter");
+        data->SetInfo(FLASH_DONE, "Bad parameter");
         return -1;
     }
 
@@ -673,10 +691,10 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
     useAdb = config->IsUseAdb();
     flashdirect = config->GetFlashDirectFlag();
 
-    data->ui_text_msg(TITLE, dev->GetDevTag());
+    data->SetInfo(TITLE, dev->GetDevTag());
     if (status == DEVICE_PLUGIN) {
-        DiagPST pst(data, data->GetXmlParser(), img->GetFileBuffer());
-        data->ui_text_msg(PROMPT_TITLE, "Begin download by Diag");
+        DiagPST pst(data, img->GetFileBuffer());
+        data->SetInfo(PROMPT_TITLE, "Begin download by Diag");
         bool result = pst.DownloadCheck();
         if(result)
             result = pst.RunTimeDiag();
@@ -711,10 +729,10 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
         }
         if(result) {
             dev->SetDeviceStatus(DEVICE_FLASH);
-            data->ui_text_msg(REBOOT_DEVICE, "Enter fastboot");
+            data->SetInfo(REBOOT_DEVICE, "Enter fastboot");
             data->WaitForDevSwitchEvt();
         } else {
-            data->ui_text_msg(FLASH_DONE, "Diag PST occur error! Please check log");
+            data->SetInfo(FLASH_DONE, "Diag PST occur error! Please check log");
             return 0;
         }
 
@@ -723,7 +741,7 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
     handle = data->usb;
     status = dev->GetDeviceStatus();
     if (handle == NULL) {
-        data->ui_text_msg(FLASH_DONE, "Bad parameter");
+        data->SetInfo(FLASH_DONE, "Bad parameter");
         return -1;
     }
 
@@ -734,7 +752,7 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
     } else if (status == DEVICE_FLASH) {
         fastboot fb(handle);
         FlashImageInfo const * image;
-        data->ui_text_msg(PROMPT_TITLE, "fastboot download");
+        data->SetInfo(PROMPT_TITLE, "fastboot download");
 
         fb.fb_queue_display("product","product");
         fb.fb_queue_display("version","version");
@@ -759,7 +777,7 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
 
         //  fb.fb_queue_reboot();
         fb.fb_execute_queue(handle, data, img->GetDiagDlImgSize());
-        data->ui_text_msg(FLASH_DONE, NULL);
+        data->SetInfo(FLASH_DONE, NULL);
         dev->SetDeviceStatus(DEVICE_REMOVED);
     }
     return 0;
@@ -805,9 +823,9 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
         dy = cy - 50;
 //        dy = pkgInfoRect.bottom + 60;
         SetDlgItemPos(IDC_STATIC_PKG, 10, dy);
-        SetDlgItemPos(IDC_EDIT_PACKAGE_PATH, 80, dy);
-        GetDlgItem(IDC_EDIT_PACKAGE_PATH)->GetWindowRect(&rectPkgPath);
-        SetDlgItemPos(IDC_BTN_BROWSE, rectPkgPath.right + 10 /* cx - 80*/, dy);
+        SetDlgItemPos(IDC_CB_PACKAGE_PATH, 80, dy);
+        GetDlgItem(IDC_CB_PACKAGE_PATH)->GetWindowRect(&rectPkgPath);
+        //SetDlgItemPos(IDC_BTN_BROWSE, rectPkgPath.right + 10 /* cx - 80*/, dy);
 
         dy = cy - 100;
         //dy = pkgInfoRect.bottom + 10;
@@ -832,8 +850,7 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
       SetDlgItemPos(IDCANCEL, (cx + 1000 ) /2-200, dy);
       SetDlgItemPos(IDC_BTN_START, (cx + 500) /2-200, dy);
       //SetDlgItemPos(IDC_SETTING, (cx +300) /2, cy - 60);
-      SetDlgItemPos(IDC_BTN_BROWSE, (cx -120) /2, dy);
-      SetDlgItemPos(IDC_EDIT_PACKAGE_PATH, 100,dy);
+      SetDlgItemPos(IDC_CB_PACKAGE_PATH, 100,dy);
       SetDlgItemPos(IDC_STATIC_PKG, 20, dy);
 
 #ifdef INLINE_SETTING
@@ -935,27 +952,50 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
   LPITEMIDLIST idl= SHBrowseForFolder(&bi);
   if(idl==NULL)
     return;
-  m_PackagePath.ReleaseBuffer();
+
   SHGetPathFromIDList(idl,m_PackagePath.GetBuffer(MAX_PATH));
   m_PackagePath.ReleaseBuffer();
 
-  if(m_PackagePath[m_PackagePath.GetLength()-1]!=L'\\')
-    m_PackagePath+=L'\\';
+  //if(m_PackagePath[m_PackagePath.GetLength()-1]!=L'\\')
+  //  m_PackagePath+=L'\\';
 
-  LPMALLOC pMalloc;
-  if(SUCCEEDED(SHGetMalloc(&pMalloc)))
-  {
-    pMalloc->Free(idl);
-    pMalloc->Release();
-  }
-
+#if 0
     if (mPSTManager.ChangePackage(m_PackagePath.GetString()))
     		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
     	UpdatePackageInfo();
     } else {
         AfxMessageBox(L"Package path is not change!", MB_ICONEXCLAMATION);
     }
+
+#else
+    /*m_PackageHistory.GetCount() -1*/
+    int result = m_PackageHistory.InsertString(0, m_PackagePath);
+    if (result >=0 )
+        m_PackageHistory.SetItemDataPtr(result, NULL);
+    m_PackageHistory.SetCurSel(0);
+#endif
 }
+
+
+void CmdmfastbootDlg::OnSelchangeCbPackagePath()
+{
+    int idx = m_PackageHistory.GetCurSel();
+    if( idx < 0 ) return;
+
+    void * data = m_PackageHistory.GetItemDataPtr(idx);
+    if (data == BROWER_PACKAGE) {
+        OnBnClickedBtnBrowse();
+        return;
+    }
+
+    m_PackageHistory.GetLBText( idx, m_PackagePath );
+
+  if (mPSTManager.ChangePackage(m_PackagePath.GetString()))
+    		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
+    	UpdatePackageInfo();
+    }
+}
+
 
 void CmdmfastbootDlg::OnBnClickedStart()
 {
@@ -1131,3 +1171,5 @@ void CmdmfastbootDlg::OnFileM801()
 //	InitSettingConfig();
 //	UpdatePackage();
 }
+
+

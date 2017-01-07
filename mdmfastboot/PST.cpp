@@ -32,9 +32,6 @@ PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
     //    delete m_image;
     //}
 
-    ProjectConfig config;
-    m_LocalConfigXml.Parse(mAppConf.GetPkgConfXmlPath());
-    mAppConf.SetProjectCode(m_LocalConfigXml.GetProjectCode());
     m_image = new flash_image(&mAppConf);
 
     for (int i = 0; i < sizeof m_workdata/ sizeof m_workdata[0]; i++) {
@@ -50,8 +47,6 @@ BOOL PSTManager::ChangePackage(const wchar_t * dir) {
   if (mAppConf.SetPackageDir(dir))//m_PackagePath.GetBuffer(/*MAX_PATH*/)))
     		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
 
-        m_LocalConfigXml.Parse(mAppConf.GetPkgConfXmlPath());
-        mAppConf.SetProjectCode(m_LocalConfigXml.GetProjectCode());
         m_image->reset(FALSE);
     	m_image->ReadPackage();
         return TRUE;
@@ -62,7 +57,7 @@ BOOL PSTManager::ChangePackage(const wchar_t * dir) {
 
 BOOL PSTManager::Initialize(CWnd *hWnd) {
   for (int i = 0; i < GetPortNum(); i++) {
-    m_workdata[i] = new UsbWorkData(i, hWnd, &mAppConf, &m_LocalConfigXml, m_image);
+    m_workdata[i] = new UsbWorkData(i, hWnd, &mAppConf,  m_image);
   }
   //mAppConf.ScanDir();
   return TRUE;
@@ -419,7 +414,7 @@ BOOL PSTManager::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPA
 }
 
 UsbWorkData::UsbWorkData(int index, CWnd* dlg,
-    AppConfig *appConf, PackageConfig *xmlParser, flash_image* package) {
+    AppConfig *appConf, flash_image* package) {
     hWnd = dlg;
     pCtl = new CPortStateUI;
     pCtl->Create(IDD_PORT_STATE, dlg);
@@ -429,7 +424,6 @@ UsbWorkData::UsbWorkData(int index, CWnd* dlg,
     mDevSwitchEvt = ::CreateEvent(NULL,TRUE,FALSE,mName);
     ASSERT(mDevSwitchEvt != NULL);
     mPAppConf = appConf;
-    mPLocalConfigXml = xmlParser;
     mProjectPackage = package;
     mActiveDevIntf = NULL;
     mMapDevIntf = NULL;
@@ -593,7 +587,7 @@ BOOL UsbWorkData::SetSwitchedStatus() {
 }
 
 /*invoke in work thread*/
-UINT UsbWorkData::ui_text_msg(UI_INFO_TYPE info_type, PCCH msg) {
+BOOL UsbWorkData::SetInfo(UI_INFO_TYPE info_type, PCCH msg) {
   UIInfo* info = new UIInfo;
 
   //if (FLASH_DONE && data->hWnd->m_fix_port_map)
@@ -604,7 +598,7 @@ UINT UsbWorkData::ui_text_msg(UI_INFO_TYPE info_type, PCCH msg) {
   hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
                           (WPARAM)info,
                           (LPARAM)this);
-  return 0;
+  return TRUE;
 }
 
 /*invoke in UI thread.*/
@@ -643,11 +637,6 @@ BOOL UsbWorkData::Log(const char * msg) {
 flash_image::flash_image(AppConfig *appConfig):
   image_list(NULL),
   image_last(NULL),
-  a5sw_kern_ver("Unknown"),
-  a5sw_sys_ver("Unknown"),
-  a5sw_usr_ver("Unknown"),
-  fw_ver("Unknown"),
-  qcn_ver("Unknown"),
   nv_buffer(NULL),
   nv_num(0),
   nv_cmd(NULL),
@@ -666,8 +655,8 @@ flash_image::~flash_image() {
 BOOL flash_image::ReadPackage() {
     CString path;
     int data_len;
-
     ProjectConfig projectConfig;
+
     mAppConfig->GetProjectConfig(projectConfig);
     const wchar_t *projectConfigFile = projectConfig.GetConfigPath().GetString();
     const wchar_t* pkg_dir = mAppConfig->GetUpdateImgPkgDir();
@@ -750,6 +739,7 @@ int flash_image::read_fastboot_config(const wchar_t* config, const wchar_t* pkg_
 
   if (data_len == 0) {
     WARN("no %S exist, load default partition table.", config);
+#if 0
     wchar_t *imgs[] = {
       L"mibib", L"sbl1.mbn",
       L"sbl2", L"sbl2.mbn",
@@ -769,6 +759,7 @@ int flash_image::read_fastboot_config(const wchar_t* config, const wchar_t* pkg_
     }
 
     //set_package_dir(GetAppPath(path).GetString());
+#endif
     return 0;
   }
 
@@ -993,117 +984,6 @@ const char* flash_image::qcn_cmds_enum_next (unsigned int index) {
   return *(nv_buffer + index);
 }
 
-void flash_image::read_package_version(const wchar_t * package_conf){
-  CComPtr<MSXML2::IXMLDOMDocument> spDoc;
-  CComPtr<MSXML2::IXMLDOMNodeList> spNodeList;
-  CComPtr<MSXML2::IXMLDOMElement> spElement;
-  CComBSTR strTagName;
-  VARIANT_BOOL bFlag;
-  long lCount;
-  HRESULT hr;
-
-  ::CoInitialize(NULL);
-  hr = spDoc.CoCreateInstance(__uuidof(MSXML2::DOMDocument));    //创建文档对象
-  hr = spDoc->load(CComVariant(package_conf), &bFlag);       //load xml文件
-  hr = spDoc->get_documentElement(&spElement);   //获取根结点
-  if (spElement == NULL) {
-    ERROR("No %S exist", package_conf);
-    return;
-    }
-  hr = spElement->get_tagName(&strTagName);
-
-  //cout << "------TagName------" << CString(strTagName) << endl;
-
-  hr = spElement->get_childNodes(&spNodeList);   //获取子结点列表
-  hr = spNodeList->get_length(&lCount);
-
-  for (long i=0; i<lCount; ++i) {
-    CComVariant varNodeValue;
-    CComPtr<MSXML2::IXMLDOMNode> spNode;
-    MSXML2::DOMNodeType NodeType;
-    CComPtr<MSXML2::IXMLDOMNodeList> spChildNodeList;
-
-    hr = spNodeList->get_item(i, &spNode);         //获取结点
-    hr = spNode->get_nodeType(&NodeType);     //获取结点信息的类型
-
-    if (NODE_ELEMENT == NodeType) {
-      long childLen;
-      hr = spNode->get_childNodes(&spChildNodeList);
-      hr = spChildNodeList->get_length(&childLen);
-
-      //cout << "------NodeList------" << endl;
-
-      for (int j=0; j<childLen; ++j) {
-        CComPtr<MSXML2::IXMLDOMNode> spChildNode;
-        CComBSTR value;
-        CComBSTR name;
-
-        hr = spChildNodeList->get_item(j, &spChildNode);
-        hr = spChildNode->get_nodeName(&name);            //获取结点名字
-        hr = spChildNode->get_text(&value);                //获取结点的值
-        //cout << CString(name) << endl;
-        //cout << CString(value) << endl << endl;
-
-        parse_pkg_sw(CString(name), CString(value));
-
-        spChildNode.Release();
-      }
-    }
-
-    spNode.Release();
-    spChildNodeList.Release();
-  }
-
-  spNodeList.Release();
-  spElement.Release();
-  spDoc.Release();
-  ::CoUninitialize();
-}
-
-
- int flash_image::parse_pkg_sw(CString & node, CString & text) {
-    if (node == L"Linux_Kernel_Ver")
-        a5sw_kern_ver = text;
-
-    else if (node == L"Linux_SYS_Ver")
-        a5sw_sys_ver = text;
-
-    else if (node == L"Linux_UserData_Ver")
-        a5sw_usr_ver = text;
-
-    else if (node == L"Q6_Resource_Ver")
-        fw_ver = text;
-
-    else if (node == L"QCN")
-        qcn_ver = text;
-
-    return 0;
-}
- int flash_image::parse_pkg_hw(CString & node, CString & text) {
-    return 0;
-}
-
-BOOL flash_image::get_pkg_a5sw_sys_ver(CString &version) {
-    version = a5sw_sys_ver;
-    return TRUE;
-}
-BOOL flash_image::get_pkg_a5sw_usr_ver(CString &version) {
-    version = a5sw_usr_ver;
-    return TRUE;
-}
-BOOL flash_image::get_pkg_a5sw_kern_ver(CString &version) {
-    version = a5sw_kern_ver;
-    return TRUE;
-}
-BOOL flash_image::get_pkg_qcn_ver(CString &version) {
-    version = qcn_ver;
-    return TRUE;
-}
-BOOL flash_image::get_pkg_fw_ver(CString &version) {
-    version = fw_ver;
-    return TRUE;
-}
-
 BOOL flash_image::set_download_flag(CString strPartitionName, bool bDownload) {
 	BOOL bRet = 0;
 	FlashImageInfo* img = image_list;
@@ -1158,11 +1038,6 @@ BOOL flash_image::reset(BOOL free_only) {
     image_last = NULL;
 
     if (!free_only) {
-      a5sw_kern_ver=("Unknown"),
-      a5sw_sys_ver=("Unknown"),
-      a5sw_usr_ver=("Unknown"),
-      fw_ver=("Unknown"),
-      qcn_ver=("Unknown");
       if (nv_buffer != NULL) {
       QcnParser::PutNVWriteCommands(nv_buffer, nv_num);
       nv_buffer = NULL;

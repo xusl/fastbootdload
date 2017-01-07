@@ -22,14 +22,14 @@
 #define IDC_BTN_STOP                    1000
 #define IDC_ST_TITLE                    1001
 #define IDC_STATIC_USERDATA_VER         1002
-#define IDC_EDIT_FRM_VER_MAIN           1003
+#define IDC_EDIT_CUSTOMER_PKG           1003
 #define IDC_EDIT_USERDATA_VER           1004
 #define IDC_STATIC_QCN_VER_MAIN         1005
 #define IDC_STATIC_SYSTEM_VER           1006
-#define IDC_EDIT_QCN_VER_MAIN           1007
+#define IDC_EDIT_VERSION_PKG            1007
 #define IDC_EDIT_SYSTEM_VER             1008
 #define IDC_STATIC_LINUX_VER_MAIN       1009
-#define IDC_EDIT_LINUX_VER_MAIN         1010
+#define IDC_EDIT_CUREF_PKG              1010
 #define IDC_PROGRESS1                   1011
 #define IDC_GROUP                       1012
 #define IDC_DL_INFO                     1013
@@ -40,9 +40,8 @@
 #define IDC_STATIC_QCN_VER              1018
 #define IDC_STATIC_LINUX_VER            1019
 #define IDC_STATIC_FRM_VER_MAIN         1020
-#define IDC_GRP_PKG_INFO                1026
-#define IDC_EDIT_PACKAGE_PATH           1027
-#define IDC_BTN_BROWSE                  1028
+#define IDC_GRP_PKG_INFO                1021
+#define IDC_CB_PACKAGE_PATH             1022
 #define IDC_DLINFO_TITLE                1029
 #define IDC_BTN_START                   1030
 #define IDC_SETTING                     1031
@@ -54,7 +53,7 @@
 #define IDC_SPIN1                       1039
 #define IDC_STATIC_SETTING              1040
 #define IDC_TPST_VERSION                1041
-#define IDC_EDIT_PTS_VERSION            1042
+#define IDC_EDIT_PROJECT_PKG            1042
 #define IDC_VERSION_GROUP               1043
 #define IDC_CB_PLATFORM                 1044
 #define IDC_STATIC_PLATFORM             1045
@@ -68,7 +67,7 @@
 #define ID_FILE_M801                    32776
 
 // Next default values for new objects
-// 
+//
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        140

@@ -36,10 +36,10 @@ enum
   TIMER_EVT_ALL
 };
 
-
 // CmdmfastbootDlg 对话框
 class CmdmfastbootDlg : public CDialog
 {
+ friend CSettingsDlg;
 // 构造
 public:
 	CmdmfastbootDlg(CWnd* pParent = NULL);	// 标准构造函数
@@ -61,19 +61,17 @@ protected:
   BOOL m_UpdateDownloadFlag;
   unsigned int m_updated_number;
 
- friend CSettingsDlg;
-
  public:
   CString m_strModuleName;
-
   PSTManager mPSTManager;
-	//CThreadPool<CDlWorker> m_dlWorkerPool;
   CListCtrl   *m_imglist;
-  CComboBox   *m_project;
-  //CListCtrl  *m_port;
+  CComboBox m_PackageHistory;
+
 #ifdef INLINE_SETTING
   CSettingsDlg m_SetDlg;
 #endif
+  //CListCtrl  *m_port;
+	//CThreadPool<CDlWorker> m_dlWorkerPool;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -85,13 +83,10 @@ protected:
 
 	void OnHelp();
 	void OnAbout();
+
 public:
 	//port UI
-
 	static MODULE_NAME m_module_name;
-	CString m_FwVer;
-	CString m_QCNVer;
-	CString m_LinuxVer;
 	CString m_PackagePath;
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	//afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
@@ -128,4 +123,5 @@ public:
 	afx_msg void OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnFileM850();
 	afx_msg void OnFileM801();
+    afx_msg void OnSelchangeCbPackagePath();
 };

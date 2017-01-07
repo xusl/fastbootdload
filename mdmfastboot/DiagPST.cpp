@@ -16,14 +16,13 @@ void DiagPSTDownloadProgress(void *data, int port,uint16 percent) {
 void DiagPSTDownloadState(void *data, int port, string msg) {
     UsbWorkData * worker = (UsbWorkData * )data;
     if(worker != NULL)
-        worker->ui_text_msg(PROMPT_TEXT, msg.c_str());
+        worker->SetInfo(PROMPT_TEXT, msg.c_str());
 }
 
-DiagPST::DiagPST(UsbWorkData * worker, PackageConfig *xmlParser, map<string,FileBufStruct> & filebuffer):
+DiagPST::DiagPST(UsbWorkData * worker, map<string,FileBufStruct> & filebuffer):
     m_iMobileId(0),
     m_FirmwareVersion(""),
     m_blDownloadMode(false),
-    m_LocalConfigXml(xmlParser),
     m_dlFileBuffer(filebuffer)
 {
     DeviceInterfaces *dev =worker->mActiveDevIntf;
@@ -50,7 +49,7 @@ DiagPST::DiagPST(UsbWorkData * worker, PackageConfig *xmlParser, map<string,File
         for (int i = 0; i < 12; i++) {
             memset(version, 0, sizeof version);
             DIAGCmd.RequestVersion(i, (char *)(&version));
-            m_Worker->ui_text_msg(FIRMWARE_VER, version);
+            m_Worker->SetInfo(FIRMWARE_VER, version);
             LOGE("index %d version %s", i, version);
         }
         //char pFlash_Type[20] = {0};
@@ -404,7 +403,7 @@ bool DiagPST::checkIfPartitionMatchNormalMode() {
 
         //compare the partition version
         //TODO::
-        string pPcPartition = m_LocalConfigXml->get_XML_Value( "PARTITION");
+        string pPcPartition = m_Worker->GetAppConfig()->GetPackageConfig()->get_XML_Value( "PARTITION");
         //INFO("COM%d: PC partition Version, version = %s",
         // m_dlPort,pPcPartition.c_str());
         string pFWPartitionVersion(pPartitionVersion);
@@ -644,8 +643,8 @@ bool DiagPST::RequestExternalVersion()
         SLEEP(1000);
     }
 
-    m_Worker->ui_text_msg(FIRMWARE_VER, pExternal);
-    m_Worker->ui_text_msg(LINUX_VER, "NA");
+    m_Worker->SetInfo(FIRMWARE_VER, pExternal);
+    m_Worker->SetInfo(LINUX_VER, "NA");
  #ifdef FEATURE_TPST
     setVerCallBack(m_dlPort,"NA",PTS_VER);
 #endif
@@ -710,14 +709,10 @@ bool DiagPST::RunTimeDiag() {
 bool DiagPST::DownloadPrg(AppConfig* config) {
     /* download PRG */
     TImgBufType *pPrgImg = &m_pDLImgInfo->prg;
-    wchar_t     filename[MAX_PATH];
     TResult     result = EOK;
+    string      fn;
 
-    config->GetDiagPSTNandPrg(filename, MAX_PATH, m_blDownloadMode);
-
-    char * fn = WideStrToMultiStr(filename);
-    if (fn == NULL)
-        return false;
+    config->GetDiagPSTNandPrg(fn, m_blDownloadMode);
 
     map<string,FileBufStruct>::iterator iter=m_dlFileBuffer.find(fn);
     if(iter!=m_dlFileBuffer.end()) {
@@ -727,7 +722,6 @@ bool DiagPST::DownloadPrg(AppConfig* config) {
 
     if (pPrgImg->data == NULL) {
         SetPromptMsg("Can not found PRG image.");
-        DELETE_IF(fn);
         return false;
     }
 
@@ -742,7 +736,6 @@ bool DiagPST::DownloadPrg(AppConfig* config) {
     if (FAILURE(result))
         SetPromptMsg("Download PRG %s failed", m_dlFileBuffer.at(fn).strFileName);
 
-    DELETE_IF(fn);
     return true;
 }
 

@@ -1,9 +1,9 @@
 #pragma once
 #include "stdafx.h"
 #include "define.h"
+#include <XmlParser.h>
 #include <map>
 #include <string>
-
 
 using namespace std;
 
@@ -50,21 +50,28 @@ public:
     int          GetUiPortTotalCount(void) { return m_nPort;};
     int          GetUiPortRowCount(void) { return m_nPortRow;};
     int          GetPSTWorkTimeout(void) { return work_timeout;};
-    BOOL         GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency);
+    BOOL         GetDiagPSTNandPrg(string &prgName, BOOL emergency);
     /*
     this is indicate that use debug mode and use adb command reboot-bootloader to enter fastboot.
     */
     BOOL         IsUseAdb() { return m_UseAdb; }
 
-    BOOL         SetProjectCode(string &projectCode);
+    BOOL         SetProjectCode(CString &projectCode);
     BOOL         GetProjectConfig(ProjectConfig& config) {
       config = mProjectConfig;
       return TRUE;
     }
     BOOL         SetPackageDir(const wchar_t * dir);
+    VOID         GetPackageHistory(list<CString> & history) {
+       history = m_PackageDirs;};
+    PackageConfig *GetPackageConfig() {
+      return &mPackageConfig;
+    }
 private:
     void         ScanDir (const wchar_t *szDirectory);
     void         SetupPackageInformation();
+    void         ReadPackageHistory();
+    void         WritePackageHistory();
 
 private:
     CString                 m_ConfigPath;
@@ -85,7 +92,9 @@ private:
     wchar_t                 pkg_conf_file[MAX_PATH];
     wchar_t                 pkg_dlimg_file[MAX_PATH];
     wchar_t                 pkg_qcn_file[MAX_PATH];
+    list<CString>           m_PackageDirs;
     map<CString, ProjectConfig> m_SupportProject;
-    ProjectConfig           mProjectConfig;
+    ProjectConfig            mProjectConfig;
+    PackageConfig            mPackageConfig;
     CString m_strModuleName;
 };

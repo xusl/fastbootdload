@@ -53,12 +53,6 @@ class flash_image{
 
     BOOL qcn_cmds_enum_init (char *cmd);
     const char* qcn_cmds_enum_next (unsigned int index);
-
-    BOOL get_pkg_a5sw_sys_ver(CString &version);
-    BOOL get_pkg_a5sw_usr_ver(CString &version);
-    BOOL get_pkg_a5sw_kern_ver(CString &version);
-    BOOL get_pkg_fw_ver(CString &version);
-    BOOL get_pkg_qcn_ver(CString &version);
 	  BOOL set_download_flag(CString strPartitionName, bool bDownload);
     int read_fastboot_config(const wchar_t* config, const wchar_t* pkg_dir);
     int read_diagpst_config(const wchar_t* config, const wchar_t* pkg_dir);
@@ -73,12 +67,12 @@ class flash_image{
      map<string,FileBufStruct> GetFileBuffer() { return m_dlFileBuffer;};
 
   protected:
-    virtual int parse_pkg_sw(CString & node, CString & text);
-    virtual int parse_pkg_hw(CString & node, CString & text);
+    //virtual int parse_pkg_sw(CString & node, CString & text);
+    //virtual int parse_pkg_hw(CString & node, CString & text);
 
   private:
     int add_image(wchar_t *partition, const wchar_t *lpath, BOOL write =FALSE, const wchar_t* config = NULL);
-    void read_package_version(const wchar_t * package_conf);
+    //void read_package_version(const wchar_t * package_conf);
 
   private:
     AppConfig *mAppConfig;
@@ -90,11 +84,6 @@ class flash_image{
     map<string,FileBufStruct>  m_dlFileBuffer;
     uint32          mDiagDlImgSize;
     uint32          mFbDlImgSize;
-    CString a5sw_kern_ver;
-    CString a5sw_usr_ver;
-    CString a5sw_sys_ver;
-    CString qcn_ver;
-    CString fw_ver;
 };
 
 typedef enum
@@ -136,7 +125,7 @@ class CPortStateUI;
 class UsbWorkData{
   public:
     UsbWorkData(int index, CWnd* pParentWnd,
-      AppConfig *appConf, PackageConfig *xmlParser, flash_image* package);
+      AppConfig *appConf, flash_image* package);
     ~UsbWorkData();
     BOOL Clean(BOOL noCleanUI=TRUE);
     BOOL IsIdle();
@@ -148,19 +137,19 @@ class UsbWorkData{
     BOOL SetSwitchedStatus();
     DWORD  WaitForDevSwitchEvt(DWORD dwMilliseconds = INFINITE);
     DWORD  SetDevSwitchEvt(BOOL flashdirect);
-    UINT ui_text_msg(UI_INFO_TYPE info_type, PCCH msg);
+    BOOL SetInfo(UI_INFO_TYPE info_type, PCCH msg);
+    BOOL SetInfo(UI_INFO_TYPE infoType, CString strInfo);
     UINT SetProgress(int progress);
-    UINT SetPromptMsg(PCCH msg) { return ui_text_msg(PROMPT_TEXT, msg);};
+    BOOL SetPromptMsg(PCCH msg) { return SetInfo(PROMPT_TEXT, msg);};
     const char *GetDevTag() { return mActiveDevIntf->GetDevTag();};
     float GetElapseSeconds();
-    BOOL SetInfo(UI_INFO_TYPE infoType, CString strInfo);
     BOOL Log(const char * msg);
     int GetStatus() { return stat;};
-    PackageConfig *GetXmlParser() { return mPLocalConfigXml;};
     BOOL CheckValid() {
       return hWnd != NULL && mProjectPackage != NULL && mPAppConf != NULL ;
     }
     BOOL UpdateUsbHandle(BOOL force, BOOL flashdirect);
+    AppConfig      * GetAppConfig() { return mPAppConf;}
 
   private:
     long long       start_time_tick;
@@ -178,7 +167,6 @@ class UsbWorkData{
     DeviceInterfaces*  mMapDevIntf;
     FlashImageInfo const *flash_partition[PARTITION_NUM_MAX];
     AppConfig      *mPAppConf;
-    PackageConfig      *mPLocalConfigXml;
     flash_image    *mProjectPackage;
     short           partition_nr;
     BOOL            update_qcn;
@@ -208,30 +196,22 @@ public:
   BOOL HandleDeviceArrived(wchar_t *devPath);
 
   int GetPortNum();
+  AppConfig* GetAppConfig() { return &mAppConf;}
   flash_image* GetProjectPackage() { return m_image;}
   BOOL ChangePackage(const wchar_t * dir);
   const wchar_t * GetPackage() { return mAppConf.GetUpdateImgPkgDir();}
   BOOL SetDownload(CString partition, bool bDownload) {
     return m_image->set_download_flag(partition, bDownload);
   }
-  const wchar_t * get_package_dir(void) {
-    return mAppConf.GetUpdateImgPkgDir();
-  }
-  //config.xml file path
-  const wchar_t * get_package_config(void) {
-    return mAppConf.GetPkgConfXmlPath();
-  }
-    //static qcn file path
-  const wchar_t * get_package_qcn_path(void) {
-    return mAppConf.GetPkgQcnPath();
-  }
 
+  void GetPackageHistory(list<CString> &history) {
+    return mAppConf.GetPackageHistory(history);
+  }
 
 private:
 
 private:
   AppConfig          mAppConf;
-  PackageConfig          m_LocalConfigXml;
   flash_image       *m_image;
   UsbWorkData       *m_workdata[PORT_NUM_MAX];
 
