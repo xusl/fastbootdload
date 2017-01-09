@@ -2,6 +2,9 @@
 
 #include "PST.h"
 
+#define PORTSTATE_WIDTH   240
+#define PORTSTATE_HEIGHT  130
+
 // CPortStateUI ¶Ô»°¿ò
 
 class CPortStateUI : public CDialog

@@ -269,14 +269,78 @@ void AppConfig:: ScanDir (const wchar_t *szDirectory)
         CString configFile = szDirectory;
         configFile += _T("\\");
         configFile += FindData.cFileName;
-        ProjectConfig projectConfig(configFile);
-        if (projectConfig.ReadConfig())
-            m_SupportProject.insert(std::pair<CString, ProjectConfig>(projectConfig.GetProjectCode(), projectConfig));
+        ParseProjectConfig(configFile);
     }
     while (FindNextFile (hFind, & FindData));
     FindClose (hFind);
 }
 
+
+void AppConfig::ParseProjectConfig(CString &projectCofig) {
+    ProjectConfig projectConfig(projectCofig);
+
+    if (projectConfig.ReadConfig())
+        m_SupportProject.insert(std::pair<CString, ProjectConfig>(projectConfig.GetProjectCode(), projectConfig));
+
+#if 0
+     WCHAR     buffer[MAX_PATH] = {0};
+     int data_len;
+     PCTSTR configFile = projectCofig.GetString();
+    if (configFile == NULL)
+        return FALSE;
+
+    if (!PathFileExists(configFile)) {
+        LOGE("%S is not exist", configFile);
+        return FALSE;
+    }
+
+     memset(buffer, 0, sizeof buffer);
+     data_len = GetPrivateProfileString(PROJECT_SECTION,
+                           _T("platform"),
+                           NULL,
+                           buffer,
+                           MAX_PATH,
+                           configFile);
+    if (data_len == 0) {
+        return FALSE;
+    }
+
+    projectConfig.SetPlatform(buffer);
+    // mPlatform = buffer;
+
+     memset(buffer, 0, sizeof buffer);
+     data_len = GetPrivateProfileString(PROJECT_SECTION,
+                           _T("version"),
+                           NULL,
+                           buffer,
+                           MAX_PATH,
+                           configFile);
+    if (data_len == 0) {
+        return FALSE;
+    }
+
+    projectCofig.SetVersion(buffer);
+    // mVersion = buffer;
+     //mIsValidConfig = TRUE;
+
+     data_len = GetPrivateProfileString(PROJECT_SECTION,
+                           _T("code"),
+                           NULL,
+                           buffer,
+                           MAX_PATH,
+                           configFile);
+   if (data_len == 0) {
+        return FALSE;
+    }
+
+   projectCofig.SetProjectCode();
+   if () {
+   }
+     //mCode = buffer;
+
+     return TRUE;
+#endif
+}
 
 BOOL AppConfig::SetProjectCode(CString &projectCode) {
     //CString code( projectCode.c_str() );
@@ -320,7 +384,7 @@ BOOL ProjectConfig::ReadConfig() {
     if (!PathFileExists(configFile))
         return FALSE;
 
-     data_len =  GetPrivateProfileString(PROJECT_SECTION,
+     data_len = GetPrivateProfileString(PROJECT_SECTION,
                            _T("code"),
                            NULL,
                            buffer,

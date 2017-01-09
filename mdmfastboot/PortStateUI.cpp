@@ -67,8 +67,8 @@ void CPortStateUI::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
 
 void CPortStateUI::SetTitle(CString strInfo)
 {
-	GetDlgItem(IDC_GROUP)->SetWindowText(strInfo.GetBuffer());
-    strInfo.ReleaseBuffer();
+	GetDlgItem(IDC_GROUP)->SetWindowText(strInfo/*.GetBuffer()*/);
+  //  strInfo.ReleaseBuffer();
 }
 
 void CPortStateUI::SetProgress(int iPercent)

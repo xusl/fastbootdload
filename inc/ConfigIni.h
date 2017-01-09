@@ -14,12 +14,22 @@ class ProjectConfig {
     ProjectConfig(CString configFile = _T("\\."));
     ~ProjectConfig();
     BOOL  ReadConfig();
+
+    VOID SetProjectCode(CString code) { mCode = code;}
+    VOID SetPlatform(CString platform) { mPlatform = platform; }
+    VOID SetVersion(CString version) { mVersion = version; }
+    VOID SetValid(BOOL valid) { mIsValidConfig = valid; }
+    VOID SetVid(CString vid) { mVid = vid; }
+    VOID SetPid(CString pid) { mPid = pid; }
+
     BOOL  IsValid() { return mIsValidConfig; }
     CString GetConfigPath() { return mProjectConfigPath; }
     CString GetProjectCode() { return mCode; }
     CString GetPlatform() { return mPlatform; }
     CString GetVersion() { return mVersion; }
     BOOL  GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency);
+    int   GetVid() { return mVid; }
+    int   GetPid() { return mPid;}
 
   private:
     CString mProjectConfigPath;
@@ -27,6 +37,8 @@ class ProjectConfig {
     CString mPlatform;
     CString mVersion;
     BOOL   mIsValidConfig;
+    int    mVid;
+    int    mPid;
 };
 
 class AppConfig{
@@ -69,6 +81,7 @@ public:
     }
 private:
     void         ScanDir (const wchar_t *szDirectory);
+    void         ParseProjectConfig(CString &projectCofig);
     void         SetupPackageInformation();
     void         ReadPackageHistory();
     void         WritePackageHistory();

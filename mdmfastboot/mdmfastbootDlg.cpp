@@ -368,6 +368,9 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
   m_bInit = TRUE;
   m_UpdateDownloadFlag = TRUE;
+  if (mPSTManager.GetPortNum() == 1)
+    ShowWindow(SW_NORMAL);
+  else
   ShowWindow(SW_MAXIMIZE);
 ::SetWindowLong(m_hWnd,GWL_STYLE,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);
 #if 0
@@ -820,14 +823,14 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
         dh = cy -dy - 120;
       } else {
         RECT rectPkgPath;
-        dy = cy - 50;
+        dy = cy - 10;
 //        dy = pkgInfoRect.bottom + 60;
         SetDlgItemPos(IDC_STATIC_PKG, 10, dy);
         SetDlgItemPos(IDC_CB_PACKAGE_PATH, 80, dy);
         GetDlgItem(IDC_CB_PACKAGE_PATH)->GetWindowRect(&rectPkgPath);
         //SetDlgItemPos(IDC_BTN_BROWSE, rectPkgPath.right + 10 /* cx - 80*/, dy);
 
-        dy = cy - 100;
+        dy = cy - 60;
         //dy = pkgInfoRect.bottom + 10;
         SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
         SetDlgItemPos(IDCANCEL, dx + 120, dy);
@@ -839,9 +842,9 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
         m_SetDlg.SetWindowPos(NULL, dx, dy, 280, 220, 0);
 #endif
 
-        dy = 230;
+        dy = 5;
         dw = cx - dx - 10;
-        dh = cy -dy - 100 -20;
+        dh = cy -dy - 60 -20;
       }
     } else {
       dx = rect.right + 8;

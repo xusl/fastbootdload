@@ -80,6 +80,14 @@ int PSTManager::GetPortNum() {
     return min(sizeof m_workdata/ sizeof m_workdata[0], mAppConf.GetUiPortTotalCount());
 }
 
+RECT PSTManager::GetPortRect(UINT index) {
+    RECT rect = {0};
+    CPortStateUI * port = GetPortUI(index);
+    if (port != NULL)
+        port->GetClientRect(&rect);
+    return rect;
+}
+
 CPortStateUI* PSTManager::GetPortUI(UINT index) {
     if (index >= GetPortNum()) {
         LOGE("index(%d) is exceed port number (%d)", index, GetPortNum());

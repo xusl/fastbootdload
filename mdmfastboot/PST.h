@@ -183,6 +183,7 @@ public:
   BOOL IsSuperMode() { return mAppConf.GetFlashDirectFlag() || mAppConf.GetForceUpdateFlag(); }
   UINT GetPortRows() { return mAppConf.GetUiPortRowCount(); }
   CPortStateUI* GetPortUI(UINT index);
+  RECT GetPortRect(UINT index = 0);
   UsbWorkData *FindUsbWorkData(wchar_t *devPath);
   BOOL FlashDeviceDone(UsbWorkData * data);
   BOOL IsHaveUsbWork(void);

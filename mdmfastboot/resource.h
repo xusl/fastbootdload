@@ -19,7 +19,6 @@
 #define IDI_LOCK                        135
 #define IDI_UNLOCK                      136
 #define IDD_ENTER_PASSWORD              139
-#define IDC_BTN_STOP                    1000
 #define IDC_ST_TITLE                    1001
 #define IDC_STATIC_USERDATA_VER         1002
 #define IDC_EDIT_CUSTOMER_PKG           1003
