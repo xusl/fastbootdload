@@ -37,10 +37,12 @@
 
 
 
-
 #include <winioctl.h>
+#include <afxcontrolbars.h>
 
 
+
+#include <afxsock.h>            // MFC socket extensions
 
 
 #ifdef _UNICODE

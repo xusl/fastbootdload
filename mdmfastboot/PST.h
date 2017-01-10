@@ -150,6 +150,7 @@ class UsbWorkData{
     }
     BOOL UpdateUsbHandle(BOOL force, BOOL flashdirect);
     AppConfig      * GetAppConfig() { return mPAppConf;}
+    BOOL ShowSubWindow(BOOL show);
 
   private:
     long long       start_time_tick;
@@ -176,9 +177,9 @@ class PSTManager {
 public:
   PSTManager(AFX_THREADPROC pfnThreadProc);
   ~PSTManager();
-  BOOL Initialize(CWnd *hWnd);
+  BOOL Initialize(CWnd *hWnd, BOOL showPort=TRUE);
+  VOID SetWork(BOOL work, BOOL schedule=TRUE);
   BOOL IsWork() { return m_bWork; }
-  VOID SetWork(BOOL work) { m_bWork = work; }
   BOOL IsAfterSaleMode() { return mAppConf.GetAfterSaleMode(); }
   BOOL IsSuperMode() { return mAppConf.GetFlashDirectFlag() || mAppConf.GetForceUpdateFlag(); }
   UINT GetPortRows() { return mAppConf.GetUiPortRowCount(); }
@@ -191,8 +192,8 @@ public:
   BOOL Reset();
 
   BOOL RejectCDROM(VOID);
-  BOOL HandleComDevice(VOID);
-  BOOL EnumerateAdbDevice(VOID);
+  BOOL HandleComDevice(BOOL schedule=TRUE);
+  BOOL EnumerateAdbDevice(BOOL schedule=TRUE);
   BOOL HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
   BOOL HandleDeviceArrived(wchar_t *devPath);
 

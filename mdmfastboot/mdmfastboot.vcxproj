@@ -107,7 +107,7 @@
       <AdditionalOptions>/D "_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES" /D "_CRT_SECURE_NO_WARNINGS"
 /I zipfile /I driver\host\windows\usb\api  %(AdditionalOptions)</AdditionalOptions>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\inc;..\libs\AdbWinApi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\inc;..\libs\QMSL;..\libs\AdbWinApi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;ADB_HOST;HAVE_WINSOCK;HAVE_WIN32_PROC;HAVE_WIN32_IPC;HAVE_WIN32_THREADS;FEATURE_LOG_SYS;FEATURE_LOG_FILE;FEATURE_THREAD_SYNC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -125,9 +125,9 @@
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
     <Link>
-      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Psapi.lib;QMSL_MSVC6R.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ShowProgress>NotSet</ShowProgress>
-      <AdditionalLibraryDirectories>.\zipfile;.\driver;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\libs\QMSL;.\zipfile;.\driver;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <DelayLoadDLLs>%(DelayLoadDLLs)</DelayLoadDLLs>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
@@ -135,7 +135,8 @@
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <PostBuildEvent>
-      <Command>copy configs\*.ini $(SolutionDir)$(Platform)\$(Configuration)\</Command>
+      <Command>copy configs\*.ini $(SolutionDir)$(Platform)\$(Configuration)\
+copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -147,7 +148,7 @@
       <AdditionalOptions>/D "_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES" /D "_CRT_SECURE_NO_WARNINGS"
 /I zipfile /I driver\host\windows\usb\api  %(AdditionalOptions)</AdditionalOptions>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\inc;..\libs\AdbWinApi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\inc;..\libs\QMSL;..\libs\AdbWinApi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;ADB_HOST;HAVE_WINSOCK;HAVE_WIN32_PROC;HAVE_WIN32_IPC;HAVE_WIN32_THREADS;FEATURE_LOG_SYS;FEATURE_LOG_FILE;FEATURE_THREAD_SYNC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -173,7 +174,8 @@
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <PostBuildEvent>
-      <Command>copy configs\*.ini $(SolutionDir)$(Platform)\$(Configuration)\</Command>
+      <Command>copy configs\*.ini $(SolutionDir)$(Platform)\$(Configuration)\
+copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -185,7 +187,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\inc;..\libs\AdbWinApi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\inc;..\libs\QMSL;..\libs\AdbWinApi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;ADB_HOST;HAVE_WINSOCK;HAVE_WIN32_PROC;HAVE_WIN32_IPC;HAVE_WIN32_THREADS;FEATURE_LOG_SYS;FEATURE_LOG_FILE;FEATURE_THREAD_SYNC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -209,7 +211,8 @@
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <PostBuildEvent>
-      <Command>copy configs\*.ini $(SolutionDir)$(Platform)\$(Configuration)\</Command>
+      <Command>copy configs\*.ini $(SolutionDir)$(Platform)\$(Configuration)\
+copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -220,7 +223,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\inc;..\libs\AdbWinApi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\inc;..\libs\QMSL;..\libs\AdbWinApi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;ADB_HOST;HAVE_WINSOCK;HAVE_WIN32_PROC;HAVE_WIN32_IPC;HAVE_WIN32_THREADS;FEATURE_LOG_SYS;FEATURE_LOG_FILE;FEATURE_THREAD_SYNC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -243,7 +246,8 @@
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <PostBuildEvent>
-      <Command>copy configs\*.ini $(SolutionDir)$(Platform)\$(Configuration)\</Command>
+      <Command>copy configs\*.ini $(SolutionDir)$(Platform)\$(Configuration)\
+copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -258,10 +262,13 @@
     <ClCompile Include="..\src\hostdl.cpp" />
     <ClCompile Include="..\src\ImgUnpack.cpp" />
     <ClCompile Include="..\src\jrddiagcmd.cpp" />
+    <ClCompile Include="..\src\jrdmmidiag.cpp" />
+    <ClCompile Include="..\src\NicManager.cpp" />
     <ClCompile Include="..\src\pkt.cpp" />
     <ClCompile Include="..\src\saharacmd.cpp" />
     <ClCompile Include="..\src\scsicmd.cpp" />
     <ClCompile Include="..\src\serialport.cpp" />
+    <ClCompile Include="..\src\telnet.cpp" />
     <ClCompile Include="..\src\XmlParser.cpp" />
     <ClCompile Include="AdbPST.cpp" />
     <ClCompile Include="DiagPST.cpp" />
@@ -270,6 +277,7 @@
     <ClCompile Include="..\src\log.cpp" />
     <ClCompile Include="mdmfastboot.cpp" />
     <ClCompile Include="mdmfastbootDlg.cpp" />
+    <ClCompile Include="MmiTestDialog.cpp" />
     <ClCompile Include="PasswordEnterDlg.cpp" />
     <ClCompile Include="PortStateUI.cpp" />
     <ClCompile Include="PST.cpp" />
@@ -287,6 +295,8 @@
     <ClCompile Include="..\src\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\inc\jrdmmidiag.h" />
+    <ClInclude Include="..\inc\NicManager.h" />
     <ClInclude Include="..\src\serialport\serialport.h" />
     <ClInclude Include="AdbPST.h" />
     <ClInclude Include="DiagPST.h" />
@@ -294,6 +304,7 @@
     <ClInclude Include="fastbootflash.h" />
     <ClInclude Include="mdmfastboot.h" />
     <ClInclude Include="mdmfastbootDlg.h" />
+    <ClInclude Include="MmiTestDialog.h" />
     <ClInclude Include="PasswordEnterDlg.h" />
     <ClInclude Include="PST.h" />
     <ClInclude Include="qcnlib\QcnParser.h" />

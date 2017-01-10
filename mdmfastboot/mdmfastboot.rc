@@ -158,6 +158,19 @@ BEGIN
     LTEXT           "",IDC_CAPSLOCK_PROMPT,42,72,108,15
 END
 
+IDD_MMITEST DIALOGEX 0, 0, 499, 246
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "CPE MMI tools"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Start",IDOK,206,225,50,14
+    PUSHBUTTON      "Exit",IDCANCEL,299,225,50,14
+    CONTROL         "",IDC_LIST_MMI,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,41,36,395,118
+    LTEXT           "",IDC_MMI_STATUS,40,159,393,41
+    LTEXT           "",IDC_MMI_DEVINFO,104,12,328,18
+    LTEXT           "Device Information",IDC_STATIC,44,16,62,8
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -244,6 +257,14 @@ BEGIN
         TOPMARGIN, 7
         BOTTOMMARGIN, 116
     END
+
+    IDD_MMITEST, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 492
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 239
+    END
 END
 #endif    // APSTUDIO_INVOKED
 
@@ -280,6 +301,7 @@ BEGIN
     IDS_TIP_FORCEUPDATE     "Do not check config.xml."
     IDS_TIP_FASTBOOT_ONLY   "Device's kernel or system partition is erase, this allow to update flash."
     IDS_TIP_SCHE            "When device more than UI port, schedule UI port if device removed."
+    IDP_SOCKETS_INIT_FAILED "Windows sockets initialization failed."
 END
 
 #endif    // Chinese (Simplified, PRC) resources

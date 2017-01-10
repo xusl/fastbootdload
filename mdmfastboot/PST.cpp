@@ -55,10 +55,14 @@ BOOL PSTManager::ChangePackage(const wchar_t * dir) {
     return FALSE;
 }
 
-BOOL PSTManager::Initialize(CWnd *hWnd) {
+BOOL PSTManager::Initialize(CWnd *hWnd, BOOL showPort) {
   for (int i = 0; i < GetPortNum(); i++) {
     m_workdata[i] = new UsbWorkData(i, hWnd, &mAppConf,  m_image);
+    if (!showPort)
+        m_workdata[i]->ShowSubWindow(showPort);
   }
+  //hWnd->Invalidate();
+
   //mAppConf.ScanDir();
   return TRUE;
 }
@@ -74,6 +78,22 @@ PSTManager::~PSTManager() {
     delete m_image;
     m_image = NULL;
   }
+}
+
+VOID PSTManager::SetWork(BOOL work, BOOL schedule) {
+    m_bWork = work;
+    if (!work || !schedule)
+        return;
+
+   if(mAppConf.IsUseAdb()) {
+        RejectCDROM();
+        HandleComDevice(FALSE);
+        EnumerateAdbDevice();
+   } else {
+        RejectCDROM();
+        if(!EnumerateAdbDevice(FALSE))
+            HandleComDevice();
+    }
 }
 
 int PSTManager::GetPortNum() {
@@ -213,7 +233,7 @@ BOOL PSTManager::Reset() {
 }
 
 
-BOOL PSTManager::EnumerateAdbDevice(VOID) {
+BOOL PSTManager::EnumerateAdbDevice(BOOL schedule) {
     usb_handle* handle;
     vector<CDevLabel> AdbDev;
     vector<CDevLabel> FbDev;
@@ -288,12 +308,12 @@ BOOL PSTManager::EnumerateAdbDevice(VOID) {
         LOGI("class %S %S",iter->GetParentIdPrefix(), iter->GetDevPath());
     }
 #endif
-    if (success)
+    if (success && schedule)
         ScheduleDeviceWork();
     return success;
 }
 
-BOOL PSTManager::HandleComDevice(VOID) {
+BOOL PSTManager::HandleComDevice(BOOL schedule) {
     vector<CDevLabel> devicePath;
 
     if (!m_bWork) {
@@ -302,6 +322,7 @@ BOOL PSTManager::HandleComDevice(VOID) {
     }
 
     GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
+    //GetDevLabelByGUID(&GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR, SRV_JRDUSBSER, devicePath, false);
     //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
     //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
     vector<CDevLabel>::iterator iter;
@@ -317,7 +338,7 @@ BOOL PSTManager::HandleComDevice(VOID) {
             success = TRUE;
     }
     devicePath.clear();
-    if (success)
+    if (success && schedule)
         ScheduleDeviceWork();
     return success;
 }
@@ -447,6 +468,10 @@ UsbWorkData::~UsbWorkData() {
     ::CloseHandle(mDevSwitchEvt);
 }
 
+BOOL UsbWorkData::ShowSubWindow(BOOL show) {
+    pCtl->ShowWindow(show ? SW_SHOW :  SW_HIDE);
+    return TRUE;
+}
 DWORD  UsbWorkData::WaitForDevSwitchEvt(DWORD dwMilliseconds) {
     SwitchDev(dwMilliseconds);
     return ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);

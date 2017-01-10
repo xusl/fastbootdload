@@ -114,6 +114,18 @@
     <ClCompile Include="PasswordEnterDlg.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\jrdmmidiag.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\telnet.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MmiTestDialog.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\NicManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DlWorker.h">
@@ -156,6 +168,15 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="PasswordEnterDlg.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\inc\jrdmmidiag.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="MmiTestDialog.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\inc\NicManager.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

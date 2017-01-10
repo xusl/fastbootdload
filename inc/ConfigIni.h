@@ -19,8 +19,8 @@ class ProjectConfig {
     VOID SetPlatform(CString platform) { mPlatform = platform; }
     VOID SetVersion(CString version) { mVersion = version; }
     VOID SetValid(BOOL valid) { mIsValidConfig = valid; }
-    VOID SetVid(CString vid) { mVid = vid; }
-    VOID SetPid(CString pid) { mPid = pid; }
+    VOID SetVid(int vid) { mVid = vid; }
+    VOID SetPid(int pid) { mPid = pid; }
 
     BOOL  IsValid() { return mIsValidConfig; }
     CString GetConfigPath() { return mProjectConfigPath; }

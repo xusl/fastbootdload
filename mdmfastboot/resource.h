@@ -10,6 +10,7 @@
 #define IDS_TIP_FORCEUPDATE             103
 #define IDS_TIP_FASTBOOT_ONLY           104
 #define IDS_TIP_SCHE                    105
+#define IDP_SOCKETS_INIT_FAILED         106
 #define IDR_MAINFRAME                   128
 #define IDD_PORT_STATE                  129
 #define IDR_MENU_MAIN                   130
@@ -19,6 +20,7 @@
 #define IDI_LOCK                        135
 #define IDI_UNLOCK                      136
 #define IDD_ENTER_PASSWORD              139
+#define IDD_MMITEST                     140
 #define IDC_ST_TITLE                    1001
 #define IDC_STATIC_USERDATA_VER         1002
 #define IDC_EDIT_CUSTOMER_PKG           1003
@@ -58,6 +60,9 @@
 #define IDC_STATIC_PLATFORM             1045
 #define IDC_EDIT_PASSWORD               1046
 #define IDC_CAPSLOCK_PROMPT             1047
+#define IDC_LIST_MMI                    1048
+#define IDC_MMI_STATUS                  1050
+#define IDC_MMI_DEVINFO                 1051
 #define ID_ABOUT_ABOUT                  32771
 #define ID_HELP_HELP                    32772
 #define ID_ABOUT_                       32773
@@ -66,12 +71,12 @@
 #define ID_FILE_M801                    32776
 
 // Next default values for new objects
-//
+// 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        140
+#define _APS_NEXT_RESOURCE_VALUE        141
 #define _APS_NEXT_COMMAND_VALUE         32777
-#define _APS_NEXT_CONTROL_VALUE         1048
+#define _APS_NEXT_CONTROL_VALUE         1052
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

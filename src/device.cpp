@@ -504,6 +504,11 @@ bool CDevLabel::SetComPort(const wchar_t *portName) {
     return true;
 }
 
+CString CDevLabel::GetComPort() {
+    CString com;
+    com.Format(_T("COM%d"), mPortNum);
+    return com;
+}
 bool CDevLabel::MatchDevPath(const wchar_t * devPath) {
     LOGE("DO CDevLabel::operator ==");
     const wchar_t *effectivePath = GetDevPath();

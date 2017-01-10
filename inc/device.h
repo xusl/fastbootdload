@@ -186,6 +186,7 @@ class CDevLabel {
     bool GetEffectiveSnPort(long *sn, long *port);
     bool SetComPort(const wchar_t *portName);
     int GetComPortNum() const{ return mPortNum;};
+    CString GetComPort();
     VOID FreeBuffer();
     VOID Dump(const char *tag);
 

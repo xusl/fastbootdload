@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "mdmfastboot.h"
 #include "mdmfastbootDlg.h"
+#include "MmiTestDialog.h"
 #include "log.h"
 
 #ifdef _DEBUG
@@ -80,6 +81,25 @@ BOOL CmdmfastbootApp::InitInstance()
 
 	CWinApp::InitInstance();
 
+/*
+    如果用MFC的CSocket类则需要调用AfxSocketInit()初始化，
+    一般都是放在App类的InitInstance()函数中，
+    而如果用纯SOCKET的API函数，
+    则需要调用WSAStartup()函数去初始化网络环境。
+
+    一般来说 ,在调用任何winsock api之前,必须调用wsastartup()进行初始化,最后调用WSACleanup()做清理工作。
+
+        MFC中的函数 AfxSocketInit() 包装了函数 WSAStartup(), 在支持WinSock的应用程序的初始化函数IninInstance()中调用AfxSocketInit()进行初始化, 程序则不必调用WSACleanUp().
+
+    AfxSocketTerm
+    */
+	if (!AfxSocketInit())
+	{
+		AfxMessageBox(IDP_SOCKETS_INIT_FAILED);
+		return FALSE;
+	}
+
+
 	AfxEnableControlContainer();
 
 	// 标准初始化
@@ -91,7 +111,12 @@ BOOL CmdmfastbootApp::InitInstance()
 	// 例如修改为公司或组织名
 	SetRegistryKey(_T("TCL MBB MODULE FASTBOOT"));
 
+#define MMI_TOOL
+#ifdef MMI_TOOL
+	MmiTestDialog dlg;
+#else
 	CmdmfastbootDlg dlg;
+#endif
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();
 	if (nResponse == IDOK)

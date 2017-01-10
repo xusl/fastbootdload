@@ -90,7 +90,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_WM_QUERYDRAGICON()
 	ON_WM_DEVICECHANGE()
 	//}}AFX_MSG_MAP
-	ON_BN_CLICKED(IDC_BTN_STOP, &CmdmfastbootDlg::OnBnClickedButtonStop)
+//	ON_BN_CLICKED(IDC_BTN_STOP, &CmdmfastbootDlg::OnBnClickedButtonStop)
 	ON_WM_SIZE()
 	ON_WM_TIMER()
 	ON_WM_GETMINMAXINFO()
@@ -277,7 +277,7 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
 	m_imglist->EnableWindow(!bwork);
     GetDlgItem(IDC_BTN_START)->EnableWindow(!bwork);
     GetDlgItem(IDCANCEL)->EnableWindow(!bwork);
-    GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
+//    GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
 
 #ifdef INLINE_SETTING
     if (!mPSTManager.IsAfterSaleMode()) {
@@ -414,7 +414,6 @@ BOOL CmdmfastbootDlg::OnInitDialog()
 
   //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回87,因为构造函数中m_hWnd还没被初始化为有效值.
   RegisterAdbDeviceNotification(m_hWnd);
-  SetWorkStatus(mPSTManager.IsWork(), TRUE);
   adb_usb_init();
 
   if (kill_adb_server(DEFAULT_ADB_PORT) == 0) {
@@ -634,9 +633,7 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
 BOOL CmdmfastbootDlg::SetupDevice(int evt) {
     switch(evt) {
     case TIMER_EVT_ADBKILLED:
-        mPSTManager.RejectCDROM();
-        if(!mPSTManager.EnumerateAdbDevice())
-            mPSTManager.HandleComDevice();
+        SetWorkStatus(mPSTManager.IsWork(), TRUE);
         break;
     case TIMER_EVT_REJECTCDROM:
         mPSTManager.RejectCDROM();
@@ -813,7 +810,7 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
       dx = rect.right + 20;
       if (mPSTManager.IsAfterSaleMode()) {
         dy = cy - 100;
-        SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
+//        SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
         SetDlgItemPos(IDCANCEL, dx + 120, dy);
         SetDlgItemPos(IDC_BTN_START, dx , dy);
         //SetDlgItemPos(IDC_SETTING, dx, dy);
@@ -832,7 +829,7 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 
         dy = cy - 60;
         //dy = pkgInfoRect.bottom + 10;
-        SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
+//        SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
         SetDlgItemPos(IDCANCEL, dx + 120, dy);
         SetDlgItemPos(IDC_BTN_START, dx , dy);
         //SetDlgItemPos(IDC_SETTING, dx, dy);
@@ -849,7 +846,7 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
     } else {
       dx = rect.right + 8;
       dy = cy - 90;
-      SetDlgItemPos(IDC_BTN_STOP, (cx + 800) /2-200, dy);
+//      SetDlgItemPos(IDC_BTN_STOP, (cx + 800) /2-200, dy);
       SetDlgItemPos(IDCANCEL, (cx + 1000 ) /2-200, dy);
       SetDlgItemPos(IDC_BTN_START, (cx + 500) /2-200, dy);
       //SetDlgItemPos(IDC_SETTING, (cx +300) /2, cy - 60);
@@ -1009,10 +1006,7 @@ void CmdmfastbootDlg::OnBnClickedStart()
 	}
 	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_DISABLED|MF_GRAYED);
 	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_DISABLED|MF_GRAYED);
-	if (SetWorkStatus(TRUE, FALSE)) {
-	//AdbUsbHandler(true);
-    SetupDevice(TIMER_EVT_ADBKILLED);
-	}
+	SetWorkStatus(TRUE, FALSE);
 
   //::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
 }
