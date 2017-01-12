@@ -1,18 +1,19 @@
 #pragma once
 
+#include "telnet.h"
 #include "PST.h"
 #include "NicManager.h"
 // MmiTestDialog dialog
 
 class MmiTestDialog : public CDialogEx
 {
-	DECLARE_DYNAMIC(MmiTestDialog)
+//	DECLARE_DYNAMIC(MmiTestDialog)
 
 public:
 	MmiTestDialog(CWnd* pParent = NULL);   // standard constructor
 	virtual ~MmiTestDialog();
 
-	virtual void OnFinalRelease();
+//	virtual void OnFinalRelease();
 
 // Dialog Data
 	enum { IDD = IDD_MMITEST };
@@ -30,10 +31,17 @@ protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
-	DECLARE_DISPATCH_MAP()
-	DECLARE_INTERFACE_MAP()
+	//DECLARE_DISPATCH_MAP()
+	//DECLARE_INTERFACE_MAP()
 public:
     static UINT RunMmiTest(LPVOID wParam);
+    BOOL TestItem(telnet &client, CString item, PCCH command);
+    BOOL TestItem(telnet &client, CString item, PCCH command, string &data);
+    BOOL TestItem(telnet &client, CString item, PCCH command, const string &ok, const string &error);
+    BOOL AddTestResult(CString item, BOOL pass, string description);
+    SOCKET GetTelnetSocket();
+    BOOL SetWork(BOOL work);
+    BOOL SetStatus(CString text);
     LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
     virtual BOOL OnInitDialog();
     afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);

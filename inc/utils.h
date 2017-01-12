@@ -218,5 +218,5 @@ int CharToBSTR(PCCH inParam, BSTR *outParam);
 extern void* load_file(LPCWSTR pathname, unsigned*  psize);
 int kill_adb_server(int port );
 BOOL StopAdbServer();
-
+SOCKET CreateSocket(const char *ip_addr,  u_short port);
 #endif /* _ADB_UTILS_H */

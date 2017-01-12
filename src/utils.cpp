@@ -334,11 +334,39 @@ _init_winsock( void )
         WSADATA  wsaData;
         int      rc = WSAStartup( MAKEWORD(2,2), &wsaData);
         if (rc != 0) {
-            fatal( "adb: could not initialize Winsock\n" );
+            LOGE( "adb: could not initialize Winsock" );
         }
         atexit( _cleanup_winsock );
         _winsock_init = 1;
     }
+}
+
+SOCKET CreateSocket(const char *ip_addr,  u_short port) {
+    SOCKET sockClient = INVALID_SOCKET;
+    SOCKADDR_IN addrSrv;
+    __int64 iResult;
+
+//    if (mWSAInitialized == FALSE) {
+//        UpdateMessage(_T("Server Startup failed!"));
+//        return sockClient;
+//    }
+
+    addrSrv.sin_addr.S_un.S_addr = inet_addr(ip_addr);
+    addrSrv.sin_family = AF_INET;
+    addrSrv.sin_port = htons(port);
+    sockClient = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    //int timeout=50000;
+    //iResult=setsockopt(sockClient,SOL_SOCKET,SO_RCVTIMEO,(const char*)&timeout,sizeof(int));
+    //if(SOCKET_ERROR==iResult)
+    //return INVALID_SOCKET;
+
+    iResult = connect(sockClient, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
+    if(iResult==SOCKET_ERROR) {
+        closesocket(sockClient);
+        LOGE("Connect device %s failed!", ip_addr);
+        sockClient = INVALID_SOCKET;
+    }
+    return sockClient;
 }
 
 int kill_adb_server(int port )

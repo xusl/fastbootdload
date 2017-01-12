@@ -283,6 +283,7 @@ copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</C
     <ClCompile Include="PST.cpp" />
     <ClCompile Include="qcnlib\QcnParser.cpp" />
     <ClCompile Include="SettingsDlg.cpp" />
+    <ClCompile Include="..\src\CMiniHttpDownloadServer.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

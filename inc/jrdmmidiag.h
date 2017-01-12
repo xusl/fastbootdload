@@ -486,8 +486,8 @@ enum
     Call_In_Check,
 
 };
-int ConnectMS_NV(unsigned short comport);
-
+int ConnectMS(unsigned short comport);
+int DisconnectMs();
 VOID DIAG_ReadSSID(char *ssid);
 VOID DIAG_WriteSSID(char *ssid);
 VOID DIAG_RestartWiFi(void);
@@ -508,7 +508,7 @@ VOID  DIAG_KEYTEST(void);
 VOID  DIAG_EXITKEYTEST(void);
 VOID  DIAG_ReadFIRMWAREVersion(char* FirmVer);
 VOID  DIAG_CheckSD_Card(void);
-VOID  DIAG_CheckSIM_Card(void);
+bool  DIAG_CheckSIM_Card(string& msg);
 VOID  DIAG_CheckNetWork(void);
 VOID  DIAG_TraceAbilityRead(TraceInfo *pTrace);
 VOID  DIAG_TraceAbilityWrite(char *traceInfo);

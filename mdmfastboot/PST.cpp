@@ -465,6 +465,12 @@ UsbWorkData::~UsbWorkData() {
         mMapDevIntf->DeleteMemory();
         delete mMapDevIntf;
     }
+    if (NULL != work) {
+        LOGE("destory when there are still have thread run");
+        AfxEndThread(-1);
+        work = NULL;
+    }
+
     ::CloseHandle(mDevSwitchEvt);
 }
 

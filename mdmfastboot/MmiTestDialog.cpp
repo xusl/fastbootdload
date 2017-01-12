@@ -5,7 +5,6 @@
 #include "mdmfastboot.h"
 #include "MmiTestDialog.h"
 #include "afxdialogex.h"
-#include "telnet.h"
 #include "log.h"
 #include <dbt.h>
 #include <usb100.h>
@@ -15,27 +14,17 @@
 #include "jrdmmidiag.h"
 // MmiTestDialog dialog
 
-IMPLEMENT_DYNAMIC(MmiTestDialog, CDialogEx)
+//IMPLEMENT_DYNAMIC(MmiTestDialog, CDialogEx)
 
 MmiTestDialog::MmiTestDialog(CWnd* pParent /*=NULL*/)
 	: CDialogEx(MmiTestDialog::IDD, pParent),
     mDeviceManager(MmiTestDialog::RunMmiTest)
 {
-	EnableAutomation();
+	//EnableAutomation();
 }
 
 MmiTestDialog::~MmiTestDialog()
 {
-}
-
-void MmiTestDialog::OnFinalRelease()
-{
-	// When the last reference for an automation object is released
-	// OnFinalRelease is called.  The base class will automatically
-	// deletes the object.  Add additional cleanup required for your
-	// object before calling the base class.
-
-	CDialogEx::OnFinalRelease();
 }
 
 void MmiTestDialog::DoDataExchange(CDataExchange* pDX)
@@ -56,44 +45,23 @@ BEGIN_MESSAGE_MAP(MmiTestDialog, CDialogEx)
 	ON_MESSAGE(UI_MESSAGE_DEVICE_INFO, &MmiTestDialog::OnDeviceInfo)
 END_MESSAGE_MAP()
 
-BEGIN_DISPATCH_MAP(MmiTestDialog, CDialogEx)
-END_DISPATCH_MAP()
-
-// Note: we add support for IID_IMmiTestDialog to support typesafe binding
-//  from VBA.  This IID must match the GUID that is attached to the
-//  dispinterface in the .IDL file.
-
-// {0391DA2E-326F-4B44-94CD-66EBA49C0C92}
-static const IID IID_IMmiTestDialog =
-{ 0x391DA2E, 0x326F, 0x4B44, { 0x94, 0xCD, 0x66, 0xEB, 0xA4, 0x9C, 0xC, 0x92 } };
-
-BEGIN_INTERFACE_MAP(MmiTestDialog, CDialogEx)
-	INTERFACE_PART(MmiTestDialog, IID_IMmiTestDialog, Dispatch)
-END_INTERFACE_MAP()
-
-
 // MmiTestDialog message handlers
-
-
 BOOL MmiTestDialog::OnInitDialog()
 {
     CDialogEx::OnInitDialog();
 
     mDeviceManager.Initialize(this, FALSE);
 
-    m_MmiItemList.InsertColumn(0, _T("Item"),LVCFMT_LEFT, 90);
-    m_MmiItemList.InsertColumn(1, _T("File Name"),LVCFMT_LEFT, 280);
-    m_MmiItemList.InsertColumn(1, _T("Result"),LVCFMT_LEFT, 180);
+    m_MmiItemList.InsertColumn(0, _T("Item"),LVCFMT_LEFT, 120);
+    m_MmiItemList.InsertColumn(1, _T("Result"),LVCFMT_LEFT, 80);
+    m_MmiItemList.InsertColumn(2, _T("Description"),LVCFMT_LEFT, 360);
     //m_MmiItemList.SetExtendedStyle(m_MmiItemList.GetExtendedStyle());//设置控件有勾选功能
-
-    m_MmiItemList.InsertItem(0, _T("MAC"));
-    m_MmiItemList.SetItemText(0,1, _T("sdf"));
-    m_MmiItemList.SetItemText(0,2,_T("Ok"));
 
     mNic.EnumNetCards();
 
     NetCardStruct nic = mNic.GetDefaultNic();
     m_MmiDevInfo = nic.mConnectionName;
+    GetDlgItem(IDC_MMI_DEVINFO)->SetWindowText(nic.mConnectionName);
     return TRUE;  // return TRUE unless you set the focus to a control
     // EXCEPTION: OCX Property Pages should return FALSE
 }
@@ -140,7 +108,7 @@ BOOL MmiTestDialog::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
             LOGI("device arrive, DBT_DEVTYP_DEVICEINTERFACE");
             //SetTimer(TIMER_EVT_USBADB, 2000, &CmdmfastbootDlg::DeviceEventTimerProc);
             //HandleDeviceArrived(pDevInf->dbcc_name);
-            mDeviceManager.EnumerateAdbDevice();
+            //mDeviceManager.EnumerateAdbDevice();
 
             break;
         }
@@ -169,19 +137,169 @@ BOOL MmiTestDialog::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
     return TRUE;
 }
 
+
+#define WIFI_GET_2DOT4G_MAC      0
+#define WIFI_SET_2DOT4G_MAC  1
+#define WIFI_GET_5G_MAC  2
+#define WIFI_SET_5G_MAC  3
+#define LED_ALL_OFF  0
+#define LED_POWER_BIT 1
+#define LED_WIFI_BIT  2
+#define LED_WPS_ON  3
+#define TEST_KEY "send_data 254 0 2 4 1"
+#define TEST_LED "send_data 254 0 2 3 0"
+#define TEST_RJ45 "send_data 254 0 2 5 1"
+#define TEST_RJ11 "send_data 254 0 2 5 0"
+#define TEST_WIFI_MAC  "send_data 254 0 3 1 "
+#define TEST_PASS    _T("Pass")
+#define TEST_FAILED  _T("Failed")
+
+
+BOOL MmiTestDialog::AddTestResult(CString item, BOOL pass, string description) {
+    int nItem = m_MmiItemList.GetItemCount();
+    m_MmiItemList.InsertItem(nItem, item);
+    m_MmiItemList.SetItemText(nItem, 1, pass ? TEST_PASS : TEST_FAILED);
+    m_MmiItemList.SetItemText(nItem, 2, CString(description.c_str()));
+    return TRUE;
+}
+
+SOCKET MmiTestDialog::GetTelnetSocket() {
+    NetCardStruct nic = mNic.GetDefaultNic();
+    m_MmiDevInfo = nic.mConnectionName;
+
+    PCHAR ip_addr = WideStrToMultiStr(nic.mGateway.GetString());
+    if (ip_addr == NULL) {
+        return INVALID_SOCKET;
+    }
+
+    SOCKET socket = CreateSocket(ip_addr, TELNET_PORT);
+    delete [] ip_addr;
+    return socket;
+}
+
 UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
     UsbWorkData* data = (UsbWorkData*)wParam;
-    DeviceInterfaces *dev;
-    dev = data->mActiveDevIntf;
-    CDevLabel* diag = dev->GetDiagIntf();
-    ConnectMS_NV( diag->GetComPortNum());
+    CDevLabel* diag = NULL;
+    MmiTestDialog *testDialog;
+    string result;
+    CString text;
+    BOOL  pass;
+
+    ASSERT(data != NULL && data->mActiveDevIntf != NULL && data->hWnd);
+    testDialog = (MmiTestDialog *)data->hWnd;
+
+    testDialog->SetStatus( _T("Begin diag test."));
+
+    diag = data->mActiveDevIntf->GetDiagIntf();
+    if(diag != NULL && ConnectMS( diag->GetComPortNum())) {
+        pass = DIAG_CheckSIM_Card(result);
+        testDialog->AddTestResult(_T("SIM card"), pass, result);
+    } else {
+        testDialog->AddTestResult(_T("USB"), FALSE, diag == NULL ? "no USB port found" : "can not connect to device");
+    }
+    DisconnectMs();
+
+    SOCKET sock = testDialog->GetTelnetSocket();
+    if (INVALID_SOCKET == sock) {
+        testDialog->AddTestResult(_T("RJ45 1"), FALSE, "Can not connect device.");
+        data->Finish();
+        testDialog->SetWork(FALSE);
+        return 1;
+    }
+
+    testDialog->AddTestResult(_T("RJ45 1"), TRUE, "Ok.");
+    telnet tn(sock, 6000, true);
+
+    LOGE("start telnet negotiate");
+    tn.send_command(NULL, result);
+    //UpdateMessage(result.c_str());
+    tn.send_command(NULL, result);
+    //UpdateMessage(result.c_str());
+
+    pass = testDialog->TestItem(tn, _T("RJ45 2"), "send_data 254 0 2 5 1", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
+    pass = testDialog->TestItem(tn, _T("RJ11"), "send_data 254 0 2 5 0", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
+//    pass = testDialog->TestItem(tn, _T("U Disk"), "send_data 254 0 2 5 0", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
+
+#ifdef USE_SENDDATA
+    string command = TEST_WIFI_MAC;
+    command += "1";
+    pass = testDialog->TestItem(tn, _T("WiFi 5G MAC"), command.c_str());
+    command = TEST_WIFI_MAC;
+    command += "0";
+    pass = testDialog->TestItem(tn, _T("WiFi 2.4G MAC"), command.c_str());
+#else
+    pass = testDialog->TestItem(tn, _T("WiFi 5G MAC"), "uci show wireless.wifi1.macaddr");
+    pass = testDialog->TestItem(tn, _T("WiFi 2.4G MAC"), "uci show wireless.wifi0.macaddr");
+#endif
+
+   // pass = testDialog->TestItem(tn, _T("WiFi scan AP"), "send_data 254 0 3 0");
+
+#if 0
+    tn.send_command(TEST_LED, result);
+    testDialog->SetStatus(CString(result.c_str()));
+    testDialog->AddTestResult(_T("LED"), FALSE, result.c_str());
+#endif
+
+    data->Finish();
+    testDialog->SetWork(FALSE);
+    LOGE("Test finish");
+
+    closesocket(sock);
     return 0;
+}
+
+BOOL MmiTestDialog::TestItem(telnet &client, CString item, PCCH command, const string &ok, const string &error) {
+    string data;
+    BOOL pass;
+
+    TestItem(client, item, command, data);
+
+    pass = (data == ok);
+    AddTestResult(item, pass, data.c_str());
+    return pass;
+}
+
+BOOL MmiTestDialog::TestItem(telnet &client, CString item, PCCH command, string &data) {
+    CString status = _T("Test item \n");
+    status += item;
+    SetStatus(status);
+    client.send_command(command, data);
+    return TRUE;
+}
+
+BOOL MmiTestDialog::TestItem(telnet &client, CString item, PCCH command) {
+    string data;
+    CString text;
+    BOOL pass;
+
+    TestItem(client, item, command, data);
+
+    text = "Test Result:\n";
+    text += data.c_str();
+    text += "\n\n Click 'Ok' to confirm pass test";
+    int iRet = AfxMessageBox(text, MB_YESNO);
+    pass = (IDYES == iRet);
+    AddTestResult(item, pass, data.c_str());
+
+    return pass;
+}
+BOOL MmiTestDialog::SetWork(BOOL work) {
+    GetDlgItem(IDOK)->EnableWindow(!work);
+    GetDlgItem(IDCANCEL)->EnableWindow(!work);
+    return TRUE;
+}
+
+BOOL MmiTestDialog::SetStatus(CString text) {
+    GetDlgItem(IDC_MMI_STATUS)->SetWindowText(text);
+    return TRUE;
 }
 
 void MmiTestDialog::OnBnClickedStart()
 {
     mDeviceManager.SetWork(TRUE, FALSE);
-    mDeviceManager.HandleComDevice(TRUE);
+    mDeviceManager.HandleComDevice(FALSE);
+    mDeviceManager.ScheduleDeviceWork();
+    SetWork(TRUE);
     //CDialogEx::OnOK();
 }
 
@@ -210,8 +328,8 @@ LRESULT MmiTestDialog::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
     }
 
     switch(uiInfo->infoType ) {
-    case TITLE:
-      //  data->pCtl->SetTitle(uiInfo->sVal);
+    case UI_DEFAULT:
+        m_MmiStatus = uiInfo->sVal;
         break;
 
     case PROGRESS_VAL:

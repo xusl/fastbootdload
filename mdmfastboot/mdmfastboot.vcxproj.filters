@@ -126,6 +126,9 @@
     <ClCompile Include="..\src\NicManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\CMiniHttpDownloadServer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DlWorker.h">

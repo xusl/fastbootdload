@@ -4,6 +4,9 @@
 #include <string.h>
 using namespace std;
 
+#define TELNET_PORT      IPPORT_TELNET
+#define DOWNLOAD_SERVER_PORT     80
+
 #define USE_WINSOCK
 //#define HAVE_POLL_FINE
 typedef enum {
@@ -387,7 +390,7 @@ protected:
   TelnetReceive telrcv_state;
 
   public:
-     telnet(curl_socket_t sock, int to, bool verb);
+     telnet(curl_socket_t sock, int timeout, bool verb);
      ~telnet();
 
      int receive_telnet_data(char *buffer, ssize_t len);

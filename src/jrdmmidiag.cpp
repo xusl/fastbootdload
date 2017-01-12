@@ -53,7 +53,16 @@ bool DIAG_ReadSSID(int testIndex,char *ssid)
         return TRUE;
 }
 
-int ConnectMS_NV(unsigned short comport)
+int DisconnectMs() {
+    if(NULL != m_QHandle)
+    {
+        QLIB_DisconnectServer(m_QHandle);
+        m_QHandle = NULL;
+    }
+    return 0;
+}
+
+int ConnectMS(unsigned short comport)
 {
     int i=0;
     int status = 0;
@@ -833,7 +842,7 @@ bool DIAG_CheckSD_Card(int testIndex)
     return TRUE;
 }
 
-bool DIAG_CheckSIM_Card(int testIndex)
+bool DIAG_CheckSIM_Card(string& msg)
 {
     jrd_diag_sim_status_req_type req;
     jrd_diag_sim_status_rsp_type resp;
@@ -851,33 +860,30 @@ bool DIAG_CheckSIM_Card(int testIndex)
                 (unsigned char *)&resp,
                 10000) != TRUE)
     {
-        ERROR("check SIM send command error");
-        //DisplayTestResult(testIndex,"check SIM send command error",false);
+        msg = "send check SIM command error, ";
         return FALSE;
     }
 
-     if(resp.diag_errno!=0)
+     if(resp.diag_errno !=0)
      {
-        ERROR("resp.sim_status response error!");
-        //DisplayTestResult(testIndex,"check sim status response error!",false);
+        msg = "diag does not response!";
         return FALSE;
      }
 
-    if(resp.status_len!= 0)
+    if(resp.status_len == 0)
     {
-        if(strstr(resp.sim_status,"READY") == NULL)
-        {
-            ERROR("resp.sim_status response didn't have READY!");
-            //DisplayTestResult(testIndex,"sim is not ready!",false);
-            return FALSE;
-        }
-    }
-    else
-    {
-        ERROR("check SIM  read response error");
-        //DisplayTestResult(testIndex,"check SIM  read response error",false);
+        msg = "check SIM read response error";
         return FALSE;
     }
+
+    if(strstr(resp.sim_status,"READY") == NULL && strstr(resp.sim_status,"PIN") == NULL)
+    {
+        msg = "SIM test error, ";
+        msg += resp.sim_status;
+        return FALSE;
+    }
+
+    msg = resp.sim_status;
 
     //DisplayTestResult(testIndex,"check SIM status successful",false);
     return TRUE;
