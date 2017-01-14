@@ -946,12 +946,18 @@ telnet::telnet(curl_socket_t sock, int to, bool verb) {
     //subopt_ttype[31] = 0; /* String termination */
     //us_preferred[CURL_TELOPT_TTYPE] = CURL_YES;
 
+    set_receive_timeout(to);
+    //SOCKET_ERROR
+}
+
+bool telnet::set_receive_timeout(int ms) {
+    timeout = ms;
     LOGE("Set timeout %d", timeout);
     setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&timeout,sizeof(timeout));
     int optLen = sizeof(timeout);
     getsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&timeout, &optLen);
     LOGE("Get timeout %d", timeout);
-    //SOCKET_ERROR
+    return ms == timeout;
 }
 
 int telnet::receive_telnet_data(char *buffer, ssize_t len) {
@@ -1044,13 +1050,16 @@ int telnet::send_command(const char *cmd, string &result, bool trim) {
 
     //&& (code == 0 || code == CURLE_RECV_TIMEOUT)
     if (trim && ( cmd != NULL ) && result.length() > strlen(cmd)) {
-        LOGE("1 %s", result.c_str());
         result.erase (result.begin(), result.begin()+strlen(cmd)+1);
-        LOGE("2 erase %s", result.c_str());
         size_t found = result.rfind('\n');
         if (found != string::npos)
             result.erase (result.begin()+found, result.end());
-        LOGE("3 erase %s", result.c_str());
+        //    data.erase(data.find_last_not_of("\t") + 1);
+        result.erase(result.find_last_not_of("\r\n") + 1);
+        result.erase(result.find_last_not_of(" ") + 1);
+        //    data.erase(data.find_last_not_of("\n") + 1);
+        result.erase(0, result.find_first_not_of("\r\n"));
+        result.erase(0, result.find_first_not_of(" "));
     }
 
     return code;

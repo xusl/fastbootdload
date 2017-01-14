@@ -19,6 +19,7 @@ public:
 	enum { IDD = IDD_MMITEST };
 
 private:
+  BOOL    m_Work;
   CListCtrl m_MmiItemList;
   CString m_MmiStatus;
   CString m_MmiDevInfo;
@@ -26,6 +27,8 @@ private:
   PSTManager mDeviceManager;
   CButton m_ExitButton;
   CButton m_StartButton;
+
+  HANDLE          mDevSwitchEvt;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
@@ -35,13 +38,17 @@ protected:
 	//DECLARE_INTERFACE_MAP()
 public:
     static UINT RunMmiTest(LPVOID wParam);
-    BOOL TestItem(telnet &client, CString item, PCCH command);
+    BOOL TestWiFi(telnet &client, CString item, PCCH command);
     BOOL TestItem(telnet &client, CString item, PCCH command, string &data);
     BOOL TestItem(telnet &client, CString item, PCCH command, const string &ok, const string &error);
+    BOOL TestKey(telnet &client, CString item,  const string &ok, int elapse);
+    BOOL TestLed(telnet &client, CString item,  int value);
+    BOOL DiagTest();
     BOOL AddTestResult(CString item, BOOL pass, string description);
     SOCKET GetTelnetSocket();
     BOOL SetWork(BOOL work);
     BOOL SetStatus(CString text);
+    VOID WaitForDevice(long seconds);
     LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
     virtual BOOL OnInitDialog();
     afx_msg BOOL OnDeviceChange(UINT nEventType, DWORD_PTR dwData);

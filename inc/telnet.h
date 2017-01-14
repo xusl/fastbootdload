@@ -392,7 +392,7 @@ protected:
   public:
      telnet(curl_socket_t sock, int timeout, bool verb);
      ~telnet();
-
+     bool set_receive_timeout(int ms);
      int receive_telnet_data(char *buffer, ssize_t len);
 
      void negotiate();
