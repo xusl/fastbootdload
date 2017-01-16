@@ -89,6 +89,8 @@ BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
 
   ScanDir(appPath.GetString());
   ReadPackageHistory();
+  //if some directory delete after latest run, we should write first.
+  WritePackageHistory();
   SetupPackageInformation();
   return TRUE;
 }

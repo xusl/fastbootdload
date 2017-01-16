@@ -51,28 +51,25 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
-
 	LRESULT OnUpdateProgressInfo(WPARAM wParam, LPARAM lParam);
 	LRESULT OnUpdatePackageInfo(WPARAM wParam, LPARAM lParam);
 // 实现
 protected:
 	HICON m_hIcon;
-  BOOL m_bInit;
   BOOL m_UpdateDownloadFlag;
   unsigned int m_updated_number;
-
- public:
   CString m_strModuleName;
   PSTManager mPSTManager;
   CListCtrl   *m_imglist;
   CComboBox m_PackageHistory;
 
-#ifdef INLINE_SETTING
-  CSettingsDlg m_SetDlg;
-#endif
+//#ifdef INLINE_SETTING
+//  CSettingsDlg m_SetDlg;
+//#endif
   //CListCtrl  *m_port;
 	//CThreadPool<CDlWorker> m_dlWorkerPool;
 
+ public:
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
@@ -88,13 +85,11 @@ public:
 	//port UI
 	static MODULE_NAME m_module_name;
 	CString m_PackagePath;
+
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	//afx_msg void OnGetMinMaxInfo(MINMAXINFO* lpMMI);
-
-  BOOL SetPortDialogs(int x, int y, int w, int h);
   BOOL SetDlgItemPos(UINT nID, int x, int y);
   BOOL UpdatePackageInfo(BOOL update = TRUE);
-
   BOOL SetupDevice(int evt);
   static void CALLBACK DeviceEventTimerProc(HWND hWnd,  UINT nMsg,  UINT_PTR nIDEvent,  DWORD dwTime);
   LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
@@ -115,6 +110,8 @@ private:
     BOOL InitSettingDlg(void);
 #endif
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
+  VOID LayoutControl();
+  VOID CmdmfastbootDlg::SetDialogSize();
 
 public:
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);

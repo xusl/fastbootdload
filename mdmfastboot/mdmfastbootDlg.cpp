@@ -59,7 +59,6 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
     mPSTManager(CmdmfastbootDlg::RunDevicePST)
 {
   m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-  m_bInit = FALSE;
   m_updated_number = 0;
   m_module_name = MODULE_M801;
 #ifdef INLINE_SETTING
@@ -120,42 +119,6 @@ void CmdmfastbootDlg::OnAbout()
 {
 	CAboutDlg dlgAbout;
 	dlgAbout.DoModal();
-}
-
-BOOL CmdmfastbootDlg::SetPortDialogs(int x, int y,  int w, int h)
-{
-  //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
-  int r, c, pw, ph;
-  CPortStateUI*  port;
-  int R_NUM, C_NUM;
-  int portsNum = mPSTManager.GetPortNum();
-
-  R_NUM = mPSTManager.GetPortRows();// mAppConf.GetUiPortRowCount();
-  C_NUM = portsNum / R_NUM;
-
-  if (R_NUM * C_NUM < portsNum) {
-    R_NUM > C_NUM ? C_NUM ++ :  R_NUM++;
-  }
-
-  pw = w / C_NUM;
-  ph = h / R_NUM;
-
-  for (r = 0; r < R_NUM; r++) {
-    for (c = 0; c < C_NUM; c++) {
-      if (r * C_NUM + c >= portsNum) break;
-
-      port = mPSTManager.GetPortUI(r * C_NUM + c);// m_workdata[r * C_NUM + c]->pCtl;
-      if (port == NULL) continue;
-      port->SetWindowPos(0,
-                         x + c * pw,
-                         y + r * ph,
-                         pw,
-                         ph,
-                         0);
-    }
-  }
-
-  return true;
 }
 
 BOOL CmdmfastbootDlg::SetDlgItemPos(UINT nID, int x, int y) {
@@ -362,17 +325,17 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   //for (int i = 0; i < mAppConf.GetUiPortTotalCount(); i++) {
   //  m_workdata[i] = new UsbWorkData(i, this, &mDevCoordinator, &mAppConf, &m_LocalConfigXml, m_image);
   //}
-  mPSTManager.Initialize(this);
   //SetUpDevice(NULL, 0, &GUID_DEVCLASS_USB,  _T("USB"));
   //SetUpAdbDevice(NULL, 0);
 
-  m_bInit = TRUE;
   m_UpdateDownloadFlag = TRUE;
   if (mPSTManager.GetPortNum() == 1)
     ShowWindow(SW_NORMAL);
-  else
-  ShowWindow(SW_MAXIMIZE);
-::SetWindowLong(m_hWnd,GWL_STYLE,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);
+  //else
+  //ShowWindow(SW_MAXIMIZE);
+
+  ::SetWindowLong(m_hWnd,GWL_STYLE,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);
+
 #if 0
   HRESULT hr = m_dlWorkerPool.Initialize(NULL, THREADPOOL_SIZE);
   m_dlWorkerPool.SetTimeout(30 * 1000);
@@ -382,6 +345,10 @@ BOOL CmdmfastbootDlg::OnInitDialog()
     return FALSE;
   }
   #endif
+
+  mPSTManager.Initialize(this);
+  SetDialogSize();
+  LayoutControl();
 
   m_imglist = ((CListCtrl*)GetDlgItem(IDC_IMAGE_LIST));
   m_imglist->InsertColumn(0, _T("Partition/QCN"),LVCFMT_LEFT, 90);
@@ -786,7 +753,6 @@ UINT CmdmfastbootDlg::RunDevicePST(LPVOID wParam) {
 
 void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
-  int dx, dy, dw, dh;
   //Remove for overland window issue by zhanghao 20160112
   /*
   if (m_nPort > 1 && (800 > cx || 800 > cy))
@@ -798,77 +764,109 @@ void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
   }*/
   //end to remove.
   CDialog::OnSize(nType, cx, cy);
-
-  if (m_bInit) {
-    RECT rect;
-    RECT pkgInfoRect;
-    GetDlgItem(IDC_GRP_PKG_INFO)->GetWindowRect(&pkgInfoRect);
-
-    GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&rect);
-
-    if (mPSTManager.GetPortNum() == 1) {
-      dx = rect.right + 20;
-      if (mPSTManager.IsAfterSaleMode()) {
-        dy = cy - 100;
-//        SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
-        SetDlgItemPos(IDCANCEL, dx + 120, dy);
-        SetDlgItemPos(IDC_BTN_START, dx , dy);
-        //SetDlgItemPos(IDC_SETTING, dx, dy);
-
-        dy = 5;
-        dw = cx - dx - 10;
-        dh = cy -dy - 120;
-      } else {
-        RECT rectPkgPath;
-        dy = cy - 10;
-//        dy = pkgInfoRect.bottom + 60;
-        SetDlgItemPos(IDC_STATIC_PKG, 10, dy);
-        SetDlgItemPos(IDC_CB_PACKAGE_PATH, 80, dy);
-        GetDlgItem(IDC_CB_PACKAGE_PATH)->GetWindowRect(&rectPkgPath);
-        //SetDlgItemPos(IDC_BTN_BROWSE, rectPkgPath.right + 10 /* cx - 80*/, dy);
-
-        dy = cy - 60;
-        //dy = pkgInfoRect.bottom + 10;
-//        SetDlgItemPos(IDC_BTN_STOP, dx+240, dy);
-        SetDlgItemPos(IDCANCEL, dx + 120, dy);
-        SetDlgItemPos(IDC_BTN_START, dx , dy);
-        //SetDlgItemPos(IDC_SETTING, dx, dy);
-
-#ifdef INLINE_SETTING
-        dy = 5;
-        m_SetDlg.SetWindowPos(NULL, dx, dy, 280, 220, 0);
-#endif
-
-        dy = 5;
-        dw = cx - dx - 10;
-        dh = cy -dy - 60 -20;
-      }
-    } else {
-      dx = rect.right + 8;
-      dy = cy - 90;
-//      SetDlgItemPos(IDC_BTN_STOP, (cx + 800) /2-200, dy);
-      SetDlgItemPos(IDCANCEL, (cx + 1000 ) /2-200, dy);
-      SetDlgItemPos(IDC_BTN_START, (cx + 500) /2-200, dy);
-      //SetDlgItemPos(IDC_SETTING, (cx +300) /2, cy - 60);
-      SetDlgItemPos(IDC_CB_PACKAGE_PATH, 100,dy);
-      SetDlgItemPos(IDC_STATIC_PKG, 20, dy);
-
-#ifdef INLINE_SETTING
-      dy = rect.bottom + 20;
-      if (!mPSTManager.IsAfterSaleMode()) {
-        m_SetDlg.SetWindowPos(NULL, rect.left, dy, 280, 220, 0);
-      }
-	  //m_SetDlg.ShowWindow(SW_HIDE);   //hide set dialog by zhanghao 20160112
-#endif
-      dy = 5;
-      dw = cx - dx - 10;
-      dh = cy -dy - 20 -70;
-    }
-
-    SetPortDialogs(dx, dy, dw, dh);
-  }
-  //Invalidate(TRUE);
+  LayoutControl();
 }
+
+VOID CmdmfastbootDlg::SetDialogSize() {
+    int cx = 0, cy = 0;
+    RECT winRect;
+    RECT clientRect;
+    RECT infoRect;
+    RECT pathRect;
+    RECT startRect;
+    RECT staticRect;
+    //RECT rc;
+
+    GetWindowRect(&winRect);
+    GetClientRect(&clientRect);
+
+  GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&infoRect);
+  GetDlgItem(IDC_BTN_START)->GetClientRect(&startRect);
+  GetDlgItem(IDC_CB_PACKAGE_PATH)->GetClientRect(&pathRect);
+  GetDlgItem(IDC_STATIC_PKG) ->GetClientRect(&staticRect);
+  //SystemParametersInfo(SPI_GETWORKAREA, 0, (PVOID) &rc, 0);
+
+  cx = winRect.right - winRect.left - (clientRect.right- clientRect.left ) ;
+  cx += MAX(mPSTManager.GetPortGridWidth() + infoRect.right - infoRect.left,
+            pathRect.right - pathRect.left + staticRect.right - staticRect.left);
+  cx += HORIZONAL_GAP * 2;
+
+  int rightHeight = mPSTManager.GetPortGridHeight();
+  int leftHeight = infoRect.bottom - infoRect.top;
+  int buttonHeight = startRect.bottom - startRect.top + VERTICAL_GAP;
+  cy = winRect.bottom - winRect.top - (clientRect.bottom - clientRect.top );
+  cy += pathRect.bottom - pathRect.top + VERTICAL_GAP;
+  //cy += infoRect.top;
+  if (rightHeight > leftHeight) {
+    leftHeight += buttonHeight;
+  } else {
+    rightHeight += buttonHeight;
+  }
+  cy += MAX(leftHeight, rightHeight);
+  cy += VERTICAL_GAP * 2;
+  SetWindowPos(0, 0, 0, cx, cy, SWP_NOSENDCHANGING/* | SWP_NOSIZE*/);
+  CenterWindow();
+}
+
+VOID CmdmfastbootDlg::LayoutControl() {
+    RECT dialogRect;
+    RECT pathRect;
+    RECT infoRect;
+    RECT exitRect;
+    RECT startRect;
+    int cx, startX, exitX;
+    int cy;
+
+    if (!mPSTManager.IsInit()) {
+        return;
+    }
+    GetClientRect(&dialogRect);
+    //cx = dialogRect.right - dialogRect.left;
+    //cy = dialogRect.bottom - dialogRect.top;
+
+    //GetDlgItem(IDC_GRP_PKG_INFO)->GetWindowRect(&infoRect);
+    GetDlgItem(IDC_GRP_PKG_INFO)->GetClientRect(&infoRect);
+    GetDlgItem(IDC_CB_PACKAGE_PATH)->GetClientRect(&pathRect);
+    GetDlgItem(IDCANCEL)->GetClientRect(&exitRect);
+    GetDlgItem(IDC_BTN_START)->GetClientRect(&startRect);
+
+    //int gridWidth = mPSTManager.GetPortGridWidth();
+    int gridHeight = mPSTManager.GetPortGridHeight();
+    cy = pathRect.bottom - pathRect.top + HORIZONAL_GAP;
+    if (gridHeight < infoRect.bottom - infoRect.top) {
+        cy = (cy + gridHeight + dialogRect.bottom )/2 ;
+        cx = (infoRect.right + dialogRect.right) /2;
+        startX = (infoRect.right + cx) /2;
+        exitX = (cx + dialogRect.right) / 2;
+    } else {
+        cy = (cy + infoRect.bottom + dialogRect.bottom )/2;
+        cx = (infoRect.left + infoRect.right)/2;
+        startX = (infoRect.left + cx) /2;
+        exitX = (cx + infoRect.right) /2;
+    }
+    cy -= (startRect.bottom - startRect.top) / 2;
+    startX -= (startRect.right - startRect.left) / 2;
+    exitX -= (exitRect.right - exitRect.left) / 2;
+
+    SetDlgItemPos(IDC_BTN_START, startX , cy);
+    SetDlgItemPos(IDCANCEL, exitX, cy);
+
+#ifdef INLINE_SETTING
+    dy = rect.bottom + 20;
+    if (!mPSTManager.IsAfterSaleMode()) {
+        m_SetDlg.SetWindowPos(NULL, rect.left, dy, 280, 220, 0);
+    }
+    //m_SetDlg.ShowWindow(SW_HIDE);   //hide set dialog by zhanghao 20160112
+#endif
+
+    mPSTManager.SetPortDialogs(infoRect.right + HORIZONAL_GAP,
+                               pathRect.bottom - pathRect.top + HORIZONAL_GAP,
+                               dialogRect.right - dialogRect.left -infoRect.right + infoRect.left - HORIZONAL_GAP * 2 ,
+                               gridHeight);
+
+    //Invalidate(TRUE);
+}
+
 //Remove by zhang hao 20160112
 /*void CmdmfastbootDlg::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {

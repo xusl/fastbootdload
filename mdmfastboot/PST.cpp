@@ -20,7 +20,10 @@ PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
     mThreadProc(pfnThreadProc),
 	mDevCoordinator(),
 	m_WorkDev(),
-	m_image(NULL)
+	m_image(NULL),
+	m_bInit(FALSE),
+	m_GridHeight(0),
+    m_GridWidth(0)
 {
     //construct update software package. get configuration about partition information.
     mAppConf.ReadConfigIni();
@@ -56,14 +59,27 @@ BOOL PSTManager::ChangePackage(const wchar_t * dir) {
 }
 
 BOOL PSTManager::Initialize(CWnd *hWnd, BOOL showPort) {
+  int row, column;
+  int portsNum = GetPortNum();
+  row = GetPortRows();
+  column = portsNum / row;
+
+  if (row * column < portsNum) {
+    row > column ? column++ :  row++;
+  }
+
   for (int i = 0; i < GetPortNum(); i++) {
     m_workdata[i] = new UsbWorkData(i, hWnd, &mAppConf,  m_image);
     if (!showPort)
         m_workdata[i]->ShowSubWindow(showPort);
   }
-  //hWnd->Invalidate();
+  RECT rect = GetPortRect(0);
+  m_GridHeight = (rect.bottom - rect.top) * row + VERTICAL_GAP * (row - 1);
+  m_GridWidth = (rect.right - rect.left) * column + HORIZONAL_GAP * (column - 1);
 
+  //hWnd->Invalidate();
   //mAppConf.ScanDir();
+  m_bInit = TRUE;
   return TRUE;
 }
 
@@ -78,6 +94,50 @@ PSTManager::~PSTManager() {
     delete m_image;
     m_image = NULL;
   }
+}
+
+BOOL PSTManager::SetPortDialogs(int x, int y) {
+    return SetPortDialogs(x, y,GetPortGridWidth(), GetPortGridHeight());
+}
+
+BOOL PSTManager::SetPortDialogs(int x, int y,  int w, int h)
+{
+  //int size = sizeof(m_workdata) / sizeof(m_workdata[0]);
+  int r, c, pw, ph;
+  CPortStateUI*  port;
+  int R_NUM, C_NUM;
+  int portsNum = GetPortNum();
+
+  R_NUM = GetPortRows();// mAppConf.GetUiPortRowCount();
+  C_NUM = portsNum / R_NUM;
+
+  if (R_NUM * C_NUM < portsNum) {
+    R_NUM > C_NUM ? C_NUM ++ :  R_NUM++;
+  }
+  if (w > m_GridWidth)
+      x += (w - m_GridWidth)/C_NUM / 2;
+  if (h > m_GridHeight)
+      y += (y - m_GridHeight)/R_NUM / 2;
+
+  pw = w / C_NUM;
+  ph = h / R_NUM;
+
+  for (r = 0; r < R_NUM; r++) {
+    for (c = 0; c < C_NUM; c++) {
+      if (r * C_NUM + c >= portsNum) break;
+
+      port = GetPortUI(r * C_NUM + c);// m_workdata[r * C_NUM + c]->pCtl;
+      if (port == NULL) continue;
+      port->SetWindowPos(0,
+                         x + c * pw,
+                         y + r * ph,
+                         pw,
+                         ph,
+                         SWP_NOSENDCHANGING | SWP_NOSIZE);
+    }
+  }
+
+  return true;
 }
 
 VOID PSTManager::SetWork(BOOL work, BOOL schedule) {
@@ -478,6 +538,7 @@ BOOL UsbWorkData::ShowSubWindow(BOOL show) {
     pCtl->ShowWindow(show ? SW_SHOW :  SW_HIDE);
     return TRUE;
 }
+
 DWORD  UsbWorkData::WaitForDevSwitchEvt(DWORD dwMilliseconds) {
     SwitchDev(dwMilliseconds);
     return ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);

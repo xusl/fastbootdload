@@ -10,6 +10,8 @@
 
 using namespace std;
 
+#define VERTICAL_GAP    5
+#define HORIZONAL_GAP   15
 
 enum
 {
@@ -187,6 +189,7 @@ public:
   RECT GetPortRect(UINT index = 0);
   UsbWorkData *FindUsbWorkData(wchar_t *devPath);
   BOOL FlashDeviceDone(UsbWorkData * data);
+  BOOL IsInit() { return m_bInit;}
   BOOL IsHaveUsbWork(void);
   BOOL ScheduleDeviceWork();
   BOOL Reset();
@@ -198,6 +201,10 @@ public:
   BOOL HandleDeviceArrived(wchar_t *devPath);
 
   int GetPortNum();
+  int GetPortGridWidth() { return m_GridWidth;}
+  int GetPortGridHeight() { return m_GridHeight;}
+  BOOL SetPortDialogs(int x, int y);
+  BOOL SetPortDialogs(int x, int y, int w, int h);
   AppConfig* GetAppConfig() { return &mAppConf;}
   flash_image* GetProjectPackage() { return m_image;}
   BOOL ChangePackage(const wchar_t * dir);
@@ -211,8 +218,9 @@ public:
   }
 
 private:
-
-private:
+  int               m_GridHeight;
+  int               m_GridWidth;
+  BOOL              m_bInit;
   AppConfig          mAppConf;
   flash_image       *m_image;
   UsbWorkData       *m_workdata[PORT_NUM_MAX];
