@@ -4,6 +4,7 @@
 #include <XmlParser.h>
 #include <map>
 #include <string>
+#include <usb_vendors.h>
 
 using namespace std;
 

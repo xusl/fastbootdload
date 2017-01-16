@@ -17,8 +17,8 @@ AppConfig::AppConfig() :
         m_flashdirect(TRUE),
         m_forceupdate(FALSE),
         m_bWork(FALSE),
-        switch_timeout(300),
-        work_timeout(600),
+        switch_timeout(3000),
+        work_timeout(6000),
         m_nPort(1),
         mProjectConfig(_T("\\."))
 {
@@ -397,7 +397,7 @@ BOOL ProjectConfig::ReadConfig() {
                            buffer,
                            MAX_PATH,
                            configFile);
-        if (data_len == 0) {
+    if (data_len == 0) {
         return FALSE;
     }
      mPlatform = buffer;
@@ -409,10 +409,34 @@ BOOL ProjectConfig::ReadConfig() {
                            buffer,
                            MAX_PATH,
                            configFile);
-        if (data_len == 0) {
+    if (data_len == 0) {
         return FALSE;
     }
      mVersion = buffer;
+
+     memset(buffer, 0, sizeof buffer);
+     data_len = GetPrivateProfileString(PROJECT_SECTION,
+                           _T("USBVid"),
+                           NULL,
+                           buffer,
+                           MAX_PATH,
+                           configFile);
+    if (data_len > 0) {
+       mVid = wcstol(buffer, NULL, 16);
+    }
+
+     memset(buffer, 0, sizeof buffer);
+     data_len = GetPrivateProfileString(PROJECT_SECTION,
+                           _T("USBPid"),
+                           NULL,
+                           buffer,
+                           MAX_PATH,
+                           configFile);
+    if (data_len > 0) {
+     //mPid = atoi(buffer);//strtol buffer;
+     mPid = wcstol(buffer, NULL, 16);
+    }
+
      mIsValidConfig = TRUE;
      return TRUE;
 }
