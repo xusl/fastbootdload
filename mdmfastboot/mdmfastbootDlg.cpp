@@ -859,9 +859,9 @@ VOID CmdmfastbootDlg::LayoutControl() {
     //m_SetDlg.ShowWindow(SW_HIDE);   //hide set dialog by zhanghao 20160112
 #endif
 
-    mPSTManager.SetPortDialogs(infoRect.right + HORIZONAL_GAP,
-                               pathRect.bottom - pathRect.top + HORIZONAL_GAP,
-                               dialogRect.right - dialogRect.left -infoRect.right + infoRect.left - HORIZONAL_GAP * 2 ,
+    mPSTManager.SetPortDialogs(infoRect.right + HORIZONAL_BASE,
+                               pathRect.bottom - pathRect.top + VERTICAL_BASE,
+                               dialogRect.right - dialogRect.left -infoRect.right + infoRect.left -HORIZONAL_BASE - HORIZONAL_GAP,
                                gridHeight);
 
     //Invalidate(TRUE);

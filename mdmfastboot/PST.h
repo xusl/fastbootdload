@@ -11,7 +11,10 @@
 using namespace std;
 
 #define VERTICAL_GAP    5
-#define HORIZONAL_GAP   15
+#define HORIZONAL_GAP   5
+
+#define VERTICAL_BASE    15
+#define HORIZONAL_BASE   15
 
 enum
 {
@@ -184,7 +187,7 @@ public:
   BOOL IsWork() { return m_bWork; }
   BOOL IsAfterSaleMode() { return mAppConf.GetAfterSaleMode(); }
   BOOL IsSuperMode() { return mAppConf.GetFlashDirectFlag() || mAppConf.GetForceUpdateFlag(); }
-  UINT GetPortRows() { return mAppConf.GetUiPortRowCount(); }
+  UINT GetPortRows();
   CPortStateUI* GetPortUI(UINT index);
   RECT GetPortRect(UINT index = 0);
   UsbWorkData *FindUsbWorkData(wchar_t *devPath);

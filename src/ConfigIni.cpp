@@ -20,7 +20,6 @@ AppConfig::AppConfig() :
         switch_timeout(300),
         work_timeout(600),
         m_nPort(1),
-        m_nPortRow(1),
         mProjectConfig(_T("\\."))
 {
    m_UseAdb = TRUE;
@@ -72,16 +71,10 @@ BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
 
   //layout setting.
   m_nPort = GetPrivateProfileInt(L"app", L"port_num",1,lpFileName);
-  m_nPortRow = GetPrivateProfileInt(L"app", L"port_row",1,lpFileName);
   if ( m_nPort < 1 )
     m_nPort = 1;
   else if (m_nPort > PORT_NUM_MAX)
     m_nPort = PORT_NUM_MAX;
-
-  if (m_nPortRow < 1 )
-    m_nPortRow  = 1;
-  else if (m_nPortRow > m_nPort)
-    m_nPortRow =  m_nPort;
 
   if (m_pack_img) {
     m_forceupdate = TRUE; /*Now fw build system can not handle config.xml, so set it to true*/

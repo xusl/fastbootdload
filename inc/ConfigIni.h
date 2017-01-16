@@ -60,7 +60,6 @@ public:
     BOOL         GetAutoWorkFlag(void) { return m_bWork; };
     BOOL         GetAfterSaleMode(void) { return m_pack_img;};
     int          GetUiPortTotalCount(void) { return m_nPort;};
-    int          GetUiPortRowCount(void) { return m_nPortRow;};
     int          GetPSTWorkTimeout(void) { return work_timeout;};
     BOOL         GetDiagPSTNandPrg(string &prgName, BOOL emergency);
     /*
@@ -94,7 +93,6 @@ private:
     BOOL                    m_forceupdate; // do not check version, if not exist config.xml or version rule is not match
     volatile BOOL           m_bWork;
     int                     m_nPort;
-    int                     m_nPortRow;
     int                     switch_timeout;
     int                     work_timeout;
     BOOL                    m_UseAdb;

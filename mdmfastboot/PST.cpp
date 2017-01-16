@@ -160,6 +160,18 @@ int PSTManager::GetPortNum() {
     return min(sizeof m_workdata/ sizeof m_workdata[0], mAppConf.GetUiPortTotalCount());
 }
 
+UINT PSTManager::GetPortRows() {
+    int rows = 1, columns = 1;
+    int num = GetPortNum();
+    for (; rows * columns < num; ) {
+        if (rows > columns)
+            columns++;
+        else
+            rows++;
+    }
+    return rows;
+}
+
 RECT PSTManager::GetPortRect(UINT index) {
     RECT rect = {0};
     CPortStateUI * port = GetPortUI(index);
