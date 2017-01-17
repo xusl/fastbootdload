@@ -7,6 +7,7 @@
 #include <XmlParser.h>
 #include <ConfigIni.h>
 #include "adb_dev_register.h"
+#include "NicManager.h"
 #include "CMiniHttpDownloadServer.h"
 
 using namespace std;
@@ -190,9 +191,7 @@ public:
   BOOL IsWork() { return m_bWork; }
   BOOL IsAfterSaleMode() { return mAppConf.GetAfterSaleMode(); }
   BOOL IsSuperMode() { return mAppConf.GetFlashDirectFlag() || mAppConf.GetForceUpdateFlag(); }
-  UINT GetPortRows();
-  CPortStateUI* GetPortUI(UINT index);
-  RECT GetPortRect(UINT index = 0);
+
   UsbWorkData *FindUsbWorkData(wchar_t *devPath);
   BOOL FlashDeviceDone(UsbWorkData * data);
   BOOL IsInit() { return m_bInit;}
@@ -206,11 +205,15 @@ public:
   BOOL HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPARAM wParam);
   BOOL HandleDeviceArrived(wchar_t *devPath);
 
-  int GetPortNum();
   int GetPortGridWidth() { return m_GridWidth;}
   int GetPortGridHeight() { return m_GridHeight;}
   BOOL SetPortDialogs(int x, int y);
   BOOL SetPortDialogs(int x, int y, int w, int h);
+  int GetPortNum();
+  UINT GetPortRows();
+  CPortStateUI* GetPortUI(UINT index);
+  RECT GetPortRect(UINT index = 0);
+
   AppConfig* GetAppConfig() { return &mAppConf;}
   flash_image* GetProjectPackage() { return m_image;}
   BOOL ChangePackage(const wchar_t * dir);
@@ -239,6 +242,7 @@ private:
 
   vector<CDevLabel>  m_WorkDev;
   DeviceCoordinator  mDevCoordinator;
+
   AFX_THREADPROC     mThreadProc;
   volatile BOOL      m_bWork;
 };

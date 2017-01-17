@@ -528,10 +528,16 @@ VOID PSTManager::StartHttpServer() {
 
 UINT PSTManager::RunHttpServer(LPVOID wParam) {
   PSTManager *manager = (PSTManager*)wParam;
+    NicManager         mNic;
+      mNic.EnumNetCards();
+
+    NetCardStruct nic = mNic.GetDefaultNic();
+  //  m_MmiDevInfo = nic.mConnectionName;
+
   ASSERT(manager);
   CMiniHttpDownloadServer httpServer(manager->GetAppConfig());
 //  httpServer.server_listen("F:\\MoveTime\\gerrit-push.py");
-  httpServer.StartHttpServer(_T("F:\\MoveTime\\gerrit-push.py"));
+  httpServer.StartHttpServer(_T("F:\\HH70VH_00_02.00_02_Factory_PD03_20170109\\image_4018\\nor-ipq40xx-single.img"));
     return 0;
 }
 

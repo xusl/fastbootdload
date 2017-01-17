@@ -265,76 +265,31 @@ void AppConfig:: ScanDir (const wchar_t *szDirectory)
         configFile += _T("\\");
         configFile += FindData.cFileName;
         ParseProjectConfig(configFile);
-    }
-    while (FindNextFile (hFind, & FindData));
+    }while (FindNextFile (hFind, & FindData));
     FindClose (hFind);
+
+#if 1
+    map<CString, ProjectConfig>::iterator it;
+    for (it = m_SupportProject.begin(); it != m_SupportProject.end(); it++) {
+        LOGE("key %S, project code %S", it->first.GetString(), it->second.GetProjectCode().GetString());
+    }
+#endif
 }
 
 
-void AppConfig::ParseProjectConfig(CString &projectCofig) {
-    ProjectConfig projectConfig(projectCofig);
+void AppConfig::ParseProjectConfig(CString &configFile) {
+    ProjectConfig projectConfig(configFile);
+    list<CString> codes;
+    list<CString>::iterator it;
 
-    if (projectConfig.ReadConfig())
+    if (!projectConfig.ReadConfig())
+        return;
+    projectConfig.GetProjectCodes(codes);
+
+    for (it = codes.begin(); it != codes.end(); ++it) {
+        projectConfig.SetProjectCode(*it);
         m_SupportProject.insert(std::pair<CString, ProjectConfig>(projectConfig.GetProjectCode(), projectConfig));
-
-#if 0
-     WCHAR     buffer[MAX_PATH] = {0};
-     int data_len;
-     PCTSTR configFile = projectCofig.GetString();
-    if (configFile == NULL)
-        return FALSE;
-
-    if (!PathFileExists(configFile)) {
-        LOGE("%S is not exist", configFile);
-        return FALSE;
     }
-
-     memset(buffer, 0, sizeof buffer);
-     data_len = GetPrivateProfileString(PROJECT_SECTION,
-                           _T("platform"),
-                           NULL,
-                           buffer,
-                           MAX_PATH,
-                           configFile);
-    if (data_len == 0) {
-        return FALSE;
-    }
-
-    projectConfig.SetPlatform(buffer);
-    // mPlatform = buffer;
-
-     memset(buffer, 0, sizeof buffer);
-     data_len = GetPrivateProfileString(PROJECT_SECTION,
-                           _T("version"),
-                           NULL,
-                           buffer,
-                           MAX_PATH,
-                           configFile);
-    if (data_len == 0) {
-        return FALSE;
-    }
-
-    projectCofig.SetVersion(buffer);
-    // mVersion = buffer;
-     //mIsValidConfig = TRUE;
-
-     data_len = GetPrivateProfileString(PROJECT_SECTION,
-                           _T("code"),
-                           NULL,
-                           buffer,
-                           MAX_PATH,
-                           configFile);
-   if (data_len == 0) {
-        return FALSE;
-    }
-
-   projectCofig.SetProjectCode();
-   if () {
-   }
-     //mCode = buffer;
-
-     return TRUE;
-#endif
 }
 
 BOOL AppConfig::SetProjectCode(CString &projectCode) {
@@ -388,7 +343,21 @@ BOOL ProjectConfig::ReadConfig() {
    if (data_len == 0) {
         return FALSE;
     }
-     mCode = buffer;
+
+  #define CODE_DELIMINATE L" ,.-"
+  //wchar_t wcs[] = L"- This, a sample string.";
+  wchar_t * token;
+  wchar_t * state;
+  //wprintf (L"Splitting wide string \"%ls\" into tokens:\n",wcs);
+  token = wcstok_s (buffer, CODE_DELIMINATE, &state);
+  while (token != NULL)
+  {
+    //wprintf (L"%ls\n",token);
+    mCodeList.push_back(CString(token));
+    token = wcstok_s (NULL, CODE_DELIMINATE, &state);
+  }
+
+     mCode = mCodeList.front();//buffer;
 
      memset(buffer, 0, sizeof buffer);
      data_len = GetPrivateProfileString(PROJECT_SECTION,

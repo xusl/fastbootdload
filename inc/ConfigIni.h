@@ -29,6 +29,7 @@ class ProjectConfig {
     CString GetProjectCode() { return mCode; }
     CString GetPlatform() { return mPlatform; }
     CString GetVersion() { return mVersion; }
+    VOID GetProjectCodes(list<CString> &codes) { codes = mCodeList;}
     BOOL  GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency);
     int   GetVid() { return mVid; }
     int   GetPid() { return mPid;}
@@ -38,6 +39,7 @@ class ProjectConfig {
     CString mCode;
     CString mPlatform;
     CString mVersion;
+    list<CString> mCodeList;
     BOOL   mIsValidConfig;
     int    mVid;
     int    mPid;
