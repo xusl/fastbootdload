@@ -3,7 +3,11 @@
 #include "log.h"
 #include "CMiniHttpDownloadServer.h"
 
-CMiniHttpDownloadServer::CMiniHttpDownloadServer() {
+CMiniHttpDownloadServer::CMiniHttpDownloadServer(AppConfig *appConfig, u_short port):
+    m_ServerWork (FALSE),
+    m_ServerPort(port),
+    mAppConfig(appConfig)
+{
     ;
 }
 
@@ -48,9 +52,9 @@ void CMiniHttpDownloadServer::HandleServerException(CString msg, SOCKET sockConn
       LOGE("Invalid Argument to asctime_s.");
    }
 
-  //  time_t curtime = time(NULL);
-  //strftime(buf, buf_len, "%a, %d %b %Y %H:%M:%S GMT", gmtime_s(&curtime));
-
+ // time_t curtime = time(NULL);
+//  strftime(buf, buf_len, "%a, %d %b %Y %H:%M:%S GMT", gmtime_s(&curtime));
+  strftime(buf, buf_len, "%a, %d %b %Y %H:%M:%S GMT", &newtime);
   //CString date = CTime::GetCurrentTime().Format(_T("%a, %d %b %Y %H:%M:%S GMT"));
 }
 
@@ -95,7 +99,7 @@ char const* CMiniHttpDownloadServer::BuildHttpServerResponse(const char *path, s
     int len = header.size();
 
     fread(content + len, 1, (size_t)nLen, pF);
-    content[length]='\0';
+    content[length - 1]='\0';
     fclose(pF);
     //printf("Header length is %d\n", header.size());
     //printf("Header is \n%s\n", header.c_str());
@@ -103,8 +107,104 @@ char const* CMiniHttpDownloadServer::BuildHttpServerResponse(const char *path, s
     return content;
 }
 
-BOOL CMiniHttpDownloadServer::BuildUpdateCommand(CString file, CString &cmd) {
+
+char const* CMiniHttpDownloadServer::BuildHttpServerResponse(LPCWSTR fn, unsigned *_sz) {
+    HANDLE    file;
+    char *data = NULL;
+    char *content = NULL;
+    char temp[64]={0};
+    char date[64]={0};
+    DWORD file_size;
+    DWORD out_bytes;
+    *_sz = 0;
+
+    file = CreateFile(fn,
+                      GENERIC_READ,
+                      FILE_SHARE_READ,
+                      NULL,
+                      OPEN_EXISTING,
+                      0,
+                      NULL);
+
+    if (file == INVALID_HANDLE_VALUE) {
+        LOGE("load_file: file open failed (rc=%ld)\n", GetLastError());
+        return NULL;
+    }
+
+    file_size = GetFileSize( file, NULL );
+
+    if (file_size <= 0) {
+        LOGE("file empty or negative size %ld\n", file_size);
+        CloseHandle(file);
+        return NULL;
+    }
+
+    sprintf(temp, "%d", file_size);
+    gmt_time_string(date, sizeof(date));
+    string header= "HTTP/1.1 200 OK\r\n";
+    header.append("Content-Length: ").append(temp).append("\r\n");
+    header.append("Date: ").append(date).append("\r\n");
+    header.append("Content-Type: application/x-sam\r\n");
+    header.append("Accept-Ranges: bytes\r\n" );
+    header.append("\r\n");
+    size_t length=header.size() + (size_t)file_size + 1;
+
+    content= (char*) malloc(sizeof(char)*length);
+    if(!content) {
+        LOGE("Failed to allocate memory!");
+        CloseHandle(file);
+        return content;
+    }
+    memset(content, 0, length);
+    memcpy(content, header.c_str(), header.size());
+    content[length - 1]='\0';
+
+    data = content + header.size(); //(char*) malloc( file_size + 1 );
+
+    if (!ReadFile(file, data, file_size, &out_bytes, NULL) || out_bytes != file_size) {
+        int retry_failed = 0;
+
+        if (GetLastError() == ERROR_NO_SYSTEM_RESOURCES) {
+            /* Attempt to read file in 10MB chunks */
+            DWORD bytes_to_read = file_size;
+            DWORD bytes_read    = 0;
+            DWORD block_size    = 10*1024*1024;
+
+            SetFilePointer( file, 0, NULL, FILE_BEGIN );
+
+            while (bytes_to_read > 0) {
+                if (block_size > bytes_to_read) {
+                    block_size = bytes_to_read;
+                }
+
+                if (!ReadFile(file, data+bytes_read, block_size, &out_bytes, NULL) ||
+                        out_bytes != block_size) {
+                    retry_failed = 1;
+                    break;
+                }
+                bytes_read    += block_size;
+                bytes_to_read -= block_size;
+            }
+        } else {
+            retry_failed = 1;
+        }
+
+        if (retry_failed) {
+            LOGE("could not read %ld bytes from '%s'\n", file_size, fn);
+            free(content);
+            content = NULL;
+            file_size = 0;
+        }
+    }
+
+    CloseHandle(file);
+    *_sz = (unsigned) length;
+
+    return content;
+}
+
 #if 0
+BOOL CMiniHttpDownloadServer::BuildUpdateCommand(CString file, CString &cmd) {
     string Firmware_name=file.GetString();
     int tmp=Firmware_name.find_last_of("\\");
     Firmware_name=Firmware_name.substr(tmp+1,Firmware_name.length());
@@ -125,11 +225,10 @@ BOOL CMiniHttpDownloadServer::BuildUpdateCommand(CString file, CString &cmd) {
 
     cmd.Format("update update -u \"http://%s/%s/\" -f --no-cert-check --no-device-check\r\n\r\n",
                                 mHostIPAddr.c_str(), Firmware_name);
-#endif
+
     return TRUE;
 }
 
-#if 0
 void CDownloadDlg::OnSend_Comand(SOCKET sockClient, const char * cmd) {
     char s_SN[16]      = {0};
     char s_SSID[51]    = {0};
@@ -211,7 +310,80 @@ DWORD WINAPI CDownloadDlg::Thread_Server_Listen(LPVOID lpPARAM) {
 }
 #endif
 
-void CMiniHttpDownloadServer::server_listen(u_short port)
+
+void CMiniHttpDownloadServer::StartHttpServer(LPCWSTR path) {
+    SOCKET sockConn = INVALID_SOCKET;
+    SOCKET sockSrv  = INVALID_SOCKET;
+    SOCKADDR_IN  addrClient;
+    SOCKADDR_IN addrSrv;
+    CString msg;
+    size_t length = 0;
+    int code;
+
+    sockSrv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sockSrv == INVALID_SOCKET) {
+        HandleServerException(_T("Create server socket failed!"), sockConn, sockSrv, NULL);
+        return ;
+    }
+
+    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+    addrSrv.sin_family = AF_INET;
+    addrSrv.sin_port = htons(m_ServerPort);
+
+    if (bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR)) == SOCKET_ERROR) {
+        msg.Format(_T("Bind socket port %d failed!"), m_ServerPort);
+        HandleServerException(msg, sockConn, sockSrv, NULL);
+        return ;
+    }
+
+    msg.Format(_T("bind socket success on port :%d"), m_ServerPort);
+    UpdateMessage(msg);
+    if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
+        HandleServerException(_T("server listen failed!"), sockConn, sockSrv, NULL);
+        return ;
+    }
+
+    UpdateMessage(_T("Listening on socket..."));
+    m_ServerWork = TRUE;
+    while(m_ServerWork) {
+        unsigned long on = 1;
+        char const * content = NULL;
+        char recvBuf[101]={0};
+        int bytes = 0;
+        int sin_size = sizeof(struct sockaddr_in);
+
+        sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &sin_size);
+        UpdateMessage(_T("Send softwre ..., please wait..."));
+        ioctlsocket(sockConn, FIONBIO, &on);
+
+        do {
+            memset(recvBuf, 0, sizeof recvBuf);
+            bytes = recv(sockConn, recvBuf, sizeof(recvBuf) - 1, 0);
+        } while(bytes > 0);
+
+         content = BuildHttpServerResponse(path, &length);
+
+        if(content == NULL) {
+            UpdateMessage(_T("Open file failed!"));
+            return ;
+        }
+
+        if (send(sockConn, content , length , 0) == SOCKET_ERROR) {
+            HandleServerException(_T("Send software failed!"), sockConn, sockSrv, &content);
+            break;
+        }
+
+        do {
+            memset(recvBuf, 0, sizeof recvBuf);
+            bytes = recv(sockConn, recvBuf, sizeof(recvBuf) - 1, 0);
+        }while(bytes > 0);
+        HandleServerException(_T("Send softwre successfully!"), INVALID_SOCKET, INVALID_SOCKET, &content);
+    }
+    HandleServerException(_T("Server exist"), sockConn, sockSrv, NULL);
+}
+
+
+void CMiniHttpDownloadServer::server_listen(const char*path)
 {
     SOCKET sockConn = INVALID_SOCKET;
     SOCKET sockSrv  = INVALID_SOCKET;
@@ -225,7 +397,7 @@ void CMiniHttpDownloadServer::server_listen(u_short port)
 //    }
 
   // server_state=false;
-    char const * content = BuildHttpServerResponse("todofile", &length);
+    char const * content = BuildHttpServerResponse(path, &length);
 
     if(content == NULL) {
         UpdateMessage(_T("Open file failed!"));
@@ -237,17 +409,18 @@ void CMiniHttpDownloadServer::server_listen(u_short port)
         HandleServerException(_T("Create server socket failed!"), sockConn, sockSrv, &content);
         return ;
     }
+
     SOCKADDR_IN addrSrv;
     addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
     addrSrv.sin_family = AF_INET;
-    addrSrv.sin_port = htons(port);
+    addrSrv.sin_port = htons(m_ServerPort);
     iResult = bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
     if (iResult == SOCKET_ERROR) {
-        msg.Format(_T("Bind socket port %d failed!"), port);
+        msg.Format(_T("Bind socket port %d failed!"), m_ServerPort);
         HandleServerException(msg, sockConn, sockSrv, &content);
         return ;
     }
-    msg.Format(_T("bind socket success on port :%d"), port);
+    msg.Format(_T("bind socket success on port :%d"), m_ServerPort);
     UpdateMessage(msg);
     if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
         HandleServerException(_T("server listen failed!"), sockConn, sockSrv, &content);
@@ -256,7 +429,7 @@ void CMiniHttpDownloadServer::server_listen(u_short port)
 
     UpdateMessage(_T("Listening on socket..."));
     SOCKADDR_IN  addrClient;
-    while(true) {
+    while(m_ServerWork) {
         unsigned long on = 1;
         char recvBuf[101]={0};
 
@@ -284,8 +457,8 @@ void CMiniHttpDownloadServer::server_listen(u_short port)
         }while(bytes > 0);
         UpdateMessage(_T("Send softwre successfully!"));
 
-        closesocket(sockConn);
-        sockConn = INVALID_SOCKET;
+        //closesocket(sockConn);
+        //sockConn = INVALID_SOCKET;
     }
     HandleServerException(_T("Server exist"), sockConn, sockSrv, &content);
 }

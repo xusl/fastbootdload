@@ -7,6 +7,7 @@
 #include <XmlParser.h>
 #include <ConfigIni.h>
 #include "adb_dev_register.h"
+#include "CMiniHttpDownloadServer.h"
 
 using namespace std;
 
@@ -182,6 +183,8 @@ class PSTManager {
 public:
   PSTManager(AFX_THREADPROC pfnThreadProc);
   ~PSTManager();
+
+ public:
   BOOL Initialize(CWnd *hWnd, BOOL showPort=TRUE);
   VOID SetWork(BOOL work, BOOL schedule=TRUE);
   BOOL IsWork() { return m_bWork; }
@@ -219,6 +222,12 @@ public:
   void GetPackageHistory(list<CString> &history) {
     return mAppConf.GetPackageHistory(history);
   }
+
+  VOID StartHttpServer();
+
+private:
+    static UINT RunDevicePST(LPVOID wParam);
+    static UINT RunHttpServer(LPVOID wParam);
 
 private:
   int               m_GridHeight;

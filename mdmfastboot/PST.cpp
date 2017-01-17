@@ -13,8 +13,12 @@
 #include "PST.h"
 
 #include "PortStateUI.h"
-
 #include <ImgUnpack.h>
+#include "fastbootflash.h"
+#include "adbhost.h"
+#include "usb_vendors.h"
+#include "DiagPST.h"
+#include "AdbPST.h"
 
 PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
     mThreadProc(pfnThreadProc),
@@ -287,7 +291,10 @@ BOOL PSTManager::ScheduleDeviceWork() {
             }
 
             if (mAppConf.GetPortDevFixedFlag() == FALSE || item == NULL || item->Match(idleDev)) {
-                workdata->Start(idleDev, mThreadProc, mAppConf.GetPSTWorkTimeout(), flashdirect);
+                workdata->Start(idleDev,
+                    mThreadProc != NULL ? mThreadProc : RunDevicePST,
+                    mAppConf.GetPSTWorkTimeout(),
+                    flashdirect);
                 break;
             }
         }
@@ -513,6 +520,140 @@ BOOL PSTManager::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPA
 
     return TRUE;
 }
+
+
+VOID PSTManager::StartHttpServer() {
+  AfxBeginThread(RunHttpServer, this);
+}
+
+UINT PSTManager::RunHttpServer(LPVOID wParam) {
+  PSTManager *manager = (PSTManager*)wParam;
+  ASSERT(manager);
+  CMiniHttpDownloadServer httpServer(manager->GetAppConfig());
+//  httpServer.server_listen("F:\\MoveTime\\gerrit-push.py");
+  httpServer.StartHttpServer(_T("F:\\MoveTime\\gerrit-push.py"));
+    return 0;
+}
+
+/*
+* update flow is done here. Do update business logically.
+*/
+UINT PSTManager::RunDevicePST(LPVOID wParam) {
+    UsbWorkData* data = (UsbWorkData*)wParam;
+    usb_handle * handle;
+    flash_image  *img;
+    DeviceInterfaces *dev;
+    int result;
+    usb_dev_t status;
+    BOOL useAdb = TRUE;
+    BOOL flashdirect = TRUE;
+    AppConfig      *config;
+
+    if (data == NULL ||  !data->CheckValid()) {
+        data->SetInfo(FLASH_DONE, "Bad parameter");
+        return -1;
+    }
+
+    dev = data->mActiveDevIntf;
+    img = data->mProjectPackage;
+    config = data->mPAppConf;
+    status = dev->GetDeviceStatus();
+    useAdb = config->IsUseAdb();
+    flashdirect = config->GetFlashDirectFlag();
+
+    data->SetInfo(TITLE, dev->GetDevTag());
+    if (status == DEVICE_PLUGIN) {
+        DiagPST pst(data, img->GetFileBuffer());
+        data->SetInfo(PROMPT_TITLE, "Begin download by Diag");
+        bool result = pst.DownloadCheck();
+        if(result)
+            result = pst.RunTimeDiag();
+
+        if(result || pst.IsEmergencyDownloadMode()) {
+            if (!pst.IsEmergencyDownloadMode() && useAdb) {
+                int count = 0;
+                do {
+                    if (count != 0)
+                        SLEEP(3000);
+                    data->UpdateUsbHandle(FALSE, flashdirect);
+                }while(data->usb == NULL && count++ < 5);
+            }
+            /*
+            * If device enter TPST status, we does not find adb device.
+            */
+            if (!pst.IsEmergencyDownloadMode() && useAdb && data->usb != NULL) {
+                    AdbPST adbPST(config->GetForceUpdateFlag(), MODULE_M850);
+                    adbPST.Reboot(data, dev);
+                //} else {
+                //    result = FALSE;
+                //    LOGE("There are no adb device when use adb reboot");
+                //}
+            } else {
+                result = pst.DownloadPrg(data->mPAppConf);
+                if(result) {
+                    result = pst.DownloadImages(img);
+                }
+            }
+        } else {
+            LOGE("download check failed");
+        }
+        if(result) {
+            dev->SetDeviceStatus(DEVICE_FLASH);
+            data->SetInfo(REBOOT_DEVICE, "Enter fastboot");
+            data->WaitForDevSwitchEvt();
+        } else {
+            data->SetInfo(FLASH_DONE, "Diag PST occur error! Please check log");
+            return 0;
+        }
+
+    }
+
+    handle = data->usb;
+    status = dev->GetDeviceStatus();
+    if (handle == NULL) {
+        data->SetInfo(FLASH_DONE, "Bad parameter");
+        return -1;
+    }
+
+    if (status == DEVICE_CHECK) {
+ //       AdbPST pst(data->mPAppConf->GetForceUpdateFlag(), m_module_name);
+//        pst.DoPST(data, img, dev);
+
+    } else if (status == DEVICE_FLASH) {
+        fastboot fb(handle);
+        FlashImageInfo const * image;
+        data->SetInfo(PROMPT_TITLE, "fastboot download");
+
+        fb.fb_queue_display("product","product");
+        fb.fb_queue_display("version","version");
+        fb.fb_queue_display("serialno","serialno");
+        fb.fb_queue_display("kernel","kernel");
+#if 0
+        //this is check new image version and firmware version by adb
+        for (int index = 0; index < data->partition_nr; index++) {
+            image = data->flash_partition[index];
+            if (image->need_download) {
+                fb.fb_queue_flash(image->partition_str, image->data, image->size);
+            }
+        }
+#endif
+        image = img->image_enum_init();
+        for(;image != NULL ; ) {
+            if (image->need_download) {
+                fb.fb_queue_flash(image->partition_str, image->data, image->size);
+            }
+            image = img->image_enum_next(image);
+        }
+
+        //  fb.fb_queue_reboot();
+        fb.fb_execute_queue(handle, data, img->GetDiagDlImgSize());
+        data->SetInfo(FLASH_DONE, NULL);
+        dev->SetDeviceStatus(DEVICE_REMOVED);
+    }
+    return 0;
+}
+
+
 
 UsbWorkData::UsbWorkData(int index, CWnd* dlg,
     AppConfig *appConf, flash_image* package) {

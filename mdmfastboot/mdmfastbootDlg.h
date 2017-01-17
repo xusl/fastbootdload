@@ -102,9 +102,6 @@ public:
 	afx_msg void OnClose();
 	afx_msg void OnDestroy();
 
-public:
-    static UINT RunDevicePST(LPVOID wParam);
-
 private:
 #ifdef INLINE_SETTING
     BOOL InitSettingDlg(void);
