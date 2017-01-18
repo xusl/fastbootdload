@@ -15,7 +15,7 @@ class ProjectConfig {
   public:
     ProjectConfig(CString configFile = _T("\\."));
     ~ProjectConfig();
-    BOOL  ReadConfig();
+    BOOL  ReadConfig(list<CString> &codes);
 
     VOID SetProjectCode(CString code) { mCode = code;}
     VOID SetPlatform(CString platform) { mPlatform = platform; }
@@ -29,7 +29,6 @@ class ProjectConfig {
     CString GetProjectCode() { return mCode; }
     CString GetPlatform() { return mPlatform; }
     CString GetVersion() { return mVersion; }
-    VOID GetProjectCodes(list<CString> &codes) { codes = mCodeList;}
     BOOL  GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency);
     int   GetVid() { return mVid; }
     int   GetPid() { return mPid;}
@@ -39,7 +38,6 @@ class ProjectConfig {
     CString mCode;
     CString mPlatform;
     CString mVersion;
-    list<CString> mCodeList;
     BOOL   mIsValidConfig;
     int    mVid;
     int    mPid;
@@ -50,8 +48,8 @@ public:
     AppConfig();
     ~AppConfig();
     BOOL         ReadConfigIni(const wchar_t * ini = L"mdmconfig.ini");
-    const wchar_t *GetUpdateImgPkgDir(void) { return pkg_dir;};
     const wchar_t *GetAppConfIniPath(void) { return m_ConfigPath.GetString();};
+    const wchar_t *GetPkgDir(void) { return pkg_dir;};
     const wchar_t *GetPkgDlImgPath(void) {return pkg_dlimg_file;};
     const wchar_t *GetPkgConfXmlPath(void) {return pkg_conf_file;};
     const wchar_t *GetPkgQcnPath(void) {return pkg_qcn_file;};

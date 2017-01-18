@@ -282,9 +282,8 @@ void AppConfig::ParseProjectConfig(CString &configFile) {
     list<CString> codes;
     list<CString>::iterator it;
 
-    if (!projectConfig.ReadConfig())
+    if (!projectConfig.ReadConfig(codes))
         return;
-    projectConfig.GetProjectCodes(codes);
 
     for (it = codes.begin(); it != codes.end(); ++it) {
         projectConfig.SetProjectCode(*it);
@@ -324,7 +323,7 @@ ProjectConfig::ProjectConfig(CString configFile):
 {
 }
 
-BOOL ProjectConfig::ReadConfig() {
+BOOL ProjectConfig::ReadConfig(list<CString> &codes) {
      WCHAR     buffer[MAX_PATH] = {0};
      int data_len;
      PCTSTR configFile = mProjectConfigPath.GetString();
@@ -353,11 +352,11 @@ BOOL ProjectConfig::ReadConfig() {
   while (token != NULL)
   {
     //wprintf (L"%ls\n",token);
-    mCodeList.push_back(CString(token));
+    codes.push_back(CString(token));
     token = wcstok_s (NULL, CODE_DELIMINATE, &state);
   }
 
-     mCode = mCodeList.front();//buffer;
+     mCode = codes.front();//buffer;
 
      memset(buffer, 0, sizeof buffer);
      data_len = GetPrivateProfileString(PROJECT_SECTION,

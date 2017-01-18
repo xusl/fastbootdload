@@ -58,55 +58,43 @@ void CMiniHttpDownloadServer::HandleServerException(CString msg, SOCKET sockConn
   //CString date = CTime::GetCurrentTime().Format(_T("%a, %d %b %Y %H:%M:%S GMT"));
 }
 
-char const* CMiniHttpDownloadServer::BuildHttpServerResponse(const char *path, size_t  *contentLength) {
-    char* content = NULL;
-    __int64  nLen = 0;
+BOOL CMiniHttpDownloadServer::FindFile(CString fileName, CString &filePath)
+{
+    BOOL             found = FALSE;
+    HANDLE           hFind;
+    WIN32_FIND_DATA  FindData;
+    wchar_t          szFileSpec [_MAX_PATH + 5];
+    const wchar_t    *szDirectory = mAppConfig->GetPkgDir();
 
-    if (path == NULL || contentLength == NULL) {
-        UpdateMessage(_T("Bad parameter of BuildHttpServerResponse"));
-        return content;
+    szFileSpec [_MAX_PATH - 1] = 0;
+    lstrcpyn (szFileSpec, szDirectory, _MAX_PATH);
+//    lstrcat (szFileSpec, "\\*.*");
+    lstrcat (szFileSpec, _T("\\*\\"));
+    lstrcat (szFileSpec, fileName);
+    hFind = FindFirstFile (szFileSpec, &FindData);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        LOGE("scan dir initialize failed");
+        return FALSE;
     }
-    *contentLength = 0;
 
-    FILE *pF = fopen(path, "rb" );
-    if(pF==NULL) {
-        //perror(file_name);
-        UpdateMessage(_T("Open file failed!"));
-        return content;
-    }
-    _fseeki64(pF, 0, SEEK_END);
-    nLen = _ftelli64(pF);
+    do {
+        // display only files, skip directories
+        if (FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue;
+        LOGD("Find file %S", FindData.cFileName);
+        if (fileName != FindData.cFileName )
+            continue;
+        filePath = szDirectory;
+        filePath += _T("\\");
+        filePath += FindData.cFileName;
+        found = TRUE;
+        break;
+    }while (FindNextFile (hFind, & FindData));
 
-    char temp[64]={0};
-    char date[64]={0};
-    sprintf(temp, "%I64d", nLen);
-    gmt_time_string(date, sizeof(date));
-    string header= "HTTP/1.1 200 OK\r\n";
-    header.append("Content-Length: ").append(temp).append("\r\n");
-    header.append("Date: ").append(date).append("\r\n");
-    header.append("Content-Type: application/x-sam\r\n");
-    header.append("Accept-Ranges: bytes\r\n" );
-    header.append("\r\n");
-    size_t length=header.size() + (size_t)nLen + 1;
-    rewind(pF);
-    content= (char*) malloc(sizeof(char)*length);
-    if(!content) {
-        UpdateMessage(_T("Failed to allocate memory!"));
-        return content;
-    }
-    memset(content, 0, length);
-    memcpy(content, header.c_str(), header.size());
-    int len = header.size();
+    FindClose (hFind);
 
-    fread(content + len, 1, (size_t)nLen, pF);
-    content[length - 1]='\0';
-    fclose(pF);
-    //printf("Header length is %d\n", header.size());
-    //printf("Header is \n%s\n", header.c_str());
-    *contentLength = length;
-    return content;
+    return found;
 }
-
 
 char const* CMiniHttpDownloadServer::BuildHttpServerResponse(LPCWSTR fn, unsigned *_sz) {
     HANDLE    file;
@@ -203,7 +191,211 @@ char const* CMiniHttpDownloadServer::BuildHttpServerResponse(LPCWSTR fn, unsigne
     return content;
 }
 
+
+void CMiniHttpDownloadServer::StartHttpServer(LPCWSTR path) {
+    SOCKET sockConn = INVALID_SOCKET;
+    SOCKET sockSrv  = INVALID_SOCKET;
+    SOCKADDR_IN  addrClient;
+    SOCKADDR_IN addrSrv;
+    CString msg;
+    size_t length = 0;
+    int code;
+
+    sockSrv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sockSrv == INVALID_SOCKET) {
+        HandleServerException(_T("Create server socket failed!"), sockConn, sockSrv, NULL);
+        return ;
+    }
+
+    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+    addrSrv.sin_family = AF_INET;
+    addrSrv.sin_port = htons(m_ServerPort);
+
+    if (bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR)) == SOCKET_ERROR) {
+        msg.Format(_T("Bind socket port %d failed!"), m_ServerPort);
+        HandleServerException(msg, sockConn, sockSrv, NULL);
+        return ;
+    }
+
+    msg.Format(_T("bind socket success on port :%d"), m_ServerPort);
+    UpdateMessage(msg);
+    if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
+        HandleServerException(_T("server listen failed!"), sockConn, sockSrv, NULL);
+        return ;
+    }
+
+    UpdateMessage(_T("Listening on socket..."));
+    m_ServerWork = TRUE;
+    while(m_ServerWork) {
+        unsigned long on = 1;
+        char const * content = NULL;
+        char recvBuf[101]={0};
+        int bytes = 0;
+        int sin_size = sizeof(struct sockaddr_in);
+
+        sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &sin_size);
+        UpdateMessage(_T("Send softwre ..., please wait..."));
+        ioctlsocket(sockConn, FIONBIO, &on);
+
+        do {
+            memset(recvBuf, 0, sizeof recvBuf);
+            bytes = recv(sockConn, recvBuf, sizeof(recvBuf) - 1, 0);
+        } while(bytes > 0);
+
+        LOGE("RECV:\n %s", recvBuf);
+
+         content = BuildHttpServerResponse(path, &length);
+
+        if(content == NULL) {
+            UpdateMessage(_T("Open file failed!"));
+            break;
+        }
+
+        if (send(sockConn, content , length , 0) == SOCKET_ERROR) {
+            HandleServerException(_T("Send software failed!"), sockConn, sockSrv, &content);
+            break;
+        }
+
+        do {
+            memset(recvBuf, 0, sizeof recvBuf);
+            bytes = recv(sockConn, recvBuf, sizeof(recvBuf) - 1, 0);
+        }while(bytes > 0);
+        HandleServerException(_T("Send softwre successfully!"), INVALID_SOCKET, INVALID_SOCKET, &content);
+    }
+    HandleServerException(_T("Server exist"), sockConn, sockSrv, NULL);
+}
+
 #if 0
+void CMiniHttpDownloadServer::server_listen(const char*path)
+{
+    SOCKET sockConn = INVALID_SOCKET;
+    SOCKET sockSrv  = INVALID_SOCKET;
+    CString msg;
+    size_t length = 0;
+    __int64 iResult;
+
+//    if (mWSAInitialized == FALSE) {
+//        UpdateMessage(_T("Server Startup failed!"));
+//        return ;
+//    }
+
+  // server_state=false;
+    char const * content = BuildHttpServerResponse(path, &length);
+
+    if(content == NULL) {
+        UpdateMessage(_T("Open file failed!"));
+        return ;
+    }
+
+    sockSrv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sockSrv == INVALID_SOCKET) {
+        HandleServerException(_T("Create server socket failed!"), sockConn, sockSrv, &content);
+        return ;
+    }
+
+    SOCKADDR_IN addrSrv;
+    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+    addrSrv.sin_family = AF_INET;
+    addrSrv.sin_port = htons(m_ServerPort);
+    iResult = bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
+    if (iResult == SOCKET_ERROR) {
+        msg.Format(_T("Bind socket port %d failed!"), m_ServerPort);
+        HandleServerException(msg, sockConn, sockSrv, &content);
+        return ;
+    }
+    msg.Format(_T("bind socket success on port :%d"), m_ServerPort);
+    UpdateMessage(msg);
+    if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
+        HandleServerException(_T("server listen failed!"), sockConn, sockSrv, &content);
+        return ;
+    }
+
+    UpdateMessage(_T("Listening on socket..."));
+    SOCKADDR_IN  addrClient;
+    while(m_ServerWork) {
+        unsigned long on = 1;
+        char recvBuf[101]={0};
+
+        int sin_size = sizeof(struct sockaddr_in);
+        sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &sin_size);
+        UpdateMessage(_T("Send softwre ..., please wait..."));
+        ioctlsocket(sockConn, FIONBIO, &on);
+
+        int bytes = 0;
+        do {
+            memset(recvBuf, 0, 101);
+            bytes = recv(sockConn, recvBuf, 100, 0);
+        } while(bytes > 0);
+
+        iResult = send(sockConn, content , length , 0);
+
+        if (iResult == SOCKET_ERROR) {
+            HandleServerException(_T("Send software failed!"), sockConn, sockSrv, &content);
+            break;
+        }
+
+        do {
+            memset(recvBuf, 0, 101);
+            bytes = recv(sockConn, recvBuf, 100, 0);
+        }while(bytes > 0);
+        UpdateMessage(_T("Send softwre successfully!"));
+
+        //closesocket(sockConn);
+        //sockConn = INVALID_SOCKET;
+    }
+    HandleServerException(_T("Server exist"), sockConn, sockSrv, &content);
+}
+
+
+char const* CMiniHttpDownloadServer::BuildHttpServerResponse(const char *path, size_t  *contentLength) {
+    char* content = NULL;
+    __int64  nLen = 0;
+
+    if (path == NULL || contentLength == NULL) {
+        UpdateMessage(_T("Bad parameter of BuildHttpServerResponse"));
+        return content;
+    }
+    *contentLength = 0;
+
+    FILE *pF = fopen(path, "rb" );
+    if(pF==NULL) {
+        //perror(file_name);
+        UpdateMessage(_T("Open file failed!"));
+        return content;
+    }
+    _fseeki64(pF, 0, SEEK_END);
+    nLen = _ftelli64(pF);
+
+    char temp[64]={0};
+    char date[64]={0};
+    sprintf(temp, "%I64d", nLen);
+    gmt_time_string(date, sizeof(date));
+    string header= "HTTP/1.1 200 OK\r\n";
+    header.append("Content-Length: ").append(temp).append("\r\n");
+    header.append("Date: ").append(date).append("\r\n");
+    header.append("Content-Type: application/x-sam\r\n");
+    header.append("Accept-Ranges: bytes\r\n" );
+    header.append("\r\n");
+    size_t length=header.size() + (size_t)nLen + 1;
+    rewind(pF);
+    content= (char*) malloc(sizeof(char)*length);
+    if(!content) {
+        UpdateMessage(_T("Failed to allocate memory!"));
+        return content;
+    }
+    memset(content, 0, length);
+    memcpy(content, header.c_str(), header.size());
+    int len = header.size();
+
+    fread(content + len, 1, (size_t)nLen, pF);
+    content[length - 1]='\0';
+    fclose(pF);
+    //printf("Header length is %d\n", header.size());
+    //printf("Header is \n%s\n", header.c_str());
+    *contentLength = length;
+    return content;
+}
+
 BOOL CMiniHttpDownloadServer::BuildUpdateCommand(CString file, CString &cmd) {
     string Firmware_name=file.GetString();
     int tmp=Firmware_name.find_last_of("\\");
@@ -310,155 +502,3 @@ DWORD WINAPI CDownloadDlg::Thread_Server_Listen(LPVOID lpPARAM) {
 }
 #endif
 
-
-void CMiniHttpDownloadServer::StartHttpServer(LPCWSTR path) {
-    SOCKET sockConn = INVALID_SOCKET;
-    SOCKET sockSrv  = INVALID_SOCKET;
-    SOCKADDR_IN  addrClient;
-    SOCKADDR_IN addrSrv;
-    CString msg;
-    size_t length = 0;
-    int code;
-
-    sockSrv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sockSrv == INVALID_SOCKET) {
-        HandleServerException(_T("Create server socket failed!"), sockConn, sockSrv, NULL);
-        return ;
-    }
-
-    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-    addrSrv.sin_family = AF_INET;
-    addrSrv.sin_port = htons(m_ServerPort);
-
-    if (bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR)) == SOCKET_ERROR) {
-        msg.Format(_T("Bind socket port %d failed!"), m_ServerPort);
-        HandleServerException(msg, sockConn, sockSrv, NULL);
-        return ;
-    }
-
-    msg.Format(_T("bind socket success on port :%d"), m_ServerPort);
-    UpdateMessage(msg);
-    if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
-        HandleServerException(_T("server listen failed!"), sockConn, sockSrv, NULL);
-        return ;
-    }
-
-    UpdateMessage(_T("Listening on socket..."));
-    m_ServerWork = TRUE;
-    while(m_ServerWork) {
-        unsigned long on = 1;
-        char const * content = NULL;
-        char recvBuf[101]={0};
-        int bytes = 0;
-        int sin_size = sizeof(struct sockaddr_in);
-
-        sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &sin_size);
-        UpdateMessage(_T("Send softwre ..., please wait..."));
-        ioctlsocket(sockConn, FIONBIO, &on);
-
-        do {
-            memset(recvBuf, 0, sizeof recvBuf);
-            bytes = recv(sockConn, recvBuf, sizeof(recvBuf) - 1, 0);
-        } while(bytes > 0);
-
-         content = BuildHttpServerResponse(path, &length);
-
-        if(content == NULL) {
-            UpdateMessage(_T("Open file failed!"));
-            return ;
-        }
-
-        if (send(sockConn, content , length , 0) == SOCKET_ERROR) {
-            HandleServerException(_T("Send software failed!"), sockConn, sockSrv, &content);
-            break;
-        }
-
-        do {
-            memset(recvBuf, 0, sizeof recvBuf);
-            bytes = recv(sockConn, recvBuf, sizeof(recvBuf) - 1, 0);
-        }while(bytes > 0);
-        HandleServerException(_T("Send softwre successfully!"), INVALID_SOCKET, INVALID_SOCKET, &content);
-    }
-    HandleServerException(_T("Server exist"), sockConn, sockSrv, NULL);
-}
-
-
-void CMiniHttpDownloadServer::server_listen(const char*path)
-{
-    SOCKET sockConn = INVALID_SOCKET;
-    SOCKET sockSrv  = INVALID_SOCKET;
-    CString msg;
-    size_t length = 0;
-    __int64 iResult;
-
-//    if (mWSAInitialized == FALSE) {
-//        UpdateMessage(_T("Server Startup failed!"));
-//        return ;
-//    }
-
-  // server_state=false;
-    char const * content = BuildHttpServerResponse(path, &length);
-
-    if(content == NULL) {
-        UpdateMessage(_T("Open file failed!"));
-        return ;
-    }
-
-    sockSrv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sockSrv == INVALID_SOCKET) {
-        HandleServerException(_T("Create server socket failed!"), sockConn, sockSrv, &content);
-        return ;
-    }
-
-    SOCKADDR_IN addrSrv;
-    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-    addrSrv.sin_family = AF_INET;
-    addrSrv.sin_port = htons(m_ServerPort);
-    iResult = bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
-    if (iResult == SOCKET_ERROR) {
-        msg.Format(_T("Bind socket port %d failed!"), m_ServerPort);
-        HandleServerException(msg, sockConn, sockSrv, &content);
-        return ;
-    }
-    msg.Format(_T("bind socket success on port :%d"), m_ServerPort);
-    UpdateMessage(msg);
-    if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
-        HandleServerException(_T("server listen failed!"), sockConn, sockSrv, &content);
-        return ;
-    }
-
-    UpdateMessage(_T("Listening on socket..."));
-    SOCKADDR_IN  addrClient;
-    while(m_ServerWork) {
-        unsigned long on = 1;
-        char recvBuf[101]={0};
-
-        int sin_size = sizeof(struct sockaddr_in);
-        sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &sin_size);
-        UpdateMessage(_T("Send softwre ..., please wait..."));
-        ioctlsocket(sockConn, FIONBIO, &on);
-
-        int bytes = 0;
-        do {
-            memset(recvBuf, 0, 101);
-            bytes = recv(sockConn, recvBuf, 100, 0);
-        } while(bytes > 0);
-
-        iResult = send(sockConn, content , length , 0);
-
-        if (iResult == SOCKET_ERROR) {
-            HandleServerException(_T("Send software failed!"), sockConn, sockSrv, &content);
-            break;
-        }
-
-        do {
-            memset(recvBuf, 0, 101);
-            bytes = recv(sockConn, recvBuf, 100, 0);
-        }while(bytes > 0);
-        UpdateMessage(_T("Send softwre successfully!"));
-
-        //closesocket(sockConn);
-        //sockConn = INVALID_SOCKET;
-    }
-    HandleServerException(_T("Server exist"), sockConn, sockSrv, &content);
-}

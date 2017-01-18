@@ -217,7 +217,7 @@ public:
   AppConfig* GetAppConfig() { return &mAppConf;}
   flash_image* GetProjectPackage() { return m_image;}
   BOOL ChangePackage(const wchar_t * dir);
-  const wchar_t * GetPackage() { return mAppConf.GetUpdateImgPkgDir();}
+  const wchar_t * GetPackage() { return mAppConf.GetPkgDir();}
   BOOL SetDownload(CString partition, bool bDownload) {
     return m_image->set_download_flag(partition, bDownload);
   }
@@ -231,6 +231,7 @@ public:
 private:
     static UINT RunDevicePST(LPVOID wParam);
     static UINT RunHttpServer(LPVOID wParam);
+    static UINT RunTelnetServer(LPVOID wParam);
 
 private:
   int               m_GridHeight;

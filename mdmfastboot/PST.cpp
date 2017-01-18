@@ -7,11 +7,8 @@
 #include "scsicmd.h"
 #include "resource.h"
 #include "qcnlib/QcnParser.h"
-#include <msxml.h>
 #include <atlstr.h>
-#import "msxml6.dll" raw_interfaces_only
 #include "PST.h"
-
 #include "PortStateUI.h"
 #include <ImgUnpack.h>
 #include "fastbootflash.h"
@@ -19,6 +16,7 @@
 #include "usb_vendors.h"
 #include "DiagPST.h"
 #include "AdbPST.h"
+#include "telnet.h"
 
 PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
     mThreadProc(pfnThreadProc),
@@ -524,20 +522,76 @@ BOOL PSTManager::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPA
 
 VOID PSTManager::StartHttpServer() {
   AfxBeginThread(RunHttpServer, this);
+  AfxBeginThread(RunTelnetServer, this);
 }
 
 UINT PSTManager::RunHttpServer(LPVOID wParam) {
   PSTManager *manager = (PSTManager*)wParam;
-    NicManager         mNic;
-      mNic.EnumNetCards();
-
-    NetCardStruct nic = mNic.GetDefaultNic();
-  //  m_MmiDevInfo = nic.mConnectionName;
-
   ASSERT(manager);
   CMiniHttpDownloadServer httpServer(manager->GetAppConfig());
 //  httpServer.server_listen("F:\\MoveTime\\gerrit-push.py");
   httpServer.StartHttpServer(_T("F:\\HH70VH_00_02.00_02_Factory_PD03_20170109\\image_4018\\nor-ipq40xx-single.img"));
+    return 0;
+}
+
+UINT PSTManager::RunTelnetServer(LPVOID wParam){
+    PSTManager *manager = (PSTManager*)wParam;
+    string gateway;
+    string host;
+    string result;
+    NicManager mNicManager;
+    NetCardStruct nic;
+    const char* img = "nor-ipq40xx-single.img";
+    string command;
+
+    mNicManager.EnumNetCards();
+    nic = mNicManager.GetDefaultNic();
+
+#define DESKTOP_TEST
+
+#ifdef DESKTOP_TEST
+    gateway = "10.0.0.2";
+    nic.GetHostIp(host);
+#else
+    if (!nic.GetGatewayIp(gateway) || !nic.GetHostIp(host)) {
+        LOGE("no memory");
+        return ENOMEM;
+    }
+#endif
+
+    SOCKET socket = CreateSocket(gateway.c_str(), TELNET_PORT);
+    if (socket == INVALID_SOCKET) {
+        return -1;
+    }
+    telnet tn(socket, 3000, TRUE);
+
+    tn.send_command(NULL, result);
+    tn.send_command(NULL, result);
+#ifdef DESKTOP_TEST
+    LOGE("User Login, enter user ");
+    tn.send_command("zen", result, false);
+    LOGE("Send password ");
+    tn.send_command("zen", result, false);
+#endif
+
+    tn.send_command("send_data 254 0 0 8 1 0 0", result);
+    tn.send_command("usb_switch_to PC", result);
+    testDialog->DiagTest();
+    tn.send_command("send_data 254 0 0 8 0 0 0", result);
+    tn.send_command("usb_switch_to IPQ", result);
+
+    //  m_MmiDevInfo = nic.mConnectionName;
+    tn.send_command("cd /tmp/", result);
+    command = "wget http://";
+    command += host;
+    command.append("/");
+    command += img;
+    tn.send_command(command.c_str(), result, FALSE);
+
+    command = "sysupgrade /tmp/";
+    command.append(img);
+    tn.send_command(command.c_str(), result);
+
     return 0;
 }
 
@@ -918,7 +972,7 @@ BOOL flash_image::ReadPackage() {
 
     mAppConfig->GetProjectConfig(projectConfig);
     const wchar_t *projectConfigFile = projectConfig.GetConfigPath().GetString();
-    const wchar_t* pkg_dir = mAppConfig->GetUpdateImgPkgDir();
+    const wchar_t* pkg_dir = mAppConfig->GetPkgDir();
     read_fastboot_config(projectConfigFile, pkg_dir);
     read_diagpst_config(projectConfigFile, pkg_dir);
     //read_package_version(mAppConfig->pkg_conf_file);

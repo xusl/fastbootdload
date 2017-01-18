@@ -7,6 +7,7 @@
 #include <cfgmgr32.h>
 #include <vector>
 #include <list>
+#include "utils.h"
 //#include "settings.h"
 
 using namespace std;
@@ -58,6 +59,25 @@ public:
     BOOL IsInvalid() {
       return (Id == -1);
     };
+
+    BOOL GetHostIp(string &hostIp) {
+      return CStringToString(mIPAddress, hostIp);
+    }
+
+    BOOL GetGatewayIp(string &gatewayIp) {
+      return CStringToString(mGateway, gatewayIp);
+    }
+
+private:
+  BOOL CStringToString(CString& source, string &sink) {
+      PCHAR buffer = WideStrToMultiStr(source.GetString());
+      if (buffer == NULL) {
+          return FALSE;
+      }
+      sink = buffer;
+      delete [] buffer;
+      return TRUE;
+    }
 };
 //typedef  NetCardStruct*  PNetCardStruct;
 

@@ -297,9 +297,9 @@ typedef enum
 #define DIAGPST_SECTION         L"pst_diag"
 #define PKG_SECTION             L"package"
 #define PKG_PATH                L"path"
-#define PST_NPRG                 L"pst_nprg"
+#define PST_NPRG                L"pst_nprg"
 #define PST_ENPRG               L"pst_enprg"
-
+#define OPENWRT_SECTION         _T("openwrt")
 
 /* SB Architecture 1.0 */
 #define PRGCOMBINE_NAME			"nandprgcombined.mbn"
