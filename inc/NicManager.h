@@ -67,17 +67,6 @@ public:
     BOOL GetGatewayIp(string &gatewayIp) {
       return CStringToString(mGateway, gatewayIp);
     }
-
-private:
-  BOOL CStringToString(CString& source, string &sink) {
-      PCHAR buffer = WideStrToMultiStr(source.GetString());
-      if (buffer == NULL) {
-          return FALSE;
-      }
-      sink = buffer;
-      delete [] buffer;
-      return TRUE;
-    }
 };
 //typedef  NetCardStruct*  PNetCardStruct;
 

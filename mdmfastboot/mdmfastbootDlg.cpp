@@ -84,7 +84,6 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_WM_QUERYDRAGICON()
 	ON_WM_DEVICECHANGE()
 	//}}AFX_MSG_MAP
-//	ON_BN_CLICKED(IDC_BTN_STOP, &CmdmfastbootDlg::OnBnClickedButtonStop)
 	ON_WM_SIZE()
 	ON_WM_TIMER()
 	ON_WM_GETMINMAXINFO()
@@ -152,7 +151,7 @@ BOOL CmdmfastbootDlg::UpdatePackageInfo(BOOL update) {
     pkgConfig = appConfig->GetPackageConfig();
 
     img = m_image->image_enum_init();
-    qcn = appConfig->GetPkgQcnPath();
+    qcn = pkgConfig->GetPkgQcnPath();
 
     m_UpdateDownloadFlag = update;
 
@@ -219,10 +218,8 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
         return FALSE;
     }
 
-    if (!bwork && mPSTManager.IsWork() && mPSTManager.IsHaveUsbWork()) {
-        int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
-                                 MB_YESNO|MB_DEFBUTTON2);
-        if (IDYES!=iRet)
+    if (!bwork && mPSTManager.IsWork()) {
+        if (!StopConfirm())
         {
             return FALSE;
         }
@@ -233,7 +230,7 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
     }
 
 	m_imglist->EnableWindow(!bwork);
-    GetDlgItem(IDC_BTN_START)->EnableWindow(!bwork);
+    GetDlgItem(IDC_BTN_START)->SetWindowText(bwork ? _T("Stop") : _T("Start"));
     GetDlgItem(IDCANCEL)->EnableWindow(!bwork);
 //    GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
 
@@ -630,16 +627,6 @@ BOOL CmdmfastbootDlg::SetupDevice(int evt) {
 
 void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
-  //Remove for overland window issue by zhanghao 20160112
-  /*
-  if (m_nPort > 1 && (800 > cx || 800 > cy))
-  {
-    return;
-  } else if (m_nPort == 1 && ( 500 > cx || 400 > cy)) {
-	  INFO("x=%s  ", "112299");
-    return;
-  }*/
-  //end to remove.
   CDialog::OnSize(nType, cx, cy);
   LayoutControl();
 }
@@ -680,6 +667,7 @@ VOID CmdmfastbootDlg::SetDialogSize() {
     rightHeight += buttonHeight;
   }
   cy += MAX(leftHeight, rightHeight);
+  cy += GetSystemMetrics(SM_CYMENU);
   cy += VERTICAL_GAP * 2;
   SetWindowPos(0, 0, 0, cx, cy, SWP_NOSENDCHANGING/* | SWP_NOSIZE*/);
   CenterWindow();
@@ -879,52 +867,51 @@ void CmdmfastbootDlg::OnBnClickedStart()
 		AfxMessageBox(L"Please select a valid package directory!", MB_OK);
 		return;
 	}
-	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_DISABLED|MF_GRAYED);
-	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_DISABLED|MF_GRAYED);
-	SetWorkStatus(TRUE, FALSE);
+    if (mPSTManager.IsWork()) {
+        if (StopConfirm()) {
+        	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_ENABLED);
+        	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_ENABLED);
+            SetWorkStatus(FALSE, FALSE);
+            mPSTManager.Reset();
+        }
+    } else {
+    	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_DISABLED|MF_GRAYED);
+    	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_DISABLED|MF_GRAYED);
+    	SetWorkStatus(TRUE, FALSE);
+    }
 
   //::PostMessage(m_hWnd, WM_CLOSE, 0, 0);
 }
 
-void CmdmfastbootDlg::OnBnClickedButtonStop()
+BOOL CmdmfastbootDlg::StopConfirm()
 {
-	GetMenu()->EnableMenuItem(ID_FILE_M850, MF_ENABLED);
-	GetMenu()->EnableMenuItem(ID_FILE_M801, MF_ENABLED);
-    SetWorkStatus(FALSE, FALSE);
-    mPSTManager.Reset();
+    if (mPSTManager.IsHaveUsbWork())
+    {
+        int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
+                        MB_YESNO|MB_DEFBUTTON2);
+        if (IDYES!= iRet)
+        {
+          return FALSE;
+        }
+    }
+    return TRUE;
 }
 
 void CmdmfastbootDlg::OnClose()
 {
   //CDialog::OnClose();
-
-  if (mPSTManager.IsHaveUsbWork())
+  if (StopConfirm())
   {
-    int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
-    MB_YESNO|MB_DEFBUTTON2);
-    if (IDYES!=iRet)
-    {
-      return;
-    }
+      OnCancel();
   }
-  OnCancel();
 }
 
 void CmdmfastbootDlg::OnBnClickedCancel()
 {
-  DWORD dwExitCode = 0;
-
-  if (mPSTManager.IsHaveUsbWork())
+  if (StopConfirm())
   {
-    int iRet = AfxMessageBox(L"Still have active downloading! Exit anyway?",
-                    MB_YESNO|MB_DEFBUTTON2);
-    if (IDYES!=iRet)
-    {
-      return;
-    }
+      OnCancel();
   }
-
-  OnCancel();
 }
 
 void CmdmfastbootDlg::OnDestroy()
@@ -965,25 +952,25 @@ CSettingsDlg settings ;
 
 
 void CmdmfastbootDlg::OnSizing(UINT fwSide, LPRECT pRect)
-	{
-	//CDialog::OnSizing(fwSide, pRect);
+{
+//CDialog::OnSizing(fwSide, pRect);
 
-	// TODO: 在此处添加消息处理程序代码
-	}
+// TODO: 在此处添加消息处理程序代码
+}
 
 void CmdmfastbootDlg::HtmlHelp(DWORD_PTR dwData, UINT nCmd)
-	{
-	// TODO: 在此添加专用代码和/或调用基类
+{
+// TODO: 在此添加专用代码和/或调用基类
 
-	CDialog::HtmlHelp(dwData, nCmd);
-	}
+CDialog::HtmlHelp(dwData, nCmd);
+}
 
 void CmdmfastbootDlg::OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct)
-	{
-	// TODO: 在此添加消息处理程序代码和/或调用默认值
+{
+// TODO: 在此添加消息处理程序代码和/或调用默认值
 
-	CDialog::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
-	}
+CDialog::OnMeasureItem(nIDCtl, lpMeasureItemStruct);
+}
 
 void CmdmfastbootDlg::OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult)
 {
@@ -1043,5 +1030,3 @@ void CmdmfastbootDlg::OnFileM801()
 //	InitSettingConfig();
 //	UpdatePackage();
 }
-
-

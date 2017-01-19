@@ -266,6 +266,7 @@ copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</C
     <ClCompile Include="..\src\jrdmmidiag.cpp" />
     <ClCompile Include="..\src\NicManager.cpp" />
     <ClCompile Include="..\src\pkt.cpp" />
+    <ClCompile Include="..\src\QcnParser.cpp" />
     <ClCompile Include="..\src\saharacmd.cpp" />
     <ClCompile Include="..\src\scsicmd.cpp" />
     <ClCompile Include="..\src\serialport.cpp" />
@@ -282,7 +283,6 @@ copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</C
     <ClCompile Include="PasswordEnterDlg.cpp" />
     <ClCompile Include="PortStateUI.cpp" />
     <ClCompile Include="PST.cpp" />
-    <ClCompile Include="qcnlib\QcnParser.cpp" />
     <ClCompile Include="SettingsDlg.cpp" />
     <ClCompile Include="..\src\CMiniHttpDownloadServer.cpp" />
     <ClCompile Include="stdafx.cpp">

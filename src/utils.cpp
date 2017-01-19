@@ -233,6 +233,20 @@ int CharToBSTR(PCCH inParam, BSTR *outParam){
     return retVal;
 }
 
+BOOL CStringToString(CString& source, string &sink) {
+#ifdef UNICODE
+  PCHAR buffer = WideStrToMultiStr(source.GetString());
+  if (buffer == NULL) {
+      return FALSE;
+  }
+  sink = buffer;
+  delete [] buffer;
+#else
+  sink = source.GetString();
+#endif
+  return TRUE;
+}
+
 /**************************************************************************/
 /**************************************************************************/
 /*****                                                                *****/
@@ -341,7 +355,7 @@ _init_winsock( void )
     }
 }
 
-SOCKET CreateSocket(const char *ip_addr,  u_short port) {
+SOCKET ConnectServer(const char *ip_addr,  u_short port) {
     SOCKET sockClient = INVALID_SOCKET;
     SOCKADDR_IN addrSrv;
     __int64 iResult;
@@ -358,7 +372,7 @@ SOCKET CreateSocket(const char *ip_addr,  u_short port) {
     //int timeout=50000;
     //iResult=setsockopt(sockClient,SOL_SOCKET,SO_RCVTIMEO,(const char*)&timeout,sizeof(int));
     //if(SOCKET_ERROR==iResult)
-    //return INVALID_SOCKET;
+    //    return INVALID_SOCKET;
 
     iResult = connect(sockClient, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
     if(iResult==SOCKET_ERROR) {

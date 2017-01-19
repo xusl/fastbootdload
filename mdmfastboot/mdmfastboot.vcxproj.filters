@@ -39,9 +39,6 @@
     <ClCompile Include="PortStateUI.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="qcnlib\QcnParser.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="SettingsDlg.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -127,6 +124,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="..\src\CMiniHttpDownloadServer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\QcnParser.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

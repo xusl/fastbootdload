@@ -50,16 +50,4 @@ private:
 //string refs;
 //m_LocalConfigXml.getElementsByTagName(L"RECOVERYFS", refs);
 //LOGE("RECOVERYFS value %sxxxxxxxxxxxxxxxxxxxxx", refs.c_str());
-class PackageConfig:  public XmlParser {
-  public:
-    PackageConfig();
-    ~PackageConfig();
-    CString GetProjectCode() { return CString(get_XML_Value("Project_Code").c_str());}
-    CString GetCURef() { return CString(get_XML_Value("CURef").c_str()); }
-    CString GetVersion() { return CString(get_XML_Value("External_Ver").c_str());}
-    CString GetCustomerCode() { return CString(get_XML_Value("Customer_Code").c_str());}
-    CString GetFlashType() { return CString(get_XML_Value("Flash_Code").c_str());}
 
- // private:
- //   virtual bool              ElementHandler(CString& name, CComBSTR &value);
-};

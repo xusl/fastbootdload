@@ -2,8 +2,8 @@
 #include "utils.h"
 #include "device.h"
 #include "resource.h"
-
 #include <ConfigIni.h>
+#include "QcnParser.h"
 
 #define PACKAGE_HISTORY_MAX 32
 #define PACKAGE_BUFFER_LEN ((PACKAGE_HISTORY_MAX) * (MAX_PATH))
@@ -23,9 +23,6 @@ AppConfig::AppConfig() :
         mProjectConfig(_T("\\."))
 {
    m_UseAdb = TRUE;
-   memset(pkg_conf_file, 0, sizeof pkg_conf_file);
-   memset(pkg_qcn_file, 0, sizeof pkg_qcn_file);
-   memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
 }
 
 BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
@@ -71,10 +68,6 @@ BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
 
   //layout setting.
   m_nPort = GetPrivateProfileInt(L"app", L"port_num",1,lpFileName);
-  if ( m_nPort < 1 )
-    m_nPort = 1;
-  else if (m_nPort > PORT_NUM_MAX)
-    m_nPort = PORT_NUM_MAX;
 
   if (m_pack_img) {
     m_forceupdate = TRUE; /*Now fw build system can not handle config.xml, so set it to true*/
@@ -191,30 +184,10 @@ void AppConfig::SetupPackageInformation() {
         data_len++;
       }
 
-
-  memset(pkg_conf_file, 0, sizeof pkg_conf_file);
-  wcsncpy_s(pkg_conf_file, pkg_dir, data_len+1);
-  wcsncat_s(pkg_conf_file, PKG_CONFIG_XML, COUNTOF(pkg_conf_file) - data_len);
-
-  memset(pkg_qcn_file, 0, sizeof pkg_qcn_file);
-  wcsncpy_s(pkg_qcn_file, pkg_dir, data_len+1);
-  wcsncat_s(pkg_qcn_file, PKG_STATIC_QCN, sizeof(pkg_qcn_file) / sizeof(pkg_qcn_file[0]) - data_len);
-
-  wchar_t * candidate[] = {L"Download.img", L"..\\DownloadImage\\Download.img"};
-
-  memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
-  for (int i = 0; i < COUNTOF(candidate); i++) {
-      wcsncpy_s(pkg_dlimg_file, pkg_dir, data_len+1);
-      wcsncat_s(pkg_dlimg_file, candidate[i], COUNTOF(pkg_dlimg_file) - data_len);
-      if(GetFileAttributes(pkg_dlimg_file) != INVALID_FILE_ATTRIBUTES) {
-          break;
-      } else {
-          memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
-      }
-  }
-    mPackageConfig.Parse(GetPkgConfXmlPath());
+    mPackageConfig.Set(pkg_dir);
     SetProjectCode(mPackageConfig.GetProjectCode());
 }
+
 
 AppConfig::~AppConfig() {
   if(log_file) free(log_file);
@@ -227,11 +200,12 @@ void AppConfig:: ScanDir (const wchar_t *szDirectory)
     HANDLE      hFind;
     WIN32_FIND_DATA  FindData;
     wchar_t     szFileSpec [_MAX_PATH + 5];
+#if 0
     FILETIME    FtLocal;
     SYSTEMTIME  SysTime;
     wchar_t        szLine [256];
     wchar_t        szDate [sizeof "jj/mm/aaaa"];
-
+#endif
     szFileSpec [_MAX_PATH - 1] = 0;
     lstrcpyn (szFileSpec, szDirectory, _MAX_PATH);
 //    lstrcat (szFileSpec, "\\*.*");
@@ -311,7 +285,6 @@ BOOL AppConfig::GetDiagPSTNandPrg(string &prgName, BOOL emergency) {
     DELETE_IF(fn);
     return TRUE;
 }
-
 
 #define PROJECT_SECTION         _T("project") //L"pst_diag"
 ProjectConfig::ProjectConfig(CString configFile):
@@ -439,4 +412,470 @@ BOOL ProjectConfig::GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergenc
 
     return TRUE;
 
+}
+
+
+PackageConfig::PackageConfig()
+{
+   memset(pkg_conf_file, 0, sizeof pkg_conf_file);
+   memset(pkg_qcn_file, 0, sizeof pkg_qcn_file);
+   memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
+}
+PackageConfig::~PackageConfig()
+{
+
+}
+
+BOOL  PackageConfig::Set(CString pkg_dir) {
+  size_t data_len = pkg_dir.GetLength();
+  memset(pkg_conf_file, 0, sizeof pkg_conf_file);
+  wcsncpy_s(pkg_conf_file, pkg_dir.GetString(), data_len+1);
+  wcsncat_s(pkg_conf_file, PKG_CONFIG_XML, COUNTOF(pkg_conf_file) - data_len);
+
+  memset(pkg_qcn_file, 0, sizeof pkg_qcn_file);
+  wcsncpy_s(pkg_qcn_file, pkg_dir.GetString(), data_len+1);
+  wcsncat_s(pkg_qcn_file, PKG_STATIC_QCN, sizeof(pkg_qcn_file) / sizeof(pkg_qcn_file[0]) - data_len);
+
+  wchar_t * candidate[] = {L"Download.img", L"..\\DownloadImage\\Download.img"};
+
+  memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
+  for (int i = 0; i < COUNTOF(candidate); i++) {
+      wcsncpy_s(pkg_dlimg_file, pkg_dir.GetString(), data_len+1);
+      wcsncat_s(pkg_dlimg_file, candidate[i], COUNTOF(pkg_dlimg_file) - data_len);
+      if(GetFileAttributes(pkg_dlimg_file) != INVALID_FILE_ATTRIBUTES) {
+          break;
+      } else {
+          memset(pkg_dlimg_file, 0, sizeof pkg_dlimg_file);
+      }
+  };
+    m_ConfigXmlParser.Parse(GetPkgConfXmlPath());
+    return TRUE;
+}
+
+
+
+
+
+flash_image::flash_image(AppConfig *appConfig):
+  image_list(NULL),
+  image_last(NULL),
+  nv_buffer(NULL),
+  nv_num(0),
+  nv_cmd(NULL),
+  mDiagDlImgSize(0),
+  mFbDlImgSize(0)
+{
+    mAppConfig = appConfig;
+    ReadPackage();
+}
+
+flash_image::~flash_image() {
+  //reset(TRUE);
+}
+
+
+BOOL flash_image::ReadPackage() {
+    CString path;
+    int data_len;
+    ProjectConfig projectConfig;
+
+    mAppConfig->GetProjectConfig(projectConfig);
+    const wchar_t *projectConfigFile = projectConfig.GetConfigPath().GetString();
+    const wchar_t* pkg_dir = mAppConfig->GetPkgDir();
+    read_fastboot_config(projectConfigFile, pkg_dir);
+    read_diagpst_config(projectConfigFile, pkg_dir);
+    //read_package_version(mAppConfig->pkg_conf_file);
+    return TRUE;
+}
+
+int flash_image::read_diagpst_config(const wchar_t* config, const wchar_t* pkg_dir) {
+  wchar_t partition_tbl[PARTITION_TBL_LEN] = {0};
+  wchar_t filename[MAX_PATH];
+  wchar_t *partition;
+  size_t partition_len;
+  CString path;
+  int data_len;
+
+  if (config == NULL) {
+    ERROR("not specified config file name");
+    return -1;
+  }
+
+  data_len = GetPrivateProfileString(DIAGPST_SECTION,
+                                     NULL,
+                                     NULL,
+                                     partition_tbl,
+                                     PARTITION_TBL_LEN,
+                                     config);
+
+  if (data_len == 0) {
+    LOGW("no DIAG PST in%S .", config);
+    return 0;
+  }
+
+  partition = partition_tbl;
+  partition_len = wcslen(partition);
+
+  while (partition_len > 0) {
+    data_len = GetPrivateProfileString(DIAGPST_SECTION,
+                                       partition,
+                                       NULL,
+                                       filename,
+                                       MAX_PATH,
+                                       config);
+    if (data_len > 0) {
+//        path.Empty();
+        path = pkg_dir;
+        //path += L'\\';
+        path += filename;
+      AddFileBuffer(partition, path.GetBuffer(), filename);
+      path.ReleaseBuffer();
+    }
+
+    partition = partition + partition_len + 1;
+    partition_len = wcslen(partition);
+  }
+
+  return 0;
+}
+
+int flash_image::read_fastboot_config(const wchar_t* config, const wchar_t* pkg_dir) {
+  wchar_t partition_tbl[PARTITION_TBL_LEN] = {0};
+  wchar_t filename[MAX_PATH];
+  wchar_t *partition;
+  size_t partition_len;
+  CString path;
+  int data_len;
+
+  if (config == NULL) {
+    ERROR("not specified config file name");
+    return -1;
+  }
+
+  data_len = GetPrivateProfileString(PARTITIONTBL_SECTION,
+                                     NULL,
+                                     NULL,
+                                     partition_tbl,
+                                     PARTITION_TBL_LEN,
+                                     config);
+
+  if (data_len == 0) {
+    WARN("no %S exist, load default partition table.", config);
+#if 0
+    wchar_t *imgs[] = {
+      L"mibib", L"sbl1.mbn",
+      L"sbl2", L"sbl2.mbn",
+      L"rpm", L"rpm.mbn",
+      L"dsp1", L"dsp1.mbn",
+      L"dsp3", L"dsp3.mbn",
+      L"dsp2", L"dsp2.mbn",
+      L"aboot", L"appsboot.mbn",
+      L"boot", L"boot-oe-msm9615.img",
+      L"system", L"9615-cdp-image-9615-cdp.yaffs2",
+      L"userdata", L"9615-cdp-usr-image.usrfs.yaffs2",
+    };
+
+    for (int i = 0; i < sizeof(imgs)/ sizeof(imgs[0]); i += 2) {
+        //parameter push stack from right to left
+        add_image(imgs[i], imgs[i+1], TRUE, config);
+    }
+
+    //set_package_dir(GetAppPath(path).GetString());
+#endif
+    return 0;
+  }
+
+  partition = partition_tbl;
+  partition_len = wcslen(partition);
+
+  while (partition_len > 0) {
+    data_len = GetPrivateProfileString(PARTITIONTBL_SECTION,
+                                       partition,
+                                       NULL,
+                                       filename,
+                                       MAX_PATH,
+                                       config);
+    if (data_len > 0) {
+//        path.Empty();
+        path = pkg_dir;
+        //path += L'\\';
+        path += filename;
+      add_image(partition, path.GetBuffer(), 0, config);
+      path.ReleaseBuffer();
+    }
+
+    partition = partition + partition_len + 1;
+    partition_len = wcslen(partition);
+  }
+
+  return 0;
+}
+
+int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write, const wchar_t* config)
+{
+  FlashImageInfo* img = NULL;
+  if (partition == NULL || lpath == NULL) {
+    ERROR("Bad parameter");
+    return -1;
+  }
+
+  img = (FlashImageInfo *)calloc(1, sizeof(FlashImageInfo));
+  //img = (FlashImageInfo *)malloc(sizeof(FlashImageInfo));
+  if (img == NULL) ERROR("out of memory");
+  //memset(img, 0, sizeof(FlashImageInfo));
+  img->data = load_file(lpath, &img->size);
+
+  if (img->data == NULL) {
+    ERROR("can not load data from file %S for  partition %S", lpath, partition);
+    free(img);
+    return -1;
+  }
+  int iDl = GetPrivateProfileInt(PARTITIONTBL_DL,
+									  partition,
+									  1,
+									  config);
+
+  img->need_download = (1==iDl)?true:false;
+  img->partition = wcsdup(partition);
+  img->partition_str = WideStrToMultiStr(partition);
+  img->lpath = wcsdup(lpath);
+
+  if (image_last != NULL)
+    image_last->next = img;
+  else
+    image_list = img;
+
+  image_last = img;
+
+  DEBUG("Load data from file %S for partition %S", lpath, partition);
+
+  if (write && config != NULL) {
+    WritePrivateProfileString(PARTITIONTBL_SECTION,partition,lpath,config);
+  }
+
+  return 0;
+}
+
+bool flash_image::AddFileBuffer(const wchar_t *partition, const wchar_t *lpath, const wchar_t *fileName) {
+    char * part = WideStrToMultiStr(partition);
+    char * fn = WideStrToMultiStr(fileName);
+    //int bytes = sizeof (wchar_t) * (2+ wcslen(pkgPath)+ wcslen(filName));
+    //wchar_t *lpath = (wchar_t *)malloc(bytes);
+    if (part != NULL && fn != NULL && lpath != NULL){
+        //memset(lpath, 0, bytes);
+        FileBufStruct afBuf;
+        afBuf.strFileBuf = (uint8*)load_file(lpath, &afBuf.uFileLens);
+        if(afBuf.strFileBuf != NULL) {
+        afBuf.strFileName = strdup(fn);
+        afBuf.isDownload= true;
+        strcpy((char *)(afBuf.partition + 2), part);
+        m_dlFileBuffer.insert(std::pair<string,FileBufStruct>(fn,afBuf));
+        LOGE("Insert diag file %s , partition %s", fn, part);
+        }
+    }
+    DELETE_IF(part);
+    DELETE_IF(fn);
+    //FREE_IF(lpath);
+    return true;
+}
+
+int flash_image::GetDiagDlImgSize() {
+    if (mDiagDlImgSize != 0)
+        return mDiagDlImgSize;
+
+    std::map<string,FileBufStruct>::iterator it;
+    for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++) {
+        if(it->second.isDownload) {
+            string Only_DownLoad("appsboot.mbn,tz.mbn,sbl1.mbn,rpm.mbn,appsboot_fastboot.mbn");
+            string mode=it->first;
+            if(Only_DownLoad.find(mode)!=-1) {
+                mDiagDlImgSize+=it->second.uFileLens;
+            } else {
+               it->second.isDownload=false;
+           }
+        }
+    }
+    return mDiagDlImgSize;
+}
+
+int flash_image::GetFbDlImgSize() {
+    if (mFbDlImgSize != 0)
+        return mFbDlImgSize;
+    FlashImageInfo const *image = image_enum_init();
+    for(;image != NULL; image = image_enum_next(image)) {
+        if (image->need_download) {
+            mFbDlImgSize += image->size;
+        }
+    }
+    return mFbDlImgSize;
+}
+
+#if 0
+BOOL flash_image::set_package_dir(const wchar_t * dir) {
+    if(dir == NULL || !PathFileExists(dir)) {
+        ERROR("%S%S", dir == NULL ? _T("Null parameter") : dir,
+                      dir == NULL ? _T("") : _T(" is not exist!"));
+        return FALSE;
+    }
+
+    if (wcscmp(dir, pkg_dir) == 0) {
+        INFO("Package directory is not changed.");
+        return FALSE;
+    }
+
+    wcscpy(pkg_dir, dir);
+    WritePrivateProfileString(PKG_SECTION, PKG_PATH, dir, mAppConfigFile.GetString());
+
+    return TRUE;
+}
+#endif
+
+const FlashImageInfo* flash_image::get_partition_info(wchar_t *partition, void **ppdata, unsigned *psize) {
+  FlashImageInfo* img;
+
+  // ASSERT( ppdata == NULL || psize == NULL );
+
+  for (img = image_list; img; img = img->next) {
+    if (wcscmp(partition, img->partition) == 0) {
+      if(ppdata != NULL)
+        *ppdata = img->data;
+      if(psize != NULL)
+        *psize = img->size;
+      return img;
+    }
+  }
+  return NULL;
+}
+
+const FlashImageInfo* flash_image::image_enum_init (void) {
+    return image_list;
+}
+
+const FlashImageInfo* flash_image::image_enum_next (const FlashImageInfo* img) {
+    if (img == NULL)
+        return NULL;
+
+    return img->next;
+}
+
+BOOL flash_image::qcn_cmds_enum_init (char *cmd) {
+  if (cmd == NULL)
+    cmd = "nv write";
+
+  if (nv_cmd == NULL || strcmp(nv_cmd, cmd) != 0)  {
+     FREE_IF(nv_cmd);
+     nv_cmd = strdup(cmd);
+     if(nv_cmd == NULL) {
+      ERROR("OUT OF MEMORY");
+      return FALSE;
+     }
+
+     if (nv_buffer != NULL) {
+      QcnParser::PutNVWriteCommands(nv_buffer, nv_num);
+      nv_buffer = NULL;
+      nv_num = 0;
+      }
+  }
+
+    if (nv_buffer == NULL)
+    {
+        QcnParser chQcn;
+
+        if (chQcn.OpenDocument(mAppConfig->GetPackageConfig()->GetPkgQcnPath()) == FALSE)
+        {
+        return FALSE;
+        }
+        return chQcn.GetNVWriteCommands(nv_cmd, &nv_buffer, &nv_num);
+        // chQcn.PutNVWriteCommands(nvBuf, dwLens);
+    }
+
+    return TRUE;
+}
+
+const char* flash_image::qcn_cmds_enum_next (unsigned int index) {
+  if (nv_buffer == NULL) {
+    ERROR("No nv cmds buffer, may be should call qcn_cmds_enum_init first!");
+    return NULL;
+  }
+
+  if (index >= nv_num) {
+    ERROR("index (%d) is exceed nv number (%d)!", index, nv_num);
+    return NULL;
+  }
+
+  return *(nv_buffer + index);
+}
+
+BOOL flash_image::set_download_flag(CString strPartitionName, bool bDownload) {
+	BOOL bRet = 0;
+	FlashImageInfo* img = image_list;
+	for(;img != NULL; ) {
+		if (0 == wcscmp(img->partition, strPartitionName.GetBuffer()))
+		{
+            ProjectConfig projectConfig;
+            mAppConfig->GetProjectConfig(projectConfig);
+            const wchar_t *projectConfigFile = projectConfig.GetConfigPath().GetString();
+			img->need_download = bDownload;
+            WritePrivateProfileString(PARTITIONTBL_DL,
+                              strPartitionName.GetString(),
+                              bDownload?L"1":L"0",
+                              projectConfigFile);
+			bRet = 1;
+			break;
+		}
+		img = img->next;
+	}
+	return bRet;
+}
+
+BOOL flash_image::reset(BOOL free_only) {
+    FlashImageInfo *img;
+    for (img = image_list; img; img = image_list) {
+      image_list = img->next;
+      if (img->partition != NULL) {
+        free(img->partition);
+        img->partition = NULL;
+      }
+
+      if (img->partition_str != NULL) {
+        delete img->partition_str;
+        img->partition_str = NULL;
+      }
+
+      if (img->lpath != NULL) {
+        free(img->lpath);
+        img->lpath = NULL;
+      }
+
+      if (img->data != NULL) {
+        free(img->data);
+        img->data = NULL;
+      }
+
+      free(img);
+      img = NULL;
+    }
+
+    image_list = NULL;
+    image_last = NULL;
+
+    if (!free_only) {
+      if (nv_buffer != NULL) {
+      QcnParser::PutNVWriteCommands(nv_buffer, nv_num);
+      nv_buffer = NULL;
+      nv_num = 0;
+      }
+      FREE_IF (nv_cmd);
+    }
+
+  std::map<string,FileBufStruct>::iterator it;
+    for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++)
+    {
+        FREE_IF(it->second.strFileBuf);
+         FREE_IF(it->second.strFileName);
+    }
+
+  mDiagDlImgSize = 0;
+  mFbDlImgSize = 0;
+	return TRUE;
 }

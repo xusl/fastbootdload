@@ -39,6 +39,7 @@ Source: "..\x64\Release\*.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: I
 Source: "..\Win32\Release\mdmfastboot.exe"; DestDir: "{app}"; Flags: ignoreversion; DestName: "TPST-CPE.exe"; Check: not Is64BitInstallMode
 Source: "..\Win32\Release\*.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: not Is64BitInstallMode
 Source: "..\mdmfastboot\configs\*"; DestDir: "{app}";Flags: ignoreversion allowunsafefiles; Permissions:everyone-full
+Source: "..\mdmfastboot\res\mdmfastboot.ico"; DestDir: "{app}";Flags: ignoreversion allowunsafefiles;DestName: "Icon.ico";Permissions:everyone-full
 
 [Icons]
 Name: "{group}\TPST-CPE"; IconFilename: {app}\Icon.ico;Filename: "{app}\TPST-CPE.exe"; WorkingDir: "{app}"

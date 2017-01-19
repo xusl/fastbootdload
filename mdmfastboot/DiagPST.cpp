@@ -403,7 +403,7 @@ bool DiagPST::checkIfPartitionMatchNormalMode() {
 
         //compare the partition version
         //TODO::
-        string pPcPartition = m_Worker->GetAppConfig()->GetPackageConfig()->get_XML_Value( "PARTITION");
+        string pPcPartition = m_Worker->GetAppConfig()->GetPackageConfig()->GetPartition();
         //INFO("COM%d: PC partition Version, version = %s",
         // m_dlPort,pPcPartition.c_str());
         string pFWPartitionVersion(pPartitionVersion);

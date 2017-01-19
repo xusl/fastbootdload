@@ -17,7 +17,6 @@
 
 #include "adbhost.h"
 #include "SettingsDlg.h"
-#include "qcnlib/QcnParser.h"
 #include "diagcmd.h"
 #include "jrddiagcmd.h"
 #include <ConfigIni.h>
@@ -96,7 +95,6 @@ public:
   afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnBnClickedBtnBrowse();
 	afx_msg void OnBnClickedStart();
-	afx_msg void OnBnClickedButtonStop();
 	afx_msg void OnBnClickedCancel();
   afx_msg void OnBnClickedSetting();
 	afx_msg void OnClose();
@@ -108,7 +106,8 @@ private:
 #endif
     BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
   VOID LayoutControl();
-  VOID CmdmfastbootDlg::SetDialogSize();
+  VOID SetDialogSize();
+  BOOL StopConfirm();
 
 public:
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);

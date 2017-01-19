@@ -28,6 +28,9 @@
 #include <ctype.h>
 #include <direct.h>
 #include <afxwin.h>
+#include <string>
+
+using namespace std;
 
 #  define DEFAULT_ADB_PORT 5037
 #  define MILLS_SECONDS (1000LL * 1000LL)
@@ -210,6 +213,7 @@ CString GetAppPath(CString & sPath );
 CString GetDirName(CString path);
 void sleep(int seconds);
 long long now(void);
+BOOL CStringToString(CString& source, string &sink);
 PWCH MultiStrToWideStr(PCCH pc);
 PCHAR WideStrToMultiStr(PCWCH WideStr);
 int CharToBSTR(PCCH inParam, BSTR *outParam);
@@ -218,5 +222,5 @@ int CharToBSTR(PCCH inParam, BSTR *outParam);
 extern void* load_file(LPCWSTR pathname, unsigned*  psize);
 int kill_adb_server(int port );
 BOOL StopAdbServer();
-SOCKET CreateSocket(const char *ip_addr,  u_short port);
+SOCKET ConnectServer(const char *ip_addr,  u_short port);
 #endif /* _ADB_UTILS_H */

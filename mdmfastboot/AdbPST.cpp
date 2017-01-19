@@ -29,7 +29,7 @@ BOOL AdbPST::Reboot(UsbWorkData* data, DeviceInterfaces *dev) {
 BOOL AdbPST::DoPST(UsbWorkData* data, flash_image* img, DeviceInterfaces *dev) {
     usb_handle * handle = data->usb;
     adbhost adb(handle , dev->GetDevId());
-    const wchar_t *conf_file = data->mPAppConf->GetPkgConfXmlPath();
+    const wchar_t *conf_file = data->mPAppConf->GetPackageConfig()->GetPkgConfXmlPath();
     char *conf_file_char;
     int result;
 

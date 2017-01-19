@@ -182,7 +182,7 @@ SOCKET MmiTestDialog::GetTelnetSocket() {
         return INVALID_SOCKET;
     }
 
-    SOCKET socket = CreateSocket(ip_addr, TELNET_PORT);
+    SOCKET socket = ConnectServer(ip_addr, TELNET_PORT);
     delete [] ip_addr;
     return socket;
 }
