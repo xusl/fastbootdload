@@ -385,8 +385,10 @@ void CMiniHttpDownloadServer::Run() {
 
         LOGE("RECV:\n %s", request.c_str());
 
-        if (request == CLOSE_SERVER)
+        if (request == CLOSE_SERVER) {
+            LOGI("close http server");
             break;
+        }
 
         if (FALSE == ParseRequest(request, path, &uiPort)) {
             HandleServerException(_T("Bad request!"),

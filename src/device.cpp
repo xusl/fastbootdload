@@ -119,6 +119,10 @@ usb_handle* DeviceInterfaces::GetUsbHandle(BOOL flashdirect) const {
     return NULL;
 }
 
+BOOL DeviceInterfaces::IsBindDiagAdb() {
+    return (NULL != GetAdbIntf()) && (NULL != GetDiagIntf());
+}
+
 BOOL DeviceInterfaces::SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf) {
     CDevLabel* pDev = NULL;
     if (type == DEVTYPE_DIAGPORT) {
@@ -240,12 +244,14 @@ BOOL DeviceCoordinator::Reset() {
     return TRUE;
 }
 
-DeviceInterfaces *DeviceCoordinator::GetValidDevice() {
+DeviceInterfaces *DeviceCoordinator::GetValidDevice(BOOL bindDiagAdb) {
     list<DeviceInterfaces*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
         DeviceInterfaces *item = *it;
         usb_dev_t status = item->GetDeviceStatus();
         if (item->GetAttachStatus())
+            continue;
+        if (bindDiagAdb && (!item->IsBindDiagAdb()))
             continue;
         if(status >= DEVICE_PLUGIN && status < DEVICE_REMOVED ) {
             return item;

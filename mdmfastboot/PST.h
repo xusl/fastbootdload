@@ -82,7 +82,8 @@ class UsbWorkData{
     BOOL IsIdle();
     BOOL Reset(VOID);
     BOOL Abort(VOID);
-    BOOL Start(DeviceInterfaces* devIntf, AFX_THREADPROC pfnThreadProc, UINT nElapse, BOOL flashdirect);
+    BOOL SetDevice(DeviceInterfaces* pDevIntf, BOOL flashdirect);
+    BOOL Start(AFX_THREADPROC pfnThreadProc);
     BOOL Finish(VOID);
     BOOL SwitchDev(UINT nElapse);
     BOOL SetSwitchedStatus();
@@ -102,12 +103,13 @@ class UsbWorkData{
     BOOL UpdateUsbHandle(BOOL force, BOOL flashdirect);
     AppConfig      * GetAppConfig() { return mPAppConf;}
     BOOL ShowSubWindow(BOOL show);
-
+    int GetIndex() { return mIndex;}
   private:
     long long       start_time_tick;
     HANDLE          mDevSwitchEvt;
     wchar_t         mName[WORK_NAME_LEN];
     int             stat;
+    int             mIndex;
 
   public:
     CWnd/*CmdmfastbootDlg*/  *hWnd;
@@ -171,12 +173,12 @@ public:
     return mAppConf.GetPackageHistory(history);
   }
 
-  VOID StartServer();
+  VOID CPEModemPST(UsbWorkData *workData);
 
   static BOOL HttpServerGetFileCB (PVOID data, string filename, CString& filePath);
   static VOID HttpServerMessageCB (PVOID data, int uiPort, CString message);
 private:
-    static UINT RunDevicePST(LPVOID wParam);
+    static UINT RunMiFiPST(LPVOID wParam);
     static UINT RunTelnetServer(LPVOID wParam);
 
 private:

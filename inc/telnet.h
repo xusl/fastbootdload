@@ -412,7 +412,6 @@ protected:
                     ssize_t count);              /* Number of bytes received */
      CURLcode send_telnet_data(const char *buffer, ssize_t len);
 
-     int receive_telnet_cmd(char *buffer, ssize_t len);
      int send_command(const char *buffer, string &result, bool trim = true);
 };
 

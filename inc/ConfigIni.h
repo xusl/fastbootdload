@@ -11,6 +11,11 @@ using namespace std;
 
 static const int PORT_NUM_MAX = 9;
 
+enum PlatformType {
+  PLATFORM_CPE = 0,
+  PLATFORM_MIFI,
+};
+
 class ProjectConfig {
   public:
     ProjectConfig(CString configFile = _T("\\."));
@@ -19,7 +24,7 @@ class ProjectConfig {
 
     VOID SetProjectCode(CString code) { mCode = code;}
     VOID SetPlatform(CString platform) { mPlatform = platform; }
-    VOID SetVersion(CString version) { mVersion = version; }
+    VOID SetVersion(int version) { mVersion = version; }
     VOID SetValid(BOOL valid) { mIsValidConfig = valid; }
     VOID SetVid(int vid) { mVid = vid; }
     VOID SetPid(int pid) { mPid = pid; }
@@ -28,17 +33,24 @@ class ProjectConfig {
     CString GetConfigPath() { return mProjectConfigPath; }
     CString GetProjectCode() { return mCode; }
     CString GetPlatform() { return mPlatform; }
-    CString GetVersion() { return mVersion; }
+    int   GetVersion() { return mVersion; }
     BOOL  GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency);
+    BOOL  IsUseAdbShell() { return mUseAdbShell;}
     int   GetVid() { return mVid; }
-    int   GetPid() { return mPid;}
+    int   GetPid() { return mPid; }
+    PlatformType GetPlatformType() { return mPlatformType; }
 
-  private:
+private:
+    VOID  SetPlatformType(CString type);
+
+private:
     CString mProjectConfigPath;
     CString mCode;
     CString mPlatform;
-    CString mVersion;
+    int    mVersion;
     BOOL   mIsValidConfig;
+    BOOL   mUseAdbShell;
+    PlatformType mPlatformType;
     int    mVid;
     int    mPid;
 };
@@ -105,8 +117,9 @@ class flash_image{
     int SetPartitionDownloadFlag(CString partition, boolean flag);
 
     bool AddFileBuffer(const wchar_t *partition, const wchar_t *pkgPath, const wchar_t *filName);
-    map<string, FileBufStruct> GetFileBuffer() { return m_dlFileBuffer;};
-    map<string, CString> GetOpenWrtFiles() { return m_OpenWrtFiles;}
+    map<string, FileBufStruct> GetFileBuffer() { return m_dlFileBuffer; }
+    map<string, CString> GetOpenWrtFiles() { return m_OpenWrtFiles; }
+    BOOL IsCPEPackage() { return m_OpenWrtFiles.size() > 0; }
     CString GetOpenWrtFilePath(string& filename) { return m_OpenWrtFiles.at(filename);}
 
   protected:
@@ -151,7 +164,8 @@ public:
     /*
     this is indicate that use debug mode and use adb command reboot-bootloader to enter fastboot.
     */
-    BOOL         IsUseAdb() { return m_UseAdb; }
+    BOOL         IsUseAdbShell() { return mProjectConfig.IsUseAdbShell(); }
+    PlatformType GetPlatformType() { return mProjectConfig.GetPlatformType(); }
 
     BOOL         SetProjectCode(CString &projectCode);
     BOOL         GetProjectConfig(ProjectConfig& config) {
@@ -181,7 +195,6 @@ private:
     int                     m_nPort;
     int                     switch_timeout;
     int                     work_timeout;
-    BOOL                    m_UseAdb;
     wchar_t                 *log_file;
     char                    *log_tag;
     char                    *log_level;

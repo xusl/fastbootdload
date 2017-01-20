@@ -146,7 +146,10 @@ VOID PSTManager::SetWork(BOOL work, BOOL schedule) {
     if (!work || !schedule)
         return;
 
-   if(mAppConf.IsUseAdb()) {
+  if (mAppConf.GetPlatformType() == PLATFORM_CPE) {
+      AfxBeginThread(CMiniHttpDownloadServer::StartHttpServer, (LPVOID)&mHttpServer);
+      AfxBeginThread(RunTelnetServer, this);
+   } else if(mAppConf.IsUseAdbShell()) {
         RejectCDROM();
         HandleComDevice(FALSE);
         EnumerateAdbDevice();
@@ -285,7 +288,7 @@ BOOL PSTManager::ScheduleDeviceWork() {
         if (workdata->GetStatus() == USB_STAT_WORKING)
             continue;
 
-        while(NULL != (idleDev = mDevCoordinator.GetValidDevice())) {
+        while(NULL != (idleDev = mDevCoordinator.GetValidDevice(mAppConf.IsUseAdbShell()))) {
             idleDev->Dump(__FUNCTION__);
             if (workdata->GetStatus() == USB_STAT_SWITCH) {
                 ASSERT(item != NULL);
@@ -297,10 +300,8 @@ BOOL PSTManager::ScheduleDeviceWork() {
             }
 
             if (mAppConf.GetPortDevFixedFlag() == FALSE || item == NULL || item->Match(idleDev)) {
-                workdata->Start(idleDev,
-                    mThreadProc != NULL ? mThreadProc : RunDevicePST,
-                    mAppConf.GetPSTWorkTimeout(),
-                    flashdirect);
+                workdata->SetDevice(idleDev, flashdirect);
+                workdata->Start(mThreadProc != NULL ? mThreadProc : RunMiFiPST);
                 break;
             }
         }
@@ -349,7 +350,7 @@ BOOL PSTManager::EnumerateAdbDevice(BOOL schedule) {
                 iter->Dump("adb interface");
                 if (!mDevCoordinator.AddDevice(*iter,
                                             DEVTYPE_ADB,
-                                            mAppConf.IsUseAdb(),
+                                            mAppConf.IsUseAdbShell(),
                                             &handle->dev_intfs))
                     continue;
 
@@ -369,7 +370,7 @@ BOOL PSTManager::EnumerateAdbDevice(BOOL schedule) {
                 iter->Dump("fastboot interface");
                 if(!mDevCoordinator.AddDevice(*iter,
                                             DEVTYPE_FASTBOOT,
-                                            mAppConf.IsUseAdb(),
+                                            mAppConf.IsUseAdbShell(),
                                             &handle->dev_intfs))
                     continue;
                 handle->dev_intfs->SetFastbootHandle(handle);
@@ -419,7 +420,7 @@ BOOL PSTManager::HandleComDevice(BOOL schedule) {
         iter->Dump(__FUNCTION__);
         if(mDevCoordinator.AddDevice(*iter,
                                    DEVTYPE_DIAGPORT,
-                                   mAppConf.IsUseAdb(),
+                                   mAppConf.IsUseAdbShell(),
                                    NULL))
             success = TRUE;
     }
@@ -464,7 +465,7 @@ BOOL PSTManager::RejectCDROM(VOID){
             }
         }
 #endif
-        if (mAppConf.IsUseAdb()) {
+        if (mAppConf.IsUseAdbShell()) {
             scsi.SwitchToDebugDevice(path);
             LOGE("Swtich to debug mode");
         } else {
@@ -528,13 +529,6 @@ BOOL PSTManager::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPA
     return TRUE;
 }
 
-
-VOID PSTManager::StartServer() {
-  AfxBeginThread(CMiniHttpDownloadServer::StartHttpServer, (LPVOID)&mHttpServer);
-  AfxBeginThread(RunTelnetServer, this);
-}
-
-
 BOOL PSTManager::HttpServerGetFileCB (PVOID data, string filename, CString& filePath) {
     PSTManager *m_PSTManager =  (PSTManager *)data;
     flash_image* packageImage = m_PSTManager->GetProjectPackage();
@@ -549,6 +543,7 @@ BOOL PSTManager::HttpServerGetFileCB (PVOID data, string filename, CString& file
 
     return TRUE;
 }
+
 VOID PSTManager::HttpServerMessageCB (PVOID data, int uiPort, CString message) {
     PSTManager *m_PSTManager =  (PSTManager *)data;
       UsbWorkData *workData = m_PSTManager->GetWorkData(uiPort);
@@ -563,7 +558,6 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     string gateway;
     string host;
     string result;
-    int uiPort = 0;
     NicManager mNicManager;
     NetCardStruct nic;
     string command;
@@ -596,7 +590,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     if (socket == INVALID_SOCKET) {
         return -1;
     }
-    telnet tn(socket, 3000, TRUE);
+    telnet tn(socket, 2000, TRUE);
 
     workData->SetInfo(PROMPT_TEXT, _T("telent: receive welcome message"));
     tn.send_command(NULL, result);
@@ -612,13 +606,13 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
 
     workData->SetInfo(PROMPT_TEXT, _T("telent: switch usb to PC"));
     //tn.send_command("send_data 254 0 0 8 1 0 0", result);
-    //tn.send_command("usb_switch_to PC", result);
+    tn.send_command("usb_switch_to PC", result);
 
     //begin USB download
-    //testDialog->DiagTest();
+     manager->CPEModemPST(workData);
 
     //tn.send_command("send_data 254 0 0 8 0 0 0", result);
-    //tn.send_command("usb_switch_to IPQ", result);
+    tn.send_command("usb_switch_to IPQ", result);
 
     workData->SetInfo(PROMPT_TEXT, _T("telent: request download file"));
     //  m_MmiDevInfo = nic.mConnectionName;
@@ -628,7 +622,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
         command += host;
         command.append("/");
         std::ostringstream oss;
-        oss << uiPort;
+        oss << workData->GetIndex();
         command.append(oss.str());
         command.append("/");
         command += openwrtFiles.begin()->first;
@@ -647,10 +641,31 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     return 0;
 }
 
+VOID PSTManager::CPEModemPST(UsbWorkData *workData) {
+    DeviceInterfaces * dev;
+    ASSERT(workData);
+     HandleComDevice(FALSE);
+     EnumerateAdbDevice(FALSE);
+     //workData->WaitForDevSwitchEvt();
+     int i = 0;
+
+     while((dev = mDevCoordinator.GetValidDevice(mAppConf.IsUseAdbShell())) == NULL) {
+        if (i++ > 30) {
+            LOGE("timeout for update CPE modem module");
+            return;
+        }
+        SLEEP(1000);
+     };
+
+     workData->SetDevice(dev, mAppConf.GetFlashDirectFlag());
+
+     RunMiFiPST(workData);
+}
+
 /*
 * update flow is done here. Do update business logically.
 */
-UINT PSTManager::RunDevicePST(LPVOID wParam) {
+UINT PSTManager::RunMiFiPST(LPVOID wParam) {
     UsbWorkData* data = (UsbWorkData*)wParam;
     usb_handle * handle;
     flash_image  *img;
@@ -670,7 +685,7 @@ UINT PSTManager::RunDevicePST(LPVOID wParam) {
     img = data->mProjectPackage;
     config = data->mPAppConf;
     status = dev->GetDeviceStatus();
-    useAdb = config->IsUseAdb();
+    useAdb = config->IsUseAdbShell();
     flashdirect = config->GetFlashDirectFlag();
 
     data->SetInfo(TITLE, dev->GetDevTag());
@@ -709,6 +724,7 @@ UINT PSTManager::RunDevicePST(LPVOID wParam) {
         } else {
             LOGE("download check failed");
         }
+
         if(result) {
             dev->SetDeviceStatus(DEVICE_FLASH);
             data->SetInfo(REBOOT_DEVICE, "Enter fastboot");
@@ -717,7 +733,6 @@ UINT PSTManager::RunDevicePST(LPVOID wParam) {
             data->SetInfo(FLASH_DONE, "Diag PST occur error! Please check log");
             return 0;
         }
-
     }
 
     handle = data->usb;
@@ -765,13 +780,12 @@ UINT PSTManager::RunDevicePST(LPVOID wParam) {
     return 0;
 }
 
-
-
 UsbWorkData::UsbWorkData(int index, CWnd* dlg,
     AppConfig *appConf, flash_image* package) {
     hWnd = dlg;
     pCtl = new CPortStateUI;
     pCtl->Create(IDD_PORT_STATE, dlg);
+    mIndex = index;
     pCtl->Init(index);
     memset(mName, 0, sizeof mName);
     _snwprintf_s(mName, WORK_NAME_LEN, _T("Work Port %d"), index);
@@ -882,10 +896,9 @@ BOOL UsbWorkData::UpdateUsbHandle(BOOL force, BOOL flashdirect) {
     return FALSE;
 }
 
-BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, AFX_THREADPROC pfnThreadProc, UINT nElapse, BOOL flashdirect) {
+BOOL UsbWorkData::SetDevice(DeviceInterfaces* pDevIntf, BOOL flashdirect) {
     ASSERT(pDevIntf != NULL);
     mActiveDevIntf = pDevIntf;
-    LOGD("Start thread to work!");
 
   UpdateUsbHandle(TRUE, flashdirect);
 
@@ -893,11 +906,16 @@ BOOL UsbWorkData::Start(DeviceInterfaces* pDevIntf, AFX_THREADPROC pfnThreadProc
   mActiveDevIntf->SetAttachStatus(true);
   stat = USB_STAT_WORKING;
   start_time_tick = now();
+  return TRUE;
+}
+
+BOOL UsbWorkData::Start( AFX_THREADPROC pfnThreadProc) {
+  LOGD("Start thread to work!");
   pCtl->Reset();
   work = AfxBeginThread(pfnThreadProc, this);
 
   if (work != NULL) {
-    INFO("Schedule work for %s with timeout %d seconds!", mActiveDevIntf->GetDevTag(), nElapse);
+    INFO("Schedule work for %s !", mActiveDevIntf->GetDevTag());
     work->m_bAutoDelete = TRUE;
     // hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);
   } else {

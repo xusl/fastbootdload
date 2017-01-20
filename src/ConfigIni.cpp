@@ -22,7 +22,7 @@ AppConfig::AppConfig() :
         m_nPort(1),
         mProjectConfig(_T("\\."))
 {
-   m_UseAdb = TRUE;
+
 }
 
 BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
@@ -291,100 +291,112 @@ ProjectConfig::ProjectConfig(CString configFile):
     mProjectConfigPath(configFile),
     mCode(_T("NullProjectCode")),
     mPlatform(_T("NullProjectPlatform")),
-    mVersion(_T("NullProjectVersion")),
+    mVersion(0),
     mIsValidConfig(FALSE)
 {
+    mPlatformType = PLATFORM_MIFI;
+    mUseAdbShell = FALSE;
 }
 
 BOOL ProjectConfig::ReadConfig(list<CString> &codes) {
-     WCHAR     buffer[MAX_PATH] = {0};
-     int data_len;
-     PCTSTR configFile = mProjectConfigPath.GetString();
+    WCHAR     buffer[MAX_PATH] = {0};
+    int data_len;
+    PCTSTR configFile = mProjectConfigPath.GetString();
     if (configFile == NULL)
         return FALSE;
 
     if (!PathFileExists(configFile))
         return FALSE;
 
-     data_len = GetPrivateProfileString(PROJECT_SECTION,
-                           _T("code"),
-                           NULL,
-                           buffer,
-                           MAX_PATH,
-                           configFile);
-   if (data_len == 0) {
-        return FALSE;
-    }
-
-  #define CODE_DELIMINATE L" ,.-"
-  //wchar_t wcs[] = L"- This, a sample string.";
-  wchar_t * token;
-  wchar_t * state;
-  //wprintf (L"Splitting wide string \"%ls\" into tokens:\n",wcs);
-  token = wcstok_s (buffer, CODE_DELIMINATE, &state);
-  while (token != NULL)
-  {
-    //wprintf (L"%ls\n",token);
-    codes.push_back(CString(token));
-    token = wcstok_s (NULL, CODE_DELIMINATE, &state);
-  }
-
-     mCode = codes.front();//buffer;
-
-     memset(buffer, 0, sizeof buffer);
-     data_len = GetPrivateProfileString(PROJECT_SECTION,
-                           _T("platform"),
-                           NULL,
-                           buffer,
-                           MAX_PATH,
-                           configFile);
+    data_len = GetPrivateProfileString(PROJECT_SECTION,
+                                       _T("code"),
+                                       NULL,
+                                       buffer,
+                                       MAX_PATH,
+                                       configFile);
     if (data_len == 0) {
         return FALSE;
     }
-     mPlatform = buffer;
 
-     memset(buffer, 0, sizeof buffer);
-     data_len = GetPrivateProfileString(PROJECT_SECTION,
-                           _T("version"),
-                           NULL,
-                           buffer,
-                           MAX_PATH,
-                           configFile);
-    if (data_len == 0) {
-        return FALSE;
+#define CODE_DELIMINATE L" ,.-"
+    //wchar_t wcs[] = L"- This, a sample string.";
+    wchar_t * token;
+    wchar_t * state;
+    //wprintf (L"Splitting wide string \"%ls\" into tokens:\n",wcs);
+    token = wcstok_s (buffer, CODE_DELIMINATE, &state);
+    while (token != NULL)  {
+        //wprintf (L"%ls\n",token);
+        codes.push_back(CString(token));
+        token = wcstok_s (NULL, CODE_DELIMINATE, &state);
     }
-     mVersion = buffer;
 
-     memset(buffer, 0, sizeof buffer);
-     data_len = GetPrivateProfileString(PROJECT_SECTION,
-                           _T("USBVid"),
-                           NULL,
-                           buffer,
-                           MAX_PATH,
-                           configFile);
+    mCode = codes.front();//buffer;
+
+    memset(buffer, 0, sizeof buffer);
+    data_len = GetPrivateProfileString(PROJECT_SECTION,
+                                       _T("platform"),
+                                       NULL,
+                                       buffer,
+                                       MAX_PATH,
+                                       configFile);
     if (data_len > 0) {
-       mVid = wcstol(buffer, NULL, 16);
+        mPlatform = buffer;
     }
 
-     memset(buffer, 0, sizeof buffer);
-     data_len = GetPrivateProfileString(PROJECT_SECTION,
-                           _T("USBPid"),
-                           NULL,
-                           buffer,
-                           MAX_PATH,
-                           configFile);
+    memset(buffer, 0, sizeof buffer);
+    data_len = GetPrivateProfileString(PROJECT_SECTION,
+                                       _T("type"),
+                                       NULL,
+                                       buffer,
+                                       MAX_PATH,
+                                       configFile);
     if (data_len > 0) {
-     //mPid = atoi(buffer);//strtol buffer;
-     mPid = wcstol(buffer, NULL, 16);
+        SetPlatformType(buffer);
     }
 
-     mIsValidConfig = TRUE;
-     return TRUE;
+    mVersion = GetPrivateProfileInt(PROJECT_SECTION, _T("version"), 8, configFile);
+
+    memset(buffer, 0, sizeof buffer);
+    data_len = GetPrivateProfileString(PROJECT_SECTION,
+                                       _T("USBVid"),
+                                       NULL,
+                                       buffer,
+                                       MAX_PATH,
+                                       configFile);
+    if (data_len > 0) {
+        mVid = wcstol(buffer, NULL, 16);
+    }
+
+    memset(buffer, 0, sizeof buffer);
+    data_len = GetPrivateProfileString(PROJECT_SECTION,
+                                       _T("USBPid"),
+                                       NULL,
+                                       buffer,
+                                       MAX_PATH,
+                                       configFile);
+    if (data_len > 0) {
+        //mPid = atoi(buffer);//strtol buffer;
+        mPid = wcstol(buffer, NULL, 16);
+    }
+
+    mIsValidConfig = TRUE;
+    return TRUE;
 }
 
 ProjectConfig::~ProjectConfig() {
     ;
 }
+
+VOID ProjectConfig::SetPlatformType(CString type) {
+    if (type.CompareNoCase(_T("CPE")) == 0) {
+        mPlatformType = PLATFORM_CPE;
+        mUseAdbShell = TRUE;
+    } else if (type.CompareNoCase(_T("MIFI")) == 0)
+        mPlatformType = PLATFORM_MIFI;
+    else
+        mPlatformType = PLATFORM_MIFI;
+}
+
 BOOL ProjectConfig::GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency) {
     if (filename == NULL || size == 0) {
         LOGE("Bad parameter");

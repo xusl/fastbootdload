@@ -240,6 +240,7 @@ class DeviceInterfaces {
   VOID SetAdbHandle(usb_handle* handle)  { mAdbHandle = handle;};
   VOID SetFastbootHandle(usb_handle* handle)  { mFbHandle = handle;};
   BOOL SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf=TRUE);
+  BOOL IsBindDiagAdb();
   VOID DeleteMemory(VOID);
   int GetDevId();
   CPacket* GetPacket();
@@ -274,7 +275,7 @@ class DeviceCoordinator {
   public:
     DeviceCoordinator();
     ~DeviceCoordinator();
-    DeviceInterfaces *GetValidDevice();
+    DeviceInterfaces *GetValidDevice(BOOL bindDiagAdb);
     BOOL GetDevice(const wchar_t *const devPath, DeviceInterfaces** outDevIntf);
     BOOL AddDevice(CDevLabel& dev, TDevType type, BOOL ignoreAttachStatus, DeviceInterfaces** intfs);
     BOOL RemoveDevice(DeviceInterfaces*const & devIntf);
