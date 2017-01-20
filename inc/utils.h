@@ -211,6 +211,7 @@ CString GetFileNameFromFullPath(CString FullPath);
 void get_my_path(char *s, size_t maxLen);
 CString GetAppPath(CString & sPath );
 CString GetDirName(CString path);
+CString GetBaseName(CString path);
 void sleep(int seconds);
 long long now(void);
 BOOL CStringToString(CString& source, string &sink);

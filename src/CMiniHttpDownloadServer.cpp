@@ -3,10 +3,12 @@
 #include "log.h"
 #include "CMiniHttpDownloadServer.h"
 
-CMiniHttpDownloadServer::CMiniHttpDownloadServer(AppConfig *appConfig, u_short port):
+CMiniHttpDownloadServer::CMiniHttpDownloadServer(PVOID data, HttpServerGetFile getFile, HttpServerMessage msg, u_short port):
     m_ServerWork (FALSE),
     m_ServerPort(port),
-    mAppConfig(appConfig)
+    m_CallBackData(data),
+    m_GetFileCB(getFile),
+    m_SetMsgCB(msg)
 {
     ;
 }
@@ -15,12 +17,17 @@ CMiniHttpDownloadServer::~CMiniHttpDownloadServer() {
     ;
 }
 
-void CMiniHttpDownloadServer::UpdateMessage(CString errormsg) {
-    ;
+void CMiniHttpDownloadServer::UpdateMessage(int uiPort, CString errormsg) {
+      if (m_GetFileCB == NULL || m_CallBackData == NULL) {
+        LOGE("NULL PARAMETER");
+        return ;
+    }
+
+    return m_SetMsgCB(m_CallBackData, uiPort, errormsg);
 }
 
 void CMiniHttpDownloadServer::HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent) {
-    UpdateMessage(msg);
+
     //        wprintf(L"socket failed with error: %ld\n", WSAGetLastError());
     if (ppContent != NULL && *ppContent != NULL) {
         free((void *)*ppContent);
@@ -58,43 +65,7 @@ void CMiniHttpDownloadServer::HandleServerException(CString msg, SOCKET sockConn
   //CString date = CTime::GetCurrentTime().Format(_T("%a, %d %b %Y %H:%M:%S GMT"));
 }
 
-BOOL CMiniHttpDownloadServer::FindFile(CString fileName, CString &filePath)
-{
-    BOOL             found = FALSE;
-    HANDLE           hFind;
-    WIN32_FIND_DATA  FindData;
-    wchar_t          szFileSpec [_MAX_PATH + 5];
-    const wchar_t    *szDirectory = mAppConfig->GetPkgDir();
 
-    szFileSpec [_MAX_PATH - 1] = 0;
-    lstrcpyn (szFileSpec, szDirectory, _MAX_PATH);
-//    lstrcat (szFileSpec, "\\*.*");
-    lstrcat (szFileSpec, _T("\\*\\"));
-    lstrcat (szFileSpec, fileName);
-    hFind = FindFirstFile (szFileSpec, &FindData);
-    if (hFind == INVALID_HANDLE_VALUE) {
-        LOGE("scan dir initialize failed");
-        return FALSE;
-    }
-
-    do {
-        // display only files, skip directories
-        if (FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            continue;
-        LOGD("Find file %S", FindData.cFileName);
-        if (fileName != FindData.cFileName )
-            continue;
-        filePath = szDirectory;
-        filePath += _T("\\");
-        filePath += FindData.cFileName;
-        found = TRUE;
-        break;
-    }while (FindNextFile (hFind, & FindData));
-
-    FindClose (hFind);
-
-    return found;
-}
 
 char const* CMiniHttpDownloadServer::BuildHttpServerResponse(LPCWSTR fn, unsigned *_sz) {
     HANDLE    file;
@@ -191,8 +162,135 @@ char const* CMiniHttpDownloadServer::BuildHttpServerResponse(LPCWSTR fn, unsigne
     return content;
 }
 
+BOOL CMiniHttpDownloadServer::BuildHttpHeader(string& header, int file_size) {
+    char temp[64]={0};
+    char date[64]={0};
+    sprintf(temp, "%d", file_size);
+    gmt_time_string(date, sizeof(date));
+    header= "HTTP/1.1 200 OK\r\n";
+    header.append("Content-Length: ").append(temp).append("\r\n");
+    header.append("Date: ").append(date).append("\r\n");
+    header.append("Content-Type: application/x-sam\r\n");
+    header.append("Accept-Ranges: bytes\r\n" );
+    header.append("\r\n");
+    return TRUE;
+}
+#define MEGABYTE (1024 * 1024)
+BOOL CMiniHttpDownloadServer::SendFile(SOCKET sock, CString &filePath, int uiPort) {
+    HANDLE    file;
+    CString msg;
+    CString fname;
+    DWORD file_size;
 
-void CMiniHttpDownloadServer::StartHttpServer(LPCWSTR path) {
+    fname = GetBaseName(filePath);
+
+    file = CreateFile(filePath.GetString(),
+                      GENERIC_READ,
+                      FILE_SHARE_READ,
+                      NULL,
+                      OPEN_EXISTING,
+                      0,
+                      NULL);
+
+    if (file == INVALID_HANDLE_VALUE) {
+        LOGE("load_file: file open failed (rc=%ld)\n", GetLastError());
+        return FALSE;
+    }
+
+    file_size = GetFileSize( file, NULL );
+
+    if (file_size <= 0) {
+        LOGE("file empty or negative size %ld\n", file_size);
+        CloseHandle(file);
+        return FALSE;
+    }
+    string header;
+    BuildHttpHeader(header, file_size);
+    if (send(sock, header.c_str(), header.size(), 0) == SOCKET_ERROR) {
+        return FALSE;
+    }
+
+    DWORD bytes_to_read = file_size;
+    DWORD bytes_read = 0;
+    char data[512] = {0};
+    DWORD block_size = sizeof data;
+    BOOL  readData = TRUE;
+    int count =0;
+
+    SetFilePointer( file, 0, NULL, FILE_BEGIN );
+
+    while (bytes_to_read > 0) {
+        if (readData) {
+            if (block_size > bytes_to_read) {
+                block_size = bytes_to_read;
+            }
+
+            memset(data, 0, block_size);
+            if (!ReadFile(file, data, block_size, &bytes_read, NULL) /*||
+                    bytes_read != block_size */) {
+             //   retry_failed = 1;
+             //   break;
+             continue;
+            }
+        }
+        if (send(sock, data, bytes_read, 0) == SOCKET_ERROR) {
+            if (WSAEWOULDBLOCK == WSAGetLastError ()) {
+                readData = FALSE;
+                continue;
+            }
+
+            LOGD ("send : Error %d", WSAGetLastError ());
+            return FALSE;
+        }
+
+        bytes_to_read -= bytes_read;
+        readData = TRUE;
+
+        if (count ++ < 100 && bytes_to_read > 0)
+            continue;
+        count = 0;
+
+        msg.Format(_T("Send %s %d%% (%.1fMB/%.1fMB) "),
+                    fname.GetString(),
+                    100 - (bytes_to_read * 100) / file_size,
+                    (float)(file_size - bytes_to_read) / MEGABYTE,
+                    (float)file_size/MEGABYTE);
+        UpdateMessage(uiPort, msg);
+    }
+
+    //if (send(sock, "\0", 1, 0) == SOCKET_ERROR) {
+    //        return FALSE;
+    //}
+
+    CloseHandle(file);
+    return TRUE;
+}
+
+BOOL CMiniHttpDownloadServer::ParseRequest(string& request, CString &sendFile, int *uiPort) {
+    if (request.size() <= 0) {
+        LOGD("empty request");
+        return FALSE;
+    }
+    if (uiPort == NULL) {
+        return FALSE;
+    }
+    char buffer[_MAX_FNAME] = {0};
+    int got = sscanf(request.c_str(), "GET /%d/%255s ", uiPort, buffer);
+
+    if (got < 2) {
+        LOGD("Can not parse request %s", request.c_str());
+        return FALSE;
+    }
+    LOGE("request port %d, filename %s", *uiPort, buffer);
+    if (m_GetFileCB == NULL || m_CallBackData == NULL) {
+        LOGE("NULL PARAMETER");
+        return FALSE;
+    }
+
+    return m_GetFileCB(m_CallBackData, buffer, sendFile);
+}
+
+void CMiniHttpDownloadServer::StartHttpServer() {
     SOCKET sockConn = INVALID_SOCKET;
     SOCKET sockSrv  = INVALID_SOCKET;
     SOCKADDR_IN  addrClient;
@@ -203,7 +301,7 @@ void CMiniHttpDownloadServer::StartHttpServer(LPCWSTR path) {
 
     sockSrv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sockSrv == INVALID_SOCKET) {
-        HandleServerException(_T("Create server socket failed!"), sockConn, sockSrv, NULL);
+        LOGE("Create Http server socket failed!");
         return ;
     }
 
@@ -212,39 +310,80 @@ void CMiniHttpDownloadServer::StartHttpServer(LPCWSTR path) {
     addrSrv.sin_port = htons(m_ServerPort);
 
     if (bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR)) == SOCKET_ERROR) {
-        msg.Format(_T("Bind socket port %d failed!"), m_ServerPort);
-        HandleServerException(msg, sockConn, sockSrv, NULL);
+        LOGE("Bind socket port %d failed!", m_ServerPort);
+        closesocket(sockSrv);
         return ;
     }
 
-    msg.Format(_T("bind socket success on port :%d"), m_ServerPort);
-    UpdateMessage(msg);
+    LOGD("bind socket success on port :%d", m_ServerPort);
     if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
-        HandleServerException(_T("server listen failed!"), sockConn, sockSrv, NULL);
+        LOGE("server listen failed!");
+        closesocket(sockSrv);
         return ;
     }
 
-    UpdateMessage(_T("Listening on socket..."));
     m_ServerWork = TRUE;
     while(m_ServerWork) {
         unsigned long on = 1;
         char const * content = NULL;
         char recvBuf[101]={0};
+        string request;
+        int uiPort = 0;
+        CString path;
         int bytes = 0;
+        int error;
         int sin_size = sizeof(struct sockaddr_in);
 
         sockConn = accept(sockSrv, (SOCKADDR*)&addrClient, &sin_size);
-        UpdateMessage(_T("Send softwre ..., please wait..."));
+        error = WSAGetLastError ();
+        WSASetLastError(NOERROR);
+        error = WSAGetLastError ();
         ioctlsocket(sockConn, FIONBIO, &on);
 
+#if 1
+        do {
+            fd_set fdRead;
+            timeval TimeOut;
+            TimeOut.tv_sec=0;
+            TimeOut.tv_usec=2000; //2S
+
+            FD_ZERO(&fdRead);
+            FD_SET(sockConn,&fdRead);
+            int ret=::select(0,&fdRead,NULL,NULL,&TimeOut);
+
+            memset(recvBuf, 0, sizeof recvBuf);
+            bytes = recv(sockConn, recvBuf, sizeof recvBuf - 1, 0);
+            if ( bytes > 0 ) {
+                LOGD("Bytes received: %d", bytes);
+                request += recvBuf;
+            } else if ( bytes == 0 ) {
+                LOGE("Connection closed");
+            } else {
+                LOGE("recv failed: %d", WSAGetLastError());
+            }
+        } while( bytes > 0 );
+#else
         do {
             memset(recvBuf, 0, sizeof recvBuf);
             bytes = recv(sockConn, recvBuf, sizeof(recvBuf) - 1, 0);
-        } while(bytes > 0);
+            request += recvBuf;
+            error = WSAGetLastError (); //errno
+            //(error != EINTR && error != EWOULDBLOCK && error != EAGAIN)
+        } while(bytes > 0 || request.size() <=0 /*|| error == WSAEWOULDBLOCK*/);
+#endif
 
-        LOGE("RECV:\n %s", recvBuf);
-
-         content = BuildHttpServerResponse(path, &length);
+        LOGE("RECV:\n %s", request.c_str());
+        if (FALSE == ParseRequest(request, path, &uiPort)) {
+            HandleServerException(_T("Bad request!"),
+                sockConn,
+                INVALID_SOCKET,
+                NULL);
+            continue;
+        }
+#if 1
+        SendFile(sockConn, path, uiPort);
+#else
+        content = BuildHttpServerResponse(path.GetString(), &length);
 
         if(content == NULL) {
             UpdateMessage(_T("Open file failed!"));
@@ -255,6 +394,7 @@ void CMiniHttpDownloadServer::StartHttpServer(LPCWSTR path) {
             HandleServerException(_T("Send software failed!"), sockConn, sockSrv, &content);
             break;
         }
+#endif
 
         do {
             memset(recvBuf, 0, sizeof recvBuf);
@@ -499,6 +639,44 @@ DWORD WINAPI CDownloadDlg::Thread_Server_Listen(LPVOID lpPARAM) {
 	CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
 	pThis->server_listen();
 	return 1;
+}
+
+BOOL CMiniHttpDownloadServer::FindFile(CString fileName, CString &filePath)
+{
+    BOOL             found = FALSE;
+    HANDLE           hFind;
+    WIN32_FIND_DATA  FindData;
+    wchar_t          szFileSpec [_MAX_PATH + 5];
+    const wchar_t    *szDirectory = m_PSTManager->GetPackage();
+
+    szFileSpec [_MAX_PATH - 1] = 0;
+    lstrcpyn (szFileSpec, szDirectory, _MAX_PATH);
+//    lstrcat (szFileSpec, "\\*.*");
+    lstrcat (szFileSpec, _T("\\*\\"));
+    lstrcat (szFileSpec, fileName);
+    hFind = FindFirstFile (szFileSpec, &FindData);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        LOGE("scan dir initialize failed");
+        return FALSE;
+    }
+
+    do {
+        // display only files, skip directories
+        if (FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue;
+        LOGD("Find file %S", FindData.cFileName);
+        if (fileName != FindData.cFileName )
+            continue;
+        filePath = szDirectory;
+        filePath += _T("\\");
+        filePath += FindData.cFileName;
+        found = TRUE;
+        break;
+    }while (FindNextFile (hFind, & FindData));
+
+    FindClose (hFind);
+
+    return found;
 }
 #endif
 

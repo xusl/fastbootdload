@@ -274,11 +274,11 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   CDialog::OnInitDialog();
   ::SetProp(m_hWnd, JRD_MDM_FASTBOOT_TOOL_APP, (HANDLE)1);//for single instance
 
-  if (!StopAdbServer())
-  {
-	  EndDialog(0);
-	  return TRUE;
-  }
+//  if (!StopAdbServer())
+//  {
+//	  EndDialog(0);
+//	  return TRUE;
+//  }
 
   // 将“关于...”菜单项添加到系统菜单中。
 
@@ -314,33 +314,22 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   InitSettingDlg();
 #endif
 
-  //for (int i = 0; i < mAppConf.GetUiPortTotalCount(); i++) {
-  //  m_workdata[i] = new UsbWorkData(i, this, &mDevCoordinator, &mAppConf, &m_LocalConfigXml, m_image);
-  //}
   //SetUpDevice(NULL, 0, &GUID_DEVCLASS_USB,  _T("USB"));
   //SetUpAdbDevice(NULL, 0);
 
   m_UpdateDownloadFlag = TRUE;
-  if (mPSTManager.GetPortNum() == 1)
-    ShowWindow(SW_NORMAL);
+
+  mPSTManager.Initialize(this);
+  SetDialogSize();
+  LayoutControl();
+
+ //if (mPSTManager.GetPortNum() == 1)
+  //  ShowWindow(SW_NORMAL);
   //else
   //ShowWindow(SW_MAXIMIZE);
 
   ::SetWindowLong(m_hWnd,GWL_STYLE,WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX);
 
-#if 0
-  HRESULT hr = m_dlWorkerPool.Initialize(NULL, THREADPOOL_SIZE);
-  m_dlWorkerPool.SetTimeout(30 * 1000);
-  if(!SUCCEEDED(hr))
-  {
-    ERROR("Failed to init thread pool!");
-    return FALSE;
-  }
-  #endif
-
-  mPSTManager.Initialize(this);
-  SetDialogSize();
-  LayoutControl();
 
   m_imglist = ((CListCtrl*)GetDlgItem(IDC_IMAGE_LIST));
   m_imglist->InsertColumn(0, _T("Partition/QCN"),LVCFMT_LEFT, 90);

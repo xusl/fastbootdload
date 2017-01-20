@@ -136,6 +136,7 @@ public:
   BOOL IsAfterSaleMode() { return mAppConf.GetAfterSaleMode(); }
   BOOL IsSuperMode() { return mAppConf.GetFlashDirectFlag() || mAppConf.GetForceUpdateFlag(); }
 
+  UsbWorkData *GetWorkData(UINT index = 0);
   UsbWorkData *FindUsbWorkData(wchar_t *devPath);
   BOOL FlashDeviceDone(UsbWorkData * data);
   BOOL IsInit() { return m_bInit;}
@@ -172,6 +173,8 @@ public:
 
   VOID StartHttpServer();
 
+  static BOOL HttpServerGetFileCB (PVOID data, string filename, CString& filePath);
+  static VOID HttpServerMessageCB (PVOID data, int uiPort, CString message);
 private:
     static UINT RunDevicePST(LPVOID wParam);
     static UINT RunHttpServer(LPVOID wParam);

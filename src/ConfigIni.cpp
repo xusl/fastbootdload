@@ -484,6 +484,7 @@ BOOL flash_image::ReadPackage() {
     const wchar_t* pkg_dir = mAppConfig->GetPkgDir();
     read_fastboot_config(projectConfigFile, pkg_dir);
     read_diagpst_config(projectConfigFile, pkg_dir);
+    read_openwrt_config(projectConfigFile, pkg_dir);
     //read_package_version(mAppConfig->pkg_conf_file);
     return TRUE;
 }
@@ -609,6 +610,63 @@ int flash_image::read_fastboot_config(const wchar_t* config, const wchar_t* pkg_
   }
 
   return 0;
+}
+
+
+int flash_image::read_openwrt_config(const wchar_t* config, const wchar_t* pkg_dir) {
+  wchar_t partition_tbl[PARTITION_TBL_LEN] = {0};
+  wchar_t filename[MAX_PATH];
+  wchar_t *partition;
+  size_t partition_len;
+  CString path;
+  int data_len;
+
+  if (config == NULL) {
+    ERROR("not specified config file name");
+    return -1;
+  }
+
+  data_len = GetPrivateProfileString(OPENWRT_SECTION,
+                                     NULL,
+                                     NULL,
+                                     partition_tbl,
+                                     PARTITION_TBL_LEN,
+                                     config);
+
+  if (data_len == 0) {
+    LOGW("no DIAG PST in%S .", config);
+    return 0;
+  }
+
+  partition = partition_tbl;
+  partition_len = wcslen(partition);
+
+  while (partition_len > 0) {
+    data_len = GetPrivateProfileString(OPENWRT_SECTION,
+                                       partition,
+                                       NULL,
+                                       filename,
+                                       MAX_PATH,
+                                       config);
+
+    partition = partition + partition_len + 1;
+    partition_len = wcslen(partition);
+
+    if (data_len <= 0) {
+        continue;
+    }
+    path = pkg_dir;
+    path += filename;
+    if (PathFileExists(path.GetString())) {
+        string basename;
+        CStringToString(GetBaseName(path), basename);
+        m_OpenWrtFiles.insert(std::pair<string,CString>(basename, path));
+    } else {
+        LOGE("%S is not exist", path.GetString());
+        continue;
+    }
+  }
+    return 0;
 }
 
 int flash_image::add_image( wchar_t *partition, const wchar_t *lpath, BOOL write, const wchar_t* config)

@@ -1,9 +1,7 @@
 #include "stdafx.h"
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "usb_adb.h"
-
 #include "scsicmd.h"
 #include "resource.h"
 #include <atlstr.h>
@@ -16,6 +14,7 @@
 #include "DiagPST.h"
 #include "AdbPST.h"
 #include "telnet.h"
+#include <sstream>
 
 PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
     mThreadProc(pfnThreadProc),
@@ -179,6 +178,15 @@ RECT PSTManager::GetPortRect(UINT index) {
     if (port != NULL)
         port->GetClientRect(&rect);
     return rect;
+}
+
+UsbWorkData *PSTManager::GetWorkData(UINT index) {
+    if (index >= GetPortNum()) {
+        LOGE("index(%d) is exceed port number (%d)", index, GetPortNum());
+        return NULL;
+    }
+
+    return m_workdata[index];
 }
 
 CPortStateUI* PSTManager::GetPortUI(UINT index) {
@@ -524,13 +532,38 @@ VOID PSTManager::StartHttpServer() {
   AfxBeginThread(RunTelnetServer, this);
 }
 
+
+BOOL PSTManager::HttpServerGetFileCB (PVOID data, string filename, CString& filePath) {
+    PSTManager *m_PSTManager =  (PSTManager *)data;
+    flash_image* packageImage = m_PSTManager->GetProjectPackage();
+
+    try {
+        filePath =packageImage->GetOpenWrtFilePath(filename);
+    } catch (const std::out_of_range& oor) {
+        std::cerr << "Out of Range error: " << oor.what() << '\n';
+        LOGE("can not find file %s", filename.c_str());
+        return FALSE;
+    }
+
+    return TRUE;
+}
+VOID PSTManager::HttpServerMessageCB (PVOID data, int uiPort, CString message) {
+    PSTManager *m_PSTManager =  (PSTManager *)data;
+      UsbWorkData *workData = m_PSTManager->GetWorkData(uiPort);
+      if (workData == NULL) {
+        return;
+      }
+      workData->SetInfo(PROMPT_TEXT, message);
+}
+
 UINT PSTManager::RunHttpServer(LPVOID wParam) {
   PSTManager *manager = (PSTManager*)wParam;
   ASSERT(manager);
-  CMiniHttpDownloadServer httpServer(manager->GetAppConfig());
-//  httpServer.server_listen("F:\\MoveTime\\gerrit-push.py");
-  httpServer.StartHttpServer(_T("F:\\HH70VH_00_02.00_02_Factory_PD03_20170109\\image_4018\\nor-ipq40xx-single.img"));
-    return 0;
+  CMiniHttpDownloadServer httpServer((PVOID)manager, &PSTManager::HttpServerGetFileCB, &PSTManager::HttpServerMessageCB );
+  //httpServer.server_listen("F:\\MoveTime\\gerrit-push.py");
+  //_T("F:\\HH70VH_00_02.00_02_Factory_PD03_20170109\\image_4018\\nor-ipq40xx-single.img")
+  httpServer.StartHttpServer();
+  return 0;
 }
 
 UINT PSTManager::RunTelnetServer(LPVOID wParam){
@@ -538,10 +571,18 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     string gateway;
     string host;
     string result;
+    int uiPort = 0;
     NicManager mNicManager;
     NetCardStruct nic;
-    const char* img = "nor-ipq40xx-single.img";
     string command;
+    flash_image *packageImage = manager->GetProjectPackage();
+    map<string, CString> openwrtFiles = packageImage->GetOpenWrtFiles();
+    UsbWorkData *workData = manager->GetWorkData();
+
+    if (openwrtFiles.size() <= 0) {
+        LOGE("There are none images to download");
+        return -1;
+    }
 
     mNicManager.EnumNetCards();
     nic = mNicManager.GetDefaultNic();
@@ -558,41 +599,59 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     }
 #endif
 
+    workData->SetInfo(PROMPT_TEXT, _T("telent: connect to device"));
     SOCKET socket = ConnectServer(gateway.c_str(), TELNET_PORT);
     if (socket == INVALID_SOCKET) {
         return -1;
     }
     telnet tn(socket, 3000, TRUE);
 
+    workData->SetInfo(PROMPT_TEXT, _T("telent: receive welcome message"));
     tn.send_command(NULL, result);
     tn.send_command(NULL, result);
+
 #ifdef DESKTOP_TEST
     LOGE("User Login, enter user ");
+    workData->SetInfo(PROMPT_TEXT, _T("telent: auto user login"));
     tn.send_command("zen", result, false);
     LOGE("Send password ");
     tn.send_command("zen", result, false);
 #endif
 
-    tn.send_command("send_data 254 0 0 8 1 0 0", result);
-    tn.send_command("usb_switch_to PC", result);
+    workData->SetInfo(PROMPT_TEXT, _T("telent: switch usb to PC"));
+    //tn.send_command("send_data 254 0 0 8 1 0 0", result);
+    //tn.send_command("usb_switch_to PC", result);
 
+    //begin USB download
     //testDialog->DiagTest();
 
-    tn.send_command("send_data 254 0 0 8 0 0 0", result);
-    tn.send_command("usb_switch_to IPQ", result);
+    //tn.send_command("send_data 254 0 0 8 0 0 0", result);
+    //tn.send_command("usb_switch_to IPQ", result);
 
+    workData->SetInfo(PROMPT_TEXT, _T("telent: request download file"));
     //  m_MmiDevInfo = nic.mConnectionName;
-    tn.send_command("cd /tmp/", result);
-    command = "wget http://";
-    command += host;
-    command.append("/");
-    command += img;
-    tn.send_command(command.c_str(), result, FALSE);
+    //for (map<string, CString>::iterator it=openwrtFiles.begin(); it != openwrtFiles.end(); it ++) {
+        //tn.send_command("cd /tmp/", result);
+        command = "wget http://";
+        command += host;
+        command.append("/");
+        std::ostringstream oss;
+        oss << uiPort;
+        command.append(oss.str());
+        command.append("/");
+        command += openwrtFiles.begin()->first;
+        command += " -O /tmp/";
+        command += openwrtFiles.begin()->first;
+        //command += it->first;
+        tn.send_command(command.c_str(), result, FALSE);
+    //}
 
+    workData->SetInfo(PROMPT_TEXT, _T("telent: execute sysupgrade"));
     command = "sysupgrade /tmp/";
-    command.append(img);
+    command.append(openwrtFiles.begin()->first);
     tn.send_command(command.c_str(), result);
 
+    workData->SetInfo(PROMPT_TEXT, _T("command is sent, please wait for device upgrade"));
     return 0;
 }
 

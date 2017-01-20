@@ -96,6 +96,7 @@ class flash_image{
 	  BOOL set_download_flag(CString strPartitionName, bool bDownload);
     int read_fastboot_config(const wchar_t* config, const wchar_t* pkg_dir);
     int read_diagpst_config(const wchar_t* config, const wchar_t* pkg_dir);
+    int read_openwrt_config(const wchar_t* config, const wchar_t* pkg_dir);
     int GetDiagDlImgSize();
     int GetFbDlImgSize();
     BOOL ReadPackage();
@@ -103,8 +104,10 @@ class flash_image{
 
     int SetPartitionDownloadFlag(CString partition, boolean flag);
 
-     bool AddFileBuffer(const wchar_t *partition, const wchar_t *pkgPath, const wchar_t *filName);
-     map<string,FileBufStruct> GetFileBuffer() { return m_dlFileBuffer;};
+    bool AddFileBuffer(const wchar_t *partition, const wchar_t *pkgPath, const wchar_t *filName);
+    map<string, FileBufStruct> GetFileBuffer() { return m_dlFileBuffer;};
+    map<string, CString> GetOpenWrtFiles() { return m_OpenWrtFiles;}
+    CString GetOpenWrtFilePath(string& filename) { return m_OpenWrtFiles.at(filename);}
 
   protected:
     //virtual int parse_pkg_sw(CString & node, CString & text);
@@ -116,12 +119,13 @@ class flash_image{
 
   private:
     AppConfig *mAppConfig;
-    FlashImageInfo *image_list;
+    FlashImageInfo *image_list; //for image download by FASTBOOT
     FlashImageInfo *image_last;
+    map<string, FileBufStruct> m_dlFileBuffer;//for image download by DIAG
+    map<string, CString> m_OpenWrtFiles; // for image download by ETHERNET (HTTP or TFTP)
     unsigned int nv_num;
     char ** nv_buffer;
     char * nv_cmd;
-    map<string,FileBufStruct>  m_dlFileBuffer;
     uint32          mDiagDlImgSize;
     uint32          mFbDlImgSize;
 };

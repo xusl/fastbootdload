@@ -82,6 +82,20 @@ CString GetDirName(CString path) {
 	return dirName;
 }
 
+CString GetBaseName(CString path) {
+    CString baseName = _T("");
+    wchar_t fname[_MAX_FNAME];
+	wchar_t ext[_MAX_EXT];
+
+//	GetCurrentDirectory(MAX_PATH, currdir);
+	_wsplitpath_s(path.GetString(), 0, 0, 0, 0, fname, _MAX_FNAME, ext, _MAX_EXT);
+
+	baseName = fname;
+	baseName += ext;
+
+	return baseName;
+}
+
 void get_my_path(char *exe, size_t maxLen)
 {
     char  *r;
