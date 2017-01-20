@@ -581,7 +581,7 @@ void CmdmfastbootDlg::OnTimer(UINT_PTR nIDEvent) {
 BOOL CmdmfastbootDlg::SetupDevice(int evt) {
     switch(evt) {
     case TIMER_EVT_ADBKILLED:
-        mPSTManager.StartHttpServer();
+        mPSTManager.StartServer();
         SetWorkStatus(mPSTManager.IsWork(), TRUE);
         break;
     case TIMER_EVT_REJECTCDROM:

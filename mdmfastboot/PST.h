@@ -171,13 +171,12 @@ public:
     return mAppConf.GetPackageHistory(history);
   }
 
-  VOID StartHttpServer();
+  VOID StartServer();
 
   static BOOL HttpServerGetFileCB (PVOID data, string filename, CString& filePath);
   static VOID HttpServerMessageCB (PVOID data, int uiPort, CString message);
 private:
     static UINT RunDevicePST(LPVOID wParam);
-    static UINT RunHttpServer(LPVOID wParam);
     static UINT RunTelnetServer(LPVOID wParam);
 
 private:
@@ -190,6 +189,7 @@ private:
 
   vector<CDevLabel>  m_WorkDev;
   DeviceCoordinator  mDevCoordinator;
+  CMiniHttpDownloadServer mHttpServer;
 
   AFX_THREADPROC     mThreadProc;
   volatile BOOL      m_bWork;

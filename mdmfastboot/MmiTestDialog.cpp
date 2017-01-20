@@ -210,9 +210,9 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
     LOGE("start telnet negotiate");
     testDialog->SetStatus(_T("start telnet negotiate"));
     tn.send_command(NULL, result);
-    //UpdateMessage(result.c_str());
     tn.send_command(NULL, result);
-    //UpdateMessage(result.c_str());
+
+//    tn.send_command("send_data 254 0 2 5 1", result);
 
     pass = testDialog->TestItem(tn, _T("RJ45 2"), "send_data 254 0 2 5 1", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
     pass = testDialog->TestItem(tn, _T("RJ11"), "send_data 254 0 2 5 0", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
@@ -258,9 +258,9 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
     pass = testDialog->TestLed(tn, _T("ALL LED ON"), 0x000007ff);
 
     tn.set_receive_timeout(5000);
-    pass = testDialog->TestKey(tn, _T("Power Key"),  "254 0 2 4 1 1 0", 5);
-    pass = testDialog->TestKey(tn, _T("WPS Key"),  "254 0 2 4 1 2 0", 5);
-    pass = testDialog->TestKey(tn, _T("Reset Key"),  "254 0 2 4 1 4 0", 5);
+    pass = testDialog->TestKey(tn, _T("Power Key"),  "254 0 2 4 1 1 0", 1, 5);
+    pass = testDialog->TestKey(tn, _T("WPS Key"),  "254 0 2 4 1 2 0", 2, 5);
+    pass = testDialog->TestKey(tn, _T("Reset Key"),  "254 0 2 4 1 4 0", 4, 5);
     tn.set_receive_timeout(3000);
 
     tn.send_command("send_data 254 0 0 8 1 0 0", result);
@@ -279,7 +279,7 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
 }
 
 //error code :  "254 0 2 4 1 0 0"
-BOOL MmiTestDialog::TestKey(telnet &client, CString item, const string &ok, int elapse) {
+BOOL MmiTestDialog::TestKey(telnet &client, CString item, const string &ok, int key, int elapse) {
     string data;
     char command[64] = {0};
     CString text;
@@ -289,7 +289,7 @@ BOOL MmiTestDialog::TestKey(telnet &client, CString item, const string &ok, int 
 
     int iRet = AfxMessageBox(text, MB_OK);
 
-    snprintf(command, sizeof command, "send_data 254 0 2 4 1 %d 0", elapse);
+    snprintf(command, sizeof command, "send_data 254 0 2 4 1 %d 0", key);
     TestItem(client, item, command, data);
 
     size_t found = data.rfind("\r\n");
@@ -418,6 +418,8 @@ VOID MmiTestDialog::WaitForDevice(long seconds) {
 }
 
 BOOL MmiTestDialog::SetWork(BOOL work) {
+    if(work)
+        m_MmiItemList.DeleteAllItems();
     GetDlgItem(IDOK)->EnableWindow(!work);
     GetDlgItem(IDCANCEL)->EnableWindow(!work);
     return TRUE;

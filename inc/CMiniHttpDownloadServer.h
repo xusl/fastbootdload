@@ -13,11 +13,8 @@ public:
 
     //void server_listen(const char*path );
     BOOL IsServerWorks() { return m_ServerWork;}
-
-    void StartHttpServer();
-    void StopHttpServer() {
-      m_ServerWork = FALSE;
-    }
+    static UINT StartHttpServer(LPVOID wParam);
+    void StopHttpServer();
 
 private:
     BOOL SendFile(SOCKET sock, CString &file, int uiPort);
@@ -26,9 +23,9 @@ private:
     //char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
     char const* BuildHttpServerResponse(LPCWSTR fn, unsigned *_sz);
     void HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent);
-    BOOL BuildUpdateCommand(CString file, CString &cmd);
+    //BOOL BuildUpdateCommand(CString file, CString &cmd);
     void UpdateMessage(int uiPort, CString errormsg);
-
+    void Run();
     void gmt_time_string(char *buf, size_t buf_len);
     //BOOL FindFile(CString fileName, CString &filePath);
 
@@ -38,4 +35,5 @@ private:
     HttpServerMessage m_SetMsgCB;
     BOOL m_ServerWork;
     u_short m_ServerPort;
+    //CWinThread* mThread;
 };

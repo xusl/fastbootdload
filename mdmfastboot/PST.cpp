@@ -19,6 +19,7 @@
 PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
     mThreadProc(pfnThreadProc),
 	mDevCoordinator(),
+	mHttpServer((PVOID)this, &HttpServerGetFileCB, &HttpServerMessageCB),
 	m_WorkDev(),
 	m_image(NULL),
 	m_bInit(FALSE),
@@ -312,7 +313,8 @@ BOOL PSTManager::ScheduleDeviceWork() {
 BOOL PSTManager::Reset() {
     for (int i= 0; i < GetPortNum(); i++) {
         m_workdata[i]->Reset();
-      }
+    }
+    mHttpServer.StopHttpServer();
     return TRUE;
 }
 
@@ -527,8 +529,8 @@ BOOL PSTManager::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPA
 }
 
 
-VOID PSTManager::StartHttpServer() {
-  AfxBeginThread(RunHttpServer, this);
+VOID PSTManager::StartServer() {
+  AfxBeginThread(CMiniHttpDownloadServer::StartHttpServer, (LPVOID)&mHttpServer);
   AfxBeginThread(RunTelnetServer, this);
 }
 
@@ -554,16 +556,6 @@ VOID PSTManager::HttpServerMessageCB (PVOID data, int uiPort, CString message) {
         return;
       }
       workData->SetInfo(PROMPT_TEXT, message);
-}
-
-UINT PSTManager::RunHttpServer(LPVOID wParam) {
-  PSTManager *manager = (PSTManager*)wParam;
-  ASSERT(manager);
-  CMiniHttpDownloadServer httpServer((PVOID)manager, &PSTManager::HttpServerGetFileCB, &PSTManager::HttpServerMessageCB );
-  //httpServer.server_listen("F:\\MoveTime\\gerrit-push.py");
-  //_T("F:\\HH70VH_00_02.00_02_Factory_PD03_20170109\\image_4018\\nor-ipq40xx-single.img")
-  httpServer.StartHttpServer();
-  return 0;
 }
 
 UINT PSTManager::RunTelnetServer(LPVOID wParam){

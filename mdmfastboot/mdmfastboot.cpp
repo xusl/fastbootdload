@@ -111,7 +111,7 @@ BOOL CmdmfastbootApp::InitInstance()
 	// 例如修改为公司或组织名
 	SetRegistryKey(_T("TCL MBB MODULE FASTBOOT"));
 
-//#define MMI_TOOL
+#define MMI_TOOL
 #ifdef MMI_TOOL
 	MmiTestDialog dlg;
 #else

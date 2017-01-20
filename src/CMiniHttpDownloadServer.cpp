@@ -3,6 +3,9 @@
 #include "log.h"
 #include "CMiniHttpDownloadServer.h"
 
+#define MEGABYTE (1024 * 1024)
+#define CLOSE_SERVER "CloseServer"
+
 CMiniHttpDownloadServer::CMiniHttpDownloadServer(PVOID data, HttpServerGetFile getFile, HttpServerMessage msg, u_short port):
     m_ServerWork (FALSE),
     m_ServerPort(port),
@@ -26,6 +29,7 @@ void CMiniHttpDownloadServer::UpdateMessage(int uiPort, CString errormsg) {
     return m_SetMsgCB(m_CallBackData, uiPort, errormsg);
 }
 
+#if 1
 void CMiniHttpDownloadServer::HandleServerException(CString msg, SOCKET sockConn, SOCKET sockSrv, const char ** ppContent) {
 
     //        wprintf(L"socket failed with error: %ld\n", WSAGetLastError());
@@ -38,7 +42,7 @@ void CMiniHttpDownloadServer::HandleServerException(CString msg, SOCKET sockConn
     if (INVALID_SOCKET != sockSrv)
         closesocket(sockSrv);
 }
-
+#endif
  void CMiniHttpDownloadServer::gmt_time_string(char *buf, size_t buf_len)
  {
   struct tm newtime;
@@ -175,7 +179,7 @@ BOOL CMiniHttpDownloadServer::BuildHttpHeader(string& header, int file_size) {
     header.append("\r\n");
     return TRUE;
 }
-#define MEGABYTE (1024 * 1024)
+
 BOOL CMiniHttpDownloadServer::SendFile(SOCKET sock, CString &filePath, int uiPort) {
     HANDLE    file;
     CString msg;
@@ -290,7 +294,14 @@ BOOL CMiniHttpDownloadServer::ParseRequest(string& request, CString &sendFile, i
     return m_GetFileCB(m_CallBackData, buffer, sendFile);
 }
 
-void CMiniHttpDownloadServer::StartHttpServer() {
+UINT CMiniHttpDownloadServer::StartHttpServer(LPVOID wParam) {
+  CMiniHttpDownloadServer *server = (CMiniHttpDownloadServer *)wParam;
+  ASSERT(server);
+  server->Run();
+  return 0;
+}
+
+void CMiniHttpDownloadServer::Run() {
     SOCKET sockConn = INVALID_SOCKET;
     SOCKET sockSrv  = INVALID_SOCKET;
     SOCKADDR_IN  addrClient;
@@ -373,6 +384,10 @@ void CMiniHttpDownloadServer::StartHttpServer() {
 #endif
 
         LOGE("RECV:\n %s", request.c_str());
+
+        if (request == CLOSE_SERVER)
+            break;
+
         if (FALSE == ParseRequest(request, path, &uiPort)) {
             HandleServerException(_T("Bad request!"),
                 sockConn,
@@ -404,6 +419,27 @@ void CMiniHttpDownloadServer::StartHttpServer() {
     }
     HandleServerException(_T("Server exist"), sockConn, sockSrv, NULL);
 }
+
+void CMiniHttpDownloadServer::StopHttpServer() {
+    if (m_ServerWork == FALSE)
+        return;
+
+      m_ServerWork = FALSE;
+      SOCKET sock = ConnectServer("127.0.0.1", m_ServerPort);
+      if (sock == INVALID_SOCKET)
+        return;
+
+      while (send(sock, CLOSE_SERVER, sizeof CLOSE_SERVER, 0) == SOCKET_ERROR) {
+            if (WSAEWOULDBLOCK == WSAGetLastError ()) {
+
+                continue;
+            }
+
+            LOGD ("send : Error %d", WSAGetLastError ());
+            break;
+        }
+}
+
 
 #if 0
 void CMiniHttpDownloadServer::server_listen(const char*path)

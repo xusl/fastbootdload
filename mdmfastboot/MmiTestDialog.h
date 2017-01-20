@@ -41,7 +41,7 @@ public:
     BOOL TestWiFi(telnet &client, CString item, PCCH command);
     BOOL TestItem(telnet &client, CString item, PCCH command, string &data);
     BOOL TestItem(telnet &client, CString item, PCCH command, const string &ok, const string &error);
-    BOOL TestKey(telnet &client, CString item,  const string &ok, int elapse);
+    BOOL TestKey(telnet &client, CString item,  const string &ok, int key, int elapse);
     BOOL TestLed(telnet &client, CString item,  int value);
     BOOL DiagTest();
     BOOL AddTestResult(CString item, BOOL pass, string description);
