@@ -39,12 +39,6 @@ enum
 
 typedef enum
 {
-	FIRMWARE_VER,
-	QCN_VER,
-	LINUX_VER,
-	SYSTEM_VER,
-	USERDATA_VER,
-	PTS_VER,
 	TITLE,
 	PROGRESS_VAL,
 	PROMPT_TITLE,
@@ -52,6 +46,7 @@ typedef enum
 	ADB_CHK_ABORT,
 	REBOOT_DEVICE,
 	FLASH_DONE,
+	PORTUI_DEVINFO,
 	UI_DEFAULT,
 }UI_INFO_TYPE;
 
@@ -60,11 +55,13 @@ typedef struct _UIInfo_
 	UI_INFO_TYPE	infoType;
 	int				    iVal;
 	CString			  sVal;
+  CString       mInfoName;
 
   _UIInfo_() {
     infoType = UI_DEFAULT;
     sVal = "";
     iVal = -1;
+    mInfoName = "";
   }
 }UIInfo;
 
@@ -91,6 +88,7 @@ class UsbWorkData{
     DWORD  SetDevSwitchEvt(BOOL flashdirect);
     BOOL SetInfo(UI_INFO_TYPE info_type, PCCH msg);
     BOOL SetInfo(UI_INFO_TYPE infoType, CString strInfo);
+    BOOL AddDevInfo(CString name, CString value);
     UINT SetProgress(int progress);
     BOOL SetPromptMsg(PCCH msg) { return SetInfo(PROMPT_TEXT, msg);};
     const char *GetDevTag() { return mActiveDevIntf->GetDevTag();};
@@ -192,6 +190,7 @@ private:
   vector<CDevLabel>  m_WorkDev;
   DeviceCoordinator  mDevCoordinator;
   CMiniHttpDownloadServer mHttpServer;
+  HANDLE          mScheduleEvt;
 
   AFX_THREADPROC     mThreadProc;
   volatile BOOL      m_bWork;

@@ -33,9 +33,9 @@ BOOL AdbPST::DoPST(UsbWorkData* data, flash_image* img, DeviceInterfaces *dev) {
     char *conf_file_char;
     int result;
 
-    adb_shell_command(adb,data, "cat /proc/version",LINUX_VER);
-    adb_shell_command(adb,data, "cat /etc/version",SYSTEM_VER);
-    adb_shell_command(adb,data, "cat /usr/version",USERDATA_VER);
+    //adb_shell_command(adb,data, "cat /proc/version",LINUX_VER);
+    //adb_shell_command(adb,data, "cat /etc/version",SYSTEM_VER);
+    //adb_shell_command(adb,data, "cat /usr/version",USERDATA_VER);
 
     if (force_update) {
         sw_version_parse(data, "a5", "mismatch");

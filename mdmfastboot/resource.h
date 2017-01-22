@@ -22,24 +22,14 @@
 #define IDD_ENTER_PASSWORD              139
 #define IDD_MMITEST                     140
 #define IDC_ST_TITLE                    1001
-#define IDC_STATIC_USERDATA_VER         1002
 #define IDC_EDIT_CUSTOMER_PKG           1003
-#define IDC_EDIT_USERDATA_VER           1004
 #define IDC_STATIC_QCN_VER_MAIN         1005
-#define IDC_STATIC_SYSTEM_VER           1006
 #define IDC_EDIT_VERSION_PKG            1007
-#define IDC_EDIT_SYSTEM_VER             1008
 #define IDC_STATIC_LINUX_VER_MAIN       1009
 #define IDC_EDIT_CUREF_PKG              1010
 #define IDC_PROGRESS1                   1011
 #define IDC_GROUP                       1012
 #define IDC_DL_INFO                     1013
-#define IDC_EDIT_FRM_VER                1014
-#define IDC_EDIT_QCN_VER                1015
-#define IDC_EDIT_LINUX_VER              1016
-#define IDC_STATIC_FRM_VER              1017
-#define IDC_STATIC_QCN_VER              1018
-#define IDC_STATIC_LINUX_VER            1019
 #define IDC_STATIC_FRM_VER_MAIN         1020
 #define IDC_GRP_PKG_INFO                1021
 #define IDC_CB_PACKAGE_PATH             1022
@@ -55,7 +45,6 @@
 #define IDC_STATIC_SETTING              1040
 #define IDC_TPST_VERSION                1041
 #define IDC_EDIT_PROJECT_PKG            1042
-#define IDC_VERSION_GROUP               1043
 #define IDC_CB_PLATFORM                 1044
 #define IDC_STATIC_PLATFORM             1045
 #define IDC_EDIT_PASSWORD               1046
@@ -63,6 +52,8 @@
 #define IDC_LIST_MMI                    1048
 #define IDC_MMI_STATUS                  1050
 #define IDC_MMI_DEVINFO                 1051
+#define IDC_LIST1                       1052
+#define IDC_DEVINFO_LIST                1052
 #define ID_ABOUT_ABOUT                  32771
 #define ID_HELP_HELP                    32772
 #define ID_ABOUT_                       32773
@@ -71,12 +62,12 @@
 #define ID_FILE_M801                    32776
 
 // Next default values for new objects
-// 
+//
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        141
 #define _APS_NEXT_COMMAND_VALUE         32777
-#define _APS_NEXT_CONTROL_VALUE         1052
+#define _APS_NEXT_CONTROL_VALUE         1053
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

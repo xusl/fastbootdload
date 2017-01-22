@@ -41,6 +41,8 @@ PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
     for (int i = 0; i < sizeof m_workdata/ sizeof m_workdata[0]; i++) {
       m_workdata[i] = NULL;
     }
+    mScheduleEvt = CreateEvent(NULL,TRUE,FALSE,_T("PSTManagerSchedule"));
+
 
     //ImgUnpack img;
     //img.UnpackDlImg(mAppConf.GetPkgDlImgPath(),mAppConf.GetAppConfIniPath());
@@ -95,6 +97,10 @@ PSTManager::~PSTManager() {
     delete m_image;
     m_image = NULL;
   }
+     if (mScheduleEvt!= NULL) {
+      ::CloseHandle(mScheduleEvt);
+      mScheduleEvt = NULL;
+    }
 }
 
 BOOL PSTManager::SetPortDialogs(int x, int y) {
@@ -267,6 +273,11 @@ BOOL PSTManager::ScheduleDeviceWork() {
     if (!m_bWork) {
         // INFO("do not work now.");
         return FALSE;
+    }
+
+    if (mAppConf.GetPlatformType() == PLATFORM_CPE) {
+       ::SetEvent(mScheduleEvt);
+        return TRUE;
     }
 
     /*
@@ -573,6 +584,8 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     mNicManager.EnumNetCards();
     nic = mNicManager.GetDefaultNic();
 
+    workData->AddDevInfo(_T("IP Address"), nic.mIPAddress);
+
 #define DESKTOP_TEST
 
 #ifdef DESKTOP_TEST
@@ -590,7 +603,8 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     if (socket == INVALID_SOCKET) {
         return -1;
     }
-    telnet tn(socket, 2000, TRUE);
+    TelnetClient tn(socket, 2000, TRUE);
+    tn.set_nbio(true);
 
     workData->SetInfo(PROMPT_TEXT, _T("telent: receive welcome message"));
     tn.send_command(NULL, result);
@@ -609,7 +623,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     tn.send_command("usb_switch_to PC", result);
 
     //begin USB download
-     manager->CPEModemPST(workData);
+  //   manager->CPEModemPST(workData);
 
     //tn.send_command("send_data 254 0 0 8 0 0 0", result);
     tn.send_command("usb_switch_to IPQ", result);
@@ -649,6 +663,15 @@ VOID PSTManager::CPEModemPST(UsbWorkData *workData) {
      //workData->WaitForDevSwitchEvt();
      int i = 0;
 
+#if 1
+    ::WaitForSingleObject(mScheduleEvt, 15 * 1000);
+    dev = mDevCoordinator.GetValidDevice(mAppConf.IsUseAdbShell());
+    if (dev == NULL) {
+        LOGE("can not find CPE modem usb devcie");
+        return;
+    }
+
+#else
      while((dev = mDevCoordinator.GetValidDevice(mAppConf.IsUseAdbShell())) == NULL) {
         if (i++ > 30) {
             LOGE("timeout for update CPE modem module");
@@ -656,6 +679,7 @@ VOID PSTManager::CPEModemPST(UsbWorkData *workData) {
         }
         SLEEP(1000);
      };
+#endif
 
      workData->SetDevice(dev, mAppConf.GetFlashDirectFlag());
 
@@ -990,6 +1014,17 @@ BOOL UsbWorkData::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
     pCtl->SetInfo(infoType, strInfo);
     return TRUE;
 };
+
+BOOL UsbWorkData::AddDevInfo(CString name, CString value) {
+  UIInfo* info = new UIInfo;
+  info->infoType = PORTUI_DEVINFO;
+  info->sVal = value;
+  info->mInfoName = name;
+  hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                          (WPARAM)info,
+                          (LPARAM)this);
+  return TRUE;
+}
 
 UINT UsbWorkData::SetProgress(int progress) {
     UIInfo* info = new UIInfo;

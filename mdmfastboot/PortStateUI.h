@@ -20,6 +20,7 @@ public:
 
 	void SetProgress(int iPercent);
 	void SetInfo(UI_INFO_TYPE infoType, CString strInfo);
+  BOOL AddDevInfo(CString name, CString value);
 	void Init(int iPortID);
   void SetTitle(CString strInfo);
   void Reset(void);
@@ -36,6 +37,7 @@ public:
 
 public:
 	int iID;
+  CListCtrl m_DevInfoList;
 	UIInfo m_PortFrmVer;
 	UIInfo m_PortQCNVer;
 	UIInfo m_PortLinuxVer;

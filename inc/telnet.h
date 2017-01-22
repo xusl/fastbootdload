@@ -365,9 +365,45 @@ struct curl_slist {
   struct curl_slist *next;
 };
 
-class telnet {
+class TelnetClient {
+  public:
+     TelnetClient(curl_socket_t sock, int timeout, bool verb);
+     ~TelnetClient();
+     bool set_receive_timeout(int ms);
+     int receive_telnet_data(char *buffer, ssize_t len);
+
+     void negotiate();
+     void send_negotiation( int cmd, int option);
+     void set_local_option( int cmd, int option);
+     void rec_do( int option);
+     void rec_dont( int option);
+     void set_remote_option( int cmd, int option);
+     void rec_will( int option);
+     void rec_wont( int option);
+
+     void printsub(int direction, unsigned char *pointer,   size_t length);
+     void printoption(const char *direction, int cmd, int option);
+     CURLcode check_telnet_options();
+     void suboption();
+     CURLcode telrcv(const unsigned char *inbuf, /* Data received from socket */
+                    ssize_t count);              /* Number of bytes received */
+     CURLcode send_telnet_data(const char *buffer, ssize_t len);
+     int send_command(const char *buffer, string &result, bool trim = true);
+     int set_nbio(bool nbio);
+
+private:
+  //int Curl_poll(struct pollfd ufds[], unsigned int nfds, int timeout_ms);
+  CURLcode Curl_write(curl_socket_t sockfd,
+                      const void *mem,
+                      size_t len,
+                      ssize_t *written);
+  CURLcode Curl_read( curl_socket_t sockfd,     /* read from this socket */
+                     char *buf,                /* store read data here */
+                     size_t sizerequested,     /* max amount to read */
+                     ssize_t *n);               /* amount bytes read */
 protected:
   bool verbose;
+  bool nbio; //block IO in socket
   curl_socket_t sockfd;
   int timeout;
   int please_negotiate;
@@ -389,41 +425,8 @@ protected:
 
   TelnetReceive telrcv_state;
 
-  public:
-     telnet(curl_socket_t sock, int timeout, bool verb);
-     ~telnet();
-     bool set_receive_timeout(int ms);
-     int receive_telnet_data(char *buffer, ssize_t len);
-
-     void negotiate();
-     void send_negotiation( int cmd, int option);
-     void set_local_option( int cmd, int option);
-     void rec_do( int option);
-     void rec_dont( int option);
-     void set_remote_option( int cmd, int option);
-     void rec_will( int option);
-     void rec_wont( int option);
-
-     void printsub(int direction, unsigned char *pointer,   size_t length);
-     void printoption(const char *direction, int cmd, int option);
-     CURLcode check_telnet_options();
-     void suboption();
-     CURLcode telrcv(const unsigned char *inbuf, /* Data received from socket */
-                    ssize_t count);              /* Number of bytes received */
-     CURLcode send_telnet_data(const char *buffer, ssize_t len);
-
-     int send_command(const char *buffer, string &result, bool trim = true);
 };
 
-//int Curl_poll(struct pollfd ufds[], unsigned int nfds, int timeout_ms);
-CURLcode Curl_write(curl_socket_t sockfd,
-                    const void *mem,
-                    size_t len,
-                    ssize_t *written);
-CURLcode Curl_read( curl_socket_t sockfd,     /* read from this socket */
-                   char *buf,                /* store read data here */
-                   size_t sizerequested,     /* max amount to read */
-                   ssize_t *n);               /* amount bytes read */
 int Curl_raw_equal(const char *first, const char *second);
 
 const char *Curl_strerror( int err);

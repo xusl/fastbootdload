@@ -23,6 +23,7 @@ CPortStateUI::~CPortStateUI()
 void CPortStateUI::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
+    DDX_Control(pDX, IDC_DEVINFO_LIST, m_DevInfoList);
 }
 
 BOOL CPortStateUI::OnInitDialog()
@@ -30,7 +31,9 @@ BOOL CPortStateUI::OnInitDialog()
   CDialog::OnInitDialog();
   //m_Brush.CreateSolidBrush(RGB(0,0,0));
   //GetDlgItem(IDC_DL_INFO)->SetWindowText(_T("Yy......"));
-
+  m_DevInfoList.InsertColumn(0, _T("Name"),LVCFMT_LEFT, 120);
+  m_DevInfoList.InsertColumn(1, _T("Value"),LVCFMT_LEFT, 280);
+  //  m_DevInfoList.InsertColumn(2, _T("Description"),LVCFMT_LEFT, 600);
   return TRUE;
 }
 
@@ -43,21 +46,6 @@ void CPortStateUI::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
 		break;
     case PROMPT_TITLE:
 		GetDlgItem(IDC_DLINFO_TITLE)->SetWindowText(strInfo.GetBuffer());
-		break;
-	case FIRMWARE_VER:
-		GetDlgItem(IDC_EDIT_FRM_VER)->SetWindowText(strInfo.GetBuffer());
-		break;
-	case QCN_VER:
-		GetDlgItem(IDC_EDIT_QCN_VER)->SetWindowText(strInfo.GetBuffer());
-		break;
-	case LINUX_VER:
-		GetDlgItem(IDC_EDIT_LINUX_VER)->SetWindowText(strInfo.GetBuffer());
-        break;
-	case SYSTEM_VER:
-		GetDlgItem(IDC_EDIT_SYSTEM_VER)->SetWindowText(strInfo.GetBuffer());
-        break;
-	case USERDATA_VER:
-		GetDlgItem(IDC_EDIT_USERDATA_VER)->SetWindowText(strInfo.GetBuffer());
 		break;
     default:
         return;
@@ -141,11 +129,17 @@ void CPortStateUI::Reset(void)
 	SetTitle(strTitle);
 	GetDlgItem(IDC_DL_INFO)->SetWindowText(lpszString);
 	GetDlgItem(IDC_DLINFO_TITLE)->SetWindowText(lpszString);
-	GetDlgItem(IDC_EDIT_FRM_VER)->SetWindowText(lpszString);
-	GetDlgItem(IDC_EDIT_QCN_VER)->SetWindowText(lpszString);
-	GetDlgItem(IDC_EDIT_LINUX_VER)->SetWindowText(lpszString);
-	GetDlgItem(IDC_EDIT_SYSTEM_VER)->SetWindowText(lpszString);
-	GetDlgItem(IDC_EDIT_USERDATA_VER)->SetWindowText(lpszString);
      ((CProgressCtrl *)GetDlgItem(IDC_PROGRESS1))->SetPos(0);
+     m_DevInfoList.DeleteAllItems();
+}
+
+BOOL CPortStateUI::AddDevInfo(CString name, CString value) {
+    int nItem = m_DevInfoList.GetItemCount();
+    m_DevInfoList.InsertItem(nItem, name);
+    m_DevInfoList.SetItemText(nItem, 1, value);
+    nItem = m_DevInfoList.GetItemCount();
+    if (nItem > 0)
+        m_DevInfoList.EnsureVisible(nItem - 1, FALSE);
+    return TRUE;
 }
 

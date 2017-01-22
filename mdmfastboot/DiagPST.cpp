@@ -49,7 +49,7 @@ DiagPST::DiagPST(UsbWorkData * worker, map<string,FileBufStruct> & filebuffer):
         for (int i = 0; i < 12; i++) {
             memset(version, 0, sizeof version);
             DIAGCmd.RequestVersion(i, (char *)(&version));
-            m_Worker->SetInfo(FIRMWARE_VER, version);
+            m_Worker->AddDevInfo(_T("Firmware version"), CString(version));
             LOGE("index %d version %s", i, version);
         }
         //char pFlash_Type[20] = {0};
@@ -643,8 +643,8 @@ bool DiagPST::RequestExternalVersion()
         SLEEP(1000);
     }
 
-    m_Worker->SetInfo(FIRMWARE_VER, pExternal);
-    m_Worker->SetInfo(LINUX_VER, "NA");
+    m_Worker->AddDevInfo(_T("Firmware version"), CString(pExternal));
+    m_Worker->AddDevInfo(_T("Linux version"), _T("NA"));
  #ifdef FEATURE_TPST
     setVerCallBack(m_dlPort,"NA",PTS_VER);
 #endif

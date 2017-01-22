@@ -205,7 +205,7 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
     }
 
     testDialog->AddTestResult(_T("RJ45 1"), TRUE, "Ok.");
-    telnet tn(sock, 3000, true);
+    TelnetClient tn(sock, 3000, true);
 
     LOGE("start telnet negotiate");
     testDialog->SetStatus(_T("start telnet negotiate"));
@@ -279,7 +279,7 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
 }
 
 //error code :  "254 0 2 4 1 0 0"
-BOOL MmiTestDialog::TestKey(telnet &client, CString item, const string &ok, int key, int elapse) {
+BOOL MmiTestDialog::TestKey(TelnetClient &client, CString item, const string &ok, int key, int elapse) {
     string data;
     char command[64] = {0};
     CString text;
@@ -301,7 +301,7 @@ BOOL MmiTestDialog::TestKey(telnet &client, CString item, const string &ok, int 
     return pass;
 }
 
-BOOL MmiTestDialog::TestLed(telnet &client, CString item,  int value) {
+BOOL MmiTestDialog::TestLed(TelnetClient &client, CString item,  int value) {
     string data;
     char command[64] = {0};
     string ok = "254 0 2 3 0 0 0";
@@ -320,7 +320,7 @@ BOOL MmiTestDialog::TestLed(telnet &client, CString item,  int value) {
     return pass;
 }
 
-BOOL MmiTestDialog::TestItem(telnet &client, CString item, PCCH command, const string &ok, const string &error) {
+BOOL MmiTestDialog::TestItem(TelnetClient &client, CString item, PCCH command, const string &ok, const string &error) {
     string data;
     BOOL pass;
 
@@ -334,7 +334,7 @@ BOOL MmiTestDialog::TestItem(telnet &client, CString item, PCCH command, const s
     return pass;
 }
 
-BOOL MmiTestDialog::TestItem(telnet &client, CString item, PCCH command, string &data) {
+BOOL MmiTestDialog::TestItem(TelnetClient &client, CString item, PCCH command, string &data) {
     CString status = _T("Test item \n\t");
     status += item;
     SetStatus(status);
@@ -342,7 +342,7 @@ BOOL MmiTestDialog::TestItem(telnet &client, CString item, PCCH command, string 
     return TRUE;
 }
 
-BOOL MmiTestDialog::TestWiFi(telnet &client, CString item, PCCH command) {
+BOOL MmiTestDialog::TestWiFi(TelnetClient &client, CString item, PCCH command) {
     string data;
     string result;
     CString text;

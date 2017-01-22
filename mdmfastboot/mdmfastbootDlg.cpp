@@ -543,6 +543,10 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
         data->pCtl->SetProgress(uiInfo->iVal);
         break;
 
+    case PORTUI_DEVINFO:
+        data->pCtl->AddDevInfo(uiInfo->mInfoName, uiInfo->sVal);
+        break;
+
     default:
         data->pCtl->SetInfo(uiInfo->infoType, uiInfo->sVal);
     }
