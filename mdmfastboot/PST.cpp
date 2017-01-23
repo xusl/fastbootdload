@@ -269,14 +269,20 @@ UsbWorkData * PSTManager::FindUsbWorkData(wchar_t *devPath) {
 }
 
 BOOL PSTManager::ScheduleDeviceWork() {
+    DeviceInterfaces* idleDev;
+    UsbWorkData* workdata;
     BOOL flashdirect = mAppConf.GetFlashDirectFlag();
     if (!m_bWork) {
         // INFO("do not work now.");
         return FALSE;
     }
 
+    LOGD("==========Begin ScheduleDeviceWork==============");
     if (mAppConf.GetPlatformType() == PLATFORM_CPE) {
-       ::SetEvent(mScheduleEvt);
+//       ::SetEvent(mScheduleEvt);
+         workdata = m_workdata[0];
+        if (workdata->GetStatus() == USB_STAT_SWITCH)
+            workdata->SetDevSwitchEvt(flashdirect);
         return TRUE;
     }
 
@@ -286,9 +292,6 @@ BOOL PSTManager::ScheduleDeviceWork() {
      * this feature will be useful when multiport port download, it help operator
      * to make sure whether the device in a specific is flashed.
      */
-    DeviceInterfaces* idleDev;
-    UsbWorkData* workdata;
-    LOGD("==========Begin ScheduleDeviceWork==============");
 
     for (int i=0; i < GetPortNum(); i++) {
         workdata = m_workdata[i];
@@ -578,15 +581,14 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
 
     if (openwrtFiles.size() <= 0) {
         LOGE("There are none images to download");
+        workData->SetInfo(PROMPT_TEXT, _T("There are none images to download"));
         return -1;
     }
 
     mNicManager.EnumNetCards();
     nic = mNicManager.GetDefaultNic();
 
-    workData->AddDevInfo(_T("IP Address"), nic.mIPAddress);
-
-#define DESKTOP_TEST
+//#define DESKTOP_TEST
 
 #ifdef DESKTOP_TEST
     gateway = "10.0.0.2";
@@ -597,6 +599,9 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
         return ENOMEM;
     }
 #endif
+
+    workData->AddDevInfo(_T("Host Connection"), nic.mConnectionName);
+    workData->AddDevInfo(_T("Device IP Address"), nic.mGateway);
 
     workData->SetInfo(PROMPT_TEXT, _T("telent: connect to device"));
     SOCKET socket = ConnectServer(gateway.c_str(), TELNET_PORT);
@@ -623,12 +628,14 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     tn.send_command("usb_switch_to PC", result);
 
     //begin USB download
-  //   manager->CPEModemPST(workData);
+    manager->CPEModemPST(workData);
 
+    workData->SetInfo(PROMPT_TEXT, _T("telent: switch usb to IPQ"));
     //tn.send_command("send_data 254 0 0 8 0 0 0", result);
     tn.send_command("usb_switch_to IPQ", result);
 
-    workData->SetInfo(PROMPT_TEXT, _T("telent: request download file"));
+    tn.set_nbio(false);
+    workData->SetInfo(PROMPT_TITLE, _T("telent: request download file"));
     //  m_MmiDevInfo = nic.mConnectionName;
     //for (map<string, CString>::iterator it=openwrtFiles.begin(); it != openwrtFiles.end(); it ++) {
         //tn.send_command("cd /tmp/", result);
@@ -660,26 +667,18 @@ VOID PSTManager::CPEModemPST(UsbWorkData *workData) {
     ASSERT(workData);
      HandleComDevice(FALSE);
      EnumerateAdbDevice(FALSE);
+
      //workData->WaitForDevSwitchEvt();
      int i = 0;
-
-#if 1
-    ::WaitForSingleObject(mScheduleEvt, 15 * 1000);
-    dev = mDevCoordinator.GetValidDevice(mAppConf.IsUseAdbShell());
-    if (dev == NULL) {
-        LOGE("can not find CPE modem usb devcie");
-        return;
-    }
-
-#else
      while((dev = mDevCoordinator.GetValidDevice(mAppConf.IsUseAdbShell())) == NULL) {
-        if (i++ > 30) {
+        if (i++ > 15) {
             LOGE("timeout for update CPE modem module");
             return;
         }
-        SLEEP(1000);
+        //::WaitForSingleObject(mScheduleEvt, 10 * 1000);
+        SLEEP(2000);
      };
-#endif
+
 
      workData->SetDevice(dev, mAppConf.GetFlashDirectFlag());
 
