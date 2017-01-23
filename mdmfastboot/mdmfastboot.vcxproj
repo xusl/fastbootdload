@@ -239,12 +239,13 @@ copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</C
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>Psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Psapi.lib;QMSL_MSVC6R.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalLibraryDirectories>..\libs\QMSL;.\zipfile;.\driver;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy configs\*.ini $(SolutionDir)$(Platform)\$(Configuration)\
@@ -279,7 +280,6 @@ copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</C
     <ClCompile Include="..\src\log.cpp" />
     <ClCompile Include="mdmfastboot.cpp" />
     <ClCompile Include="mdmfastbootDlg.cpp" />
-    <ClCompile Include="MmiTestDialog.cpp" />
     <ClCompile Include="PasswordEnterDlg.cpp" />
     <ClCompile Include="PortStateUI.cpp" />
     <ClCompile Include="PST.cpp" />
@@ -306,7 +306,6 @@ copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</C
     <ClInclude Include="fastbootflash.h" />
     <ClInclude Include="mdmfastboot.h" />
     <ClInclude Include="mdmfastbootDlg.h" />
-    <ClInclude Include="MmiTestDialog.h" />
     <ClInclude Include="PasswordEnterDlg.h" />
     <ClInclude Include="PST.h" />
     <ClInclude Include="qcnlib\QcnParser.h" />

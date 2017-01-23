@@ -117,9 +117,6 @@
     <ClCompile Include="..\src\telnet.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="MmiTestDialog.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\NicManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -174,9 +171,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="..\inc\jrdmmidiag.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="MmiTestDialog.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="..\inc\NicManager.h">

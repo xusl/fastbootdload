@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "deviceswitch", "deviceswitc
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "install", "autorun\install.vcxproj", "{6691D1CD-9023-46F4-9213-43D4CB91C961}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CPEReliabilityTool", "CPEReliabilityTool\CPEReliabilityTool.vcxproj", "{9596C2AC-66B0-4F28-807E-7CFF78717560}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -79,6 +81,12 @@ Global
 		{6691D1CD-9023-46F4-9213-43D4CB91C961}.Release|Win32.ActiveCfg = Release|Win32
 		{6691D1CD-9023-46F4-9213-43D4CB91C961}.Release|Win32.Build.0 = Release|Win32
 		{6691D1CD-9023-46F4-9213-43D4CB91C961}.Release|x64.ActiveCfg = Release|Win32
+		{9596C2AC-66B0-4F28-807E-7CFF78717560}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9596C2AC-66B0-4F28-807E-7CFF78717560}.Debug|Win32.Build.0 = Debug|Win32
+		{9596C2AC-66B0-4F28-807E-7CFF78717560}.Debug|x64.ActiveCfg = Debug|Win32
+		{9596C2AC-66B0-4F28-807E-7CFF78717560}.Release|Win32.ActiveCfg = Release|Win32
+		{9596C2AC-66B0-4F28-807E-7CFF78717560}.Release|Win32.Build.0 = Release|Win32
+		{9596C2AC-66B0-4F28-807E-7CFF78717560}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
