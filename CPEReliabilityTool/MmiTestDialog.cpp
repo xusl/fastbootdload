@@ -194,8 +194,14 @@ SOCKET MmiTestDialog::GetTelnetSocket() {
     NetCardStruct nic = mNic.GetDefaultNic();
     m_MmiDevInfo = nic.mConnectionName;
 
+    if (nic.mGateway.IsEmpty()) {
+        SetStatus( _T("No device IP address."));
+        return INVALID_SOCKET;
+    }
+
     PCHAR ip_addr = WideStrToMultiStr(nic.mGateway.GetString());
     if (ip_addr == NULL) {
+        SetStatus( _T("can not get IP address."));
         return INVALID_SOCKET;
     }
 

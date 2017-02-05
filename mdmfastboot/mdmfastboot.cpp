@@ -4,7 +4,6 @@
 #include "stdafx.h"
 #include "mdmfastboot.h"
 #include "mdmfastbootDlg.h"
-#include "MmiTestDialog.h"
 #include "log.h"
 
 #ifdef _DEBUG
@@ -111,12 +110,7 @@ BOOL CmdmfastbootApp::InitInstance()
 	// 例如修改为公司或组织名
 	SetRegistryKey(_T("TCL MBB MODULE FASTBOOT"));
 
-//#define MMI_TOOL
-#ifdef MMI_TOOL
-	MmiTestDialog dlg;
-#else
 	CmdmfastbootDlg dlg;
-#endif
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();
 	if (nResponse == IDOK)
