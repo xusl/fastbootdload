@@ -76,6 +76,7 @@ void CmdmfastbootDlg::DoDataExchange(CDataExchange* pDX)
     //DDX_Text(pDX, IDC_EDIT_CUREF_PKG, m_LinuxVer);
 
     DDX_Control(pDX, IDC_CB_PACKAGE_PATH, m_PackageHistory);
+    DDX_Control(pDX, IDC_COMBO_NIC, m_NicComboBox);
 }
 
 BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
@@ -102,6 +103,7 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_COMMAND(ID_FILE_M850, &CmdmfastbootDlg::OnFileM850)
 	ON_COMMAND(ID_FILE_M801, &CmdmfastbootDlg::OnFileM801)
     ON_CBN_SELCHANGE(IDC_CB_PACKAGE_PATH, &CmdmfastbootDlg::OnSelchangeCbPackagePath)
+    ON_CBN_SELCHANGE(IDC_COMBO_NIC, &CmdmfastbootDlg::OnCbnSelchangeComboNic)
 END_MESSAGE_MAP()
 
 void CmdmfastbootDlg::OnHelp()
@@ -359,6 +361,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   }
   m_PackagePath = mPSTManager.GetPackage();
   UpdatePackageInfo(FALSE);
+  SetupNicList();
 
   //注释设备通知，不能放在构造函数，否则 RegisterDeviceNotification 返回87,因为构造函数中m_hWnd还没被初始化为有效值.
   RegisterAdbDeviceNotification(m_hWnd);
@@ -371,6 +374,22 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   }
 
   return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
+}
+
+VOID CmdmfastbootDlg::SetupNicList() {
+    NicManager *m_pNicManager = mPSTManager.GetNicManager();
+    list<NetCardStruct>* nic = (list<NetCardStruct>*)m_pNicManager->GetNicList();
+    list<NetCardStruct>::iterator it;
+    int result = CB_OKAY;
+    m_NicComboBox.ResetContent();
+    for (it = nic->begin(); it != nic->end(); ++it) {
+        result = m_NicComboBox.AddString(it->mConnectionName);
+        if (result != CB_ERR && result != CB_ERRSPACE) {
+          m_NicComboBox.SetItemDataPtr(result, (void *)it->Id);
+          if (it->Id == m_pNicManager->GetDefaultNic().Id)
+            m_NicComboBox.SetCurSel(result);
+        }
+    }
 }
 
 void CmdmfastbootDlg::OnSysCommand(UINT nID, LPARAM lParam)
@@ -661,8 +680,9 @@ VOID CmdmfastbootDlg::SetDialogSize() {
   cy += MAX(leftHeight, rightHeight);
   cy += GetSystemMetrics(SM_CYMENU);
   cy += VERTICAL_GAP * 2;
-  SetWindowPos(0, 0, 0, cx, cy, SWP_NOSENDCHANGING/* | SWP_NOSIZE*/);
+  SetWindowPos(0, 0, 0, cx, cy, SWP_SHOWWINDOW | SWP_NOSENDCHANGING /*| SWP_NOSIZE*/);
   CenterWindow();
+  Invalidate(TRUE);
 }
 
 VOID CmdmfastbootDlg::LayoutControl() {
@@ -852,6 +872,20 @@ void CmdmfastbootDlg::OnSelchangeCbPackagePath()
 }
 
 
+void CmdmfastbootDlg::OnCbnSelchangeComboNic()
+{
+    int idx = m_NicComboBox.GetCurSel();
+    if( idx < 0 ) return;
+
+    void * data = m_NicComboBox.GetItemDataPtr(idx);
+
+    NicManager *m_pNicManager = mPSTManager.GetNicManager();
+    m_pNicManager->SetDefaultNic((DWORD) data);
+
+   // m_NicComboBox.GetLBText( idx, );
+}
+
+
 void CmdmfastbootDlg::OnBnClickedStart()
 {
 	if (m_imglist->GetItemCount()<1)
@@ -945,7 +979,7 @@ CSettingsDlg settings ;
 
 void CmdmfastbootDlg::OnSizing(UINT fwSide, LPRECT pRect)
 {
-//CDialog::OnSizing(fwSide, pRect);
+  CDialog::OnSizing(fwSide, pRect);
 
 // TODO: 在此处添加消息处理程序代码
 }
@@ -1022,3 +1056,5 @@ void CmdmfastbootDlg::OnFileM801()
 //	InitSettingConfig();
 //	UpdatePackage();
 }
+
+

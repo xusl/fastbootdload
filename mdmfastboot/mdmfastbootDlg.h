@@ -61,6 +61,7 @@ protected:
   PSTManager mPSTManager;
   CListCtrl   *m_imglist;
   CComboBox m_PackageHistory;
+  CComboBox m_NicComboBox;
 
 //#ifdef INLINE_SETTING
 //  CSettingsDlg m_SetDlg;
@@ -102,12 +103,13 @@ public:
 
 private:
 #ifdef INLINE_SETTING
-    BOOL InitSettingDlg(void);
+  BOOL InitSettingDlg(void);
 #endif
-    BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
+  BOOL SetWorkStatus(BOOL bwork, BOOL bforce);
   VOID LayoutControl();
   VOID SetDialogSize();
   BOOL StopConfirm();
+  VOID SetupNicList();
 
 public:
 	afx_msg void OnSizing(UINT fwSide, LPRECT pRect);
@@ -116,5 +118,6 @@ public:
 	afx_msg void OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnFileM850();
 	afx_msg void OnFileM801();
-    afx_msg void OnSelchangeCbPackagePath();
+  afx_msg void OnSelchangeCbPackagePath();
+  afx_msg void OnCbnSelchangeComboNic();
 };

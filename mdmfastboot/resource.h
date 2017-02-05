@@ -20,7 +20,6 @@
 #define IDI_LOCK                        135
 #define IDI_UNLOCK                      136
 #define IDD_ENTER_PASSWORD              139
-#define IDD_MMITEST                     140
 #define IDC_ST_TITLE                    1001
 #define IDC_EDIT_CUSTOMER_PKG           1003
 #define IDC_STATIC_QCN_VER_MAIN         1005
@@ -49,11 +48,10 @@
 #define IDC_STATIC_PLATFORM             1045
 #define IDC_EDIT_PASSWORD               1046
 #define IDC_CAPSLOCK_PROMPT             1047
-#define IDC_LIST_MMI                    1048
-#define IDC_MMI_STATUS                  1050
-#define IDC_MMI_DEVINFO                 1051
 #define IDC_LIST1                       1052
 #define IDC_DEVINFO_LIST                1052
+#define IDC_COMBO_NIC                   1053
+#define IDC_STATIC_NIC                  1054
 #define ID_ABOUT_ABOUT                  32771
 #define ID_HELP_HELP                    32772
 #define ID_ABOUT_                       32773
@@ -62,12 +60,12 @@
 #define ID_FILE_M801                    32776
 
 // Next default values for new objects
-//
+// 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        141
 #define _APS_NEXT_COMMAND_VALUE         32777
-#define _APS_NEXT_CONTROL_VALUE         1053
+#define _APS_NEXT_CONTROL_VALUE         1055
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

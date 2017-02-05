@@ -84,7 +84,7 @@ public:
     void EnumNetCards();
     const list<NetCardStruct>* GetNicList() const { return  &mNicList;}
     int GetNicNum() { return (int)mNicList.size(); }
-    NetCardStruct GetDefaultNic() const { return m_DefaultNic;};
+    NetCardStruct GetDefaultNic() const { return m_DefaultNic;}
     BOOL SetDefaultNic(DWORD id);
     BOOL RestoreDefaultNic();
     int SetIP( CString & ip,  CString & gateway,  CString & subnetMask, BOOL updateIp=TRUE);

@@ -159,6 +159,9 @@ public:
   CPortStateUI* GetPortUI(UINT index);
   RECT GetPortRect(UINT index = 0);
 
+  NicManager * GetNicManager() { return &mNicManager;}
+  NetCardStruct GetNic() const { return mNicManager.GetDefaultNic();}
+
   AppConfig* GetAppConfig() { return &mAppConf;}
   flash_image* GetProjectPackage() { return m_image;}
   BOOL ChangePackage(const wchar_t * dir);
@@ -180,18 +183,17 @@ private:
     static UINT RunTelnetServer(LPVOID wParam);
 
 private:
-  int               m_GridHeight;
-  int               m_GridWidth;
-  BOOL              m_bInit;
-  AppConfig          mAppConf;
-  flash_image       *m_image;
-  UsbWorkData       *m_workdata[PORT_NUM_MAX];
-
-  vector<CDevLabel>  m_WorkDev;
-  DeviceCoordinator  mDevCoordinator;
+  int                   m_GridHeight;
+  int                   m_GridWidth;
+  BOOL                  m_bInit;
+  AppConfig             mAppConf;
+  flash_image           *m_image;
+  UsbWorkData           *m_workdata[PORT_NUM_MAX];
+  vector<CDevLabel>     m_WorkDev;
+  DeviceCoordinator     mDevCoordinator;
+  NicManager            mNicManager;
   CMiniHttpDownloadServer mHttpServer;
-  HANDLE          mScheduleEvt;
-
-  AFX_THREADPROC     mThreadProc;
-  volatile BOOL      m_bWork;
+  HANDLE                mScheduleEvt;
+  AFX_THREADPROC        mThreadProc;
+  volatile BOOL         m_bWork;
 };

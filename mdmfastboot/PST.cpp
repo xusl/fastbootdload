@@ -83,6 +83,8 @@ BOOL PSTManager::Initialize(CWnd *hWnd, BOOL showPort) {
   //hWnd->Invalidate();
   //mAppConf.ScanDir();
   m_bInit = TRUE;
+
+  mNicManager.EnumNetCards();
   return TRUE;
 }
 
@@ -572,7 +574,6 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     string gateway;
     string host;
     string result;
-    NicManager mNicManager;
     NetCardStruct nic;
     string command;
     flash_image *packageImage = manager->GetProjectPackage();
@@ -585,8 +586,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
         return -1;
     }
 
-    mNicManager.EnumNetCards();
-    nic = mNicManager.GetDefaultNic();
+    nic = manager->GetNic();
 
 //#define DESKTOP_TEST
 
