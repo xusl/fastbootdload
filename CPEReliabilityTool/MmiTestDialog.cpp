@@ -58,6 +58,8 @@ void MmiTestDialog::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(MmiTestDialog, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+    ON_BN_CLICKED(IDOK, &MmiTestDialog::OnBnClickedStart)
+    ON_BN_CLICKED(IDCANCEL, &MmiTestDialog::OnBnClickedExit)
 END_MESSAGE_MAP()
 
 
@@ -414,7 +416,11 @@ BOOL MmiTestDialog::DiagTest() {
         BOOL pass = DIAG_CheckSIM_Card(result);
         AddTestResult(_T("SIM card"), pass, result);
     } else {
-        AddTestResult(_T("USB"), FALSE, "can not connect to device");
+        if (diag.GetComPortNum() > 100) {
+            AfxMessageBox(_T("The Com port number is too large, please set it lower than 100."), MB_OK);
+        } else {
+            AddTestResult(_T("USB"), FALSE, "can not connect to device");
+        }
     }
     DisconnectMs();
 
@@ -450,6 +456,17 @@ void MmiTestDialog::OnBnClickedStart()
     //mDeviceManager.SetWork(TRUE, FALSE);
     //mDeviceManager.HandleComDevice(FALSE);
     //mDeviceManager.ScheduleDeviceWork();
+
+    if (mNic.GetNicNum() <= 0) {
+        AfxMessageBox(_T("There are no ethernet Network Interface Card"), MB_OK);
+        return;
+    }
+
+    if (mNic.GetNicNum() > 1) {
+        AfxMessageBox(_T("There are more than one ethernet Network Interface Card"), MB_OK);
+        return;
+    }
+
     AfxBeginThread(MmiTestDialog::RunMmiTest, this);
     SetWork(TRUE);
     //CDialogEx::OnOK();
