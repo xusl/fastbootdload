@@ -116,8 +116,9 @@ public:
 	virtual void HtmlHelp(DWORD_PTR dwData, UINT nCmd = 0x000F);
 	afx_msg void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
 	afx_msg void OnLvnItemchanged(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnFileM850();
-	afx_msg void OnFileM801();
   afx_msg void OnSelchangeCbPackagePath();
   afx_msg void OnCbnSelchangeComboNic();
+  afx_msg void OnSettingsOptions();
+	afx_msg void OnFileM850();
+	afx_msg void OnFileM801();
 };

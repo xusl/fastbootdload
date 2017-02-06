@@ -86,8 +86,8 @@ public:
     int GetNicNum() { return (int)mNicList.size(); }
     NetCardStruct GetDefaultNic() const { return m_DefaultNic;}
     BOOL SetDefaultNic(DWORD id);
+    BOOL UpdateNic(NetCardStruct &nic);
     BOOL RestoreDefaultNic();
-    int SetIP( CString & ip,  CString & gateway,  CString & subnetMask, BOOL updateIp=TRUE);
 
     BOOL IsChangingIp() const { return m_IsChangingIp;}
     BOOL EnableDhcp(BOOL updateIp);
@@ -105,6 +105,7 @@ private:
     BOOL SwitchNic(NetCardStruct &netCard, bool Enabled);
     bool NetCardStateChange(NetCardStruct &netCard, bool Enabled);
     BOOL WaitAddrChanged();
+    int SetIP( CString & ip,  CString & gateway,  CString & subnetMask, BOOL updateIp=TRUE);
     BOOL RegGetIP(const CString & adapter, CString& ip, CString &subnetMask, CString& gateway,  BOOL& enableDHCP);
     BOOL RegSetIP(const CString & adapter,  CString & pIPAddress,  CString & pNetMask,  CString & pNetGate, DWORD enableDHCP);
     BOOL RegSetMultisz(HKEY hKey, LPCWSTR lpValueName,  CString& lpValue);

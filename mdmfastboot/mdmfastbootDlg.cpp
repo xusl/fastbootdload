@@ -5,6 +5,7 @@
 #include "log.h"
 #include "mdmfastboot.h"
 #include "mdmfastbootDlg.h"
+#include "PasswordEnterDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -100,10 +101,11 @@ BEGIN_MESSAGE_MAP(CmdmfastbootDlg, CDialog)
 	ON_WM_SIZING()
 	ON_WM_MEASUREITEM()
 	ON_NOTIFY(LVN_ITEMCHANGED, IDC_IMAGE_LIST, &CmdmfastbootDlg::OnLvnItemchanged)
-	ON_COMMAND(ID_FILE_M850, &CmdmfastbootDlg::OnFileM850)
-	ON_COMMAND(ID_FILE_M801, &CmdmfastbootDlg::OnFileM801)
     ON_CBN_SELCHANGE(IDC_CB_PACKAGE_PATH, &CmdmfastbootDlg::OnSelchangeCbPackagePath)
     ON_CBN_SELCHANGE(IDC_COMBO_NIC, &CmdmfastbootDlg::OnCbnSelchangeComboNic)
+    ON_COMMAND(ID_SETTINGS_OPTIONS, &CmdmfastbootDlg::OnSettingsOptions)
+	//ON_COMMAND(ID_FILE_M850, &CmdmfastbootDlg::OnFileM850)
+	//ON_COMMAND(ID_FILE_M801, &CmdmfastbootDlg::OnFileM801)
 END_MESSAGE_MAP()
 
 void CmdmfastbootDlg::OnHelp()
@@ -966,8 +968,7 @@ CSettingsDlg settings ;
 	{
 
 	}
-    #else
-
+#else
 	m_SetDlg.Create(IDD_SETTINGS, NULL);
 	    m_SetDlg.ModifyStyle(
               WS_CHILD | WS_VISIBLE | DS_CENTER,
@@ -1057,4 +1058,9 @@ void CmdmfastbootDlg::OnFileM801()
 //	UpdatePackage();
 }
 
-
+void CmdmfastbootDlg::OnSettingsOptions()
+{
+CSettingsDlg dlg;
+//PasswordEnterDlg dlg;
+dlg.DoModal();
+}

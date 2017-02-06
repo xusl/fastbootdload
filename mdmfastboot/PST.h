@@ -154,13 +154,12 @@ public:
   int GetPortGridHeight() { return m_GridHeight;}
   BOOL SetPortDialogs(int x, int y);
   BOOL SetPortDialogs(int x, int y, int w, int h);
-  int GetPortNum();
+  UINT GetPortNum();
   UINT GetPortRows();
   CPortStateUI* GetPortUI(UINT index);
   RECT GetPortRect(UINT index = 0);
 
   NicManager * GetNicManager() { return &mNicManager;}
-  NetCardStruct GetNic() const { return mNicManager.GetDefaultNic();}
 
   AppConfig* GetAppConfig() { return &mAppConf;}
   flash_image* GetProjectPackage() { return m_image;}

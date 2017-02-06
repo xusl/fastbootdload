@@ -2,10 +2,8 @@
 //
 
 #include "stdafx.h"
-#include "mdmfastboot.h"
+#include "resource.h"
 #include "SettingsDlg.h"
-#include "mdmfastbootDlg.h"
-
 
 // CSettingsDlg ¶Ô»°¿ò
 
@@ -18,7 +16,7 @@ CSettingsDlg::CSettingsDlg(CWnd* pParent /*=NULL*/)
   m_pForceupdate(NULL)
 {
 
-	EnableAutomation();
+	//EnableAutomation();
 
 }
 
@@ -64,7 +62,7 @@ BOOL CSettingsDlg::SetForeUpdateData(int *pData){
 
 BEGIN_MESSAGE_MAP(CSettingsDlg, CDialogEx)
 	ON_NOTIFY_EX_RANGE(TTN_NEEDTEXT,0,0xFFFF,&CSettingsDlg::OnToolTipNotify)
-	ON_WM_SIZE()
+	//ON_WM_SIZE()
 	ON_BN_CLICKED(IDC_CHECK_FORCEUPDATE, &CSettingsDlg::OnBnClickedCheckForceupdate)
 	ON_BN_CLICKED(IDC_FASTBOOT_ONLY, &CSettingsDlg::OnBnClickedFastbootOnly)
 	ON_BN_CLICKED(IDC_SCHE_REMOVE, &CSettingsDlg::OnBnClickedScheRemove)

@@ -1,12 +1,9 @@
 #pragma once
 #include "afxdialogex.h"
-enum {
-SETTING_FORCEUPDATE = 0,
-SETTING_REMOVE,
-};
+
 // CSettingsDlg 对话框
 
-class CmdmfastbootDlg;
+//class CmdmfastbootDlg;
 
 class CSettingsDlg : public CDialogEx
 {
@@ -24,7 +21,7 @@ public:
 // 对话框数据
 	enum { IDD = IDD_SETTINGS };
 
-	CmdmfastbootDlg* m_pParent;
+	//CmdmfastbootDlg* m_pParent;
 private:
   int *m_pSchedule;
   int *m_pFlashdirect;
@@ -33,12 +30,13 @@ private:
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
-	DECLARE_MESSAGE_MAP()
-public:
 	virtual BOOL OnInitDialog();
+	DECLARE_MESSAGE_MAP()
+
+public:
   BOOL OnToolTipNotify(UINT id, NMHDR *pNMH,  LRESULT *pResult);
 
   afx_msg void OnBnClickedCheckForceupdate();
   afx_msg void OnBnClickedFastbootOnly();
   afx_msg void OnBnClickedScheRemove();
-	};
+};

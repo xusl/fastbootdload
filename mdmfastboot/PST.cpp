@@ -71,7 +71,7 @@ BOOL PSTManager::Initialize(CWnd *hWnd, BOOL showPort) {
     row > column ? column++ :  row++;
   }
 
-  for (int i = 0; i < GetPortNum(); i++) {
+  for (UINT i = 0; i < GetPortNum(); i++) {
     m_workdata[i] = new UsbWorkData(i, hWnd, &mAppConf,  m_image);
     if (!showPort)
         m_workdata[i]->ShowSubWindow(showPort);
@@ -89,7 +89,7 @@ BOOL PSTManager::Initialize(CWnd *hWnd, BOOL showPort) {
 }
 
 PSTManager::~PSTManager() {
-  for (int i = 0; i < GetPortNum(); i++) {
+  for (UINT i = 0; i < GetPortNum(); i++) {
     if (m_workdata[i] != NULL) {
        delete m_workdata[i];
        m_workdata[i] = NULL;
@@ -168,7 +168,7 @@ VOID PSTManager::SetWork(BOOL work, BOOL schedule) {
     }
 }
 
-int PSTManager::GetPortNum() {
+UINT PSTManager::GetPortNum() {
     return min(sizeof m_workdata/ sizeof m_workdata[0], mAppConf.GetUiPortTotalCount());
 }
 
@@ -212,7 +212,7 @@ CPortStateUI* PSTManager::GetPortUI(UINT index) {
 
 BOOL PSTManager::IsHaveUsbWork(void) {
   UsbWorkData* workdata;
-  int i= 0;
+  UINT i= 0;
   for (; i < GetPortNum(); i++) {
     workdata = m_workdata[i];
     if (!workdata->IsIdle())
@@ -257,7 +257,7 @@ UsbWorkData * PSTManager::FindUsbWorkData(wchar_t *devPath) {
     }
 
     // first search the before, for switch device.
-    for ( int i= 0; i < GetPortNum(); i++) {
+    for ( UINT i= 0; i < GetPortNum(); i++) {
         DeviceInterfaces* item = m_workdata[i]->mActiveDevIntf;
         if (item == NULL)
             continue;
@@ -295,7 +295,7 @@ BOOL PSTManager::ScheduleDeviceWork() {
      * to make sure whether the device in a specific is flashed.
      */
 
-    for (int i=0; i < GetPortNum(); i++) {
+    for (UINT i=0; i < GetPortNum(); i++) {
         workdata = m_workdata[i];
         DeviceInterfaces* item = workdata->mMapDevIntf;
         if (item == NULL)
@@ -328,7 +328,7 @@ BOOL PSTManager::ScheduleDeviceWork() {
 }
 
 BOOL PSTManager::Reset() {
-    for (int i= 0; i < GetPortNum(); i++) {
+    for (UINT i= 0; i < GetPortNum(); i++) {
         m_workdata[i]->Reset();
     }
     mHttpServer.StopHttpServer();
@@ -429,7 +429,7 @@ BOOL PSTManager::HandleComDevice(BOOL schedule) {
     //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
     //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
     vector<CDevLabel>::iterator iter;
-    DeviceInterfaces* devintf;
+    //DeviceInterfaces* devintf;
     BOOL success = FALSE;
 
     for (iter = devicePath.begin(); iter != devicePath.end();++iter) {
@@ -574,6 +574,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     string gateway;
     string host;
     string result;
+    NicManager * nicManager;
     NetCardStruct nic;
     string command;
     flash_image *packageImage = manager->GetProjectPackage();
@@ -586,7 +587,9 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
         return -1;
     }
 
-    nic = manager->GetNic();
+    nicManager = manager->GetNicManager();
+    nic = nicManager->GetDefaultNic();
+    nicManager->UpdateNic(nic);
 
 //#define DESKTOP_TEST
 
@@ -693,7 +696,7 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
     usb_handle * handle;
     flash_image  *img;
     DeviceInterfaces *dev;
-    int result;
+//    int result;
     usb_dev_t status;
     BOOL useAdb = TRUE;
     BOOL flashdirect = TRUE;
