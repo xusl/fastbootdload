@@ -155,7 +155,16 @@ void AppConfig::ReadPackageHistory() {
                                        MAX_PATH,
                                        m_ConfigPath.GetString());
     if (data_len > 0 && PathFileExists(filename)) {
-        m_PackageDirs.push_back(filename);
+        int length = wcslen(filename);
+        if(filename[length - 1] != PATH_SEPERATOR ) {
+            if (length + 1 < MAX_PATH) {
+                filename[length + 1] = filename[length];
+                filename[length] = PATH_SEPERATOR;
+                m_PackageDirs.push_back(filename);
+            }
+        } else {
+            m_PackageDirs.push_back(filename);
+        }
     }
 
     cursor = cursor + length + 1;

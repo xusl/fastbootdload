@@ -57,6 +57,7 @@ CmdmfastbootDlg::CmdmfastbootDlg(CWnd* pParent /*=NULL*/)
   m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
   m_updated_number = 0;
   m_module_name = MODULE_M801;
+  m_PackageSelIdx = 0;
 #ifdef INLINE_SETTING
   m_SetDlg.m_pParent = this;
 #endif
@@ -236,6 +237,8 @@ BOOL CmdmfastbootDlg::SetWorkStatus(BOOL bwork, BOOL bforce) {
 	m_imglist->EnableWindow(!bwork);
     GetDlgItem(IDC_BTN_START)->SetWindowText(bwork ? _T("Stop") : _T("Start"));
     GetDlgItem(IDCANCEL)->EnableWindow(!bwork);
+    m_PackageHistory.EnableWindow(!bwork);
+    m_NicComboBox.EnableWindow(!bwork);
 //    GetDlgItem(IDC_BTN_STOP)->EnableWindow(bwork);
 
 #ifdef INLINE_SETTING
@@ -354,8 +357,10 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   }
   result = m_PackageHistory.AddString(_T("Browser..."));
   m_PackageHistory.SetItemDataPtr(result, BROWER_PACKAGE);
-  if (result != CB_ERR && result != CB_ERRSPACE)
+  if (result != CB_ERR && result != CB_ERRSPACE) {
       m_PackageHistory.SetCurSel(0);//SelectString(0, );
+      m_PackageSelIdx = 0;
+  }
 
   if (mPSTManager.IsAfterSaleMode()) {
     GetDlgItem(IDC_CB_PACKAGE_PATH)->ShowWindow(SW_HIDE);
@@ -820,21 +825,27 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
   bi.lpfn   =   BrowseCallbackProc;
   bi.ulFlags=BIF_USENEWUI | BIF_NONEWFOLDERBUTTON | BIF_EDITBOX | BIF_RETURNONLYFSDIRS;
   if(PathFileExists(m_PackagePath.GetString())) {
-    path = GetDirName(m_PackagePath);
-    bi.lParam = (LPARAM)path.GetString();
+    if(FILE_ATTRIBUTE_DIRECTORY & GetFileAttributes(m_PackagePath.GetString())) {
+        path = m_PackagePath;
+    } else {
+        path = GetDirName(m_PackagePath);
+    }
   } else {
     GetAppPath(path);
-    bi.lParam = (LPARAM)path.GetString();
   }
+  bi.lParam = (LPARAM)path.GetString();
   LPITEMIDLIST idl= SHBrowseForFolder(&bi);
-  if(idl==NULL)
+  if(idl==NULL) {
+    //user click 'Cancel' button
+    m_PackageHistory.SetCurSel(m_PackageSelIdx);
     return;
+  }
 
   SHGetPathFromIDList(idl,m_PackagePath.GetBuffer(MAX_PATH));
   m_PackagePath.ReleaseBuffer();
 
-  //if(m_PackagePath[m_PackagePath.GetLength()-1]!=L'\\')
-  //  m_PackagePath+=L'\\';
+  if(m_PackagePath[m_PackagePath.GetLength()-1] != PATH_SEPERATOR)
+    m_PackagePath += PATH_SEPERATOR;
 
 #if 0
     if (mPSTManager.ChangePackage(m_PackagePath.GetString()))
@@ -846,10 +857,28 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
 
 #else
     /*m_PackageHistory.GetCount() -1*/
+    int nItem = 0, nPreItem = -1;
+    while ((nItem = m_PackageHistory.FindString(nItem, m_PackagePath.GetString())) != CB_ERR)
+    {
+        CString package;
+        m_PackageHistory.GetLBText(nItem, package);
+        if(package[package.GetLength()-1] != PATH_SEPERATOR)
+            package += PATH_SEPERATOR;
+        if (package == m_PackagePath) {
+           m_PackageHistory.DeleteString(nItem);
+           break;
+        }
+
+        if (nItem == nPreItem)
+            break;
+        nPreItem = nItem;
+    }
+
     int result = m_PackageHistory.InsertString(0, m_PackagePath);
     if (result >=0 )
         m_PackageHistory.SetItemDataPtr(result, NULL);
     m_PackageHistory.SetCurSel(0);
+    m_PackageSelIdx = 0;
 #endif
 }
 
@@ -864,6 +893,7 @@ void CmdmfastbootDlg::OnSelchangeCbPackagePath()
         OnBnClickedBtnBrowse();
         return;
     }
+    m_PackageSelIdx = idx;
 
     m_PackageHistory.GetLBText( idx, m_PackagePath );
 

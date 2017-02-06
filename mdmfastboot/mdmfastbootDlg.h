@@ -62,6 +62,7 @@ protected:
   CListCtrl   *m_imglist;
   CComboBox m_PackageHistory;
   CComboBox m_NicComboBox;
+  int        m_PackageSelIdx;
 
 //#ifdef INLINE_SETTING
 //  CSettingsDlg m_SetDlg;

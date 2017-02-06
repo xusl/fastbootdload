@@ -389,6 +389,8 @@ typedef enum
 #define XML_KEY_FLASH_CODE              "Flash_Code"
 
 /*******************config.xml define End*************************/
+
+#define PATH_SEPERATOR _T('\\')
 /* Data size unit */
 #define KB (1024)	   // kilobyte
 //#define MB (1024*1024)    // megabyte
