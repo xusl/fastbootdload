@@ -24,9 +24,7 @@
 
 
 // MmiTestDialog dialog
-
-
-
+#define CLOSE_MESSAGEDIALOG 1
 
 MmiTestDialog::MmiTestDialog(CWnd* pParent /*=NULL*/)
 	: CDialogEx(MmiTestDialog::IDD, pParent),
@@ -60,6 +58,7 @@ BEGIN_MESSAGE_MAP(MmiTestDialog, CDialogEx)
 	ON_WM_QUERYDRAGICON()
     ON_BN_CLICKED(IDOK, &MmiTestDialog::OnBnClickedStart)
     ON_BN_CLICKED(IDCANCEL, &MmiTestDialog::OnBnClickedExit)
+    ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
@@ -192,6 +191,7 @@ BOOL MmiTestDialog::AddTestResult(CString item, BOOL pass, string description) {
 
 SOCKET MmiTestDialog::GetTelnetSocket() {
     NetCardStruct nic = mNic.GetDefaultNic();
+    mNic.UpdateNic(nic);
     m_MmiDevInfo = nic.mConnectionName;
 
     if (nic.mGateway.IsEmpty()) {
@@ -204,6 +204,10 @@ SOCKET MmiTestDialog::GetTelnetSocket() {
         SetStatus( _T("can not get IP address."));
         return INVALID_SOCKET;
     }
+
+    CString text;
+    text.Format(_T("Connect device %s"), nic.mGateway.GetString());
+    SetStatus(text);
 
     SOCKET socket = ConnectServer(ip_addr, TELNET_PORT);
     delete [] ip_addr;
@@ -228,7 +232,7 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
     }
 
     testDialog->AddTestResult(_T("RJ45 1"), TRUE, "Ok.");
-    TelnetClient tn(sock, 3000, true);
+    TelnetClient tn(sock, 1500, true);
 
     LOGE("start telnet negotiate");
     testDialog->SetStatus(_T("start telnet negotiate"));
@@ -240,6 +244,7 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
     pass = testDialog->TestItem(tn, _T("RJ45 2"), "send_data 254 0 2 5 1", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
     pass = testDialog->TestItem(tn, _T("RJ11"), "send_data 254 0 2 5 0", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
 
+//#define USE_SENDDATA
 #ifdef USE_SENDDATA
     string command = TEST_WIFI_MAC;
     command += "1";
@@ -267,33 +272,33 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
 
     tn.set_receive_timeout(1000);
     pass = testDialog->TestLed(tn, _T("ALL LED OFF"), 0x00000000);
-    pass = testDialog->TestLed(tn, _T("Power LED"), 0x00000001);
+    pass = testDialog->TestLed(tn, _T("Power LED"), 0x00000400);
     pass = testDialog->TestLed(tn, _T("WIFI LED"), 0x00000002);
     pass = testDialog->TestLed(tn, _T("TEL LED"), 0x00000004);
     pass = testDialog->TestLed(tn, _T("Net1-green LED"), 0x00000008);
     pass = testDialog->TestLed(tn, _T("Net2-blue LED"), 0x00000010);
     pass = testDialog->TestLed(tn, _T("Net3-red LED"), 0x00000020);
-    //pass = testDialog->TestLed(tn, _T("Signal1 LED"), 0x00000040);
-    //pass = testDialog->TestLed(tn, _T("Signal2 LED"), 0x00000080);
-    //pass = testDialog->TestLed(tn, _T("Signal3 LED"), 0x00000100);
+    pass = testDialog->TestLed(tn, _T("Signal1 LED"), 0x00000040);
+    pass = testDialog->TestLed(tn, _T("Signal2 LED"), 0x00000100);
+    pass = testDialog->TestLed(tn, _T("Signal3 LED"), 0x00000080);
     //pass = testDialog->TestLed(tn, _T("Zigbee LED"), 0x00000200);
-    pass = testDialog->TestLed(tn, _T("WPS LED"), 0x00000400);
-    pass = testDialog->TestLed(tn, _T("ALL LED ON"), 0x000007ff);
+    //pass = testDialog->TestLed(tn, _T("WPS LED"), 0x00000001);
+    pass = testDialog->TestLed(tn, _T("ALL LED ON"), 0x0000ffff);
 
-    tn.set_receive_timeout(5000);
+    tn.set_receive_timeout(1000);
     pass = testDialog->TestKey(tn, _T("Power Key"),  "254 0 2 4 1 1 0", 1, 5);
     pass = testDialog->TestKey(tn, _T("WPS Key"),  "254 0 2 4 1 2 0", 2, 5);
     pass = testDialog->TestKey(tn, _T("Reset Key"),  "254 0 2 4 1 4 0", 4, 5);
-    tn.set_receive_timeout(3000);
+    tn.set_receive_timeout(2000);
 
     tn.send_command("send_data 254 0 0 8 1 0 0", result);
     tn.send_command("usb_switch_to PC", result);
     testDialog->DiagTest();
+    testDialog->SetStatus(_T("Test finish"));
     tn.send_command("send_data 254 0 0 8 0 0 0", result);
     tn.send_command("usb_switch_to IPQ", result);
 
     testDialog->SetWork(FALSE);
-    LOGE("Test finish");
 
     tn.send_command("exit", result);
     closesocket(sock);
@@ -306,20 +311,33 @@ BOOL MmiTestDialog::TestKey(TelnetClient &client, CString item, const string &ok
     string data;
     char command[64] = {0};
     CString text;
-    BOOL pass;
+    int tries = 0;
+    BOOL pass = FALSE;
 
-    text.Format(_T("Press '%s' Key within %d seconds after click 'OK'"), item.GetString(), elapse);
-
+    SetTimer(CLOSE_MESSAGEDIALOG, 5000, NULL);
+    text.Format(_T("Press '%s' Key after dialog disappear or click 'OK'"), item.GetString());
     int iRet = AfxMessageBox(text, MB_OK);
 
     snprintf(command, sizeof command, "send_data 254 0 2 4 1 %d 0", key);
-    TestItem(client, item, command, data);
 
-    size_t found = data.rfind("\r\n");
-    if (found != string::npos)
-        data = data.substr(found + 2);
+    while(!pass && tries < 6) {
+        if (tries > 1) {
+            text.Format(_T("Please Press '%s' Key again, last test (the %d) failed."), item.GetString(), tries);
+        } else {
+            text.Format(_T("Please Press '%s' Key"), item.GetString());
+        }
+        //SetStatus(text);
+        TestItem(client, text/*item*/, command, data);
 
-    pass = (data == ok);
+        size_t found = data.rfind("\r\n");
+        if (found != string::npos)
+            data = data.substr(found + 2);
+
+        pass = (data == ok);
+        tries ++;
+    }
+    SetStatus(item);
+
     AddTestResult(item, pass, data.c_str());
     return pass;
 }
@@ -331,7 +349,7 @@ BOOL MmiTestDialog::TestLed(TelnetClient &client, CString item,  int value) {
     BOOL pass;
 
     //snprintf(ok, sizeof ok, "254 0 2 3 0 %d 0", value);
-    snprintf(command, sizeof command, "send_data 254 0 2 3 0 %d 0", value);
+    snprintf(command, sizeof command, "send_data 254 0 2 3 0 %d %d", value & 0x000000FF, (value >> 8) & 0x000000FF);
     TestItem(client, item, command, data);
 
     size_t found = data.rfind("\r\n");
@@ -339,6 +357,15 @@ BOOL MmiTestDialog::TestLed(TelnetClient &client, CString item,  int value) {
         data = data.substr(found + 2);
 
     pass = (data == ok);
+
+#if 1
+    if (pass) {
+        CString text;
+        text.Format(_T("Please confirm '%s' test"), item.GetString());
+        pass = (IDYES == AfxMessageBox(text, MB_YESNO));
+    }
+#endif
+
     AddTestResult(item, pass, data.c_str());
     return pass;
 }
@@ -557,3 +584,16 @@ HCURSOR MmiTestDialog::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+void MmiTestDialog::OnTimer(UINT_PTR nIDEvent)
+{
+    // TODO: Add your message handler code here and/or call default
+    if(CLOSE_MESSAGEDIALOG == nIDEvent) //这里的nIDEvent == 1，在SetTimer的第一个参数中用到
+    {
+        KillTimer(nIDEvent);
+        keybd_event(VK_RETURN,0,0,0);//按键下去
+        keybd_event(VK_RETURN,0,KEYEVENTF_KEYUP,0);//，按键上来，模拟"回车"命令
+        return;
+    }
+
+    CDialogEx::OnTimer(nIDEvent);
+}

@@ -111,9 +111,6 @@
     <ClCompile Include="PasswordEnterDlg.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\jrdmmidiag.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\telnet.cpp">
       <Filter>源文件</Filter>
     </ClCompile>

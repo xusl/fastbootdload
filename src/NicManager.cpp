@@ -910,7 +910,8 @@ void NicManager::EnumNetCards()
         }
     }
     if(!mNicList.empty()) {
-        m_DefaultNic = mNicList.front();
+        //m_DefaultNic = mNicList.front();
+        m_DefaultNic = mNicList.back();
         m_DefaultNicOrigin = m_DefaultNic;
     }
 

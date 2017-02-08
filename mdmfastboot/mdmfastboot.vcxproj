@@ -264,7 +264,6 @@ copy ..\libs\QMSL\QMSL_MSVC6R.dll $(SolutionDir)$(Platform)\$(Configuration)\</C
     <ClCompile Include="..\src\hostdl.cpp" />
     <ClCompile Include="..\src\ImgUnpack.cpp" />
     <ClCompile Include="..\src\jrddiagcmd.cpp" />
-    <ClCompile Include="..\src\jrdmmidiag.cpp" />
     <ClCompile Include="..\src\NicManager.cpp" />
     <ClCompile Include="..\src\pkt.cpp" />
     <ClCompile Include="..\src\QcnParser.cpp" />
