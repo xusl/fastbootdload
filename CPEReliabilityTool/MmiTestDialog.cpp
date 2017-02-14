@@ -17,6 +17,7 @@
 #include "jrdmmidiag.h"
 #include "adb_dev_register.h"
 #include "NicManager.h"
+#include "QLib_Defines.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -41,6 +42,7 @@ MmiTestDialog::~MmiTestDialog()
       mDevSwitchEvt = NULL;
     }
     WSACleanup();
+    StopLogging();
 }
 
 void MmiTestDialog::DoDataExchange(CDataExchange* pDX)
@@ -75,6 +77,8 @@ BOOL MmiTestDialog::OnInitDialog()
 
 	// TODO: Add extra initialization here
 
+    StartLogging(_T("CPEReliabilityTool.log"), "all", "all");
+	
     m_MmiItemList.InsertColumn(0, _T("Item"),LVCFMT_LEFT, 200);
     m_MmiItemList.InsertColumn(1, _T("Result"),LVCFMT_LEFT, 100);
     m_MmiItemList.InsertColumn(2, _T("Description"),LVCFMT_LEFT, 600);
@@ -322,7 +326,7 @@ BOOL MmiTestDialog::TestKey(TelnetClient &client, CString item, const string &ok
 
     while(!pass && tries < 6) {
         if (tries > 1) {
-            text.Format(_T("Please Press '%s' Key again, last test (the %d) failed."), item.GetString(), tries);
+            text.Format(_T("Please Press '%s' Key again, last test (the %d) failed."), item.GetString(), tries - 1);
         } else {
             text.Format(_T("Please Press '%s' Key"), item.GetString());
         }
@@ -430,27 +434,35 @@ BOOL MmiTestDialog::DiagTest() {
     vector<CDevLabel> devicePath;
     vector<CDevLabel>::iterator iter;
     BOOL success = FALSE;
+	int port = QLIB_COM_AUTO_DETECT;
 
     SetStatus(_T("Wait for USB device"));
-    WaitForDevice(15);
+    WaitForDevice(30);
+	
+	LOGE("try search %S", SRV_JRDUSBSER);
     GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
+	if (devicePath.empty()) {		
+		LOGE("try search %S", SRV_ALCATELUSBSER);
+	    GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_ALCATELUSBSER, devicePath, false);
+	}
     //GetDevLabelByGUID(&GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR, SRV_JRDUSBSER, devicePath, false);
     //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR
     //GetDevLabelByGUID(&GUID_DEVCLASS_PORTS , SRV_SERIAL, devicePath, false);
 
-    if (devicePath.empty()) {
-        AddTestResult(_T("USB"), FALSE, "no USB port found");
-        return FALSE;
+    if (!devicePath.empty()) {
+        //AddTestResult(_T("USB"), FALSE, "no USB port found");
+        //return FALSE;
+	    CDevLabel diag = devicePath.front();
+		port = diag.GetComPortNum();
     }
 
-    CDevLabel diag = devicePath.front();
-    if(ConnectMS( diag.GetComPortNum())) {
+    if(ConnectMS(port)) {
         string result;
         BOOL pass = DIAG_CheckSIM_Card(result);
         AddTestResult(_T("SIM card"), pass, result);
     } else {
-        if (diag.GetComPortNum() > 100) {
-            AfxMessageBox(_T("The Com port number is too large, please set it lower than 100."), MB_OK);
+        if (port > 255 && port != QLIB_COM_AUTO_DETECT) {
+            AfxMessageBox(_T("The Com port number is too large, please set it lower than 255."), MB_OK);
         } else {
             AddTestResult(_T("USB"), FALSE, "can not connect to device");
         }

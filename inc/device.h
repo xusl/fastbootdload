@@ -134,6 +134,7 @@ typedef struct usb_handle {
 //PortName: location in
 //HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Enum\USB\Vid_1bbb&Pid_0196&MI_02\6&1e805b40&1&0002\Device Parameters
 #define SRV_JRDUSBSER    L"jrdusbser"
+#define SRV_ALCATELUSBSER L"Alcatelusbser"
 #define SRV_SERIAL       L"Serial"
 
 typedef enum {

@@ -288,7 +288,7 @@ BOOL GetDevLabelByGUID(CONST GUID *pClsGuid, PCWSTR service,
             continue;
         }
         if (_wcsnicmp((const wchar_t *)buffer, service, nSize/sizeof(wchar_t))) {
-            //LOGE("SPDRP_SERVICE return '%S', does not match '%S'.", buffer, service);
+            LOGE("SPDRP_SERVICE return '%S', does not match '%S'.", buffer, service);
             FREE_IF(pDetData);
             continue;
         }
