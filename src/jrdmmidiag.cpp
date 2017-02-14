@@ -842,7 +842,7 @@ bool DIAG_CheckSD_Card(int testIndex)
     return TRUE;
 }
 
-bool DIAG_CheckSIM_Card(string& msg)
+BOOL DIAG_CheckSIM_Card(string& msg)
 {
     jrd_diag_sim_status_req_type req;
     jrd_diag_sim_status_rsp_type resp;
@@ -888,6 +888,36 @@ bool DIAG_CheckSIM_Card(string& msg)
     //DisplayTestResult(testIndex,"check SIM status successful",false);
     return TRUE;
 }
+
+BOOL DIAG_TurnTelRing(BOOL on, string& msg)
+{
+    jrd_diag_rj11_req_type req;
+    jrd_diag_rj11_rsp_type resp;
+    short resp_len = sizeof(jrd_diag_rj11_rsp_type);
+
+    req.hdr.cmd_entry = JRD_DIAG_CMD_F;
+    req.hdr.class_code = E_JRD_DIAG_PERIPHERAL;
+    req.hdr.cmd_code = E_JRD_DIAG_PERI_RJ11;
+	req.ring_toggle = on ? 4 : 5;
+
+     if(QLIB_SendSync(
+                m_QHandle,
+                sizeof(jrd_diag_rj11_req_type),
+                (unsigned char *)(&req),
+                &resp_len,
+                (unsigned char *)&resp,
+                10000) != TRUE)
+    {
+        msg = "send check RJ11 Ring command error, ";
+        return FALSE;
+    }
+
+    msg = "command send";
+
+    //DisplayTestResult(testIndex,"check SIM status successful",false);
+    return resp.diag_errno == 0;
+}
+
 
 bool DIAG_CheckNetWork(int testIndex)
 {

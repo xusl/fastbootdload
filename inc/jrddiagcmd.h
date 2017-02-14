@@ -109,6 +109,7 @@ typedef enum
   E_JRD_DIAG_PERI_KEY = 6,
   E_JRD_DIAG_PERI_CHARGER_STATUS = 7,
   E_JRD_DIAG_PERI_SCREEN = 8,
+  E_JRD_DIAG_PERI_RJ11 = 14,
   E_JRD_DIAG_PERI_CMD_MAX,
 }e_jrd_diag_peripheral_id_type;
 

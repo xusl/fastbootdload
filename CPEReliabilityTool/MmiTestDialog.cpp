@@ -225,7 +225,6 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
     BOOL  pass;
 
     testDialog = (MmiTestDialog *)wParam;
-
     testDialog->SetStatus( _T("Begin MMI test."));
 
     SOCKET sock = testDialog->GetTelnetSocket();
@@ -246,7 +245,7 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
 //    tn.send_command("send_data 254 0 2 5 1", result);
 
     pass = testDialog->TestItem(tn, _T("RJ45 2"), "send_data 254 0 2 5 1", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
-    pass = testDialog->TestItem(tn, _T("RJ11"), "send_data 254 0 2 5 0", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
+    //pass = testDialog->TestItem(tn, _T("RJ11"), "send_data 254 0 2 5 0", "254 0 2 5 0 0 0", "254 0 2 5 0 1 0");
 
 //#define USE_SENDDATA
 #ifdef USE_SENDDATA
@@ -297,8 +296,10 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
 
     tn.send_command("send_data 254 0 0 8 1 0 0", result);
     tn.send_command("usb_switch_to PC", result);
+	
     testDialog->DiagTest();
     testDialog->SetStatus(_T("Test finish"));
+	
     tn.send_command("send_data 254 0 0 8 0 0 0", result);
     tn.send_command("usb_switch_to IPQ", result);
 
@@ -460,6 +461,16 @@ BOOL MmiTestDialog::DiagTest() {
         string result;
         BOOL pass = DIAG_CheckSIM_Card(result);
         AddTestResult(_T("SIM card"), pass, result);
+		pass = DIAG_TurnTelRing(TRUE, result);
+		AddTestResult(_T("Ring on command"), pass, result);
+		if (pass) {
+			SLEEP(2000);
+			pass = DIAG_TurnTelRing(FALSE, result);
+			AddTestResult(_T("Ring off command"), pass, result);
+		}
+		
+        pass = (IDYES == AfxMessageBox(_T("Please confirm RJ11 ring test"), MB_YESNO));		
+		AddTestResult(_T("RJ11"), pass, "");
     } else {
         if (port > 255 && port != QLIB_COM_AUTO_DETECT) {
             AfxMessageBox(_T("The Com port number is too large, please set it lower than 255."), MB_OK);

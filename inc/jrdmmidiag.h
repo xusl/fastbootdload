@@ -307,7 +307,19 @@ typedef struct{
   int32 status_len;
   char sim_status[32]; //
 } jrd_diag_sim_status_rsp_type;
+
 /* ------------------------------------------------------------------------- */
+typedef struct {
+    jrd_diag_hdr_type hdr;
+    uint8           ring_toggle;
+} jrd_diag_rj11_req_type;
+
+typedef struct {
+    jrd_diag_hdr_type hdr;
+    int32 diag_errno;
+    char status[36];
+} jrd_diag_rj11_rsp_type;
+
 /* ------------------------------------------------------------------------- */
 typedef struct{
   jrd_diag_hdr_type hdr;
@@ -508,7 +520,8 @@ VOID  DIAG_KEYTEST(void);
 VOID  DIAG_EXITKEYTEST(void);
 VOID  DIAG_ReadFIRMWAREVersion(char* FirmVer);
 VOID  DIAG_CheckSD_Card(void);
-bool  DIAG_CheckSIM_Card(string& msg);
+BOOL  DIAG_CheckSIM_Card(string& msg);
+BOOL  DIAG_TurnTelRing(BOOL on, string& msg);
 VOID  DIAG_CheckNetWork(void);
 VOID  DIAG_TraceAbilityRead(TraceInfo *pTrace);
 VOID  DIAG_TraceAbilityWrite(char *traceInfo);
