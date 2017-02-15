@@ -500,13 +500,13 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                 CDevLabel *dev = NULL;
                 int code = pThis->TelnetPST(&dev);
                 if (NO_ERROR == code ) {
-                    code = pThis->TFTPDownload(TRUE);
+                    code = pThis->TFTPDownload(dev, TRUE);
                     if (NO_ERROR != code && dev != NULL) {
                       if (pThis->SniffNetwork("Policy again", ipAddress.c_str())) {
                           dev->SetStatus(DEVICE_ARRIVE);
                            code = pThis->TelnetPST(NULL);
                            if (NO_ERROR == code ) {
-                               code = pThis->TFTPDownload(FALSE);
+                               code = pThis->TFTPDownload(dev, FALSE);
                            }
                       }
                     } else {
@@ -516,7 +516,7 @@ DWORD WINAPI CDownloadDlg::NetworkSniffer(LPVOID lpPARAM) {
                     if (dc->GetSuperMode()) {
                         pThis->SetPtsText("Can not connects to device, start download server.");
                         pThis->b_download = true;
-                        code = pThis->TFTPDownload(FALSE);
+                        code = pThis->TFTPDownload(dev, FALSE);
                     } else {
                         pThis->SetPtsText( "Can not connects to device");
                     }
@@ -874,54 +874,14 @@ void CDownloadDlg::OnBnClickedStart() {
 
 #define DEVICE_DOWNLOAD_IP   "192.168.1.1"
 #define DEFAULT_SERVER_IP    "192.168.1.10"
-int CDownloadDlg::TFTPDownload(BOOL again) {
-    CString msg;
-    string mac;
-    int  waitCount = 0;
-
-    NetCardStruct nic = mNic.GetDefaultNic();
-    if (nic.mIPAddress != DEFAULT_SERVER_IP) {
-        msg.Format("Now IP is %s, change to the default IP", nic.mIPAddress.c_str());
-        SetPtsText( msg);
-        mNic.SetIP(DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP, "255.255.255.0");
-        SetInformation(HOST_NIC, "");
-    }
-
-#if 1
-    for (; waitCount < 10; waitCount++) {
-        if (0 != mNic.ResolveIpMac(DEVICE_DOWNLOAD_IP, mac) &&
-           !mNic.CheckIpInArpTable(DEVICE_DOWNLOAD_IP, mac)) {
-           LOGE("can not found device, wait 2000");
-           Sleep(2000);
-        } else {
-          break;
-        }
-    }
-   if (waitCount >= 10) {
-        if (again) {
-            SetPtsText( "Lost device, try again.");
-            mNic.SetIP(nic.mIPAddress.c_str(), nic.mGateway.c_str(), nic.mSubnetMask.c_str());
-        } else {
-            SetPtsText( "Lost device, abort updating.");
-        }
-        return -1;
-   }
-#endif
-
-    mNic.UpdateIP();
-    SetInformation(HOST_NIC, "");
-    SetPtsText( "start download server");
-    StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
-    return NO_ERROR;
-}
 #define COMMAND_UPDATE "send_data 254 0 0 7 0 1 0\n"
 //#define CMD_REBOOT      "send_data 254 0 0 5 0 0 0\n"
 #define CMD_REBOOT      "reboot\n"
 #define CMD_FW_VERSION  "jrd_system_get_firmware_version \n"
 //#define CMD_OS_VERSION  "cat /proc/version \n"
 #define CMD_OS_VERSION  "uname -r\n"
-#define SET_DOWNLOAD_DEVIP       "fw_setenv ipaddr " DEVICE_DOWNLOAD_IP
-#define SET_DOWNLOAD_SRVIP "fw_setenv serverip " DEFAULT_SERVER_IP
+#define SET_DOWNLOAD_DEVIP       "fw_setenv ipaddr " //DEVICE_DOWNLOAD_IP
+#define SET_DOWNLOAD_SRVIP "fw_setenv serverip " //DEFAULT_SERVER_IP
 
 int CDownloadDlg::TelnetPST(CDevLabel **ppDev) {
     CString msg;
@@ -930,8 +890,10 @@ int CDownloadDlg::TelnetPST(CDevLabel **ppDev) {
     string customId;
     string versionCode;
     string buildId;
+	string cmd;
     string result;
     int i = 0;
+    NetCardStruct nic = mNic.GetDefaultNic();
     DeviceCoordinator * dc = GetDeviceCoodinator();
 
     CDevLabel *dev = dc->GetValidDevice();
@@ -1044,9 +1006,15 @@ int CDownloadDlg::TelnetPST(CDevLabel **ppDev) {
         Sleep(3000);
     }
 
-    SetPtsText( "Set download environment");
-    tn.send_command(SET_DOWNLOAD_DEVIP, result, false);	
-    tn.send_command(SET_DOWNLOAD_SRVIP, result, false);
+	msg.Format( "Set download environment, ip %s, server %s",
+		dev->GetIpAddr().c_str(), nic.mIPAddress.c_str());
+    SetPtsText(msg);
+	cmd = SET_DOWNLOAD_DEVIP;
+	cmd += dev->GetIpAddr(); //nic.mGateway
+    tn.send_command(cmd.c_str(), result, false);	
+	cmd = SET_DOWNLOAD_SRVIP;
+	cmd += nic.mIPAddress;
+    tn.send_command(cmd.c_str(), result, false);
 	
     SetPtsText( "Enter download mode");
     dev->TickWatchDog();
@@ -1089,6 +1057,62 @@ TELPSTERR:
     MessageBeep(MB_ICONERROR);
     return ERROR_GEN_FAILURE;
 }
+
+int CDownloadDlg::TFTPDownload(CDevLabel *pDev, BOOL again) {
+    CString msg;
+//	string hostIp;
+	string gatewayIp;
+	string deviceIp = DEVICE_DOWNLOAD_IP;
+    string mac;
+    int  waitCount = 0;
+    NetCardStruct nic = mNic.GetDefaultNic();
+	
+	if (pDev != NULL && pDev->GetIpAddr().length() > 0) {		
+    	deviceIp = pDev->GetIpAddr();	
+		gatewayIp = deviceIp;//nic.mGateway
+		if (nic.mEnableDHCP) {		
+	        msg.Format("set Host IP %s, Gateway %s", nic.mIPAddress.c_str(), gatewayIp.c_str());
+	        SetPtsText( msg);
+	        mNic.SetIP(nic.mIPAddress.c_str(), gatewayIp.c_str(), nic.mSubnetMask.c_str());
+		}
+	} else if (nic.mIPAddress != DEFAULT_SERVER_IP) {
+        msg.Format("set Host IP %s, Gateway %s", DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP);
+        SetPtsText( msg);
+        mNic.SetIP(DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP, "255.255.255.0");
+    }
+
+	msg.Format("assume device Ip %s in download mode (uboot)", deviceIp.c_str());
+	SetPtsText( msg);
+    SetInformation(HOST_NIC, "");
+
+#if 1
+    for (; waitCount < 10; waitCount++) {
+        if (0 != mNic.ResolveIpMac(deviceIp.c_str(), mac) &&
+           !mNic.CheckIpInArpTable(deviceIp.c_str(), mac)) {
+           LOGE("can not found device, wait 2000");
+           Sleep(2000);
+        } else {
+          break;
+        }
+    }
+   if (waitCount >= 10) {
+        if (again) {
+            SetPtsText( "Lost device, try again.");
+            mNic.SetIP(nic.mIPAddress.c_str(), nic.mGateway.c_str(), nic.mSubnetMask.c_str());
+        } else {
+            SetPtsText( "Lost device, abort updating.");
+        }
+        return -1;
+   }
+#endif
+
+    mNic.UpdateIP();
+    SetInformation(HOST_NIC, "");
+    SetPtsText( "start download server");
+    StartTftpd32Services(GetSafeHwnd(), m_pCoordinator);
+    return NO_ERROR;
+}
+
 
 DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     CDownloadDlg *pThis = (CDownloadDlg *)lpPARAM;
