@@ -24,4 +24,7 @@ Release/
 doc/
 Win32/
 Win32Release/
-
+Output/
+*.zip
+*.rar
+*.exe

@@ -110,8 +110,8 @@ BOOL ConfigIni::ReadConfigIni(const char * ini){
         m_HostIPEnd = m_HostIPStart;
 
     //telnet section
-    m_TelnetTimeoutMs = GetPrivateProfileInt(TELNET_SECTION, _T("TimeoutMs"), 6000, lpFileName);
-    if (m_TelnetTimeoutMs < 3000) {
+    m_TelnetTimeoutMs = GetPrivateProfileInt(TELNET_SECTION, _T("TimeoutMs"), 3000, lpFileName);
+    if (m_TelnetTimeoutMs < 500) {
         LOGE("TelnetTimeoutMs %d, is too samll", m_TelnetTimeoutMs);
     } else {
         LOGE("TelnetTimeoutMs is %d", m_TelnetTimeoutMs);

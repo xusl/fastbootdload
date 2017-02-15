@@ -18,16 +18,17 @@
 #define  CURL_SB_EOF(x) (x->subpointer >= x->subend)
 #define  CURL_SB_LEN(x) (x->subend - x->subpointer)
 
+#define CMDRSPBUFLEN (BUFSIZE * 4)
 
-telnet::~telnet() {
+TelnetClient::~TelnetClient() {
   curl_slist_free_all(telnet_vars);
   telnet_vars = NULL;
 }
 
-void telnet::negotiate() {
+void TelnetClient::negotiate() {
   int i;
   //struct TELNET *tn = (struct TELNET *) conn->data->state.proto.telnet;
-    telnet *tn = this;
+    TelnetClient *tn = this;
   for(i = 0;i < CURL_NTELOPTS;i++) {
     if(us_preferred[i] == CURL_YES)
       set_local_option(i, CURL_YES);
@@ -37,7 +38,7 @@ void telnet::negotiate() {
   }
 }
 
-void telnet::send_negotiation(int cmd, int option) {
+void TelnetClient::send_negotiation(int cmd, int option) {
    unsigned char buf[3];
    ssize_t bytes_written;
    int err;
@@ -55,7 +56,7 @@ void telnet::send_negotiation(int cmd, int option) {
    printoption("SENT", cmd, option);    ;
 }
 
-void telnet::printoption(const char *direction, int cmd, int option)
+void TelnetClient::printoption(const char *direction, int cmd, int option)
 {
   const char *fmt;
   const char *opt;
@@ -90,9 +91,9 @@ void telnet::printoption(const char *direction, int cmd, int option)
 }
 
 
-void telnet::set_remote_option(int option, int newstate) {
+void TelnetClient::set_remote_option(int option, int newstate) {
   //struct TELNET *tn = (struct TELNET *)conn->data->state.proto.telnet;
-  telnet *tn = this;
+  TelnetClient *tn = this;
   if(newstate == CURL_YES) {
     switch(him[option]) {
     case CURL_NO:
@@ -164,10 +165,10 @@ void telnet::set_remote_option(int option, int newstate) {
 }
 
 
-void telnet::rec_will( int option)
+void TelnetClient::rec_will( int option)
 {
   //struct TELNET *tn = (struct TELNET *)conn->data->state.proto.telnet;
-  telnet *tn = this;
+  TelnetClient *tn = this;
   LOGD("ENTER");
   switch(him[option]) {
   case CURL_NO:
@@ -213,10 +214,10 @@ void telnet::rec_will( int option)
   }
 }
 
-void telnet::rec_wont( int option)
+void TelnetClient::rec_wont( int option)
 {
   //struct TELNET *tn = (struct TELNET *)conn->data->state.proto.telnet;
-  telnet *tn = this;
+  TelnetClient *tn = this;
   LOGD("ENTER");
   switch(him[option]) {
   case CURL_NO:
@@ -256,10 +257,10 @@ void telnet::rec_wont( int option)
   }
 }
 
-void telnet::set_local_option( int option, int newstate)
+void TelnetClient::set_local_option( int option, int newstate)
 {
   //struct TELNET *tn = (struct TELNET *)conn->data->state.proto.telnet;
-  telnet *tn = this;
+  TelnetClient *tn = this;
   LOGD("ENTER set_local_option");
   if(newstate == CURL_YES) {
     switch(us[option]) {
@@ -331,10 +332,10 @@ void telnet::set_local_option( int option, int newstate)
   }
 }
 
-void telnet::rec_do( int option)
+void TelnetClient::rec_do( int option)
 {
   //struct TELNET *tn = (struct TELNET *)conn->data->state.proto.telnet;
-  telnet *tn = this;
+  TelnetClient *tn = this;
   LOGD("ENTER");
   switch(us[option]) {
   case CURL_NO:
@@ -379,10 +380,10 @@ void telnet::rec_do( int option)
   }
 }
 
-void telnet::rec_dont( int option)
+void TelnetClient::rec_dont( int option)
 {
   //struct TELNET *tn = (struct TELNET *)conn->data->state.proto.telnet;
-  telnet *tn = this;
+  TelnetClient *tn = this;
   LOGD("ENTER");
   switch(us[option]) {
   case CURL_NO:
@@ -421,7 +422,7 @@ void telnet::rec_dont( int option)
     break;
   }
 }
-void telnet::printsub(int direction, unsigned char *pointer,
+void TelnetClient::printsub(int direction, unsigned char *pointer,
          size_t length) {
   unsigned int i = 0;
 
@@ -523,7 +524,7 @@ void telnet::printsub(int direction, unsigned char *pointer,
   }
 }
 
-CURLcode telnet::check_telnet_options()
+CURLcode TelnetClient::check_telnet_options()
 {
   CURLcode result = CURLE_OK;
 #if 0
@@ -533,7 +534,7 @@ CURLcode telnet::check_telnet_options()
   char option_arg[256];
   //struct SessionHandle *data = conn->data;
   //struct TELNET *tn = (struct TELNET *)conn->data->state.proto.telnet;
-  telnet * tn = this;
+  TelnetClient * tn = this;
   /* Add the user name as an environment variable if it
      was given on the command line */
   if(conn->bits.user_passwd) {
@@ -599,7 +600,7 @@ CURLcode telnet::check_telnet_options()
   return result;
 }
 
-void telnet::suboption() {
+void TelnetClient::suboption() {
   struct curl_slist *v;
   unsigned char temp[2048];
   ssize_t bytes_written;
@@ -610,7 +611,7 @@ void telnet::suboption() {
   char varval[128];
   //struct SessionHandle *data = conn->data;
   //struct TELNET *tn = (struct TELNET *)data->state.proto.telnet;
-  telnet *tn = this;
+  TelnetClient *tn = this;
 
   printsub('<', (unsigned char *)tn->subbuffer, CURL_SB_LEN(tn)+2);
   switch (CURL_SB_GET(tn)) {
@@ -669,14 +670,14 @@ void telnet::suboption() {
   return;    ;
 }
 
-CURLcode telnet::telrcv(const unsigned char *inbuf, /* Data received from socket */
+CURLcode TelnetClient::telrcv(const unsigned char *inbuf, /* Data received from socket */
                 ssize_t count)              /* Number of bytes received */
 {
   unsigned char c;
   CURLcode result = CURLE_UNSUPPORTED_PROTOCOL;
   int in = 0;
   int startwrite=-1;
-  telnet* tn = this;
+  TelnetClient* tn = this;
 #if 0
 #define startskipping()                                       \
   if(startwrite >= 0) {                                       \
@@ -835,7 +836,7 @@ CURLcode telnet::telrcv(const unsigned char *inbuf, /* Data received from socket
 }
 /* Escape and send a telnet data block */
 /* TODO: write large chunks of data instead of one byte at a time */
-CURLcode telnet::send_telnet_data(const char *buffer, ssize_t len)
+CURLcode TelnetClient::send_telnet_data(const char *buffer, ssize_t len)
 {
   unsigned char outbuf[2];
   ssize_t bytes_written, total_written;
@@ -905,7 +906,7 @@ while(true) {
   return rc;
 }
 
-telnet::telnet(curl_socket_t sock, int to, bool verb) {
+TelnetClient::TelnetClient(curl_socket_t sock, int to, bool verb) {
     memset(us, CURL_NO, sizeof us);
     memset(usq, CURL_NO, sizeof usq);
     memset(us_preferred, CURL_NO, sizeof us_preferred);
@@ -921,6 +922,7 @@ telnet::telnet(curl_socket_t sock, int to, bool verb) {
     sockfd = sock;
     verbose = verb;
     timeout = to;
+    set_nbio(false);
 
     telrcv_state = CURL_TS_DATA;
 
@@ -946,22 +948,42 @@ telnet::telnet(curl_socket_t sock, int to, bool verb) {
     //subopt_ttype[31] = 0; /* String termination */
     //us_preferred[CURL_TELOPT_TTYPE] = CURL_YES;
 
-    setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&timeout,sizeof(timeout));
+    set_receive_timeout(to);
     //SOCKET_ERROR
 }
 
-int telnet::receive_telnet_data(char *buffer, ssize_t len) {
+bool TelnetClient::set_receive_timeout(int ms) {
+    timeout = ms;
+    LOGE("Set timeout %d", timeout);
+    setsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&timeout,sizeof(timeout));
+    int optLen = sizeof(timeout);
+    getsockopt(sockfd, SOL_SOCKET,SO_RCVTIMEO,(char *)&timeout, &optLen);
+    LOGE("Get timeout %d", timeout);
+    return ms == timeout;
+}
+
+int TelnetClient::set_nbio(bool nonblocking) {
+    unsigned long on = nonblocking ? 1 : 0;
+    int error = WSAGetLastError ();
+    WSASetLastError(NOERROR);
+    error = WSAGetLastError ();
+    ioctlsocket(sockfd, FIONBIO, &on);
+    nbio = nonblocking;
+    return 0;
+}
+int TelnetClient::receive_telnet_data(char *buffer, ssize_t len) {
     CURLcode code;
     ssize_t nread;
     char buf[BUFSIZE] = {0};
-//    int rl;
-    int retry = 0;
+    int read_byte = 0;
 
     memset(buffer, 0, len);
 
     while(TRUE) {
         /* read data from network */
         memset(buf, 0, sizeof buf);
+
+if (true/*!nbio*/) {
         code = Curl_read(sockfd, buf, CURLMIN(BUFSIZE, len) - 1, &nread);
         //LOGD("read %d bytes", nread);
         /* read would've blocked. Loop again */
@@ -975,6 +997,31 @@ int telnet::receive_telnet_data(char *buffer, ssize_t len) {
                the server closed the connection and we bail out */
             break;
         }
+} else {
+      nread = 0;
+      do {
+        fd_set fdRead;
+        timeval TimeOut;
+        TimeOut.tv_sec=0;
+        TimeOut.tv_usec=500;
+
+        FD_ZERO(&fdRead);
+        FD_SET(sockfd,&fdRead);
+        int ret = select(0,&fdRead,NULL,NULL,&TimeOut);
+
+        read_byte = sread(sockfd, buf + nread, sizeof buf - nread);
+         if ( read_byte > 0 ) {
+            LOGD("Bytes received: %d", read_byte);
+            nread += read_byte;
+        } else if ( read_byte == 0 ) {
+            LOGE("Connection closed");
+        } else {
+            LOGE("recv failed: %d", WSAGetLastError());
+        }
+      } while( read_byte > 0 && (sizeof buf - nread) > 0);
+      if (nread <= 0)
+        break;
+}
 
         if (telnet_cmd_negotiate){
             LOGD("read(%d bytes): %s",nread, buf);
@@ -1019,8 +1066,7 @@ int telnet::receive_telnet_data(char *buffer, ssize_t len) {
     return code;
 }
 
-#define CMDRSPBUFLEN (BUFSIZE * 4)
-int telnet::send_command(const char *cmd, string &result, bool trim) {
+int TelnetClient::send_command(const char *cmd, string &result, bool trim) {
     char buf[CMDRSPBUFLEN];
     int code;
 
@@ -1044,95 +1090,17 @@ int telnet::send_command(const char *cmd, string &result, bool trim) {
         size_t found = result.rfind('\n');
         if (found != string::npos)
             result.erase (result.begin()+found, result.end());
+        //    data.erase(data.find_last_not_of("\t") + 1);
+        result.erase(result.find_last_not_of("\r\n") + 1);
+        result.erase(result.find_last_not_of(" ") + 1);
+        //    data.erase(data.find_last_not_of("\n") + 1);
+        result.erase(0, result.find_first_not_of("\r\n"));
+        result.erase(0, result.find_first_not_of(" "));
     }
 
     return code;
 }
 
-int telnet::receive_telnet_cmd(char *buffer, ssize_t len) {
-    CURLcode code;
-    ssize_t nread;
-    char buf[BUFSIZE] = {0};
-    int rl;
-
-    memset(buffer, 0, len);
-
-    while(TRUE) {
-        /* read data from network */
-        LOGD("Print timestamp ");
-        memset(buf, 0, sizeof buf);
-        code = Curl_read(sockfd, buf, BUFSIZE - 1, &nread);
-        LOGD("read %d bytes", nread);
-        /* read would've blocked. Loop again */
-        if(code == CURLE_AGAIN)
-            continue;//break;
-        /* returned not-zero, this an error */
-        else if(code)
-        {
-            break;
-        }
-        /* returned zero but actually received 0 or less here,
-           the server closed the connection and we bail out */
-        else if(nread <= 0)
-        {
-            break;
-        }
-        if (len <=0 || nread > len)
-            LOGD("THERE Are not enough data to copy");
-        if (len > 0)
-        {
-            rl = CURLMIN(nread, len);
-            strncpy(buffer, buf, rl);
-            len -= rl;
-            buffer += rl;
-        }
-        if(strchr(buf,'#') != NULL)
-        {
-            break;
-        }
-
-        /*if (telnet_cmd_negotiate)
-          {
-          LOGD("read:: %s", buf);
-          if (len <=0 || nread > len)
-          LOGD("THERE Are not enough data to copy");
-          if (len > 0)
-          {
-          int rl = CURLMIN(nread, len);
-          strncpy(buffer, buf, rl);
-          len -= rl;
-          buffer += rl;
-          }
-          }
-          else
-          {
-          code = telrcv((unsigned char *)buf, nread);
-          LOGD("telrcv_state %d. return %d", telrcv_state, code);
-          if(code)
-          {
-          LOGD("read:: %s", buf);
-          telnet_cmd_negotiate = 1;
-          if (len > 0)
-          {
-          int rl = CURLMIN(nread, len);
-          strncpy(buffer, buf, rl);
-          len -= rl;
-          buffer += rl;
-          }
-        //break;
-        }
-        }*/
-
-        /* Negotiate if the peer has started negotiating,
-           otherwise don't. We don't want to speak telnet with
-           non-telnet servers, like POP or SMTP. */
-        /*if(please_negotiate && !already_negotiated) {
-          negotiate();
-          already_negotiated = 1;
-          }*/
-    }
-    return code;
-}
 #if 0
   HMODULE wsock2;
   WSOCK2_FUNC close_event_func;
@@ -1154,7 +1122,7 @@ int telnet::receive_telnet_cmd(char *buffer, ssize_t len) {
   bool keepon = TRUE;
   char *buf = data->state.buffer;
   //struct TELNET *tn;
-  telnet* tn = this;
+  TelnetClient* tn = this;
 
   *done = TRUE; /* unconditionally */
 
@@ -1446,6 +1414,7 @@ static CURLcode check_wsock2 () {
   return CURLE_OK;
 #endif
 
+#if 0
 /*
  * This is a wrapper around poll().  If poll() does not exist, then
  * select() is used instead.  An error is returned if select() is
@@ -1609,8 +1578,9 @@ int Curl_poll(struct pollfd ufds[], unsigned int nfds, int timeout_ms)
 
   return r;
 }
+#endif
 
-CURLcode Curl_write(curl_socket_t sockfd,
+CURLcode TelnetClient::Curl_write(curl_socket_t sockfd,
                     const void *mem,
                     size_t len,
                     ssize_t *written)
@@ -1668,7 +1638,7 @@ CURLcode Curl_write(curl_socket_t sockfd,
  *
  * Returns a regular CURLcode value.
  */
-CURLcode Curl_read(/* connection data */
+CURLcode TelnetClient::Curl_read(/* connection data */
                    curl_socket_t sockfd,     /* read from this socket */
                    char *buf,                /* store read data here */
                    size_t sizerequested,     /* max amount to read */
@@ -1676,20 +1646,39 @@ CURLcode Curl_read(/* connection data */
 {
   CURLcode curlcode = CURLE_RECV_ERROR;
   ssize_t nread = 0;
-
-  /* Set 'num' to 0 or 1, depending on which socket that has been sent here.
-     If it is the second socket, we set num to 1. Otherwise to 0. This lets
-     us use the correct ssl handle. */
-  //int num = (sockfd == conn->sock[SECONDARYSOCKET]);
+  ssize_t read_byte = 0;
 
   *n=0; /* reset amount to zero */
 
-  //nread = conn->recv[num](conn, num, buffertofill, bytesfromsocket, &curlcode);
-  //curl_socket_t sockfd = conn->sock[num];
+if (nbio) {
+    memset(buf, 0, sizerequested);
+      do {
+        fd_set fdRead;
+        timeval TimeOut;
+        TimeOut.tv_sec=0;
+        TimeOut.tv_usec=200000;  //microsecond, 1/1000 000 s, 0.2
+
+        FD_ZERO(&fdRead);
+        FD_SET(sockfd,&fdRead);
+        int ret = select(0,&fdRead,NULL,NULL,&TimeOut);
+
+        read_byte = sread(sockfd, buf + nread, sizerequested - nread);
+         if ( read_byte > 0 ) {
+            LOGD("Bytes received: %d", read_byte);
+            nread += read_byte;
+        } else if ( read_byte == 0 ) {
+            LOGE("Connection closed");
+        } else {
+            LOGE("recv failed: %d", WSAGetLastError());
+        }
+      } while( read_byte > 0 && (sizerequested - nread) > 0);
+}else {
   nread = sread(sockfd, buf, sizerequested);
+  read_byte = nread;
+}
 
   curlcode = CURLE_OK;
-  if(-1 == nread) {
+  if(-1 == read_byte) {
     int err = SOCKERRNO;
 
       /* This is how Windows does it */
@@ -2110,7 +2099,7 @@ const char *Curl_strerror( int err)
     strncpy(buf, strerror(err), max);
   else {
     if(!get_winsock_error(err, buf, max) &&
-        !FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err,
+        !FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err,
                        LANG_NEUTRAL, buf, (DWORD)max, NULL))
       _snprintf(buf, max, "Unknown error %d (%#x)", err, err);
   }

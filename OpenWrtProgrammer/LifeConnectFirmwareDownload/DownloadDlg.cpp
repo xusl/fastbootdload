@@ -920,6 +920,8 @@ int CDownloadDlg::TFTPDownload(BOOL again) {
 #define CMD_FW_VERSION  "jrd_system_get_firmware_version \n"
 //#define CMD_OS_VERSION  "cat /proc/version \n"
 #define CMD_OS_VERSION  "uname -r\n"
+#define SET_DOWNLOAD_DEVIP       "fw_setenv ipaddr " DEVICE_DOWNLOAD_IP
+#define SET_DOWNLOAD_SRVIP "fw_setenv serverip " DEFAULT_SERVER_IP
 
 int CDownloadDlg::TelnetPST(CDevLabel **ppDev) {
     CString msg;
@@ -952,7 +954,7 @@ int CDownloadDlg::TelnetPST(CDevLabel **ppDev) {
     SetInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
 
     b_download = true;
-    telnet tn(sock, m_Config.GetTelnetTimeoutMs(), m_Config.GetVerbose());
+    TelnetClient tn(sock, m_Config.GetTelnetTimeoutMs(), m_Config.GetVerbose());
 
     LOGE("start telnet negotiate");
     tn.send_command(NULL, result);
@@ -1042,7 +1044,11 @@ int CDownloadDlg::TelnetPST(CDevLabel **ppDev) {
         Sleep(3000);
     }
 
-    SetPtsText( "Set download mode");
+    SetPtsText( "Set download environment");
+    tn.send_command(SET_DOWNLOAD_DEVIP, result, false);	
+    tn.send_command(SET_DOWNLOAD_SRVIP, result, false);
+	
+    SetPtsText( "Enter download mode");
     dev->TickWatchDog();
     tn.send_command(COMMAND_UPDATE, result, false);
 
@@ -1109,7 +1115,7 @@ DWORD WINAPI CDownloadDlg::WorkThread(LPVOID lpPARAM) {
     pThis->SetInformation(DEV_IP_ADDR, dev->GetIpAddr().c_str());
     pThis->b_download = true;
 
-    telnet tn(sock);
+    TelnetClient tn(sock);
     string result;
 
  //   tn.receive_telnet_data(buf, BUFSIZE);

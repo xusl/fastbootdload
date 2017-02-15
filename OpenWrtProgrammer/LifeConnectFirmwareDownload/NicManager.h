@@ -72,10 +72,12 @@ public:
     void EnumNetCards();
     const list<NetCardStruct>* GetNicList() const { return  &mNicList;}
     int GetNicNum() { return (int)mNicList.size(); }
-    NetCardStruct GetDefaultNic() const { return m_DefaultNic;};
-    BOOL RestoreDefaultNic();
-    BOOL IsChangingIp() const { return m_IsChangingIp;}
+    NetCardStruct GetDefaultNic() const { return m_DefaultNic;}
     BOOL SetDefaultNic(DWORD id);
+    BOOL UpdateNic(NetCardStruct &nic);
+    BOOL RestoreDefaultNic();
+
+    BOOL IsChangingIp() const { return m_IsChangingIp;}
     BOOL EnableDhcp(BOOL updateIp);
     int SetIP(PCCH ip, PCCH gateway, PCCH subnetMask, BOOL updateIp=TRUE);
     BOOL UpdateIP();
@@ -89,13 +91,13 @@ public:
 private:
     int ExecuteCommand(LPSTR command, LPSTR parameter);
     BOOL GetNicInfo(NetCardStruct &netCard);
+    BOOL UpdateNic();
     BOOL RegGetIP(const string & adapter, string& ip, string &subnetMask, string& gateway,  BOOL& enableDHCP);
     BOOL RegSetIP(const string & adapter, LPCTSTR pIPAddress, LPCTSTR pNetMask, LPCTSTR pNetGate, DWORD enableDHCP);
     BOOL RegSetMultisz(HKEY hKey, LPCSTR lpValueName, CONST CHAR* lpValue);
     BOOL RegReadConnectName(const string & adapter, string& name);
     BOOL RegReadAdapter(const char* driver, string &adapter);
     bool NetCardStateChange(NetCardStruct &netCard, bool Enabled);
-    BOOL UpdateNic();
     BOOL WaitAddrChanged();
     BOOL SwitchNic(NetCardStruct &netCard, bool Enabled);
     ULONG GetRegistryProperty(HDEVINFO DeviceInfoSet,

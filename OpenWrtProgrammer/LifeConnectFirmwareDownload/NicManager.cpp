@@ -945,6 +945,12 @@ BOOL NicManager::RestoreDefaultNic() {
     }
     return FALSE;
 }
+
+BOOL NicManager::UpdateNic(NetCardStruct &nic) {
+    RegGetIP(nic.mAdapterName, nic.mIPAddress, nic.mSubnetMask, nic.mGateway, nic.mEnableDHCP);
+    return TRUE;
+}
+
 //---------------------------------------------------------------------------
 ULONG NicManager::GetRegistryProperty(HDEVINFO DeviceInfoSet,
     PSP_DEVINFO_DATA diData,
