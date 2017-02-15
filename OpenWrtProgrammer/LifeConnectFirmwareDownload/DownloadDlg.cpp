@@ -1066,12 +1066,13 @@ int CDownloadDlg::TFTPDownload(CDevLabel *pDev, BOOL again) {
     string mac;
     int  waitCount = 0;
     NetCardStruct nic = mNic.GetDefaultNic();
+	BOOL reset = FALSE;
 	
 	if (pDev != NULL && pDev->GetIpAddr().length() > 0) {		
     	deviceIp = pDev->GetIpAddr();	
 		gatewayIp = deviceIp;//nic.mGateway
 		if (nic.mEnableDHCP) {		
-	        msg.Format("set Host IP %s, Gateway %s", nic.mIPAddress.c_str(), gatewayIp.c_str());
+	        msg.Format("Set Host IP %s, Gateway %s", nic.mIPAddress.c_str(), gatewayIp.c_str());
 	        SetPtsText( msg);
 	        mNic.SetIP(nic.mIPAddress.c_str(), gatewayIp.c_str(), nic.mSubnetMask.c_str());
 		}
@@ -1079,26 +1080,31 @@ int CDownloadDlg::TFTPDownload(CDevLabel *pDev, BOOL again) {
         msg.Format("set Host IP %s, Gateway %s", DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP);
         SetPtsText( msg);
         mNic.SetIP(DEFAULT_SERVER_IP, DEVICE_DOWNLOAD_IP, "255.255.255.0");
+		reset = TRUE;
     }
 
-	msg.Format("assume device Ip %s in download mode (uboot)", deviceIp.c_str());
+	msg.Format("Find target device with IP Address %s", deviceIp.c_str());
 	SetPtsText( msg);
     SetInformation(HOST_NIC, "");
 
 #if 1
-    for (; waitCount < 10; waitCount++) {
+#define POLL_TARGET_MAX 30
+    for (; waitCount < POLL_TARGET_MAX; waitCount++) {
         if (0 != mNic.ResolveIpMac(deviceIp.c_str(), mac) &&
            !mNic.CheckIpInArpTable(deviceIp.c_str(), mac)) {
-           LOGE("can not found device, wait 2000");
-           Sleep(2000);
+           //LOGE("can not found device, wait 2s");
+           msg.Format("Wait for target device response, %d time(s)", waitCount + 1);
+	       SetPtsText( msg);
+           Sleep(3000);
         } else {
           break;
         }
     }
-   if (waitCount >= 10) {
+   if (waitCount >= POLL_TARGET_MAX) {
         if (again) {
-            SetPtsText( "Lost device, try again.");
-            mNic.SetIP(nic.mIPAddress.c_str(), nic.mGateway.c_str(), nic.mSubnetMask.c_str());
+            SetPtsText( "Target device do not response, try again.");
+			if (reset)
+              mNic.SetIP(nic.mIPAddress.c_str(), nic.mGateway.c_str(), nic.mSubnetMask.c_str());
         } else {
             SetPtsText( "Lost device, abort updating.");
         }
