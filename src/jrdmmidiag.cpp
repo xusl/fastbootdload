@@ -4,7 +4,7 @@
 #include "device.h"
 #include "QLib_Defines.h"
 #include "QLib.h"
-
+#define RETRY_TIMES 5
 HANDLE  	m_QHandle   = NULL;
 
 bool DIAG_ReadSSID(int testIndex,char *ssid)
@@ -917,6 +917,103 @@ BOOL DIAG_TurnTelRing(BOOL on, string& msg)
     //DisplayTestResult(testIndex,"check SIM status successful",false);
     return resp.diag_errno == 0;
 }
+
+bool IMEICheck(string &IMEI)
+{
+    if(IMEI.size() !=15)
+        return FALSE;
+
+    for(unsigned int i=0;i<IMEI.size();i++)
+    {
+    	if (IMEI.at(i) > '9' || IMEI.at(i) < '0')
+			return FALSE;
+#if 0
+        if(IMEI.mid(i,1)=="0"||IMEI.mid(i,1)=="1"||IMEI.mid(i,1)=="2"||IMEI.mid(i,1)=="3"||
+           IMEI.mid(i,1)=="4"||IMEI.mid(i,1)=="5"||IMEI.mid(i,1)=="6"||IMEI.mid(i,1)=="7"||
+           IMEI.mid(i,1)=="8"||IMEI.mid(i,1)=="9")
+            ;
+        else
+            return false;
+#endif
+    }
+    string temp="08";
+#if 0
+    temp.append(IMEI.mid(0,1)).append("a").append(IMEI.mid(2,1)).append(IMEI.mid(1,1)).append(IMEI.mid(4,1))
+          .append(IMEI.mid(3,1)).append(IMEI.mid(6,1)).append(IMEI.mid(5,1)).append(IMEI.mid(8,1)).append(IMEI.mid(7,1)).append(IMEI.mid(10,1))
+          .append(IMEI.mid(9,1)).append(IMEI.mid(12,1)).append(IMEI.mid(11,1)).append(IMEI.mid(14,1)).append(IMEI.mid(13,1));
+#endif
+     temp += IMEI.at(0);
+     temp += "a";
+     temp += IMEI.at(2);
+     temp += IMEI.at(1);
+     temp += IMEI.at(4);
+     temp += IMEI.at(3);
+     temp += IMEI.at(6);
+     temp += IMEI.at(5);
+     temp += IMEI.at(8);
+     temp += IMEI.at(7);
+     temp += IMEI.at(10);
+     temp += IMEI.at(9);
+     temp += IMEI.at(12);
+     temp += IMEI.at(11);
+     temp += IMEI.at(14);
+     temp += IMEI.at(13);
+    IMEI=temp;
+    return TRUE;
+}
+
+BOOL DIAG_IMEIWrite(string& imei, string& msg)
+{
+    if(!IMEICheck(imei))
+    {
+        msg = "Wrong IMEI Input!\n For example: 863459020000414";
+        return FALSE;
+    }
+    const char *IMEI=imei.c_str();
+
+    jrd_diag_sys_imei_write_req_rsp_type req,resp;
+    short resp_len = sizeof(jrd_diag_sys_imei_write_req_rsp_type);
+
+    req.hdr.cmd_entry = JRD_DIAG_CMD_F;
+    req.hdr.class_code = E_JRD_DIAG_SYS;
+    req.hdr.cmd_code = E_JRD_DIAG_SYS_IMEI_WRITE;
+    req.rw_flag = E_JRD_WRITE;
+
+    sscanf(IMEI, "%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+                               &req.imei[0], &req.imei[1], &req.imei[2], &req.imei[3], &req.imei[4], &req.imei[5]
+                               , &req.imei[6], &req.imei[7], &req.imei[8]);
+
+    for(int i = 0; i < RETRY_TIMES; i++)
+    {
+        if(QLIB_SendSync(
+                    m_QHandle,
+                    sizeof(jrd_diag_sys_imei_write_req_rsp_type),
+                    (unsigned char *)&req,
+                    &resp_len,
+                    (unsigned char *)&resp,
+                    10000) != TRUE) {
+            if(i == RETRY_TIMES - 1)
+            {
+                LOGE("IMEI write send command error!");
+                msg = "IMEI write send command error!";
+                return FALSE;
+            } else {
+                SLEEP(200);
+            }
+        } else {
+            LOGE("IMEI write send command ok,the IMEI = %s",IMEI);
+            msg = "Write IMEI successfully!";
+            break;
+        }
+    }
+    if(resp.diag_errno != 0) {
+        LOGE("IMEI write response error! %d", resp.diag_errno);
+        msg = "IMEI write response error!";
+        return FALSE;
+    }
+    return TRUE;
+}
+
 
 
 bool DIAG_CheckNetWork(int testIndex)

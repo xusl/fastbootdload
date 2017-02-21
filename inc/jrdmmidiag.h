@@ -522,6 +522,7 @@ VOID  DIAG_ReadFIRMWAREVersion(char* FirmVer);
 VOID  DIAG_CheckSD_Card(void);
 BOOL  DIAG_CheckSIM_Card(string& msg);
 BOOL  DIAG_TurnTelRing(BOOL on, string& msg);
+BOOL  DIAG_IMEIWrite(string& imei, string& msg);
 VOID  DIAG_CheckNetWork(void);
 VOID  DIAG_TraceAbilityRead(TraceInfo *pTrace);
 VOID  DIAG_TraceAbilityWrite(char *traceInfo);

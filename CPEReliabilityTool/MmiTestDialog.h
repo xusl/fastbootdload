@@ -18,15 +18,14 @@ public:
 	enum { IDD = IDD_MMITEST };
 
 private:
-  BOOL    m_Work;
+  BOOL m_Work;
   CListCtrl m_MmiItemList;
   CString m_MmiStatus;
   CString m_MmiDevInfo;
   NicManager mNic;
   CButton m_ExitButton;
   CButton m_StartButton;
-
-  HANDLE          mDevSwitchEvt;
+  HANDLE  mDevSwitchEvt;
 
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support

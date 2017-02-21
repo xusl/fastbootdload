@@ -423,7 +423,8 @@ BOOL PSTManager::HandleComDevice(BOOL schedule) {
         INFO("!!!!do not work now.");
         return FALSE;
     }
-
+	
+	GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_ALCATELUSBSER, devicePath, false);
     GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
     //GetDevLabelByGUID(&GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR, SRV_JRDUSBSER, devicePath, false);
     //for  COM1, GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR

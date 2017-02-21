@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "CPEReliabilityTool.h"
 #include "MmiTestDialog.h"
+#include "ReliabilityDialog.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -73,7 +74,9 @@ BOOL CCPEReliabilityToolApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	MmiTestDialog dlg;
+	//MmiTestDialog dlg;
+	CReliabilityDialog dlg;
+	
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();
 	if (nResponse == IDOK)

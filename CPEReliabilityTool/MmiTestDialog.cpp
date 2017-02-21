@@ -61,6 +61,7 @@ BEGIN_MESSAGE_MAP(MmiTestDialog, CDialogEx)
     ON_BN_CLICKED(IDOK, &MmiTestDialog::OnBnClickedStart)
     ON_BN_CLICKED(IDCANCEL, &MmiTestDialog::OnBnClickedExit)
     ON_WM_TIMER()
+    ON_WM_DEVICECHANGE()
 END_MESSAGE_MAP()
 
 
@@ -77,8 +78,8 @@ BOOL MmiTestDialog::OnInitDialog()
 
 	// TODO: Add extra initialization here
 
-    StartLogging(_T("CPEReliabilityTool.log"), "all", "all");
-	
+    //StartLogging(_T("CPEReliabilityTool.log"), "all", "all");
+    	
     m_MmiItemList.InsertColumn(0, _T("Item"),LVCFMT_LEFT, 200);
     m_MmiItemList.InsertColumn(1, _T("Result"),LVCFMT_LEFT, 100);
     m_MmiItemList.InsertColumn(2, _T("Description"),LVCFMT_LEFT, 600);
@@ -90,6 +91,7 @@ BOOL MmiTestDialog::OnInitDialog()
     m_MmiDevInfo = nic.mConnectionName;
     GetDlgItem(IDC_MMI_DEVINFO)->SetWindowText(nic.mConnectionName);
 
+	GetDlgItem(IDCANCEL)->ShowWindow(HIDE_WINDOW);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -282,8 +284,8 @@ UINT MmiTestDialog::RunMmiTest(LPVOID wParam) {
     pass = testDialog->TestLed(tn, _T("Net2-blue LED"), 0x00000010);
     pass = testDialog->TestLed(tn, _T("Net3-red LED"), 0x00000020);
     pass = testDialog->TestLed(tn, _T("Signal1 LED"), 0x00000040);
-    pass = testDialog->TestLed(tn, _T("Signal2 LED"), 0x00000100);
-    pass = testDialog->TestLed(tn, _T("Signal3 LED"), 0x00000080);
+    pass = testDialog->TestLed(tn, _T("Signal2 LED"), 0x00000080);
+    pass = testDialog->TestLed(tn, _T("Signal3 LED"), 0x00000100);
     //pass = testDialog->TestLed(tn, _T("Zigbee LED"), 0x00000200);
     //pass = testDialog->TestLed(tn, _T("WPS LED"), 0x00000001);
     pass = testDialog->TestLed(tn, _T("ALL LED ON"), 0x0000ffff);
@@ -498,7 +500,7 @@ BOOL MmiTestDialog::SetWork(BOOL work) {
     if(work)
         m_MmiItemList.DeleteAllItems();
     GetDlgItem(IDOK)->EnableWindow(!work);
-    GetDlgItem(IDCANCEL)->EnableWindow(!work);
+//    GetDlgItem(IDCANCEL)->EnableWindow(!work);
     return TRUE;
 }
 
@@ -533,6 +535,7 @@ void MmiTestDialog::OnBnClickedExit()
 {
     // TODO: Add your control notification handler code here
     CDialogEx::OnCancel();
+	//::PostMessage(GetSafeHwnd(), WM_CLOSE, 0, 0); 
 }
 
 
