@@ -50,14 +50,15 @@ PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
 
 
 BOOL PSTManager::ChangePackage(const wchar_t * dir) {
-  if (mAppConf.SetPackageDir(dir))//m_PackagePath.GetBuffer(/*MAX_PATH*/)))
+  CString errMsg;
+  if (mAppConf.SetPackageDir(dir, errMsg))//m_PackagePath.GetBuffer(/*MAX_PATH*/)))
     		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
 
         m_image->reset(FALSE);
     	m_image->ReadPackage();
         return TRUE;
     }
-
+    AfxMessageBox(errMsg, MB_OK);
     return FALSE;
 }
 

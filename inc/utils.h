@@ -29,6 +29,7 @@
 #include <direct.h>
 #include <afxwin.h>
 #include <string>
+#include <list>
 
 using namespace std;
 
@@ -157,61 +158,18 @@ static __inline__  int  adb_is_absolute_host_path( const char*  path )
     return isalpha(path[0]) && path[1] == ':' && path[2] == '\\';
 }
 
-/* bounded buffer functions */
-
-/* all these functions are used to append data to a bounded buffer.
- *
- * after each operation, the buffer is guaranteed to be zero-terminated,
- * even in the case of an overflow. they all return the new buffer position
- * which allows one to use them in succession, only checking for overflows
- * at the end. For example:
- *
- *    BUFF_DECL(temp,p,end,1024);
- *    char*    p;
- *
- *    p = buff_addc(temp, end, '"');
- *    p = buff_adds(temp, end, string);
- *    p = buff_addc(temp, end, '"');
- *
- *    if (p >= end) {
- *        overflow detected. note that 'temp' is
- *        zero-terminated for safety.
- *    }
- *    return strdup(temp);
- */
-
-/* tries to add a character to the buffer, in case of overflow
- * this will only write a terminating zero and return buffEnd.
- */
-char*   buff_addc (char*  buff, char*  buffEnd, int  c);
-
-/* tries to add a string to the buffer */
-char*   buff_adds (char*  buff, char*  buffEnd, const char*  s);
-
-/* tries to add a bytes to the buffer. the input can contain zero bytes,
- * but a terminating zero will always be appended at the end anyway
- */
-char*   buff_addb (char*  buff, char*  buffEnd, const void*  data, int  len);
-
-/* tries to add a formatted string to a bounded buffer */
-char*   buff_add  (char*  buff, char*  buffEnd, const char*  format, ... );
-
-/* convenience macro used to define a bounded buffer, as well as
- * a 'cursor' and 'end' variables all in one go.
- *
- * note: this doesn't place an initial terminating zero in the buffer,
- * you need to use one of the buff_ functions for this. or simply
- * do _cursor[0] = 0 manually.
- */
-#define  BUFF_DECL(_buff,_cursor,_end,_size)   \
-    char   _buff[_size], *_cursor=_buff, *_end = _cursor + (_size)
-
 const char * basename(const char * f_name);
 CString GetFileNameFromFullPath(CString FullPath);
+CString TrimPathDelimitor(CString &path);
+CString CurrentDirName(CString & originPath);
 void get_my_path(char *s, size_t maxLen);
 CString GetAppPath(CString & sPath );
 CString GetDirName(CString path);
 CString GetBaseName(CString path);
+CString UpDir(CString & originPath);
+void ScanDir (const wchar_t *szDirectory, const wchar_t *pattern, 
+  list<CString>& files, BOOL useSpec = TRUE, BOOL recursively = TRUE);
+
 void sleep(int seconds);
 long long now(void);
 BOOL CStringToString(CString& source, string &sink);

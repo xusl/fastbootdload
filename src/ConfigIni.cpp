@@ -27,6 +27,7 @@ AppConfig::AppConfig() :
 
 BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
   LPCTSTR lpFileName;
+  list<CString> projectConfFiles;
   int data_len;
   wchar_t log_conf[MAX_PATH]= {0};
   CString appPath= L".\\";
@@ -73,7 +74,21 @@ BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
     m_forceupdate = TRUE; /*Now fw build system can not handle config.xml, so set it to true*/
   }
 
-  ScanDir(appPath.GetString());
+  ScanDir(appPath.GetString(), _T("\\*ProjectConfig.ini"), projectConfFiles, TRUE, FALSE);
+
+	list<CString>::iterator itf;
+	for (itf = projectConfFiles.begin(); itf != projectConfFiles.end(); ++itf) {       
+	    ParseProjectConfig(*itf);
+	}
+
+#if 1
+    map<CString, ProjectConfig>::iterator it;
+    for (it = m_SupportProject.begin(); it != m_SupportProject.end(); it++) {
+        LOGE("key %S, project code %S", it->first.GetString(), it->second.GetProjectCode().GetString());
+    }
+#endif
+
+  
   ReadPackageHistory();
   //if some directory delete after latest run, we should write first.
   WritePackageHistory();
@@ -81,7 +96,14 @@ BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
   return TRUE;
 }
 
-BOOL AppConfig::SetPackageDir(const wchar_t * dir) {
+BOOL AppConfig::SetPackageDir(const wchar_t * dir, CString& errMsg) {
+	BOOL validPath = FALSE;		
+	PackageConfig pkgConf;
+	ProjectConfig project;
+	CString modemPkgPath;
+	CString CPEPackagePath;
+	list<CString> scannedFiles;
+	
     if(dir == NULL || !PathFileExists(dir)) {
         ERROR("%S%S", dir == NULL ? _T("Null parameter") : dir,
                       dir == NULL ? _T("") : _T(" is not exist!"));
@@ -92,9 +114,77 @@ BOOL AppConfig::SetPackageDir(const wchar_t * dir) {
         INFO("Package directory is not changed.");
         return FALSE;
     }
+	
+	//We use PKG_CONFIG_XML to locate the modem package.
+	ScanDir(dir, PKG_CONFIG_XML, scannedFiles, FALSE, TRUE);
+	//if (scannedFiles.size() > 1) {
+	//	errMsg.Format(_T("More than one %s in path %s"), PKG_CONFIG_XML, dir);
+	//	return FALSE;
+	//}
+
+	errMsg.Format(_T("Can not found %s in path %s"), PKG_CONFIG_XML, dir);
+
+	list<CString>::iterator itxml;
+	for (itxml = scannedFiles.begin(); itxml != scannedFiles.end(); ++itxml) {
+		modemPkgPath = GetDirName(*itxml);
+		pkgConf.Set(modemPkgPath);
+		
+		map<CString,ProjectConfig>::iterator iter=m_SupportProject.find(pkgConf.GetProjectCode());
+	    if(iter!=m_SupportProject.end()) {
+	        project = m_SupportProject.at(pkgConf.GetProjectCode());	        
+	    } else {
+		    errMsg.Format(_T("Tool does not support project %s"), pkgConf.GetProjectCode());
+			continue;
+		}
+
+		if (scannedFiles.size() > 1 && modemPkgPath.Find(project.GetModemSubDir().GetString()) == -1) {
+			continue;
+		}
+		
+		validPath = TRUE;
+		break;
+	}
+
+	if (!validPath)
+		return validPath;
+
+	modemPkgPath = TrimPathDelimitor(modemPkgPath);		
+	
+	if (project.GetPlatformType() == PLATFORM_CPE) {
+			CString root = dir;
+			CString target = UpDir(root);
+			CString currentDirName = CurrentDirName(root);
+			
+		scannedFiles.clear();
+		
+		ScanDir(dir, project.GetCPEFlagFile().GetString(), scannedFiles, FALSE, TRUE);
+	    errMsg.Format(_T("Can not found %s in %s"), project.GetCPEFlagFile(), dir);
+		if (scannedFiles.size() == 0 ) {
+			ScanDir(target.GetString(), project.GetCPEFlagFile().GetString(), scannedFiles, FALSE, TRUE);
+		    errMsg += _T(", or ");
+            errMsg += target;
+			if (scannedFiles.size() == 0 && project.GetModemSubDir() == currentDirName) {
+				target = UpDir(target);
+				ScanDir(target.GetString(), project.GetCPEFlagFile().GetString(), scannedFiles, FALSE, TRUE);
+		    errMsg += _T(", or ");
+            errMsg += target;
+			}
+		}
+		if (scannedFiles.size() == 0) {
+			return FALSE;
+		}
+		if (scannedFiles.size() > 1) {
+			errMsg.Format(_T("More than one %S in path %S"), project.GetCPEFlagFile().GetString(), dir);
+			return FALSE;
+		}
+		m_CPEPackagePath = GetDirName(scannedFiles.front());
+		m_CPEPackagePath += PATH_DELIMITERS;
+	}
 
     wcscpy_s(pkg_dir, dir);
-
+	m_ModemPackagePath = modemPkgPath;
+	m_ModemPackagePath += PATH_DELIMITERS;
+	
 #if 0
     list<CString>::iterator it;
     for (it = m_PackageDirs.begin(); it != m_PackageDirs.end(); ++it) {
@@ -109,7 +199,9 @@ BOOL AppConfig::SetPackageDir(const wchar_t * dir) {
 
     //WritePrivateProfileString(PKG_SECTION, PKG_PATH, dir, m_ConfigPath.GetString());
     WritePackageHistory();
-    SetupPackageInformation();
+	
+    mPackageConfig.Set(m_ModemPackagePath);
+    SetProjectCode(mPackageConfig.GetProjectCode());
 
     return TRUE;
 }
@@ -140,7 +232,7 @@ void AppConfig::ReadPackageHistory() {
                                      m_ConfigPath.GetString());
 
   if (data_len == 0) {
-    WARN("no %S exist, load default partition table.");
+    WARN("none package history.");
     return ;
   }
 
@@ -172,8 +264,12 @@ void AppConfig::ReadPackageHistory() {
   }
 }
 
+/* 
+* read download package path from the the tool application file.
+*/
 void AppConfig::SetupPackageInformation() {
   size_t data_len;
+  CString errMsg;
   CString appPath= L".\\"; //GetCurrentDirectory();
 //TODO?? , how to determined invalid package.
     data_len = GetPrivateProfileString(PKG_SECTION,
@@ -192,9 +288,10 @@ void AppConfig::SetupPackageInformation() {
         pkg_dir[data_len + 1] = L'\0';
         data_len++;
       }
-
-    mPackageConfig.Set(pkg_dir);
-    SetProjectCode(mPackageConfig.GetProjectCode());
+	SetPackageDir(pkg_dir, errMsg);
+	
+    //mPackageConfig.Set(pkg_dir);
+    //SetProjectCode(mPackageConfig.GetProjectCode());
 }
 
 
@@ -204,66 +301,12 @@ AppConfig::~AppConfig() {
   if(log_level) delete log_level;
 }
 
-void AppConfig:: ScanDir (const wchar_t *szDirectory)
-{
-    HANDLE      hFind;
-    WIN32_FIND_DATA  FindData;
-    wchar_t     szFileSpec [_MAX_PATH + 5];
-#if 0
-    FILETIME    FtLocal;
-    SYSTEMTIME  SysTime;
-    wchar_t        szLine [256];
-    wchar_t        szDate [sizeof "jj/mm/aaaa"];
-#endif
-    szFileSpec [_MAX_PATH - 1] = 0;
-    lstrcpyn (szFileSpec, szDirectory, _MAX_PATH);
-//    lstrcat (szFileSpec, "\\*.*");
-    lstrcat (szFileSpec, _T("\\*ProjectConfig.ini"));
-    hFind = FindFirstFile (szFileSpec, &FindData);
-    if (hFind == INVALID_HANDLE_VALUE) {
-        LOGE("scan dir initialize failed");
-        return;
-    }
-
-    do {
-        // display only files, skip directories
-        if (FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            continue;
-#if 0
-        FileTimeToLocalFileTime (& FindData.ftCreationTime, & FtLocal);
-        FileTimeToSystemTime (& FtLocal, & SysTime);
-        GetDateFormat (LOCALE_SYSTEM_DEFAULT,
-                       DATE_SHORTDATE,
-                       & SysTime,
-                       NULL,
-                       szDate, sizeof szDate);
-        szDate [sizeof "jj/mm/aaaa" - 1]=0;    // truncate date
-        FindData.cFileName[62] = 0;      // truncate file name if needed
-        // dialog structure allow up to 64 char
-        wsprintf (szLine, "%s\t%s\t%d",
-                  FindData.cFileName, szDate, FindData.nFileSizeLow);
-#endif
-        LOGD("Find file %S", FindData.cFileName);
-        CString configFile = szDirectory;
-        configFile += _T("\\");
-        configFile += FindData.cFileName;
-        ParseProjectConfig(configFile);
-    }while (FindNextFile (hFind, & FindData));
-    FindClose (hFind);
-
-#if 1
-    map<CString, ProjectConfig>::iterator it;
-    for (it = m_SupportProject.begin(); it != m_SupportProject.end(); it++) {
-        LOGE("key %S, project code %S", it->first.GetString(), it->second.GetProjectCode().GetString());
-    }
-#endif
-}
-
-
 void AppConfig::ParseProjectConfig(CString &configFile) {
     ProjectConfig projectConfig(configFile);
     list<CString> codes;
     list<CString>::iterator it;
+
+	LOGD("Parse project config %S", configFile);
 
     if (!projectConfig.ReadConfig(codes))
         return;
@@ -300,6 +343,8 @@ ProjectConfig::ProjectConfig(CString configFile):
     mProjectConfigPath(configFile),
     mCode(_T("NullProjectCode")),
     mPlatform(_T("NullProjectPlatform")),
+    mModemSubDir(_T("NullModemSubDir")),
+    mCPEFlagFile(_T("NullCPEFlagFile")),
     mVersion(0),
     mIsValidConfig(FALSE)
 {
@@ -388,6 +433,26 @@ BOOL ProjectConfig::ReadConfig(list<CString> &codes) {
         mPid = wcstol(buffer, NULL, 16);
     }
 
+	data_len = GetPrivateProfileString(PROJECT_SECTION,
+                                       _T("modemSubDir"),
+                                       NULL,
+                                       buffer,
+                                       MAX_PATH,
+                                       configFile);
+	if (data_len > 0) {
+		mModemSubDir = buffer;
+	}	
+
+	data_len = GetPrivateProfileString(OPENWRT_SECTION,
+                                       _T("image"),
+                                       NULL,
+                                       buffer,
+                                       MAX_PATH,
+                                       configFile);
+	if (data_len > 0) {
+		mCPEFlagFile = buffer;
+	}	
+
     mIsValidConfig = TRUE;
     return TRUE;
 }
@@ -473,10 +538,6 @@ BOOL  PackageConfig::Set(CString pkg_dir) {
     return TRUE;
 }
 
-
-
-
-
 flash_image::flash_image(AppConfig *appConfig):
   image_list(NULL),
   image_last(NULL),
@@ -502,10 +563,14 @@ BOOL flash_image::ReadPackage() {
 
     mAppConfig->GetProjectConfig(projectConfig);
     const wchar_t *projectConfigFile = projectConfig.GetConfigPath().GetString();
-    const wchar_t* pkg_dir = mAppConfig->GetPkgDir();
-    read_fastboot_config(projectConfigFile, pkg_dir);
-    read_diagpst_config(projectConfigFile, pkg_dir);
-    read_openwrt_config(projectConfigFile, pkg_dir);
+    //const wchar_t* pkg_dir = mAppConfig->GetPkgDir();
+    //read_fastboot_config(projectConfigFile, pkg_dir);
+    //read_diagpst_config(projectConfigFile, pkg_dir);
+    //read_openwrt_config(projectConfigFile, pkg_dir);
+	
+    read_fastboot_config(projectConfigFile, mAppConfig->GetModemPackagePath());
+    read_diagpst_config(projectConfigFile, mAppConfig->GetModemPackagePath());
+    read_openwrt_config(projectConfigFile, mAppConfig->GetCPEPackagePath());
     //read_package_version(mAppConfig->pkg_conf_file);
     return TRUE;
 }

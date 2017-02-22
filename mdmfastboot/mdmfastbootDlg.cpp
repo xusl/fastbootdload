@@ -847,15 +847,8 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
   if(m_PackagePath[m_PackagePath.GetLength()-1] != PATH_SEPERATOR)
     m_PackagePath += PATH_SEPERATOR;
 
-#if 0
-    if (mPSTManager.ChangePackage(m_PackagePath.GetString()))
-    		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
-    	UpdatePackageInfo();
-    } else {
-        AfxMessageBox(L"Package path is not change!", MB_ICONEXCLAMATION);
-    }
 
-#else
+
     /*m_PackageHistory.GetCount() -1*/
     int nItem = 0, nPreItem = -1;
     while ((nItem = m_PackageHistory.FindString(nItem, m_PackagePath.GetString())) != CB_ERR)
@@ -879,7 +872,11 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
         m_PackageHistory.SetItemDataPtr(result, NULL);
     m_PackageHistory.SetCurSel(0);
     m_PackageSelIdx = 0;
-#endif
+	
+    if (mPSTManager.ChangePackage(m_PackagePath.GetString()))
+    		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
+    	UpdatePackageInfo();
+    } 
 }
 
 

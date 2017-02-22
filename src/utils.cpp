@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "stdafx.h"
+#include "define.h"
 #include "utils.h"
 #include "log.h"
 #include <stdarg.h>
@@ -110,7 +111,99 @@ void get_my_path(char *exe, size_t maxLen)
         exe[0] = '\0';
     }
 }
+CString TrimPathDelimitor(CString &path) {
+	int index = -1;
+	CString normal = path;
+	while((index = normal.ReverseFind(PATH_DELIMITER)) == (normal.GetLength() -1))
+		normal = normal.Left(index );		
+	return normal;
+}
 
+CString UpDir(CString & originPath) {
+	CString target = TrimPathDelimitor(originPath);
+//  target = originPath.Left(originPath.GetLength()-1);
+    return target.Left(target.ReverseFind(PATH_DELIMITER));	
+}
+
+//if c:/bar/foo, return foo
+CString CurrentDirName(CString & originPath) {
+	CString target = TrimPathDelimitor(originPath);
+//  target = originPath.Left(originPath.GetLength()-1);
+    return target.Right(target.GetLength() - target.ReverseFind(PATH_DELIMITER) - 1);	
+}
+
+void ScanDir (const wchar_t *szDirectory, const wchar_t *pattern, list<CString>& files, BOOL useSpec, BOOL recursively)
+{
+    HANDLE      hFind;
+    WIN32_FIND_DATA  FindData;
+    wchar_t     szFileSpec [_MAX_PATH + 5] = { 0};
+#if 0
+    FILETIME    FtLocal;
+    SYSTEMTIME  SysTime;
+    wchar_t        szLine [256];
+    wchar_t        szDate [sizeof "jj/mm/aaaa"];
+#endif
+    szFileSpec [_MAX_PATH - 1] = 0;
+
+	if (szDirectory == NULL || wcslen(szDirectory) == 0) {
+		LOGE("Invalid parameter");
+		return;
+	}
+
+    lstrcpyn (szFileSpec, szDirectory, _MAX_PATH);
+	if (szFileSpec[wcslen(szFileSpec) -1 ] != PATH_DELIMITER) {
+			lstrcat (szFileSpec, _T("\\"));
+	}
+	
+    if (useSpec) {
+	    lstrcat (szFileSpec, pattern);
+	} else {		
+		lstrcat (szFileSpec, _T("*.*"));				
+	}
+	
+    hFind = FindFirstFile (szFileSpec, &FindData);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        LOGE("scan dir initialize failed %S, %S. %d", szDirectory, szFileSpec, GetLastError());
+        return;
+    }
+
+    do {		
+        CString item = szDirectory;
+        item += PATH_DELIMITERS;//_T("\\");
+        item += FindData.cFileName;
+		
+        // display only files, skip directories
+        if (FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			if(0 == lstrcmp(FindData.cFileName, _T("..")) || 0 == lstrcmp(FindData.cFileName, _T(".")))
+				continue;
+			if (recursively )
+				ScanDir(item.GetString(), pattern, files, useSpec, recursively);
+            continue;
+    	}
+#if 0
+        FileTimeToLocalFileTime (& FindData.ftCreationTime, & FtLocal);
+        FileTimeToSystemTime (& FtLocal, & SysTime);
+        GetDateFormat (LOCALE_SYSTEM_DEFAULT,
+                       DATE_SHORTDATE,
+                       & SysTime,
+                       NULL,
+                       szDate, sizeof szDate);
+        szDate [sizeof "jj/mm/aaaa" - 1]=0;    // truncate date
+        FindData.cFileName[62] = 0;      // truncate file name if needed
+        // dialog structure allow up to 64 char
+        wsprintf (szLine, "%s\t%s\t%d",
+                  FindData.cFileName, szDate, FindData.nFileSizeLow);
+#endif
+	    if (!useSpec) {
+			if (pattern != NULL && wcslen(pattern) >= 0 && lstrcmp(pattern, FindData.cFileName) != 0)
+				continue;
+    	}
+		
+        LOGD("Find file %S", FindData.cFileName);
+		files.push_back(item);		
+    }while (FindNextFile (hFind, & FindData));
+    FindClose (hFind);
+}
 
 #if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
   #define DELTA_EPOCH_IN_MICROSECS  11644473600000000Ui64
@@ -284,7 +377,7 @@ void *load_file(LPCWSTR fn, unsigned *_sz)
                        NULL );
 
     if (file == INVALID_HANDLE_VALUE) {
-        LOGE("load_file: file open failed (rc=%ld)\n", GetLastError());
+        LOGE("load_file: file open %S failed (rc=%ld)\n", fn, GetLastError());
         return NULL;
     }
 
@@ -483,92 +576,4 @@ BOOL StopAdbServer(){
 		}
 	}
 	return TRUE;
-}
-
-
-char*
-buff_addc (char*  buff, char*  buffEnd, int  c)
-{
-    int  avail = buffEnd - buff;
-
-    if (avail <= 0)  /* already in overflow mode */
-        return buff;
-
-    if (avail == 1) {  /* overflowing, the last byte is reserved for zero */
-        buff[0] = 0;
-        return buff + 1;
-    }
-
-    buff[0] = (char) c;  /* add char and terminating zero */
-    buff[1] = 0;
-    return buff + 1;
-}
-
-char*
-buff_adds (char*  buff, char*  buffEnd, const char*  s)
-{
-    int  slen = strlen(s);
-
-    return buff_addb(buff, buffEnd, s, slen);
-}
-
-char*
-buff_addb (char*  buff, char*  buffEnd, const void*  data, int  len)
-{
-    int  avail = (buffEnd - buff);
-
-    if (avail <= 0 || len <= 0)  /* already overflowing */
-        return buff;
-
-    if (len > avail)
-        len = avail;
-
-    memcpy(buff, data, len);
-
-    buff += len;
-
-    /* ensure there is a terminating zero */
-    if (buff >= buffEnd) {  /* overflow */
-        buff[-1] = 0;
-    } else
-        buff[0] = 0;
-
-    return buff;
-}
-
-char*
-buff_add  (char*  buff, char*  buffEnd, const char*  format, ... )
-{
-    int      avail;
-
-    avail = (buffEnd - buff);
-
-    if (avail > 0) {
-        va_list  args;
-        int      nn;
-
-        va_start(args, format);
-        nn = vsnprintf( buff, avail, format, args);
-        va_end(args);
-
-        if (nn < 0) {
-            /* some C libraries return -1 in case of overflow,
-             * but they will also do that if the format spec is
-             * invalid. We assume ADB is not buggy enough to
-             * trigger that last case. */
-            nn = avail;
-        }
-        else if (nn > avail) {
-            nn = avail;
-        }
-
-        buff += nn;
-
-        /* ensure that there is a terminating zero */
-        if (buff >= buffEnd)
-            buff[-1] = 0;
-        else
-            buff[0] = 0;
-    }
-    return buff;
 }

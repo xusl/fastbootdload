@@ -14,6 +14,7 @@ static const int PORT_NUM_MAX = 9;
 enum PlatformType {
   PLATFORM_CPE = 0,
   PLATFORM_MIFI,
+  PLATFORM_MAX
 };
 
 class ProjectConfig {
@@ -33,6 +34,8 @@ class ProjectConfig {
     CString GetConfigPath() { return mProjectConfigPath; }
     CString GetProjectCode() { return mCode; }
     CString GetPlatform() { return mPlatform; }
+    CString GetCPEFlagFile() { return mCPEFlagFile; }
+    CString GetModemSubDir() { return mModemSubDir; }
     int   GetVersion() { return mVersion; }
     BOOL  GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergency);
     BOOL  IsUseAdbShell() { return mUseAdbShell;}
@@ -47,6 +50,8 @@ private:
     CString mProjectConfigPath;
     CString mCode;
     CString mPlatform;
+    CString mCPEFlagFile;
+    CString mModemSubDir;
     int    mVersion;
     BOOL   mIsValidConfig;
     BOOL   mUseAdbShell;
@@ -149,7 +154,9 @@ public:
     ~AppConfig();
     BOOL         ReadConfigIni(const wchar_t * ini = L"mdmconfig.ini");
     const wchar_t *GetAppConfIniPath(void) { return m_ConfigPath.GetString();};
-    const wchar_t *GetPkgDir(void) { return pkg_dir;};
+    const wchar_t *GetPkgDir(void) { return pkg_dir;}
+    const wchar_t *GetModemPackagePath(void) { return m_ModemPackagePath.GetString();}
+    const wchar_t *GetCPEPackagePath(void) { return m_CPEPackagePath.GetString();}
     const wchar_t *GetLogFilePath(void) {return log_file;};
     const char  *GetLogTag(void) { return log_tag;};
     const char  *GetLogLevel(void) { return log_level;};
@@ -172,14 +179,13 @@ public:
       config = mProjectConfig;
       return TRUE;
     }
-    BOOL         SetPackageDir(const wchar_t * dir);
+    BOOL         SetPackageDir(const wchar_t * dir, CString& errMsg);
     VOID         GetPackageHistory(list<CString> & history) {
        history = m_PackageDirs;};
        PackageConfig *GetPackageConfig() {
       return &mPackageConfig;
     }
 private:
-    void         ScanDir (const wchar_t *szDirectory);
     void         ParseProjectConfig(CString &projectCofig);
     void         SetupPackageInformation();
     void         ReadPackageHistory();
@@ -199,6 +205,8 @@ private:
     char                    *log_tag;
     char                    *log_level;
     wchar_t                 pkg_dir[MAX_PATH];
+    CString                 m_ModemPackagePath;
+    CString                 m_CPEPackagePath;
     list<CString>           m_PackageDirs;
     map<CString, ProjectConfig> m_SupportProject;
     ProjectConfig            mProjectConfig;

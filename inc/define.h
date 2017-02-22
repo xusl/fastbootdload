@@ -291,7 +291,6 @@ typedef enum
 /*-------------------------------------------------------------------------*/
 #define PKG_CONFIG_XML          L"config.xml"
 #define PKG_STATIC_QCN          L"static.qcn"
-
 #define PARTITIONTBL_SECTION    L"partition_table"
 #define PARTITIONTBL_DL		      L"partition_dl"
 #define DIAGPST_SECTION         L"pst_diag"
@@ -300,6 +299,9 @@ typedef enum
 #define PST_NPRG                L"pst_nprg"
 #define PST_ENPRG               L"pst_enprg"
 #define OPENWRT_SECTION         _T("openwrt")
+#define ASTERISK                L"*"
+
+#define CONFIG_XML_SPEC       ASTERISK PKG_CONFIG_XML
 
 /* SB Architecture 1.0 */
 #define PRGCOMBINE_NAME			"nandprgcombined.mbn"
@@ -390,7 +392,10 @@ typedef enum
 
 /*******************config.xml define End*************************/
 
-#define PATH_SEPERATOR _T('\\')
+#define PATH_SEPERATOR  _T('\\')
+#define PATH_DELIMITER  _T('\\')
+#define PATH_DELIMITERS  _T("\\")
+
 /* Data size unit */
 #define KB (1024)	   // kilobyte
 //#define MB (1024*1024)    // megabyte
