@@ -101,7 +101,7 @@ BOOL AppConfig::SetPackageDir(const wchar_t * dir, CString& errMsg) {
 	PackageConfig pkgConf;
 	ProjectConfig project;
 	CString modemPkgPath;
-	CString CPEPackagePath;
+	CString CPEPkgPath;
 	list<CString> scannedFiles;
 	
     if(dir == NULL || !PathFileExists(dir)) {
@@ -110,7 +110,7 @@ BOOL AppConfig::SetPackageDir(const wchar_t * dir, CString& errMsg) {
         return FALSE;
     }
 
-    if (wcscmp(dir, pkg_dir) == 0) {
+    if (wcscmp(dir, pkg_dir) == 0 && m_ModemPackagePath == dir) {
         INFO("Package directory is not changed.");
         return FALSE;
     }
@@ -148,7 +148,12 @@ BOOL AppConfig::SetPackageDir(const wchar_t * dir, CString& errMsg) {
 	if (!validPath)
 		return validPath;
 
-	modemPkgPath = TrimPathDelimitor(modemPkgPath);		
+	modemPkgPath = TrimPathDelimitor(modemPkgPath);	
+	modemPkgPath += PATH_DELIMITERS;
+	if (modemPkgPath == m_ModemPackagePath) {
+		errMsg = _T("Modem package is not changed");
+		return FALSE;
+	}
 	
 	if (project.GetPlatformType() == PLATFORM_CPE) {
 			CString root = dir;
@@ -177,13 +182,17 @@ BOOL AppConfig::SetPackageDir(const wchar_t * dir, CString& errMsg) {
 			errMsg.Format(_T("More than one %S in path %S"), project.GetCPEFlagFile().GetString(), dir);
 			return FALSE;
 		}
-		m_CPEPackagePath = GetDirName(scannedFiles.front());
-		m_CPEPackagePath += PATH_DELIMITERS;
+		 CPEPkgPath = GetDirName(scannedFiles.front());
+		 CPEPkgPath += PATH_DELIMITERS;
+		 if (m_CPEPackagePath == CPEPkgPath) {
+			errMsg = _T("CPE package is not changed");
+			return FALSE;
+		}
 	}
-
+		
     wcscpy_s(pkg_dir, dir);
 	m_ModemPackagePath = modemPkgPath;
-	m_ModemPackagePath += PATH_DELIMITERS;
+    m_CPEPackagePath = CPEPkgPath;
 	
 #if 0
     list<CString>::iterator it;

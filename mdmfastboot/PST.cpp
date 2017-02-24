@@ -57,8 +57,10 @@ BOOL PSTManager::ChangePackage(const wchar_t * dir) {
         m_image->reset(FALSE);
     	m_image->ReadPackage();
         return TRUE;
-    }
-    AfxMessageBox(errMsg, MB_OK);
+}
+  if (errMsg.GetLength() > 0)
+
+  AfxMessageBox(errMsg, MB_OK);
     return FALSE;
 }
 
@@ -227,6 +229,10 @@ BOOL PSTManager::FlashDeviceDone(UsbWorkData * data) {
         LOGE("error, null parameter");
         return FALSE;
     }
+	if (mAppConf.GetPlatformType() == PLATFORM_CPE)  {
+		LOGD("CPE platform now donot support automatically schedule mechaism.");
+		return TRUE;
+	}
 
     data->Finish();
     if (NULL == mDevCoordinator.IsEmpty()) {
@@ -286,6 +292,7 @@ BOOL PSTManager::ScheduleDeviceWork() {
          workdata = m_workdata[0];
         if (workdata->GetStatus() == USB_STAT_SWITCH)
             workdata->SetDevSwitchEvt(flashdirect);
+	    LOGD("==========END ScheduleDeviceWork (CPE)==============");
         return TRUE;
     }
 
@@ -424,7 +431,7 @@ BOOL PSTManager::HandleComDevice(BOOL schedule) {
         INFO("!!!!do not work now.");
         return FALSE;
     }
-	
+
 	GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_ALCATELUSBSER, devicePath, false);
     GetDevLabelByGUID(&GUID_DEVINTERFACE_COMPORT, SRV_JRDUSBSER, devicePath, false);
     //GetDevLabelByGUID(&GUID_DEVINTERFACE_SERENUM_BUS_ENUMERATOR, SRV_JRDUSBSER, devicePath, false);
@@ -568,7 +575,7 @@ VOID PSTManager::HttpServerMessageCB (PVOID data, int uiPort, CString message) {
       if (workData == NULL) {
         return;
       }
-      workData->SetInfo(PROMPT_TEXT, message);
+      workData->SetDevicePortText(PROMPT_TEXT, message);
 }
 
 UINT PSTManager::RunTelnetServer(LPVOID wParam){
@@ -584,22 +591,27 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     UsbWorkData *workData = manager->GetWorkData();
 
     if (openwrtFiles.size() <= 0) {
-        LOGE("There are none images to download");
-        workData->SetInfo(PROMPT_TEXT, _T("There are none images to download"));
+        workData->SetDevicePortText(PROMPT_TEXT, _T("There are none images to download"));
         return -1;
     }
 
     nicManager = manager->GetNicManager();
     nic = nicManager->GetDefaultNic();
     nicManager->UpdateNic(nic);
+	
+	workData->Clean(FALSE);
+	workData->SetParallelMode(FALSE);
+	workData->SetStatus(USB_STAT_WORKING);
 
-//#define DESKTOP_TEST
+    //#define DESKTOP_TEST
 
 #ifdef DESKTOP_TEST
     gateway = "10.0.0.2";
     nic.GetHostIp(host);
 #else
     if (!nic.GetGatewayIp(gateway) || !nic.GetHostIp(host)) {
+        workData->SetInfo(OPENWRT_UPDATED, "");
+	    workData->SetDevicePortText(PROMPT_TEXT, _T("No device found"));
         LOGE("no memory");
         return ENOMEM;
     }
@@ -608,62 +620,139 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     workData->AddDevInfo(_T("Host Connection"), nic.mConnectionName);
     workData->AddDevInfo(_T("Device IP Address"), nic.mGateway);
 
-    workData->SetInfo(PROMPT_TEXT, _T("telent: connect to device"));
+    workData->SetDevicePortText(PROMPT_TITLE, _T("Connect to device"));
     SOCKET socket = ConnectServer(gateway.c_str(), TELNET_PORT);
-    if (socket == INVALID_SOCKET) {
+    if (socket == INVALID_SOCKET) {		
+        workData->SetInfo(OPENWRT_UPDATED, "");
+	    workData->SetDevicePortText(PROMPT_TEXT, _T("Can not connect to device"));
         return -1;
     }
     TelnetClient tn(socket, 2000, TRUE);
+    tn.register_callback(wParam, HttpServerMessageCB, workData->GetIndex());
     tn.set_nbio(true);
 
-    workData->SetInfo(PROMPT_TEXT, _T("telent: receive welcome message"));
+    workData->SetDevicePortText(PROMPT_TEXT, _T("receive welcome message"));
     tn.send_command(NULL, result);
     tn.send_command(NULL, result);
 
 #ifdef DESKTOP_TEST
     LOGE("User Login, enter user ");
-    workData->SetInfo(PROMPT_TEXT, _T("telent: auto user login"));
+    workData->SetDevicePortText(PROMPT_TEXT, _T("telent: auto user login"));
     tn.send_command("zen", result, false);
     LOGE("Send password ");
     tn.send_command("zen", result, false);
 #endif
 
-    workData->SetInfo(PROMPT_TEXT, _T("telent: switch usb to PC"));
+    tn.send_command("echo $PATH", result);
+    //workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
+
+    workData->SetDevicePortText(PROMPT_TITLE, _T("Update Modem Image"));
+    workData->SetDevicePortText(PROMPT_TEXT, _T("switch usb to PC"));
     //tn.send_command("send_data 254 0 0 8 1 0 0", result);
-    tn.send_command("usb_switch_to PC", result);
+    tn.send_command("/bin/usb_switch_to PC", result);
 
     //begin USB download
     manager->CPEModemPST(workData);
 
-    workData->SetInfo(PROMPT_TEXT, _T("telent: switch usb to IPQ"));
+    workData->SetDevicePortText(PROMPT_TEXT, _T("switch usb to IPQ"));
     //tn.send_command("send_data 254 0 0 8 0 0 0", result);
-    tn.send_command("usb_switch_to IPQ", result);
+    tn.send_command("/bin/usb_switch_to IPQ", result);
 
     tn.set_nbio(false);
-    workData->SetInfo(PROMPT_TITLE, _T("telent: request download file"));
+    workData->SetDevicePortText(PROMPT_TITLE, _T("Update Router Image"));
     //  m_MmiDevInfo = nic.mConnectionName;
     //for (map<string, CString>::iterator it=openwrtFiles.begin(); it != openwrtFiles.end(); it ++) {
-        //tn.send_command("cd /tmp/", result);
-        command = "wget http://";
-        command += host;
-        command.append("/");
-        std::ostringstream oss;
-        oss << workData->GetIndex();
-        command.append(oss.str());
-        command.append("/");
-        command += openwrtFiles.begin()->first;
-        command += " -O /tmp/";
-        command += openwrtFiles.begin()->first;
-        //command += it->first;
-        tn.send_command(command.c_str(), result, FALSE);
+    //tn.send_command("cd /tmp/", result);
+    command = "wget http://";
+    command += host;
+    command.append("/");
+    std::ostringstream oss;
+    oss << workData->GetIndex();
+    command.append(oss.str());
+    command.append("/");
+    command += openwrtFiles.begin()->first;
+    command += " -O /tmp/";
+    command += openwrtFiles.begin()->first;
+    //command += it->first;
+    tn.send_command(command.c_str(), result, FALSE);
     //}
 
-    workData->SetInfo(PROMPT_TEXT, _T("telent: execute sysupgrade"));
+    workData->SetDevicePortText(PROMPT_TITLE, _T("execute sysupgrade, please wait ..."));
+    tn.set_receive_timeout(1000);
+    tn.set_verbose(false);
     command = "sysupgrade /tmp/";
     command.append(openwrtFiles.begin()->first);
-    tn.send_command(command.c_str(), result);
+    tn.send_command(command.c_str(), result, FALSE);
 
-    workData->SetInfo(PROMPT_TEXT, _T("command is sent, please wait for device upgrade"));
+    string lineHeadPart="";
+    int i = 0;
+    BOOL done = FALSE;
+    while (i < 200) {
+        if (result.size() == 0) {
+            i++;
+            goto RCV_NEXT_DATA;
+        }
+
+		i = 0;
+        if (result.rfind('\n') == string::npos) {
+            lineHeadPart += result;
+            goto RCV_NEXT_DATA;
+        }
+
+        result = lineHeadPart + result;
+		
+		if(result.find("Upgrade completed") != string::npos ||
+           result.find("Rebooting system") != string::npos) {
+           done = TRUE;
+           break;
+		}
+		 if (result.find("not a valid FIT image") != string::npos) {
+            break;
+        }
+
+        if (result.back() == '\n') {//result.at(result.size() - 1) == '\n' 
+            lineHeadPart.clear();
+        } else {
+            lineHeadPart = result;
+            lineHeadPart.substr(lineHeadPart.rfind('\n') + 1);
+        }
+        size_t found = result.rfind("\n");
+        if (found != string::npos) {
+            result.erase(found);
+        }
+        found = result.rfind("\n");
+        if (found != string::npos) {
+            result.erase(0, found + 1);
+        }
+        //use printf to handle \b (backspace) in the result data;
+        while((found = result.find('\b')) != string::npos) {
+            if(found > 0)
+                result.erase(found - 1, 2);
+            else
+                result.erase(0, 1);
+        }
+
+        workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
+        		
+RCV_NEXT_DATA:
+        tn.send_command(NULL, result, FALSE);
+    };
+
+    workData->SetDevicePortText(PROMPT_TITLE, _T("Work out"));
+    workData->SetDevicePortText(PROMPT_TEXT, done ? _T("Now please reboot the device.") : _T("Update main board failed"));
+#if 0
+    for (;;) {
+        nicManager->UpdateNic(nic);
+        if (nic.mGateway.GetLength() == 0) {
+            workData->SetInfo(FLASH_DONE, _T("Device Update"));
+            break;
+        }
+        Sleep(1000);
+    }
+#endif
+    //nicManager->WaitAddrChanged();
+    workData->SetInfo(OPENWRT_UPDATED, "");
+
     return 0;
 }
 
@@ -823,6 +912,7 @@ UsbWorkData::UsbWorkData(int index, CWnd* dlg,
     mProjectPackage = package;
     mActiveDevIntf = NULL;
     mMapDevIntf = NULL;
+	m_ParallelMode = TRUE;
     Clean(TRUE);
 }
 
@@ -866,6 +956,8 @@ BOOL UsbWorkData::IsIdle() {
     //if (stat == USB_STAT_SWITCH || stat == USB_STAT_WORKING)
     if (stat == USB_STAT_WORKING)
         return FALSE;
+	if (!m_ParallelMode && stat == USB_STAT_SWITCH)
+		return FALSE;
     return TRUE;
 }
 
@@ -906,7 +998,7 @@ BOOL UsbWorkData::Reset(VOID) {
     }
     start_time_tick = -1;
 
-    Clean(TRUE);
+    Clean(FALSE);
     return TRUE;
 }
 
@@ -1013,7 +1105,7 @@ BOOL UsbWorkData::SetInfo(UI_INFO_TYPE info_type, PCCH msg) {
 }
 
 /*invoke in UI thread.*/
-BOOL UsbWorkData::SetInfo(UI_INFO_TYPE infoType, CString strInfo)
+BOOL UsbWorkData::SetDevicePortText(UI_INFO_TYPE infoType, CString strInfo)
 {
     pCtl->SetInfo(infoType, strInfo);
     return TRUE;

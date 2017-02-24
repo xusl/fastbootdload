@@ -92,7 +92,9 @@ public:
     BOOL IsChangingIp() const { return m_IsChangingIp;}
     BOOL EnableDhcp(BOOL updateIp);
     BOOL UpdateIP();
+    //@deprecate method
     BOOL NotifyIPChange(LPCTSTR lpszAdapterName, int nIndex);
+    BOOL WaitAddrChanged();
     BOOL GetConnectedState();
     BOOL CheckIpInArpTable(const char *ip, string & mac);
     int ResolveIpMac(const char *DestIpString, string & mac);
@@ -104,7 +106,6 @@ private:
     BOOL UpdateNic();
     BOOL SwitchNic(NetCardStruct &netCard, bool Enabled);
     bool NetCardStateChange(NetCardStruct &netCard, bool Enabled);
-    BOOL WaitAddrChanged();
     int SetIP( CString & ip,  CString & gateway,  CString & subnetMask, BOOL updateIp=TRUE);
     BOOL RegGetIP(const CString & adapter, CString& ip, CString &subnetMask, CString& gateway,  BOOL& enableDHCP);
     BOOL RegSetIP(const CString & adapter,  CString & pIPAddress,  CString & pNetMask,  CString & pNetGate, DWORD enableDHCP);

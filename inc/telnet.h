@@ -365,11 +365,14 @@ struct curl_slist {
   struct curl_slist *next;
 };
 
+typedef VOID ( *TelnetCmdMessage) (PVOID data, int uiPort, CString message);
+
 class TelnetClient {
   public:
      TelnetClient(curl_socket_t sock, int timeout, bool verb);
      ~TelnetClient();
      bool set_receive_timeout(int ms);
+     void set_verbose(bool verb) { verbose = verb;}
      int receive_telnet_data(char *buffer, ssize_t len);
 
      void negotiate();
@@ -390,8 +393,10 @@ class TelnetClient {
      CURLcode send_telnet_data(const char *buffer, ssize_t len);
      int send_command(const char *buffer, string &result, bool trim = true);
      int set_nbio(bool nbio);
+     BOOL register_callback(PVOID data, TelnetCmdMessage func, u_short port);
 
 private:
+  BOOL ui_notify(const char *buffer);
   //int Curl_poll(struct pollfd ufds[], unsigned int nfds, int timeout_ms);
   CURLcode Curl_write(curl_socket_t sockfd,
                       const void *mem,
@@ -424,7 +429,9 @@ protected:
   unsigned char *subpointer, *subend;      /* buffer for sub-options */
 
   TelnetReceive telrcv_state;
-
+  TelnetCmdMessage m_CmdMsgCB;
+  PVOID m_CallBackData;
+  u_short m_DevicePort;
 };
 
 int Curl_raw_equal(const char *first, const char *second);

@@ -47,6 +47,7 @@ typedef enum
 	REBOOT_DEVICE,
 	FLASH_DONE,
 	PORTUI_DEVINFO,
+	OPENWRT_UPDATED,
 	UI_DEFAULT,
 }UI_INFO_TYPE;
 
@@ -87,7 +88,7 @@ class UsbWorkData{
     DWORD  WaitForDevSwitchEvt(DWORD dwMilliseconds = INFINITE);
     DWORD  SetDevSwitchEvt(BOOL flashdirect);
     BOOL SetInfo(UI_INFO_TYPE info_type, PCCH msg);
-    BOOL SetInfo(UI_INFO_TYPE infoType, CString strInfo);
+    BOOL SetDevicePortText(UI_INFO_TYPE infoType, CString strInfo);
     BOOL AddDevInfo(CString name, CString value);
     UINT SetProgress(int progress);
     BOOL SetPromptMsg(PCCH msg) { return SetInfo(PROMPT_TEXT, msg);};
@@ -95,6 +96,8 @@ class UsbWorkData{
     float GetElapseSeconds();
     BOOL Log(const char * msg);
     int GetStatus() { return stat;};
+    VOID SetStatus(int status) { stat = status;};
+    VOID SetParallelMode(BOOL on) {m_ParallelMode = on;}
     BOOL CheckValid() {
       return hWnd != NULL && mProjectPackage != NULL && mPAppConf != NULL ;
     }
@@ -122,6 +125,7 @@ class UsbWorkData{
     flash_image    *mProjectPackage;
     short           partition_nr;
     BOOL            update_qcn;
+    BOOL            m_ParallelMode;
 } ;
 
 class PSTManager {

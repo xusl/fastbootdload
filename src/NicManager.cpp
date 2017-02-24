@@ -25,7 +25,7 @@ NicManager::NicManager():
 {
     mNicList.clear();
     m_NicToggle = NIC_SETUPDI_TOGGLE;
-    m_Timeout = 6000;
+    m_Timeout = 20 * MICRO_SECONDS;
 }
 
 NicManager::~NicManager(void)

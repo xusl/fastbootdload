@@ -203,7 +203,7 @@ bool XmlParser::ElementHandler(CString& name, CComBSTR &value) {
     PCHAR pname = WideStrToMultiStr(name.GetString());
     PCHAR pvalue = WideStrToMultiStr(value_text.GetString());
 
-    LOGD("Name: %s,  Value:%s", pname, pvalue);
+    //LOGD("Name: %s,  Value:%s", pname, pvalue);
 
     //PCHAR pname = WideStrToMultiStr(name.GetBuffer(0));
     //PCHAR pvalue = WideStrToMultiStr(value_text.GetBuffer(0));

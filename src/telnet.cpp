@@ -917,6 +917,10 @@ TelnetClient::TelnetClient(curl_socket_t sock, int to, bool verb) {
     memset(subopt_xdisploc, 0, sizeof subopt_xdisploc);
     memset(subbuffer, 0, sizeof subbuffer);
 
+	m_CallBackData = NULL;
+    m_CmdMsgCB = NULL;
+    m_DevicePort = -1;
+
     //struct SessionHandle *data = conn->data;
     //curl_socket_t sockfd = conn->sock[FIRSTSOCKET];
     sockfd = sock;
@@ -950,6 +954,21 @@ TelnetClient::TelnetClient(curl_socket_t sock, int to, bool verb) {
 
     set_receive_timeout(to);
     //SOCKET_ERROR
+}
+
+BOOL TelnetClient::register_callback(PVOID data, TelnetCmdMessage func, u_short port) {
+    m_CallBackData = data;
+    m_CmdMsgCB = func;
+    m_DevicePort = port;
+    return TRUE;
+}
+
+BOOL TelnetClient::ui_notify(const char *buffer) {
+	if (m_CallBackData == NULL || m_CmdMsgCB == NULL || m_DevicePort == -1)
+		return FALSE;
+	CString msg(buffer);
+	m_CmdMsgCB(m_CallBackData, m_DevicePort, msg);
+	return TRUE;
 }
 
 bool TelnetClient::set_receive_timeout(int ms) {
@@ -1024,7 +1043,8 @@ if (true/*!nbio*/) {
 }
 
         if (telnet_cmd_negotiate){
-            LOGD("read(%d bytes): %s",nread, buf);
+			if (verbose)
+	            LOGD("read(%d bytes): %s",nread, buf);
             if (len > 0) {
                 int rl = CURLMIN(nread, len);
                 strncpy(buffer, buf, rl);
@@ -1069,6 +1089,7 @@ if (true/*!nbio*/) {
 int TelnetClient::send_command(const char *cmd, string &result, bool trim) {
     char buf[CMDRSPBUFLEN];
     int code;
+	string msg;
 
     if(cmd != NULL) {
         string enterCmd;
@@ -1078,6 +1099,9 @@ int TelnetClient::send_command(const char *cmd, string &result, bool trim) {
         if(strrchr(cmd, '\n') == NULL)
             enterCmd.append(1, '\n');
         send_telnet_data(enterCmd.c_str(), enterCmd.size());
+		msg = "execute command ";
+		msg += cmd;
+		ui_notify(msg.c_str());
     }
 
     result.clear();
@@ -1090,12 +1114,12 @@ int TelnetClient::send_command(const char *cmd, string &result, bool trim) {
         size_t found = result.rfind('\n');
         if (found != string::npos)
             result.erase (result.begin()+found, result.end());
-        //    data.erase(data.find_last_not_of("\t") + 1);
-        result.erase(result.find_last_not_of("\r\n") + 1);
-        result.erase(result.find_last_not_of(" ") + 1);
-        //    data.erase(data.find_last_not_of("\n") + 1);
-        result.erase(0, result.find_first_not_of("\r\n"));
-        result.erase(0, result.find_first_not_of(" "));
+		found = result.find_last_not_of(" \t\f\v\r\n");
+        if (found != string::npos)
+        	result.erase(found + 1);
+		found = result.find_first_not_of(" \t\f\v\r\n");
+        if (found != string::npos)
+        	result.erase(0, found);
     }
 
     return code;
@@ -1686,7 +1710,8 @@ if (nbio) {
       /* this is just a case of EWOULDBLOCK */
       curlcode = CURLE_AGAIN;
     } else {
-      LOGD("Recv failure: %s", Curl_strerror(err));
+	  if (verbose)
+	      LOGD("Recv failure: %s", Curl_strerror(err));
       curlcode = (err== WSAETIMEDOUT) ? CURLE_RECV_TIMEOUT : CURLE_RECV_ERROR;
     }
   }

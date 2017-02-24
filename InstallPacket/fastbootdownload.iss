@@ -7,16 +7,26 @@
 ; time    : 2013/08/09
 ;
 ;===========================================================
+#define AppVersion "1.0.0.3"
 [Setup]
-AppName=TPST-CPE
-AppVerName=1.0.0.1
-AppPublisher=JRD
+AppName=TPST-CPE-{#AppVersion}
+AppVerName={#AppVersion}        
+AppPublisher=JRD (Shenzhen), Inc.
+AppPublisherURL=www.jrdcom.com
+AppSupportURL=www.jrdcom.com
+AppUpdatesURL=www.jrdcom.com
+VersionInfoCompany=TCL Communication Technology Holdings Limited
+VersionInfoCopyright=Copyright (C) 2006-2015 TCL Communication Technology Holdings Limited
+VersionInfoDescription=Dedicate tool for update Life Connect, supported by SCD Connected Object
+VersionInfoVersion={#AppVersion}
 DefaultDirName={pf}\JRD\TPST-CPE
 DefaultGroupName=JRD\TPST-CPE
 DisableProgramGroupPage=yes
 OutputDir= .\
-OutputBaseFilename=TPST-CPE_Setup
-SetupIconFile=..\mdmfastboot\res\mdmfastboot.ico
+OutputBaseFilename=TPST-CPE-{#AppVersion}-Setup
+SetupIconFile=..\mdmfastboot\res\mdmfastboot.ico 
+WizardImageFile=.\icons\orange.bmp
+WizardSmallImageFile=.\icons\orange_s.bmp
 Compression=lzma
 SolidCompression=yes
 ; "ArchitecturesInstallIn64BitMode=x64" requests that the install be

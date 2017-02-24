@@ -545,7 +545,7 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
     case REBOOT_DEVICE:
         //data->SwitchDev(switch_timeout);
         data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
-        data->pCtl->SetInfo(PROMPT_TITLE, CString(""));
+        //data->pCtl->SetInfo(PROMPT_TITLE, CString(""));
         break;
 
     case FLASH_DONE:
@@ -559,6 +559,15 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
         }
         m_updated_number ++;
         mPSTManager.FlashDeviceDone(data);
+		break;
+		
+	case OPENWRT_UPDATED:	
+		//add for HH70 one thread only
+		LOGE("Openwrt updated");
+	    mPSTManager.SetWork(FALSE);
+		SetWorkStatus(FALSE, TRUE);
+		data->Finish();
+        //mPSTManager.Reset();
         break;
 
     case TITLE:
@@ -1087,7 +1096,6 @@ void CmdmfastbootDlg::OnFileM801()
 
 void CmdmfastbootDlg::OnSettingsOptions()
 {
-CSettingsDlg dlg;
-//PasswordEnterDlg dlg;
-dlg.DoModal();
+//CSettingsDlg dlg;
+//dlg.DoModal();
 }

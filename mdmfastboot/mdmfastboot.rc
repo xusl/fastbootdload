@@ -156,8 +156,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,1
- PRODUCTVERSION 1,0,0,1
+ FILEVERSION 1,0,0,3
+ PRODUCTVERSION 1,0,0,3
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -174,12 +174,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "TCL Telecommunication"
             VALUE "FileDescription", "a tool to update module firmware through fastboot."
-            VALUE "FileVersion", "1.0.0.1"
+            VALUE "FileVersion", "1.0.0.3"
             VALUE "InternalName", "TPST-CPE.exe"
             VALUE "LegalCopyright", "(C) TCL Telecommunication。保留所有权利。"
             VALUE "OriginalFilename", "TPST-CPE.exe"
             VALUE "ProductName", "M800 module"
-            VALUE "ProductVersion", "1.0.0.1"
+            VALUE "ProductVersion", "1.0.0.3"
         END
     END
     BLOCK "VarFileInfo"
