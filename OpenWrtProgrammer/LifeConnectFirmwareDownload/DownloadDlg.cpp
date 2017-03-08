@@ -406,6 +406,9 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr, BOOL killSniff, BOOL up
     return TRUE;
 }
 
+DWORD WINAPI CDownloadDlg::CaptureLog(LPVOID lpPARAM)  {
+}
+	
 /*
 * Two important note:
 * 1. Life Connect will detect internet connection, so it alway changes ip from 192.168.1.1 to 192.168.237.1

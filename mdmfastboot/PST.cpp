@@ -586,6 +586,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     NicManager * nicManager;
     NetCardStruct nic;
     string command;
+	int error;
     flash_image *packageImage = manager->GetProjectPackage();
     map<string, CString> openwrtFiles = packageImage->GetOpenWrtFiles();
     UsbWorkData *workData = manager->GetWorkData();
@@ -652,11 +653,17 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     tn.send_command("/bin/usb_switch_to PC", result);
 
     //begin USB download
-    manager->CPEModemPST(workData);
+    error = manager->CPEModemPST(workData);
 
     workData->SetDevicePortText(PROMPT_TEXT, _T("switch usb to IPQ"));
     //tn.send_command("send_data 254 0 0 8 0 0 0", result);
     tn.send_command("/bin/usb_switch_to IPQ", result);
+
+	if (error != 0) {
+		workData->SetDevicePortText(PROMPT_TEXT, _T("Update mini board failed"));
+	    workData->SetInfo(OPENWRT_UPDATED, "");
+		return 1;
+	}
 
     tn.set_nbio(false);
     workData->SetDevicePortText(PROMPT_TITLE, _T("Update Router Image"));
@@ -680,7 +687,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     workData->SetDevicePortText(PROMPT_TITLE, _T("execute sysupgrade, please wait ..."));
     tn.set_receive_timeout(1000);
     tn.set_verbose(false);
-    command = "sysupgrade /tmp/";
+    command = "sysupgrade -n -v /tmp/";
     command.append(openwrtFiles.begin()->first);
     tn.send_command(command.c_str(), result, FALSE);
 
@@ -689,7 +696,8 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     BOOL done = FALSE;
     while (i < 200) {
         if (result.size() == 0) {
-            i++;
+            i++;		 	
+			LOGE("receive empty message, %d time(s)", i);
             goto RCV_NEXT_DATA;
         }
 
@@ -706,7 +714,8 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
            done = TRUE;
            break;
 		}
-		 if (result.find("not a valid FIT image") != string::npos) {
+		 if (result.find("not a valid FIT image") != string::npos) {		 	
+			LOGE("receive error message, %s", result.c_str());
             break;
         }
 
@@ -732,14 +741,18 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
                 result.erase(0, 1);
         }
 
-        workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
+        workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));				 	
+		LOGE("receive message, %s", result.c_str());
         		
 RCV_NEXT_DATA:
         tn.send_command(NULL, result, FALSE);
     };
 
+	if (!done) {
+		LOGE("Timeout exceed limit");
+	}
     workData->SetDevicePortText(PROMPT_TITLE, _T("Work out"));
-    workData->SetDevicePortText(PROMPT_TEXT, done ? _T("Now please reboot the device.") : _T("Update main board failed"));
+    workData->SetDevicePortText(PROMPT_TEXT, done ? _T("Device updated. Please reboot the device.") : _T("Update main board failed"));
 #if 0
     for (;;) {
         nicManager->UpdateNic(nic);
@@ -750,13 +763,14 @@ RCV_NEXT_DATA:
         Sleep(1000);
     }
 #endif
+
     //nicManager->WaitAddrChanged();
     workData->SetInfo(OPENWRT_UPDATED, "");
 
     return 0;
 }
 
-VOID PSTManager::CPEModemPST(UsbWorkData *workData) {
+UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
     DeviceInterfaces * dev;
     ASSERT(workData);
      HandleComDevice(FALSE);
@@ -767,16 +781,15 @@ VOID PSTManager::CPEModemPST(UsbWorkData *workData) {
      while((dev = mDevCoordinator.GetValidDevice(mAppConf.IsUseAdbShell())) == NULL) {
         if (i++ > 15) {
             LOGE("timeout for update CPE modem module");
-            return;
+            return 1;
         }
         //::WaitForSingleObject(mScheduleEvt, 10 * 1000);
         SLEEP(2000);
      };
 
-
      workData->SetDevice(dev, mAppConf.GetFlashDirectFlag());
 
-     RunMiFiPST(workData);
+     return RunMiFiPST(workData);
 }
 
 /*
@@ -811,7 +824,7 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
         data->SetInfo(PROMPT_TITLE, "Begin download by Diag");
         bool result = pst.DownloadCheck();
         if(result)
-            result = pst.RunTimeDiag();
+            result = pst.RunTimeDiag(data->mPAppConf);
 
         if(result || pst.IsEmergencyDownloadMode()) {
             if (!pst.IsEmergencyDownloadMode() && useAdb) {

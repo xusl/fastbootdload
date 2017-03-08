@@ -44,7 +44,7 @@ public:
     virtual void initDLimgInfo();
     virtual void initCustDataInfo();
     virtual bool DownloadCheck();
-    virtual bool RunTimeDiag();
+    virtual bool RunTimeDiag(AppConfig* config);
     virtual bool DownloadImages(flash_image *img);
     virtual bool DownloadCustomerInfo();
     virtual bool DownloadPrg(AppConfig* config);

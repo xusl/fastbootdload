@@ -7,7 +7,7 @@
 ; time    : 2013/08/09
 ;
 ;===========================================================
-#define AppVersion "1.0.0.3"
+#define AppVersion "1.0.0.5"
 [Setup]
 AppName=TPST-CPE-{#AppVersion}
 AppVerName={#AppVersion}        

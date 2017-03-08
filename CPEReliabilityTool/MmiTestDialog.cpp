@@ -321,9 +321,11 @@ BOOL MmiTestDialog::TestKey(TelnetClient &client, CString item, const string &ok
     int tries = 0;
     BOOL pass = FALSE;
 
-    SetTimer(CLOSE_MESSAGEDIALOG, 5000, NULL);
+	//when add Tab for IMEI function, this timer will cause dialog crash.
+    //SetTimer(CLOSE_MESSAGEDIALOG, 5000, NULL);
     text.Format(_T("Press '%s' Key after dialog disappear or click 'OK'"), item.GetString());
     int iRet = AfxMessageBox(text, MB_OK);
+    //KillTimer(CLOSE_MESSAGEDIALOG);
 
     snprintf(command, sizeof command, "send_data 254 0 2 4 1 %d 0", key);
 

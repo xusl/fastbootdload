@@ -182,7 +182,7 @@ public:
     BOOL         SetPackageDir(const wchar_t * dir, CString& errMsg);
     VOID         GetPackageHistory(list<CString> & history) {
        history = m_PackageDirs;};
-       PackageConfig *GetPackageConfig() {
+     PackageConfig *GetPackageConfig() {
       return &mPackageConfig;
     }
 private:

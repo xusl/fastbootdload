@@ -672,7 +672,7 @@ bool DiagPST::DownloadCheck()
     return result;
 }
 
-bool DiagPST::RunTimeDiag() {
+bool DiagPST::RunTimeDiag(AppConfig* config) {
     if(!SwitchOfflineMode()) {
         return false;
     }

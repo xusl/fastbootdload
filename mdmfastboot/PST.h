@@ -177,7 +177,7 @@ public:
     return mAppConf.GetPackageHistory(history);
   }
 
-  VOID CPEModemPST(UsbWorkData *workData);
+  UINT CPEModemPST(UsbWorkData *workData);
 
   static BOOL HttpServerGetFileCB (PVOID data, string filename, CString& filePath);
   static VOID HttpServerMessageCB (PVOID data, int uiPort, CString message);
