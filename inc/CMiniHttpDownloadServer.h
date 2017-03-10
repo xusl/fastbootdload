@@ -12,11 +12,17 @@ public:
     ~CMiniHttpDownloadServer();
 
     //void server_listen(const char*path );
-    BOOL IsServerWorks() { return m_ServerWork;}
+    BOOL IsServerWorks() {     
+    	EnterCriticalSection(&mStatusCs);
+  		LeaveCriticalSection(&mStatusCs);
+      return m_ServerWork;
+    }
     static UINT StartHttpServer(LPVOID wParam);
     void StopHttpServer();
+    u_short GetPort() { return m_ServerPort; }
 
 private:
+    BOOL BindPort(SOCKET sock, u_short port);
     BOOL SendFile(SOCKET sock, CString &file, int uiPort);
     BOOL ParseRequest(string& request, CString &sendFile, int *uiPort);
     BOOL BuildHttpHeader(string& header, int dataSize);
@@ -28,12 +34,13 @@ private:
     void Run();
     void gmt_time_string(char *buf, size_t buf_len);
     //BOOL FindFile(CString fileName, CString &filePath);
-
+    
 private:
     PVOID m_CallBackData;
     HttpServerGetFile m_GetFileCB;
     HttpServerMessage m_SetMsgCB;
     BOOL m_ServerWork;
     u_short m_ServerPort;
+    CRITICAL_SECTION mStatusCs;
     //CWinThread* mThread;
 };

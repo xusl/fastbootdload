@@ -23,6 +23,11 @@
 TelnetClient::~TelnetClient() {
   curl_slist_free_all(telnet_vars);
   telnet_vars = NULL;
+  LOGD("Deconstructure telnet client.");
+  if (sockfd != INVALID_SOCKET) {
+	  closesocket(sockfd);	
+      sockfd = INVALID_SOCKET;
+  }
 }
 
 void TelnetClient::negotiate() {
@@ -952,6 +957,8 @@ TelnetClient::TelnetClient(curl_socket_t sock, int to, bool verb) {
     //subopt_ttype[31] = 0; /* String termination */
     //us_preferred[CURL_TELOPT_TTYPE] = CURL_YES;
 
+    struct linger so_linger = {TRUE, 0};
+    setsockopt(sockfd, SOL_SOCKET, SO_LINGER, (char *)&so_linger, sizeof(so_linger));
     set_receive_timeout(to);
     //SOCKET_ERROR
 }

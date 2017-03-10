@@ -127,8 +127,9 @@ void CLog::StartLogging
 	const char* tags
 )
 {
-	loc = std::locale::global(std::locale(""));
-
+	//use system locale, but numpunct use default , so input number do not add a thounsands separator,
+	//for example, 8081 => 8,081
+	loc = std::locale::global(std::locale("")).combine<std::numpunct<char>>(locale::classic());
 
 #ifdef FEATURE_LOG_FILE
 	/* If the stream has been opened, do nothing */

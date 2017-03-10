@@ -13,7 +13,7 @@ CMiniHttpDownloadServer::CMiniHttpDownloadServer(PVOID data, HttpServerGetFile g
     m_GetFileCB(getFile),
     m_SetMsgCB(msg)
 {
-    ;
+    InitializeCriticalSection(&mStatusCs);
 }
 
 CMiniHttpDownloadServer::~CMiniHttpDownloadServer() {
@@ -301,39 +301,69 @@ UINT CMiniHttpDownloadServer::StartHttpServer(LPVOID wParam) {
   return 0;
 }
 
+BOOL CMiniHttpDownloadServer::BindPort(SOCKET sock, u_short port) {
+    SOCKADDR_IN addrSrv;
+    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+    addrSrv.sin_family = AF_INET;
+    addrSrv.sin_port = htons(port);
+
+    if (bind(sock, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR)) == SOCKET_ERROR) {
+        LOGE("Bind socket port %d failed!", port);
+        //closesocket(sock);
+        return FALSE;
+    }
+	m_ServerPort = port;
+    LOGD("bind socket success on port :%d", m_ServerPort);
+	return TRUE;
+}
+
 void CMiniHttpDownloadServer::Run() {
     SOCKET sockConn = INVALID_SOCKET;
     SOCKET sockSrv  = INVALID_SOCKET;
     SOCKADDR_IN  addrClient;
-    SOCKADDR_IN addrSrv;
     CString msg;
     size_t length = 0;
     int code;
+	BOOL binded = FALSE;
+	//int  availabledPort[] = {0xffff, 8081, /*8082, 8083, 8084, 8888, */9999};
 
+	EnterCriticalSection(&mStatusCs);
     sockSrv = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sockSrv == INVALID_SOCKET) {
         LOGE("Create Http server socket failed!");
+		LeaveCriticalSection(&mStatusCs);
         return ;
     }
+	#if 0
+	availabledPort[0] = m_ServerPort;
+	for (int pidx = 0; (!binded) && pidx < COUNTOF(availabledPort); pidx++) {
+		binded = BindPort(sockSrv, availabledPort[pidx]);
+	}
+	#endif
 
-    addrSrv.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-    addrSrv.sin_family = AF_INET;
-    addrSrv.sin_port = htons(m_ServerPort);
-
-    if (bind(sockSrv, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR)) == SOCKET_ERROR) {
-        LOGE("Bind socket port %d failed!", m_ServerPort);
-        closesocket(sockSrv);
-        return ;
-    }
-
-    LOGD("bind socket success on port :%d", m_ServerPort);
+	binded = BindPort(sockSrv, m_ServerPort);
+	for (int srvport = 800; (!binded) && srvport < 888; srvport++) {
+		binded = BindPort(sockSrv, srvport);		
+	}
+	
+	if (!binded) {
+		LOGE("Bind all available port failed.");
+		closesocket(sockSrv);
+		sockSrv = INVALID_SOCKET;
+		LeaveCriticalSection(&mStatusCs);
+		return;
+	}
+	
     if (listen(sockSrv, SOMAXCONN) == SOCKET_ERROR) {
         LOGE("server listen failed!");
         closesocket(sockSrv);
+		sockSrv = INVALID_SOCKET;
+		LeaveCriticalSection(&mStatusCs);
         return ;
     }
 
     m_ServerWork = TRUE;
+	LeaveCriticalSection(&mStatusCs);
     while(m_ServerWork) {
         unsigned long on = 1;
         char const * content = NULL;

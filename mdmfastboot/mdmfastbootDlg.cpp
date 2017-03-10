@@ -567,6 +567,7 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 	    mPSTManager.SetWork(FALSE);
 		SetWorkStatus(FALSE, TRUE);
 		data->Finish();
+		data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
         //mPSTManager.Reset();
         break;
 
