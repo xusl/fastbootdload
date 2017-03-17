@@ -792,10 +792,11 @@ UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
     ASSERT(workData);
      HandleComDevice(FALSE);
      EnumerateAdbDevice(FALSE);
-
-     //workData->WaitForDevSwitchEvt();
+     
      int i = 0;
 	 BOOL bindDiagAdb = mAppConf.IsUseAdbShell();
+
+#if 0	 
 #ifdef CPE_SKIP_DIAG_PORT
 	 bindDiagAdb = FALSE;
 #endif
@@ -807,7 +808,13 @@ UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
         //::WaitForSingleObject(mScheduleEvt, 10 * 1000);
         SLEEP(2000);
      };
-
+     SLEEP(15000);
+#else
+    //first the COM device, and seconde is the ADB device, so we must wait two times totally.
+	while (i++ < 2) {
+		 workData->WaitForDevSwitchEvt(FALSE);
+	}
+#endif
      workData->SetDevice(dev, mAppConf.GetFlashDirectFlag());
 
      return RunMiFiPST(workData);
@@ -887,7 +894,7 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
         if(result) {
             dev->SetDeviceStatus(DEVICE_FLASH);
             data->SetInfo(REBOOT_DEVICE, "Enter fastboot");
-            data->WaitForDevSwitchEvt();
+            data->WaitForDevSwitchEvt(TRUE);
         } else {
             data->SetInfo(FLASH_DONE, "Diag PST occur error! Please check log");
             return 0;
@@ -908,7 +915,7 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
 
         dev->SetDeviceStatus(DEVICE_FLASH);
         data->SetInfo(REBOOT_DEVICE, "Enter fastboot");
-        data->WaitForDevSwitchEvt();
+        data->WaitForDevSwitchEvt(TRUE);
     } 
 
     handle = data->usb;
@@ -991,8 +998,9 @@ BOOL UsbWorkData::ShowSubWindow(BOOL show) {
     return TRUE;
 }
 
-DWORD  UsbWorkData::WaitForDevSwitchEvt(DWORD dwMilliseconds) {
-    SwitchDev(dwMilliseconds);
+DWORD  UsbWorkData::WaitForDevSwitchEvt(BOOL changeStatus, DWORD dwMilliseconds) {
+	if (changeStatus)
+	    SwitchDev(dwMilliseconds);
     return ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);
 }
 

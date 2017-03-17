@@ -85,7 +85,7 @@ class UsbWorkData{
     BOOL Finish(VOID);
     BOOL SwitchDev(UINT nElapse);
     BOOL SetSwitchedStatus();
-    DWORD  WaitForDevSwitchEvt(DWORD dwMilliseconds = INFINITE);
+    DWORD  WaitForDevSwitchEvt(BOOL changeStatus, DWORD dwMilliseconds = INFINITE);
     DWORD  SetDevSwitchEvt(BOOL flashdirect);
     BOOL SetInfo(UI_INFO_TYPE info_type, PCCH msg);
     BOOL SetDevicePortText(UI_INFO_TYPE infoType, CString strInfo);
