@@ -31,14 +31,6 @@ const uint16 MAX_CDROMS  = (MAX_DEVICES);
 /* Each device has two port (diag & nmea) */
 const uint16 MAX_PORTS   = (MAX_DEVICES * 2);
 
-/* Device Type */
-typedef enum {
-	DEVTYPE_NONE  = 0,
-	DEVTYPE_CDROM,
-	DEVTYPE_PORT,
-	DEVTYPE_DISK,
-	DEVTYPE_MAX = 0xFF,
-} TDeviceEnumType;
 
 typedef enum {
 	DEVEVT_UNKNOWN = 0,
@@ -59,6 +51,7 @@ typedef enum {
     DEVICE_REMOVED,
     DEVICE_MAX
 }usb_dev_t;
+
 
 class DeviceInterfaces;
 /** Structure usb_handle describes our connection to the usb device via
@@ -141,11 +134,14 @@ typedef enum {
 	//DEVTYPE_NONE  = 0,
 	//DEVTYPE_CDROM,
 	//DEVTYPE_DISK
-	DEVTYPE_DIAGPORT,
-	DEVTYPE_FASTBOOT,
-	DEVTYPE_ADB,
+	DEVTYPE_DIAGPORT = 0x0001,
+	DEVTYPE_ADB = 0x0002,
+	DEVTYPE_FASTBOOT = 0x0004,
+	DEVTYPE_ANY = 0x8000,
+	DEVTYPE_MASK = 0x7FFF,
 	//DEVTYPE_MAX = 0xFF,
 } TDevType;
+
 
 /*
 a usb device path in various mode:
@@ -276,7 +272,7 @@ class DeviceCoordinator {
   public:
     DeviceCoordinator();
     ~DeviceCoordinator();
-    DeviceInterfaces *GetValidDevice(BOOL bindDiagAdb);
+    DeviceInterfaces *GetValidDevice(int32 devMask);
     BOOL GetDevice(const wchar_t *const devPath, DeviceInterfaces** outDevIntf);
     BOOL AddDevice(CDevLabel& dev, TDevType type, BOOL ignoreAttachStatus, DeviceInterfaces** intfs);
     BOOL RemoveDevice(DeviceInterfaces*const & devIntf);

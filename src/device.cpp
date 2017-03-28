@@ -119,9 +119,6 @@ usb_handle* DeviceInterfaces::GetUsbHandle(BOOL flashdirect) const {
     return NULL;
 }
 
-BOOL DeviceInterfaces::IsBindDiagAdb() {
-    return (NULL != GetAdbIntf()) && (NULL != GetDiagIntf());
-}
 
 BOOL DeviceInterfaces::SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf) {
     CDevLabel* pDev = NULL;
@@ -244,18 +241,35 @@ BOOL DeviceCoordinator::Reset() {
     return TRUE;
 }
 
-DeviceInterfaces *DeviceCoordinator::GetValidDevice(BOOL bindDiagAdb) {
+DeviceInterfaces *DeviceCoordinator::GetValidDevice(int32 devMask) {
     list<DeviceInterfaces*>::iterator it;
     for (it = mDevintfList.begin(); it != mDevintfList.end(); ++it) {
         DeviceInterfaces *item = *it;
         usb_dev_t status = item->GetDeviceStatus();
-        if (item->GetAttachStatus())
+        if (item->GetAttachStatus()) {
+			LOGD("Device %d is attached.", item->GetDevTag());
             continue;
-        if (bindDiagAdb && (!item->IsBindDiagAdb()))
+    	}
+		
+        if (devMask & DEVTYPE_DIAGPORT && (item->GetDiagIntf() == NULL)) {			
+			LOGD("Device %d found none diag port.", item->GetDevTag());
             continue;
+    	}
+		
+        if (devMask & DEVTYPE_ADB && (item->GetAdbIntf() == NULL)) {
+			LOGD("Device %d found none adb device.", item->GetDevTag());
+            continue;
+    	}
+		
+        if (devMask & DEVTYPE_FASTBOOT && (item->GetFastbootIntf() == NULL)) {			
+			LOGD("Device %d found none fastboot device.", item->GetDevTag());
+            continue;
+    	}
         if(status >= DEVICE_PLUGIN && status < DEVICE_REMOVED ) {
             return item;
         }
+		
+		LOGD("Device %d state is %d.", item->GetDevTag(), status);
     }
     LOGE("None device found");
     return NULL;

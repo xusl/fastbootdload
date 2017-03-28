@@ -3,6 +3,7 @@
 #include "arpa_telnet.h"
 #include "log.h"
 #include "stdio.h"
+#include "mstcpip.h"
 
 #define elapsed_ms  (int)curlx_tvdiff(curlx_tvnow(), initial_tv)
 
@@ -956,7 +957,7 @@ TelnetClient::TelnetClient(curl_socket_t sock, int to, bool verb) {
     //strncpy(subopt_ttype, "vt100", 31);
     //subopt_ttype[31] = 0; /* String termination */
     //us_preferred[CURL_TELOPT_TTYPE] = CURL_YES;
-
+	
     struct linger so_linger = {TRUE, 0};
     setsockopt(sockfd, SOL_SOCKET, SO_LINGER, (char *)&so_linger, sizeof(so_linger));
     set_receive_timeout(to);
@@ -997,6 +998,42 @@ int TelnetClient::set_nbio(bool nonblocking) {
     nbio = nonblocking;
     return 0;
 }
+
+
+int TelnetClient::set_keepalive(bool keepalive) {
+    int onoff = 1;
+	int optLen = sizeof(onoff);
+    getsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (char *)&onoff, &optLen);
+//	getsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, (char *)&keepidle, &optLen); 
+//	getsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, (char *)&keepintvl, &optLen);
+
+	if (keepalive && onoff) 
+		return 0;
+
+	if ((!keepalive) && (!onoff))
+		return 0;
+
+#if 0	
+		onoff = keepalive ? 1 : 0;
+	    setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (char *)&onoff, optLen);
+#else
+		tcp_keepalive alive_in = {TRUE, 10 * 60 * 1000,  1 * 1000 };
+		tcp_keepalive alive_out = {0};
+		DWORD bytes = 0;
+		alive_in.keepalivetime = 5000;
+		alive_in.keepaliveinterval = 1000;
+		alive_in.onoff = keepalive ? 1 : 0;
+		int result = WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &alive_in, sizeof(alive_in), &alive_out, sizeof(alive_out), &bytes, NULL, NULL);
+		if (result == SOCKET_ERROR) {
+			LOGE("Set SIO_KEEPALIVE_VALS failed");
+		}
+#endif
+		
+	optLen = sizeof(onoff);
+    getsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (char *)&onoff, &optLen);
+	return 0;
+}
+
 int TelnetClient::receive_telnet_data(char *buffer, ssize_t len) {
     CURLcode code;
     ssize_t nread;

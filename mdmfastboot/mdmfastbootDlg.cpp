@@ -327,7 +327,7 @@ BOOL CmdmfastbootDlg::OnInitDialog()
   m_UpdateDownloadFlag = TRUE;
 
   mPSTManager.Initialize(this);
-  SetDialogSize();
+  //SetDialogSize();
   LayoutControl();
 
  //if (mPSTManager.GetPortNum() == 1)
@@ -459,7 +459,7 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
     DEV_BROADCAST_HDR* phdr = (DEV_BROADCAST_HDR*)dwData;
     PDEV_BROADCAST_DEVICEINTERFACE pDevInf = (PDEV_BROADCAST_DEVICEINTERFACE)phdr;
 
-    //DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x", nEventType, phdr->dbch_devicetype);
+    DEBUG("OnDeviceChange, EventType: 0x%x, DeviceType 0x%x", nEventType, phdr->dbch_devicetype);
 
     if (nEventType == DBT_DEVICEARRIVAL) {
         switch( phdr->dbch_devicetype ) {
@@ -554,8 +554,14 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
             data->pCtl->SetInfo(PROMPT_TITLE, CString(""));
         } else {
             CString prompt;
-            prompt.Format(_T("Update device sucessfully, elapse %.3fSeconds"), data->GetElapseSeconds());
-            data->pCtl->SetInfo(PROMPT_TITLE, prompt);
+	        if (mPSTManager.GetAppConfig()->GetPlatformType() == PLATFORM_CPE) {
+	            prompt.Format(_T("elapse %.3f Seconds"), data->GetElapseSeconds());
+		        data->pCtl->AddDevInfo(_T("Modem updated"), prompt);
+				data->pCtl->SetProgressVisible(FALSE);
+        	} else {
+	            prompt.Format(_T("Update device sucessfully, elapse %.3f Seconds"), data->GetElapseSeconds());
+	            data->pCtl->SetInfo(PROMPT_TITLE, prompt);
+    		}
         }
         m_updated_number ++;
         mPSTManager.FlashDeviceDone(data);
@@ -656,7 +662,7 @@ BOOL CmdmfastbootDlg::SetupDevice(int evt) {
 void CmdmfastbootDlg::OnSize(UINT nType, int cx, int cy)
 {
   CDialog::OnSize(nType, cx, cy);
-  LayoutControl();
+  //LayoutControl();
 }
 
 VOID CmdmfastbootDlg::SetDialogSize() {
@@ -696,7 +702,8 @@ VOID CmdmfastbootDlg::SetDialogSize() {
   }
   cy += MAX(leftHeight, rightHeight);
   cy += GetSystemMetrics(SM_CYMENU);
-  cy += VERTICAL_GAP * 2;
+  //cy += GetSystemMetrics(SM_CYCAPTION);
+  //cy += VERTICAL_GAP * 2;
   SetWindowPos(0, 0, 0, cx, cy, SWP_SHOWWINDOW | SWP_NOSENDCHANGING /*| SWP_NOSIZE*/);
   CenterWindow();
   Invalidate(TRUE);
@@ -714,6 +721,9 @@ VOID CmdmfastbootDlg::LayoutControl() {
     if (!mPSTManager.IsInit()) {
         return;
     }
+
+//  CMenu* pSysMenu = GetSystemMenu(FALSE);
+	
     GetClientRect(&dialogRect);
     //cx = dialogRect.right - dialogRect.left;
     //cy = dialogRect.bottom - dialogRect.top;
@@ -726,7 +736,8 @@ VOID CmdmfastbootDlg::LayoutControl() {
 
     //int gridWidth = mPSTManager.GetPortGridWidth();
     int gridHeight = mPSTManager.GetPortGridHeight();
-    cy = pathRect.bottom - pathRect.top + HORIZONAL_GAP;
+    cy = pathRect.bottom - pathRect.top + HORIZONAL_GAP;	
+    //cy = GetSystemMetrics(SM_CYMENU) + GetSystemMetrics(SM_CYCAPTION);
     if (gridHeight < infoRect.bottom - infoRect.top) {
         cy = (cy + gridHeight + dialogRect.bottom )/2 ;
         cx = (infoRect.right + dialogRect.right) /2;

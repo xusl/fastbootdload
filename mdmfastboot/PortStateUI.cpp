@@ -61,10 +61,20 @@ void CPortStateUI::SetTitle(CString strInfo)
 
 void CPortStateUI::SetProgress(int iPercent)
 {
+	SetProgressVisible(TRUE);
     ((CProgressCtrl *)GetDlgItem(IDC_PROGRESS1))->SetPos(iPercent);
 	//::SendMessage(GetDlgItem(IDC_PROGRESS1)->m_hWnd, PBM_SETPOS, iPercent, 0);
     //GetDlgItem(IDC_PROGRESS1)->SendMessage(PBM_SETPOS, iPercent, 0);
     //Invalidate();
+}
+
+void CPortStateUI::SetProgressVisible(BOOL show)
+{
+    BOOL visible = ((CProgressCtrl *)GetDlgItem(IDC_PROGRESS1))->IsWindowVisible();
+	if ((visible && show) || (!visible && !show))
+		return;
+	
+	((CProgressCtrl *)GetDlgItem(IDC_PROGRESS1))->ShowWindow(show ? SW_SHOW : SW_HIDE);
 }
 
 void CPortStateUI::Init(int iPortID)
@@ -73,7 +83,7 @@ void CPortStateUI::Init(int iPortID)
 	CString strTitle;
 	strTitle.Format(_T("%s %d"), _T("Port"), iPortID);
 	SetTitle(strTitle);
-	ShowWindow(1);
+	ShowWindow(SW_SHOWNORMAL);
 }
 
 BEGIN_MESSAGE_MAP(CPortStateUI, CDialog)
@@ -129,8 +139,9 @@ void CPortStateUI::Reset(void)
 	SetTitle(strTitle);
 	GetDlgItem(IDC_DL_INFO)->SetWindowText(lpszString);
 	GetDlgItem(IDC_DLINFO_TITLE)->SetWindowText(lpszString);
-     ((CProgressCtrl *)GetDlgItem(IDC_PROGRESS1))->SetPos(0);
-     m_DevInfoList.DeleteAllItems();
+	SetProgress(0);
+	SetProgressVisible(FALSE);
+    m_DevInfoList.DeleteAllItems();
 }
 
 BOOL CPortStateUI::AddDevInfo(CString name, CString value) {

@@ -24,6 +24,7 @@ public:
 	void Init(int iPortID);
   void SetTitle(CString strInfo);
   void Reset(void);
+  void SetProgressVisible(BOOL show);
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV Ö§³Ö

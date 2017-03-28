@@ -53,7 +53,6 @@ BOOL PSTManager::ChangePackage(const wchar_t * dir) {
   CString errMsg;
   if (mAppConf.SetPackageDir(dir, errMsg))//m_PackagePath.GetBuffer(/*MAX_PATH*/)))
     		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
-
         m_image->reset(FALSE);
     	m_image->ReadPackage();
         return TRUE;
@@ -312,7 +311,7 @@ BOOL PSTManager::ScheduleDeviceWork() {
         if (workdata->GetStatus() == USB_STAT_WORKING)
             continue;
 
-        while(NULL != (idleDev = mDevCoordinator.GetValidDevice(mAppConf.IsUseAdbShell()))) {
+        while(NULL != (idleDev = mDevCoordinator.GetValidDevice(DEVTYPE_ANY))) {
             idleDev->Dump(__FUNCTION__);
             if (workdata->GetStatus() == USB_STAT_SWITCH) {
                 ASSERT(item != NULL);
@@ -340,6 +339,7 @@ BOOL PSTManager::Reset() {
         m_workdata[i]->Reset();
     }
     mHttpServer.StopHttpServer();
+	mDevCoordinator.Reset();
     return TRUE;
 }
 
@@ -566,6 +566,7 @@ BOOL PSTManager::HttpServerGetFileCB (PVOID data, string filename, CString& file
         return FALSE;
     }
 
+    LOGE("get path %S for file %s", filePath, filename.c_str());
     return TRUE;
 }
 
@@ -586,16 +587,16 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     NicManager * nicManager;
     NetCardStruct nic;
     string command;
-	int error;
+    int error;
     flash_image *packageImage = manager->GetProjectPackage();
     map<string, CString> openwrtFiles = packageImage->GetOpenWrtFiles();
     UsbWorkData *workData = manager->GetWorkData();
 
-	std::ostringstream ossPort;
-	//use system locale, but numpunct use default , so input number do not add a thounsands separator,
-	//for example, 8081 => 8,081
-	ossPort.imbue(locale::classic()/*std::locale()*/);
-	
+    std::ostringstream ossPort;
+    //use system locale, but numpunct use default , so input number do not add a thounsands separator,
+    //for example, 8081 => 8,081
+    ossPort.imbue(locale::classic()/*std::locale()*/);
+
     if (openwrtFiles.size() <= 0) {
         workData->SetDevicePortText(PROMPT_TEXT, _T("There are none images to download"));
         return -1;
@@ -604,10 +605,10 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     nicManager = manager->GetNicManager();
     nic = nicManager->GetDefaultNic();
     nicManager->UpdateNic(nic);
-	
-	workData->Clean(FALSE);
-	workData->SetParallelMode(FALSE);
-	workData->SetStatus(USB_STAT_WORKING);
+
+    workData->Clean(FALSE);
+    workData->SetParallelMode(FALSE);
+    workData->SetStatus(USB_STAT_WORKING);
 
     //#define DESKTOP_TEST
 
@@ -623,40 +624,49 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
 
     //for thread sync problem, when we invoke mHttpServer.IsServerWorks,
     //http server may not ready, and it will return false;
-	if (!manager->mHttpServer.IsServerWorks()) {
-		workData->SetInfo(OPENWRT_UPDATED, "File server is not ready.");
-		return ENOENT;
-	}
-	
+    if (!manager->mHttpServer.IsServerWorks()) {
+        workData->SetInfo(OPENWRT_UPDATED, "File server is not ready.");
+        return ENOENT;
+    }
+
     workData->AddDevInfo(_T("Host Connection"), nic.mConnectionName);
     workData->AddDevInfo(_T("Device IP Address"), nic.mGateway);
 
     workData->SetDevicePortText(PROMPT_TITLE, _T("Connect to device"));
     SOCKET socket = ConnectServer(gateway.c_str(), TELNET_PORT);
-    if (socket == INVALID_SOCKET) {		
+    if (socket == INVALID_SOCKET) {
         workData->SetInfo(OPENWRT_UPDATED, "Can not connect to device");
         return -1;
     }
     TelnetClient tn(socket, 2000, TRUE);
-    tn.register_callback(wParam, HttpServerMessageCB, workData->GetIndex());
+
+    tn.set_keepalive(true);
     tn.set_nbio(true);
+    tn.register_callback(wParam, HttpServerMessageCB, workData->GetIndex());
 
     workData->SetDevicePortText(PROMPT_TEXT, _T("receive welcome message"));
-    error = tn.send_command(NULL, result);
-    error += tn.send_command(NULL, result);	
-
+	
+	Sleep(2000);
+	error = tn.send_command(NULL, result);
+    error += tn.send_command(NULL, result);
+	
 #ifdef DESKTOP_TEST
     LOGE("User Login, enter user ");
     workData->SetDevicePortText(PROMPT_TEXT, _T("telent: auto user login"));
     tn.send_command("zen", result, false);
     LOGE("Send password ");
     tn.send_command("zen", result, false);
+#else
+	//do {
+    //	error = tn.send_command(NULL, result);
+	//} while (result.find_first_of("@:#$") == string::npos);
 #endif
 
     tn.send_command("echo $PATH", result);
     //workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
 
     workData->SetDevicePortText(PROMPT_TITLE, _T("Update Modem Image"));
+    tn.send_command("/bin/usb_switch_to IPQ", result);
     workData->SetDevicePortText(PROMPT_TEXT, _T("switch usb to PC"));
     //tn.send_command("send_data 254 0 0 8 1 0 0", result);
     tn.send_command("/bin/usb_switch_to PC", result);
@@ -664,15 +674,14 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     //begin USB download
     error = manager->CPEModemPST(workData);
 
-    workData->SetDevicePortText(PROMPT_TEXT, _T("switch usb to IPQ"));
+    //workData->SetDevicePortText(PROMPT_TEXT, _T("switch usb to IPQ"));
     //tn.send_command("send_data 254 0 0 8 0 0 0", result);
-    tn.send_command("/bin/usb_switch_to IPQ", result);
+    //tn.send_command("/bin/usb_switch_to IPQ", result);
 
-	if (error != 0) {
-	    workData->SetInfo(OPENWRT_UPDATED, "Update mini board failed");
-		return 2;
-	}
-
+    if (error != 0) {
+        workData->SetInfo(OPENWRT_UPDATED, "Update modem failed");
+        return 2;
+    }
 
     tn.set_nbio(false);
     workData->SetDevicePortText(PROMPT_TITLE, _T("Update Router Image"));
@@ -693,14 +702,14 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     //command += it->first;
     tn.send_command(command.c_str(), result, FALSE);
 #endif
-	ossPort << "wget http://" << host << ":" << manager->mHttpServer.GetPort();
-	ossPort << "/" << workData->GetIndex() << "/" << openwrtFiles.begin()->first;
-	ossPort << " -O /tmp/" << openwrtFiles.begin()->first;
-	
+    ossPort << "wget http://" << host << ":" << manager->mHttpServer.GetPort();
+    ossPort << "/" << workData->GetIndex() << "/" << openwrtFiles.begin()->first;
+    ossPort << " -O /tmp/" << openwrtFiles.begin()->first;
+
     tn.send_command(ossPort.str().c_str(), result, FALSE);
     //}
 
-    workData->SetDevicePortText(PROMPT_TITLE, _T("execute sysupgrade, please wait ..."));
+    //    workData->SetDevicePortText(PROMPT_TITLE, _T("execute sysupgrade, please wait ..."));
     tn.set_receive_timeout(1000);
     tn.set_verbose(false);
     command = "sysupgrade -n -v /tmp/";
@@ -712,30 +721,31 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     BOOL done = FALSE;
     while (i < 200) {
         if (result.size() == 0) {
-            i++;		 	
-			LOGE("receive empty message, %d time(s)", i);
+            i++;
+            LOGE("receive empty message, %d time(s)", i);
             goto RCV_NEXT_DATA;
         }
 
-		i = 0;
+        i = 0;
         if (result.rfind('\n') == string::npos) {
             lineHeadPart += result;
             goto RCV_NEXT_DATA;
         }
 
         result = lineHeadPart + result;
-		
-		if(result.find("Upgrade completed") != string::npos ||
+
+        if(result.find("Upgrade completed") != string::npos ||
            result.find("Rebooting system") != string::npos) {
-           done = TRUE;
-           break;
-		}
-		 if (result.find("not a valid FIT image") != string::npos) {		 	
-			LOGE("receive error message, %s", result.c_str());
+            done = TRUE;
+            LOGE("receive message, %s", result.c_str());
+            break;
+        }
+        if (result.find("not a valid FIT image") != string::npos) {
+            LOGE("receive error message, %s", result.c_str());
             break;
         }
 
-        if (result.back() == '\n') {//result.at(result.size() - 1) == '\n' 
+        if (result.back() == '\n') {//result.at(result.size() - 1) == '\n'
             lineHeadPart.clear();
         } else {
             lineHeadPart = result;
@@ -757,18 +767,21 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
                 result.erase(0, 1);
         }
 
-        workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));				 	
-		LOGE("receive message, %s", result.c_str());
-        		
+        workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
+        LOGE("receive message, %s", result.c_str());
+
 RCV_NEXT_DATA:
         tn.send_command(NULL, result, FALSE);
     };
 
-	if (!done) {
-		LOGE("Timeout exceed limit");
-	}
-    workData->SetDevicePortText(PROMPT_TITLE, _T("Work out"));
-
+    if (!done) {
+        LOGE("Timeout exceed limit");
+	    workData->SetInfo(OPENWRT_UPDATED,  "Update main board failed");
+    } else {
+		tn.send_command("halt"/* "poweroff", not use "reboot"*/, result, FALSE);
+	    workData->SetDevicePortText(PROMPT_TITLE, _T("Device updated"));
+	    workData->SetInfo(OPENWRT_UPDATED,  "Please wait for device reboot.");
+    }
 #if 0
     for (;;) {
         nicManager->UpdateNic(nic);
@@ -781,43 +794,65 @@ RCV_NEXT_DATA:
 #endif
 
     //nicManager->WaitAddrChanged();
-    workData->SetInfo(OPENWRT_UPDATED, done ? "Device updated. Please reboot the device." : "Update main board failed");
-		
+    
     return 0;
 }
 
 #define CPE_SKIP_DIAG_PORT
 UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
     DeviceInterfaces * dev;
+    //BOOL testFastboot = FALSE;
     ASSERT(workData);
-     HandleComDevice(FALSE);
-     EnumerateAdbDevice(FALSE);
-     
-     int i = 0;
-	 BOOL bindDiagAdb = mAppConf.IsUseAdbShell();
+    HandleComDevice(FALSE);
+    EnumerateAdbDevice(FALSE);
 
-#if 0	 
-#ifdef CPE_SKIP_DIAG_PORT
-	 bindDiagAdb = FALSE;
-#endif
-     while((dev = mDevCoordinator.GetValidDevice(bindDiagAdb)) == NULL) {
-        if (i++ > 15) {
+    int i = 0;
+    while((dev = mDevCoordinator.GetValidDevice(DEVTYPE_ADB | DEVTYPE_DIAGPORT )) == NULL) {
+        if (i++ > 30) {
+	        workData->AddDevInfo(_T("ERROR"), _T("No device found. Please check USB cable."));
             LOGE("timeout for update CPE modem module");
             return 1;
         }
-        //::WaitForSingleObject(mScheduleEvt, 10 * 1000);
-        SLEEP(2000);
-     };
-     SLEEP(15000);
-#else
-    //first the COM device, and seconde is the ADB device, so we must wait two times totally.
-	while (i++ < 2) {
-		 workData->WaitForDevSwitchEvt(FALSE);
-	}
-#endif
-     workData->SetDevice(dev, mAppConf.GetFlashDirectFlag());
 
-     return RunMiFiPST(workData);
+        if ((dev = mDevCoordinator.GetValidDevice(DEVTYPE_FASTBOOT) ) != NULL) {
+			LOGE("Found fastboot first! No adb or diag device.");
+            if (mAppConf.GetFlashDirectFlag())
+                break;
+            else {
+                workData->AddDevInfo(_T("ERROR"), _T("Modem already in download state."));
+                return -1;
+        	}
+            /*
+               if (testFastboot) {
+               workData->SetDevicePortText(PROMPT_TEXT, _T("Modem not flash whole image"));
+               LOGE("modem still in fastboot state, although tool reboot it.");
+               break;
+               } else if (dev->GetFastbootHandle()) {
+               fastboot fb(NULL);
+               fb.fb_queue_reboot();
+               workData->SetDevice(dev, mAppConf.GetFlashDirectFlag());
+               fb.fb_execute_queue(dev->GetFastbootHandle(), workData, 0);
+               LOGE("modem in fastboot state, reboot it.");
+               workData->SetDevicePortText(PROMPT_TEXT, _T("Modem already enter download state, reset device"));
+               //mDevCoordinator.RemoveDevice(dev);
+               mDevCoordinator.RemoveDevice(data->mActiveDevIntf)
+               }
+               testFastboot = TRUE;
+               continue;
+               */
+        }
+
+        //::WaitForSingleObject(mScheduleEvt, 10 * 1000);
+        CString text = _T("Waiting for usb devices");
+        for(int k = 0; k <= i % 3; k++)
+            text.Append(_T(" ..."));
+        workData->SetDevicePortText(PROMPT_TEXT, text);
+        workData->WaitForDevSwitchEvt(FALSE, 2 * 1000);
+    };
+    //     SLEEP(15000);
+    workData->SetDevice(dev, mAppConf.GetFlashDirectFlag());
+
+    return RunMiFiPST(workData);
 }
 
 /*
@@ -854,7 +889,7 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
 		status = dev->GetDeviceStatus();
  	}
 #endif
-	
+
     if (status == DEVICE_PLUGIN) {
         DiagPST pst(data, img->GetFileBuffer());
         data->SetInfo(PROMPT_TITLE, "Begin download by Diag");
@@ -916,7 +951,7 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
         dev->SetDeviceStatus(DEVICE_FLASH);
         data->SetInfo(REBOOT_DEVICE, "Enter fastboot");
         data->WaitForDevSwitchEvt(TRUE);
-    } 
+    }
 
     handle = data->usb;
     status = dev->GetDeviceStatus();

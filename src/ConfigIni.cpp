@@ -77,7 +77,7 @@ BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
   ScanDir(appPath.GetString(), _T("\\*ProjectConfig.ini"), projectConfFiles, TRUE, FALSE);
 
 	list<CString>::iterator itf;
-	for (itf = projectConfFiles.begin(); itf != projectConfFiles.end(); ++itf) {       
+	for (itf = projectConfFiles.begin(); itf != projectConfFiles.end(); ++itf) {
 	    ParseProjectConfig(*itf);
 	}
 
@@ -88,7 +88,7 @@ BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
     }
 #endif
 
-  
+
   ReadPackageHistory();
   //if some directory delete after latest run, we should write first.
   WritePackageHistory();
@@ -97,16 +97,16 @@ BOOL AppConfig::ReadConfigIni(const wchar_t * ini){
 }
 
 BOOL AppConfig::SetPackageDir(const wchar_t * dir, CString& errMsg) {
-	BOOL validPath = FALSE;		
-	PackageConfig pkgConf;
-	ProjectConfig project;
-	CString modemPkgPath;
-	CString CPEPkgPath;
-	list<CString> scannedFiles;
-	
+    BOOL validPath = FALSE;
+    PackageConfig pkgConf;
+    ProjectConfig project;
+    CString modemPkgPath;
+    CString CPEPkgPath;
+    list<CString> scannedFiles;
+
     if(dir == NULL || !PathFileExists(dir)) {
         ERROR("%S%S", dir == NULL ? _T("Null parameter") : dir,
-                      dir == NULL ? _T("") : _T(" is not exist!"));
+              dir == NULL ? _T("") : _T(" is not exist!"));
         return FALSE;
     }
 
@@ -114,86 +114,86 @@ BOOL AppConfig::SetPackageDir(const wchar_t * dir, CString& errMsg) {
         INFO("Package directory is not changed.");
         return FALSE;
     }
-	
-	//We use PKG_CONFIG_XML to locate the modem package.
-	ScanDir(dir, PKG_CONFIG_XML, scannedFiles, FALSE, TRUE);
-	//if (scannedFiles.size() > 1) {
-	//	errMsg.Format(_T("More than one %s in path %s"), PKG_CONFIG_XML, dir);
-	//	return FALSE;
-	//}
 
-	errMsg.Format(_T("Can not found %s in path %s"), PKG_CONFIG_XML, dir);
+    //We use PKG_CONFIG_XML to locate the modem package.
+    ScanDir(dir, PKG_CONFIG_XML, scannedFiles, FALSE, TRUE);
+    //if (scannedFiles.size() > 1) {
+    //	errMsg.Format(_T("More than one %s in path %s"), PKG_CONFIG_XML, dir);
+    //	return FALSE;
+    //}
 
-	list<CString>::iterator itxml;
-	for (itxml = scannedFiles.begin(); itxml != scannedFiles.end(); ++itxml) {
-		modemPkgPath = GetDirName(*itxml);
-		pkgConf.Set(modemPkgPath);
-		
-		map<CString,ProjectConfig>::iterator iter=m_SupportProject.find(pkgConf.GetProjectCode());
-	    if(iter!=m_SupportProject.end()) {
-	        project = m_SupportProject.at(pkgConf.GetProjectCode());	        
-	    } else {
-		    errMsg.Format(_T("Tool does not support project %s"), pkgConf.GetProjectCode());
-			continue;
-		}
+    errMsg.Format(_T("Can not found %s in path %s"), PKG_CONFIG_XML, dir);
 
-		if (scannedFiles.size() > 1 && modemPkgPath.Find(project.GetModemSubDir().GetString()) == -1) {
-			continue;
-		}
-		
-		validPath = TRUE;
-		break;
-	}
+    list<CString>::iterator itxml;
+    for (itxml = scannedFiles.begin(); itxml != scannedFiles.end(); ++itxml) {
+        modemPkgPath = GetDirName(*itxml);
+        pkgConf.Set(modemPkgPath);
 
-	if (!validPath)
-		return validPath;
+        map<CString,ProjectConfig>::iterator iter=m_SupportProject.find(pkgConf.GetProjectCode());
+        if(iter!=m_SupportProject.end()) {
+            project = m_SupportProject.at(pkgConf.GetProjectCode());
+        } else {
+            errMsg.Format(_T("Tool does not support project %s"), pkgConf.GetProjectCode());
+            continue;
+        }
 
-	modemPkgPath = TrimPathDelimitor(modemPkgPath);	
-	modemPkgPath += PATH_DELIMITERS;
-	if (modemPkgPath == m_ModemPackagePath) {
-		errMsg = _T("Modem package is not changed");
-		return FALSE;
-	}
-	
-	if (project.GetPlatformType() == PLATFORM_CPE) {
-			CString root = dir;
-			CString target = UpDir(root);
-			CString currentDirName = CurrentDirName(root);
-			
-		scannedFiles.clear();
-		
-		ScanDir(dir, project.GetCPEFlagFile().GetString(), scannedFiles, FALSE, TRUE);
-	    errMsg.Format(_T("Can not found %s in %s"), project.GetCPEFlagFile(), dir);
-		if (scannedFiles.size() == 0 ) {
-			ScanDir(target.GetString(), project.GetCPEFlagFile().GetString(), scannedFiles, FALSE, TRUE);
-		    errMsg += _T(", or ");
+        if (scannedFiles.size() > 1 && modemPkgPath.Find(project.GetModemSubDir().GetString()) == -1) {
+            continue;
+        }
+
+        validPath = TRUE;
+        break;
+    }
+
+    if (!validPath)
+        return validPath;
+
+    modemPkgPath = TrimPathDelimitor(modemPkgPath);
+    modemPkgPath += PATH_DELIMITERS;
+    if (modemPkgPath == m_ModemPackagePath) {
+        errMsg = _T("Modem package is not changed");
+        return FALSE;
+    }
+
+    if (project.GetPlatformType() == PLATFORM_CPE) {
+        CString root = dir;
+        CString target = UpDir(root);
+        CString currentDirName = CurrentDirName(root);
+
+        scannedFiles.clear();
+
+        ScanDir(dir, project.GetCPEFlagFile().GetString(), scannedFiles, FALSE, TRUE);
+        errMsg.Format(_T("Can not found %s in %s"), project.GetCPEFlagFile(), dir);
+        if (scannedFiles.size() == 0 ) {
+            ScanDir(target.GetString(), project.GetCPEFlagFile().GetString(), scannedFiles, FALSE, TRUE);
+            errMsg += _T(", or ");
             errMsg += target;
-			if (scannedFiles.size() == 0 && project.GetModemSubDir() == currentDirName) {
-				target = UpDir(target);
-				ScanDir(target.GetString(), project.GetCPEFlagFile().GetString(), scannedFiles, FALSE, TRUE);
-		    errMsg += _T(", or ");
-            errMsg += target;
-			}
-		}
-		if (scannedFiles.size() == 0) {
-			return FALSE;
-		}
-		if (scannedFiles.size() > 1) {
-			errMsg.Format(_T("More than one %S in path %S"), project.GetCPEFlagFile().GetString(), dir);
-			return FALSE;
-		}
-		 CPEPkgPath = GetDirName(scannedFiles.front());
-		 CPEPkgPath += PATH_DELIMITERS;
-		 if (m_CPEPackagePath == CPEPkgPath) {
-			errMsg = _T("CPE package is not changed");
-			return FALSE;
-		}
-	}
-		
+            if (scannedFiles.size() == 0 && project.GetModemSubDir() == currentDirName) {
+                target = UpDir(target);
+                ScanDir(target.GetString(), project.GetCPEFlagFile().GetString(), scannedFiles, FALSE, TRUE);
+                errMsg += _T(", or ");
+                errMsg += target;
+            }
+        }
+        if (scannedFiles.size() == 0) {
+            return FALSE;
+        }
+        if (scannedFiles.size() > 1) {
+            errMsg.Format(_T("More than one %s in path %s"), project.GetCPEFlagFile().GetString(), dir);
+            return FALSE;
+        }
+        CPEPkgPath = GetDirName(scannedFiles.front());
+        CPEPkgPath += PATH_DELIMITERS;
+        if (m_CPEPackagePath == CPEPkgPath) {
+            errMsg = _T("CPE package is not changed");
+            return FALSE;
+        }
+    }
+
     wcscpy_s(pkg_dir, dir);
-	m_ModemPackagePath = modemPkgPath;
+    m_ModemPackagePath = modemPkgPath;
     m_CPEPackagePath = CPEPkgPath;
-	
+
 #if 0
     list<CString>::iterator it;
     for (it = m_PackageDirs.begin(); it != m_PackageDirs.end(); ++it) {
@@ -208,7 +208,7 @@ BOOL AppConfig::SetPackageDir(const wchar_t * dir, CString& errMsg) {
 
     //WritePrivateProfileString(PKG_SECTION, PKG_PATH, dir, m_ConfigPath.GetString());
     WritePackageHistory();
-	
+
     mPackageConfig.Set(m_ModemPackagePath);
     SetProjectCode(mPackageConfig.GetProjectCode());
 
@@ -273,7 +273,7 @@ void AppConfig::ReadPackageHistory() {
   }
 }
 
-/* 
+/*
 * read download package path from the the tool application file.
 */
 void AppConfig::SetupPackageInformation() {
@@ -298,7 +298,7 @@ void AppConfig::SetupPackageInformation() {
         data_len++;
       }
 	SetPackageDir(pkg_dir, errMsg);
-	
+
     //mPackageConfig.Set(pkg_dir);
     //SetProjectCode(mPackageConfig.GetProjectCode());
 }
@@ -450,7 +450,7 @@ BOOL ProjectConfig::ReadConfig(list<CString> &codes) {
                                        configFile);
 	if (data_len > 0) {
 		mModemSubDir = buffer;
-	}	
+	}
 
 	data_len = GetPrivateProfileString(OPENWRT_SECTION,
                                        _T("image"),
@@ -460,7 +460,7 @@ BOOL ProjectConfig::ReadConfig(list<CString> &codes) {
                                        configFile);
 	if (data_len > 0) {
 		mCPEFlagFile = buffer;
-	}	
+	}
 
     mIsValidConfig = TRUE;
     return TRUE;
@@ -576,7 +576,7 @@ BOOL flash_image::ReadPackage() {
     //read_fastboot_config(projectConfigFile, pkg_dir);
     //read_diagpst_config(projectConfigFile, pkg_dir);
     //read_openwrt_config(projectConfigFile, pkg_dir);
-	
+
     read_fastboot_config(projectConfigFile, mAppConfig->GetModemPackagePath());
     read_diagpst_config(projectConfigFile, mAppConfig->GetModemPackagePath());
     read_openwrt_config(projectConfigFile, mAppConfig->GetCPEPackagePath());
@@ -760,6 +760,7 @@ int flash_image::read_openwrt_config(const wchar_t* config, const wchar_t* pkg_d
         LOGE("%S is not exist", path.GetString());
         continue;
     }
+    LOGE("Find Router image %S", path.GetString());
   }
     return 0;
 }
@@ -984,51 +985,53 @@ BOOL flash_image::set_download_flag(CString strPartitionName, bool bDownload) {
 BOOL flash_image::reset(BOOL free_only) {
     FlashImageInfo *img;
     for (img = image_list; img; img = image_list) {
-      image_list = img->next;
-      if (img->partition != NULL) {
-        free(img->partition);
-        img->partition = NULL;
-      }
+        image_list = img->next;
+        if (img->partition != NULL) {
+            free(img->partition);
+            img->partition = NULL;
+        }
 
-      if (img->partition_str != NULL) {
-        delete img->partition_str;
-        img->partition_str = NULL;
-      }
+        if (img->partition_str != NULL) {
+            delete img->partition_str;
+            img->partition_str = NULL;
+        }
 
-      if (img->lpath != NULL) {
-        free(img->lpath);
-        img->lpath = NULL;
-      }
+        if (img->lpath != NULL) {
+            free(img->lpath);
+            img->lpath = NULL;
+        }
 
-      if (img->data != NULL) {
-        free(img->data);
-        img->data = NULL;
-      }
+        if (img->data != NULL) {
+            free(img->data);
+            img->data = NULL;
+        }
 
-      free(img);
-      img = NULL;
+        free(img);
+        img = NULL;
     }
 
     image_list = NULL;
     image_last = NULL;
 
     if (!free_only) {
-      if (nv_buffer != NULL) {
-      QcnParser::PutNVWriteCommands(nv_buffer, nv_num);
-      nv_buffer = NULL;
-      nv_num = 0;
-      }
-      FREE_IF (nv_cmd);
+        if (nv_buffer != NULL) {
+            QcnParser::PutNVWriteCommands(nv_buffer, nv_num);
+            nv_buffer = NULL;
+            nv_num = 0;
+        }
+        FREE_IF (nv_cmd);
     }
 
-  std::map<string,FileBufStruct>::iterator it;
+    std::map<string,FileBufStruct>::iterator it;
     for (it = m_dlFileBuffer.begin(); it != m_dlFileBuffer.end(); it++)
     {
         FREE_IF(it->second.strFileBuf);
-         FREE_IF(it->second.strFileName);
+        FREE_IF(it->second.strFileName);
     }
+    m_dlFileBuffer.clear();
+    m_OpenWrtFiles.clear();
 
-  mDiagDlImgSize = 0;
-  mFbDlImgSize = 0;
-	return TRUE;
+    mDiagDlImgSize = 0;
+    mFbDlImgSize = 0;
+    return TRUE;
 }

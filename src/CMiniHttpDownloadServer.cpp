@@ -200,6 +200,7 @@ BOOL CMiniHttpDownloadServer::SendFile(SOCKET sock, CString &filePath, int uiPor
         LOGE("load_file: file open failed (rc=%ld)\n", GetLastError());
         return FALSE;
     }
+	LOGD("Send file %S to client", filePath.GetString());
 
     file_size = GetFileSize( file, NULL );
 
