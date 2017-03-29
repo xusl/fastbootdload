@@ -778,9 +778,10 @@ RCV_NEXT_DATA:
         LOGE("Timeout exceed limit");
 	    workData->SetInfo(OPENWRT_UPDATED,  "Update main board failed");
     } else {
-		tn.send_command("halt"/* "poweroff", not use "reboot"*/, result, FALSE);
+		//tn.send_command("halt"/* "poweroff", not use "reboot"*/, result, FALSE);
+		workData->AddDevInfo(_T("Router updated"), _T("Please remove USB & power, attach power cable again"));
 	    workData->SetDevicePortText(PROMPT_TITLE, _T("Device updated"));
-	    workData->SetInfo(OPENWRT_UPDATED,  "Please wait for device reboot.");
+	    workData->SetInfo(OPENWRT_UPDATED,  "Please reboot device .");		
     }
 #if 0
     for (;;) {
@@ -803,6 +804,11 @@ UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
     DeviceInterfaces * dev;
     //BOOL testFastboot = FALSE;
     ASSERT(workData);
+
+	if (kill_adb_server(DEFAULT_ADB_PORT) == 0 || StopAdbServer()) {
+		Sleep(2000);
+	}
+	
     HandleComDevice(FALSE);
     EnumerateAdbDevice(FALSE);
 

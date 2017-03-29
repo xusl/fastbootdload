@@ -52,6 +52,7 @@
 #define IDC_DEVINFO_LIST                1052
 #define IDC_COMBO_NIC                   1053
 #define IDC_STATIC_NIC                  1054
+#define IDC_ABOUT_VERSION               1055
 #define ID_ABOUT_ABOUT                  32771
 #define ID_HELP_HELP                    32772
 #define ID_ABOUT_                       32773
@@ -66,7 +67,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        141
 #define _APS_NEXT_COMMAND_VALUE         32778
-#define _APS_NEXT_CONTROL_VALUE         1055
+#define _APS_NEXT_CONTROL_VALUE         1056
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

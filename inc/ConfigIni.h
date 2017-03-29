@@ -124,7 +124,6 @@ class flash_image{
     bool AddFileBuffer(const wchar_t *partition, const wchar_t *pkgPath, const wchar_t *filName);
     map<string, FileBufStruct> GetFileBuffer() { return m_dlFileBuffer; }
     map<string, CString> GetOpenWrtFiles() { return m_OpenWrtFiles; }
-    BOOL IsCPEPackage() { return m_OpenWrtFiles.size() > 0; }
     CString GetOpenWrtFilePath(string& filename) { return m_OpenWrtFiles.at(filename);}
 
   protected:

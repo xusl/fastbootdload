@@ -7,7 +7,9 @@
 ; time    : 2013/08/09
 ;
 ;===========================================================
-#define AppVersion "1.0.0.7"
+#define AppVersion "1.0.0.8"
+#define AppVersionNum 8
+#define ReleaseDateTimeString GetDateTimeString('dd/mm/yyyy hh:nn:ss', '-', ':');
 [Setup]
 AppName=TPST-CPE-{#AppVersion}
 AppVerName={#AppVersion}        
@@ -63,9 +65,9 @@ Filename: "{app}\TPST-CPE.exe"; Description: "{cm:LaunchProgram,TPST-CPE}"; Flag
 Root: HKLM; Subkey: "Software\JRD"; Flags: createvalueifdoesntexist
 Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: string; ValueName: "Path"; ValueData: "{app}"
-Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: string; ValueName: "Version"; ValueData: "1.0.0.1"
-Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: dword; ValueName: "VersionNum"; ValueData: "0001"
-Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: string; ValueName: "Release Date"; ValueData: "2017/01/06"
+Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: string; ValueName: "Version"; ValueData: "{#AppVersion}"
+Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: dword; ValueName: "VersionNum"; ValueData: "{#AppVersionNum}"
+Root: HKLM; Subkey: "Software\JRD\TPST-CPE"; ValueType: string; ValueName: "Release Date"; ValueData: "{#ReleaseDateTimeString}"
 
 [UninstallDelete]
 ;Type: files; Name: "{app}\*.log"
@@ -100,7 +102,7 @@ begin
          'Version', Version) then
       begin
         // Successfully read the value
-        Version := Format('Exist the version %s,whether uninstall it?',[Version]);
+        Version := Format('Exist version %s, uninstall it?',[Version]);
         if MsgBox(Version,mbConfirmation,MB_YESNO) = IDYES then
         begin
          //read the path

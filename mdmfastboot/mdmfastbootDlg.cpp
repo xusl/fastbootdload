@@ -11,8 +11,9 @@
 #define new DEBUG_NEW
 #endif
 
-#pragma	 comment(lib,"setupapi.lib")
+#pragma	comment(lib,"setupapi.lib")
 #pragma comment(lib, "User32.lib")
+#pragma comment(lib,"Version.lib")
 
 MODULE_NAME CmdmfastbootDlg::m_module_name;
 #define BROWER_PACKAGE _T("Browser...")
@@ -23,11 +24,20 @@ class CAboutDlg : public CDialog
 {
 public:
 	CAboutDlg();
-
+    virtual BOOL OnInitDialog();
 // 对话框数据
 	enum { IDD = IDD_ABOUTBOX };
+private:
+	void GetVersionInfo (LPCWSTR strLangID/*=NULL*/, LPCWSTR strInfoType/*=NULL*/);
 
-	protected:
+private:
+	CStatic m_AboutVersion;
+	CString m_strFixedProductVersion;
+	CString m_strFixedFileVersion;
+	CString m_strVersionInfo;
+
+
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
 // 实现
@@ -43,6 +53,69 @@ CAboutDlg::CAboutDlg() : CDialog(CAboutDlg::IDD)
 void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
+	DDX_Control(pDX,  IDC_ABOUT_VERSION, m_AboutVersion);
+}
+
+void CAboutDlg::GetVersionInfo (LPCWSTR strLangID/*=NULL*/, LPCWSTR strInfoType/*=NULL*/)
+{
+    DWORD dwVerInfoSize;
+    DWORD dwHnd;
+    void* pBuffer;
+    VS_FIXEDFILEINFO *pFixedInfo; // pointer to fixed file info structure
+    LPVOID  lpVersion;    // String pointer to 'version' text
+    UINT    uVersionLen;   // Current length of full version string
+    WCHAR szGetName[500];
+    WCHAR szFilename[MAX_PATH] = {0};
+
+    GetModuleFileName(NULL, szFilename, MAX_PATH);
+    //"040904B0" == English, "080403A8"== "Chinese"
+    dwVerInfoSize = GetFileVersionInfoSize(szFilename, &dwHnd);
+    if (dwVerInfoSize) {
+        pBuffer = malloc(dwVerInfoSize);
+        if (pBuffer == NULL)
+            return;
+        GetFileVersionInfo(szFilename, dwHnd, dwVerInfoSize, pBuffer);
+        // get the fixed file info (language-independend)
+        VerQueryValue(pBuffer,_T("\\"),(void**)&pFixedInfo,(UINT *)&uVersionLen);
+        m_strFixedProductVersion.Format (_T("%u,%u,%u,%u"),
+                                         HIWORD (pFixedInfo->dwProductVersionMS),
+                                         LOWORD (pFixedInfo->dwProductVersionMS),
+                                         HIWORD (pFixedInfo->dwProductVersionLS),
+                                         LOWORD (pFixedInfo->dwProductVersionLS));
+        m_strFixedFileVersion.Format (_T("%u,%u,%u,%u"),
+                                      HIWORD (pFixedInfo->dwFileVersionMS),
+                                      LOWORD (pFixedInfo->dwFileVersionMS),
+                                      HIWORD (pFixedInfo->dwFileVersionLS),
+                                      LOWORD (pFixedInfo->dwFileVersionLS));
+        // get the string file info (language-dependend)
+        if (strLangID != NULL || strInfoType != NULL)
+        {
+            lstrcpy(szGetName, _T("\\StringFileInfo\\"));
+            lstrcat (szGetName, strLangID);
+            lstrcat (szGetName, _T("\\"));
+            lstrcat (szGetName, strInfoType);
+            // copy version info, if desired entry exists
+            if (VerQueryValue(pBuffer,szGetName,(void**)&lpVersion,(UINT *)&uVersionLen) != 0)
+                m_strVersionInfo = (LPTSTR)lpVersion;
+        }
+        if (pBuffer != NULL)
+            free(pBuffer);
+    }
+}
+
+BOOL CAboutDlg::OnInitDialog()
+{
+	CDialog::OnInitDialog();
+    //AfxGetApp()->m_pszExeName/*m_pszAppName*/
+
+    CString version = _T("TPST CPE V");
+    GetVersionInfo(_T("080403A8"), _T("ProductVersion"));
+	version += m_strVersionInfo;
+    version += _T("\r\nTCL Product Support Tool. It helps to update firmware of CPE product.");
+    version += _T("\r\nCopyright (C) 2017  TCT SCD Connected Object\r\n\r\n Developer: \r\n\t");
+
+    m_AboutVersion.SetWindowText(version);
+    return TRUE;  // return TRUE unless you set the focus to a control
 }
 
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialog)
@@ -566,8 +639,8 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
         m_updated_number ++;
         mPSTManager.FlashDeviceDone(data);
 		break;
-		
-	case OPENWRT_UPDATED:	
+
+	case OPENWRT_UPDATED:
 		//add for HH70 one thread only
 		LOGE("Openwrt updated");
 	    mPSTManager.SetWork(FALSE);
@@ -723,7 +796,7 @@ VOID CmdmfastbootDlg::LayoutControl() {
     }
 
 //  CMenu* pSysMenu = GetSystemMenu(FALSE);
-	
+
     GetClientRect(&dialogRect);
     //cx = dialogRect.right - dialogRect.left;
     //cy = dialogRect.bottom - dialogRect.top;
@@ -736,7 +809,7 @@ VOID CmdmfastbootDlg::LayoutControl() {
 
     //int gridWidth = mPSTManager.GetPortGridWidth();
     int gridHeight = mPSTManager.GetPortGridHeight();
-    cy = pathRect.bottom - pathRect.top + HORIZONAL_GAP;	
+    cy = pathRect.bottom - pathRect.top + HORIZONAL_GAP;
     //cy = GetSystemMetrics(SM_CYMENU) + GetSystemMetrics(SM_CYCAPTION);
     if (gridHeight < infoRect.bottom - infoRect.top) {
         cy = (cy + gridHeight + dialogRect.bottom )/2 ;
@@ -893,11 +966,11 @@ void CmdmfastbootDlg::OnBnClickedBtnBrowse()
         m_PackageHistory.SetItemDataPtr(result, NULL);
     m_PackageHistory.SetCurSel(0);
     m_PackageSelIdx = 0;
-	
+
     if (mPSTManager.ChangePackage(m_PackagePath.GetString()))
     		/*m_ConfigPath.GetBuffer(MAX_PATH))*/ {
     	UpdatePackageInfo();
-    } 
+    }
 }
 
 

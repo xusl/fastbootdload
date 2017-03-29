@@ -313,7 +313,8 @@ AppConfig::~AppConfig() {
 void AppConfig::ParseProjectConfig(CString &configFile) {
     ProjectConfig projectConfig(configFile);
     list<CString> codes;
-    list<CString>::iterator it;
+    list<CString>::iterator it;	
+	std::pair<std::map<CString, ProjectConfig>::iterator, bool> ret;
 
 	LOGD("Parse project config %S", configFile);
 
@@ -322,7 +323,12 @@ void AppConfig::ParseProjectConfig(CString &configFile) {
 
     for (it = codes.begin(); it != codes.end(); ++it) {
         projectConfig.SetProjectCode(*it);
-        m_SupportProject.insert(std::pair<CString, ProjectConfig>(projectConfig.GetProjectCode(), projectConfig));
+        ret = m_SupportProject.insert(std::pair<CString, ProjectConfig>(projectConfig.GetProjectCode(), projectConfig));
+		if (!ret.second) {
+			LOGE("Project '%S' already existed", projectConfig.GetProjectCode().GetString());
+			LOGE("with a value of '%S'", ret.first->second.GetConfigPath().GetString());
+			LOGE("can not set value '%S'", projectConfig.GetConfigPath().GetString());
+		}
     }
 }
 
@@ -509,7 +515,9 @@ BOOL ProjectConfig::GetDiagPSTNandPrg(wchar_t *filename, int size, BOOL emergenc
 
 }
 
-
+/*
+Information of download image, which parse file config.xml in image package.
+*/
 PackageConfig::PackageConfig()
 {
    memset(pkg_conf_file, 0, sizeof pkg_conf_file);
@@ -547,6 +555,11 @@ BOOL  PackageConfig::Set(CString pkg_dir) {
     return TRUE;
 }
 
+/*
+* this class is the actually handler that get download data or file.
+* Now Modem image which download by fastboot or diag port through USB 
+* are loaded in RAM, and OpenWrt image is the absolute full path.
+*/
 flash_image::flash_image(AppConfig *appConfig):
   image_list(NULL),
   image_last(NULL),
@@ -753,14 +766,21 @@ int flash_image::read_openwrt_config(const wchar_t* config, const wchar_t* pkg_d
     path = pkg_dir;
     path += filename;
     if (PathFileExists(path.GetString())) {
-        string basename;
-        CStringToString(GetBaseName(path), basename);
-        m_OpenWrtFiles.insert(std::pair<string,CString>(basename, path));
+		std::pair<std::map<string, CString>::iterator, bool> ret;
+        string imageKey;//basename; // do not use variable basename, for in log/utils module , it use as a function
+        CStringToString(CString(filename) /*GetBaseName(path)*/, imageKey);
+        ret = m_OpenWrtFiles.insert(std::pair<string,CString>(imageKey, path));
+		if (!ret.second ) {
+			ERROR("Element '%s' already existed", imageKey.c_str());
+			LOGE("with a value of '%S'", ret.first->second.GetString());
+			LOGE("can not set value '%S'", path.GetString());
+			return ERROR_DUP_NAME;
+		}
     } else {
         LOGE("%S is not exist", path.GetString());
         continue;
     }
-    LOGE("Find Router image %S", path.GetString());
+    LOGE("set image %S patch %S", filename, path.GetString());
   }
     return 0;
 }
