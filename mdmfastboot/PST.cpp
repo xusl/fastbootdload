@@ -340,6 +340,7 @@ BOOL PSTManager::Reset() {
     }
     mHttpServer.StopHttpServer();
 	mDevCoordinator.Reset();
+	//TODO:: Stop telnet client.
     return TRUE;
 }
 
@@ -596,9 +597,14 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     //use system locale, but numpunct use default , so input number do not add a thounsands separator,
     //for example, 8081 => 8,081
     ossPort.imbue(locale::classic()/*std::locale()*/);
+	
+	if(workData->GetStatus() == USB_STAT_WAITING_CLOSE) {
+		LOGE("workdata status is USB_STAT_WAITING_CLOSE, return");
+		return 0;
+	}
 
     if (openwrtFiles.size() <= 0) {
-        workData->SetDevicePortText(PROMPT_TEXT, _T("There are none images to download"));
+        workData->SetInfo(OPENWRT_UPDATED,  "None images to download");
         return -1;
     }
 
@@ -813,7 +819,17 @@ UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
     EnumerateAdbDevice(FALSE);
 
     int i = 0;
-    while((dev = mDevCoordinator.GetValidDevice(DEVTYPE_ADB | DEVTYPE_DIAGPORT )) == NULL) {
+#ifdef CPE_SKIP_DIAG_PORT
+    while((dev = mDevCoordinator.GetValidDevice(DEVTYPE_ADB )) == NULL)
+#else
+    while((dev = mDevCoordinator.GetValidDevice(DEVTYPE_ADB | DEVTYPE_DIAGPORT )) == NULL)
+#endif
+    {
+    	if (workData->IsIdle()) {
+			LOGE("Work force stop by user.");
+			return 2;
+		}
+		
         if (i++ > 30) {
 	        workData->AddDevInfo(_T("ERROR"), _T("No device found. Please check USB cable."));
             LOGE("timeout for update CPE modem module");
@@ -934,8 +950,8 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
 
         if(result) {
             dev->SetDeviceStatus(DEVICE_FLASH);
-            data->SetInfo(REBOOT_DEVICE, "Enter fastboot");
-            data->WaitForDevSwitchEvt(TRUE);
+            data->SetInfo(REBOOT_DEVICE, "Modem enter download state");
+            data->WaitForDevSwitchEvt(TRUE, 100 * 1000);
         } else {
             data->SetInfo(FLASH_DONE, "Diag PST occur error! Please check log");
             return 0;
@@ -945,7 +961,8 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
     handle = data->usb;
     status = dev->GetDeviceStatus();
     if (handle == NULL) {
-        data->SetInfo(FLASH_DONE, "Bad parameter");
+		LOGE("No USB handle for adb device");
+        data->SetInfo(FLASH_DONE, "No adb device");
         return -1;
     }
 
@@ -955,14 +972,15 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
 //        adbPST.DoPST(data, img, dev);
 
         dev->SetDeviceStatus(DEVICE_FLASH);
-        data->SetInfo(REBOOT_DEVICE, "Enter fastboot");
-        data->WaitForDevSwitchEvt(TRUE);
+        data->SetInfo(REBOOT_DEVICE, "Modem enter download state");
+        data->WaitForDevSwitchEvt(TRUE, 120 * 1000);
     }
 
     handle = data->usb;
     status = dev->GetDeviceStatus();
     if (handle == NULL) {
-        data->SetInfo(FLASH_DONE, "Bad parameter");
+		LOGE("No USB handle for fastboot");
+        data->SetInfo(FLASH_DONE, "No fastboot device");
         return -1;
     }
 
@@ -1039,12 +1057,26 @@ BOOL UsbWorkData::ShowSubWindow(BOOL show) {
     return TRUE;
 }
 
+/*
+* the begin of device switch. 
+*/
 DWORD  UsbWorkData::WaitForDevSwitchEvt(BOOL changeStatus, DWORD dwMilliseconds) {
-	if (changeStatus)
-	    SwitchDev(dwMilliseconds);
+	if (changeStatus) {
+	  usb_close(usb);
+	  usb = NULL;
+	  stat = USB_STAT_SWITCH;
+	  mActiveDevIntf->SetAttachStatus(false);
+
+	  /*Set switch timeout*/
+	  //hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);    
+	}
+	
     return ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);
 }
 
+/*
+* the end of device switch. 
+*/
 DWORD  UsbWorkData::SetDevSwitchEvt(BOOL flashdirect) {
     stat = USB_STAT_WORKING;
     if (mActiveDevIntf != NULL) {
@@ -1072,7 +1104,8 @@ BOOL UsbWorkData::Clean(BOOL noCleanUI) {
   }
   if (mDevSwitchEvt != NULL)
       ::ResetEvent(mDevSwitchEvt);
-  stat = USB_STAT_IDLE;
+  
+  SetStatus(USB_STAT_IDLE);
   work = NULL;
   update_qcn = FALSE;
   partition_nr = 0;
@@ -1084,12 +1117,16 @@ BOOL UsbWorkData::Clean(BOOL noCleanUI) {
 }
 
 BOOL UsbWorkData::Reset(VOID) {
-    LOGD("Do reset");
+    LOGD("UsbWorkData Do reset");
     if (stat == USB_STAT_WORKING) {
-      if (work != NULL) //Delete, or ExitInstance
-        work->PostThreadMessage( WM_QUIT, NULL, NULL );
-      //usb_close(usb);
-      //hWnd->KillTimer((UINT_PTR)this);
+	    if (work != NULL) { //Delete, or ExitInstance
+	      work->PostThreadMessage( WM_QUIT, NULL, NULL );
+	      //usb_close(usb);
+	      //hWnd->KillTimer((UINT_PTR)this);
+	  	} else {
+	      	SetStatus(USB_STAT_WAITING_CLOSE);
+			return TRUE;
+	  	}
     } else if (stat == USB_STAT_SWITCH) {
       //remove_switch_device(workdata->usb_sn);
       //hWnd->KillTimer((UINT_PTR)this);
@@ -1107,7 +1144,7 @@ BOOL UsbWorkData::Reset(VOID) {
 }
 
 BOOL UsbWorkData::Abort(VOID) {
-    stat = USB_STAT_ERROR;
+	SetStatus(USB_STAT_ERROR);
     //hWnd->KillTimer((UINT_PTR)this);
     return TRUE;
 }
@@ -1128,7 +1165,7 @@ BOOL UsbWorkData::SetDevice(DeviceInterfaces* pDevIntf, BOOL flashdirect) {
 
   usb_set_work(usb, TRUE);
   mActiveDevIntf->SetAttachStatus(true);
-  stat = USB_STAT_WORKING;
+  SetStatus(USB_STAT_WORKING);
   start_time_tick = now();
   return TRUE;
 }
@@ -1137,6 +1174,7 @@ BOOL UsbWorkData::Start( AFX_THREADPROC pfnThreadProc) {
   LOGD("Start thread to work!");
   pCtl->Reset();
   work = AfxBeginThread(pfnThreadProc, this);
+  //GetCurrentThread
 
   if (work != NULL) {
     INFO("Schedule work for %s !", mActiveDevIntf->GetDevTag());
@@ -1152,6 +1190,7 @@ BOOL UsbWorkData::Start( AFX_THREADPROC pfnThreadProc) {
 
 BOOL UsbWorkData::Finish(VOID) {
   stat = USB_STAT_FINISH;
+  //set mMapDevIntf after the first device is updated.
   if ( mMapDevIntf == NULL  &&
      mActiveDevIntf  != NULL &&
      mActiveDevIntf->GetDiagIntf() != NULL &&
@@ -1167,30 +1206,6 @@ BOOL UsbWorkData::Finish(VOID) {
   //KILL work timer.
   //hWnd->KillTimer((UINT_PTR)this);
   return TRUE;
-}
-
-
-BOOL UsbWorkData::SwitchDev(UINT nElapse) {
-  usb_close(usb);
-  usb = NULL;
-  work = NULL;
-  stat = USB_STAT_SWITCH;
-  mActiveDevIntf->SetAttachStatus(false);
-
-  /*Set switch timeout*/
-  //hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);
-    return TRUE;
-}
-
-BOOL UsbWorkData::SetSwitchedStatus() {
-    if ( stat == USB_STAT_SWITCH) {
-        LOGI("Kill switch timer");
-        //hWnd->KillTimer((UINT_PTR)this);
-        stat = USB_STAT_WORKING;
-    } else {
-        Log("device does not in switch mode");
-    }
-    return TRUE;
 }
 
 /*invoke in work thread*/

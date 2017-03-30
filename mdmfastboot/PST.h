@@ -34,6 +34,7 @@ enum
   USB_STAT_SWITCH,
   USB_STAT_FINISH,
   USB_STAT_ERROR,
+  USB_STAT_WAITING_CLOSE,
 };
 
 
@@ -84,7 +85,6 @@ class UsbWorkData{
     BOOL Start(AFX_THREADPROC pfnThreadProc);
     BOOL Finish(VOID);
     BOOL SwitchDev(UINT nElapse);
-    BOOL SetSwitchedStatus();
     DWORD  WaitForDevSwitchEvt(BOOL changeStatus, DWORD dwMilliseconds = INFINITE);
     DWORD  SetDevSwitchEvt(BOOL flashdirect);
     BOOL SetInfo(UI_INFO_TYPE info_type, PCCH msg);
@@ -116,9 +116,12 @@ class UsbWorkData{
     CWnd/*CmdmfastbootDlg*/  *hWnd;
     CPortStateUI     *pCtl;
     CWinThread       *work;
+    int               threadId;
     usb_handle       *usb;
     //this is the serial number for logical ui.
     DeviceInterfaces*  mActiveDevIntf;
+    //for multiple port download, this is the tag. 
+    //it set after the first device is updated.
     DeviceInterfaces*  mMapDevIntf;
     FlashImageInfo const *flash_partition[PARTITION_NUM_MAX];
     AppConfig      *mPAppConf;
