@@ -570,7 +570,7 @@ void adbhost::process() {
 
 
 int adbhost::shell(const char * command, void **response, int *responselen) {
-  char * shell;
+  char * shell_cmd;
   int len;
   if (command == NULL) {
     ERROR("Invalid parameter. command is NULL.");
@@ -584,35 +584,40 @@ int adbhost::shell(const char * command, void **response, int *responselen) {
   }
 
   len = strlen("shell:") + strlen(command) + 1;
-  shell = (char *)malloc(len);
-  if(shell == 0) {
+  
+  if((shell_cmd = (char *)malloc(len)) == 0) {
     ERROR("No memory");
     return -1;
   }
-  snprintf(shell, len, "shell:""%s", command);
+  snprintf(shell_cmd, len, "shell:""%s", command);
 
   // 3. if we receive connect message from remote, do open
-  open_service(shell);
+  open_service(shell_cmd);
 
   if (!handle_open_response()) {
-    free(shell);
+    free(shell_cmd);
     return -1;
   }
   // 4. do write what we want to do.
   handle_shell_response(response, responselen);
-  free(shell);
+  free(shell_cmd);
   return 0;
 }
 
-int adbhost::reboot_bootloader(MODULE_NAME module_name) {
-	if (MODULE_M850==module_name)
-	{
-		return shell("sys_reboot bootloader", NULL, NULL);
-	}
-	else
-	{
-		return shell("reboot-bootloader", NULL, NULL);
-	}
+int adbhost::reboot_bootloader() {
+	
+  connect(&this->t);
+  if (!handle_connect_response()) {
+    return -1;
+  }
+
+  open_service("reboot:bootloader");
+
+  if (!handle_open_response()) {    
+    return -1;
+  }
+  return 0;
+//  close_remote();
 }
 
 

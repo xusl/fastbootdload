@@ -23,6 +23,7 @@ BOOL AdbPST::Reboot(UsbWorkData* data, DeviceInterfaces *dev) {
     usb_handle * handle = data->usb;
     adbhost adb(handle , dev->GetDevId());
     adb.shell("reboot-bootloader", NULL, NULL);
+	//adb.reboot_bootloader();
     return TRUE;
 }
 
@@ -82,7 +83,15 @@ BOOL AdbPST::DoPST(UsbWorkData* data, flash_image* img, DeviceInterfaces *dev) {
     //adb_shell_command(adb,data, "trace -r");
     //adb_shell_command(adb,data, "backup");
     if (data->partition_nr > 0) {
-        adb.reboot_bootloader(m_module_name);
+	    if (MODULE_M850== m_module_name)
+		{
+			return adb.shell("sys_reboot bootloader", NULL, NULL);
+		}
+		else
+		{
+			return adb.shell("reboot-bootloader", NULL, NULL);
+		}		
+	
         data->SetInfo(REBOOT_DEVICE, "reboot bootloader");
     } else {
         // that is mean just update qcn

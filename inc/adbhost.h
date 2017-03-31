@@ -57,10 +57,8 @@ class adbhost
 		~adbhost(void);
 
 		void process(void);
-    int reboot_bootloader(MODULE_NAME module_name);
-    //
+    int reboot_bootloader();
     int shell(const char * command, void **response, int *len);
-
 		int sync_pull(const char *rpath, const char *lpath);
 		int sync_push(const char *lpath, const char *rpath);
 
