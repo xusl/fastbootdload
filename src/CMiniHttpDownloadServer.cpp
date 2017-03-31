@@ -387,23 +387,33 @@ void CMiniHttpDownloadServer::Run() {
             fd_set fdRead;
             timeval TimeOut;
             TimeOut.tv_sec=0;
-            TimeOut.tv_usec=2000; //2S
+            TimeOut.tv_usec=200 * 1000; //2S
 
             FD_ZERO(&fdRead);
             FD_SET(sockConn,&fdRead);
             int ret=::select(0,&fdRead,NULL,NULL,&TimeOut);
+			if (ret == 0) {
+				LOGD("select time out ");
+				break;
+			} else if (ret == SOCKET_ERROR) {  
+				LOGE("select occur %d", WSAGetLastError());
+				break;
+		    }
 
             memset(recvBuf, 0, sizeof recvBuf);
+			
+	        WSASetLastError(NOERROR);
             bytes = recv(sockConn, recvBuf, sizeof recvBuf - 1, 0);
+	        error = WSAGetLastError();
             if ( bytes > 0 ) {
                 LOGD("Bytes received: %d", bytes);
                 request += recvBuf;
             } else if ( bytes == 0 ) {
                 LOGE("Connection closed");
-            } else {
-                LOGE("recv failed: %d", WSAGetLastError());
-            }
-        } while( bytes > 0 );
+            } else { //bytes == SOCKET_ERROR 
+                LOGE("xx:: recv failed: %d", error);
+            }			
+        } while( bytes > 0 || error == WSAEWOULDBLOCK);
 #else
         do {
             memset(recvBuf, 0, sizeof recvBuf);

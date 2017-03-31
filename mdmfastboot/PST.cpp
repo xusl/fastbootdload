@@ -689,7 +689,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
         return 2;
     }
 
-    tn.set_nbio(false);
+    //tn.set_nbio(false);
     workData->SetDevicePortText(PROMPT_TITLE, _T("Update Router Image"));
     //  m_MmiDevInfo = nic.mConnectionName;
     //for (map<string, CString>::iterator it=openwrtFiles.begin(); it != openwrtFiles.end(); it ++) {
@@ -716,29 +716,25 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     //}
 
     //    workData->SetDevicePortText(PROMPT_TITLE, _T("execute sysupgrade, please wait ..."));
-    tn.set_receive_timeout(1000);
-    tn.set_verbose(false);
+    //tn.set_receive_timeout(1000);
+    //tn.set_verbose(true);
     command = "sysupgrade -n -v /tmp/";
     command.append(openwrtFiles.begin()->first);
     tn.send_command(command.c_str(), result, FALSE);
 
-    string lineHeadPart="";
+	size_t found;
     int i = 0;
     BOOL done = FALSE;
-    while (i < 200) {
-        if (result.size() == 0) {
-            i++;
-            LOGE("receive empty message, %d time(s)", i);
-            goto RCV_NEXT_DATA;
-        }
-
-        i = 0;
-        if (result.rfind('\n') == string::npos) {
-            lineHeadPart += result;
-            goto RCV_NEXT_DATA;
-        }
-
-        result = lineHeadPart + result;
+	BOOL receivedData = result.size() > 0;
+	/*for nbio, timeout is 0.2, and erase a partition may cosume 20+s.*/
+    while (i < 300) {
+        if (!receivedData) {
+            LOGD("(%d) empty message", i);
+			if (i++ > 0)
+	            goto RCV_NEXT_DATA;
+        } else {
+	        i = 0;
+    	}
 
         if(result.find("Upgrade completed") != string::npos ||
            result.find("Rebooting system") != string::npos) {
@@ -750,34 +746,19 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
             LOGE("receive error message, %s", result.c_str());
             break;
         }
-
-        if (result.back() == '\n') {//result.at(result.size() - 1) == '\n'
-            lineHeadPart.clear();
+		
+		if (result.back() == '\n') {//result.at(result.size() - 1) == '\n'                 
+		    found = result.rfind("\n", result.size() - 2);
         } else {
-            lineHeadPart = result;
-            lineHeadPart.substr(lineHeadPart.rfind('\n') + 1);
+            found = result.rfind("\n");
         }
-        size_t found = result.rfind("\n");
-        if (found != string::npos) {
-            result.erase(found);
-        }
-        found = result.rfind("\n");
-        if (found != string::npos) {
+		if (found != string::npos) {
             result.erase(0, found + 1);
-        }
-        //use printf to handle \b (backspace) in the result data;
-        while((found = result.find('\b')) != string::npos) {
-            if(found > 0)
-                result.erase(found - 1, 2);
-            else
-                result.erase(0, 1);
-        }
-
+        }				
         workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
-        LOGE("receive message, %s", result.c_str());
 
 RCV_NEXT_DATA:
-        tn.send_command(NULL, result, FALSE);
+        receivedData = tn.get_command_output(result);	
     };
 
     if (!done) {
@@ -872,6 +853,13 @@ UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
         workData->WaitForDevSwitchEvt(FALSE, 2 * 1000);
     };
     //     SLEEP(15000);
+    
+#ifdef CPE_SKIP_DIAG_PORT
+	 if (dev->GetDeviceStatus() == DEVICE_PLUGIN) {
+	 	dev->SetDeviceStatus(DEVICE_CHECK);
+ 	}
+#endif
+
     workData->SetDevice(dev, mAppConf.GetFlashDirectFlag());
 
     return RunMiFiPST(workData);
@@ -882,11 +870,8 @@ UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
 */
 UINT PSTManager::RunMiFiPST(LPVOID wParam) {
     UsbWorkData* data = (UsbWorkData*)wParam;
-    usb_handle * handle;
     flash_image  *img;
     DeviceInterfaces *dev;
-//    int result;
-    usb_dev_t status;
     BOOL useAdb = TRUE;
     BOOL flashdirect = TRUE;
     AppConfig      *config;
@@ -899,20 +884,12 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
     dev = data->mActiveDevIntf;
     img = data->mProjectPackage;
     config = data->mPAppConf;
-    status = dev->GetDeviceStatus();
     useAdb = config->IsUseAdbShell();
     flashdirect = config->GetFlashDirectFlag();
 
     data->SetInfo(TITLE, dev->GetDevTag());
 
-#ifdef CPE_SKIP_DIAG_PORT
-	 if (status == DEVICE_PLUGIN) {
-	 	dev->SetDeviceStatus(DEVICE_CHECK);
-		status = dev->GetDeviceStatus();
- 	}
-#endif
-
-    if (status == DEVICE_PLUGIN) {
+    if (dev->GetDeviceStatus() == DEVICE_PLUGIN) {
         DiagPST pst(data, img->GetFileBuffer());
         data->SetInfo(PROMPT_TITLE, "Begin download by Diag");
         bool result = pst.DownloadCheck();
@@ -954,38 +931,38 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
             data->WaitForDevSwitchEvt(TRUE, 100 * 1000);
         } else {
             data->SetInfo(FLASH_DONE, "Diag PST occur error! Please check log");
-            return 0;
+            return 1;
         }
     }
-
-    handle = data->usb;
-    status = dev->GetDeviceStatus();
-    if (handle == NULL) {
+    
+    if (( data->usb) == NULL) {
 		LOGE("No USB handle for adb device");
         data->SetInfo(FLASH_DONE, "No adb device");
         return -1;
     }
 
-    if (status == DEVICE_CHECK) {
+    if (dev->GetDeviceStatus() == DEVICE_CHECK) {
          AdbPST adbPST(config->GetForceUpdateFlag(), MODULE_M850);
 		 adbPST.Reboot(data, dev);
 //        adbPST.DoPST(data, img, dev);
 
         dev->SetDeviceStatus(DEVICE_FLASH);
         data->SetInfo(REBOOT_DEVICE, "Modem enter download state");
-        data->WaitForDevSwitchEvt(TRUE, 120 * 1000);
+        data->WaitForDevSwitchEvt(TRUE, 60 * 1000);
     }
 
-    handle = data->usb;
-    status = dev->GetDeviceStatus();
-    if (handle == NULL) {
-		LOGE("No USB handle for fastboot");
-        data->SetInfo(FLASH_DONE, "No fastboot device");
-        return -1;
-    }
+	/*for HH70, sometimes after send reboot-bootloader command, it will enumerate adb device again.*/
+    while((data->usb) == NULL) {		
+        data->SetInfo(PROMPT_TITLE, "wait for device enter download state");		
+	    if (data->WaitForDevSwitchEvt(TRUE, 60 * 1000) != WAIT_OBJECT_0) {
+			LOGE("No USB handle for fastboot");
+	        data->SetInfo(FLASH_DONE, "No fastboot device");
+	        return -1;
+	    }
+	}
 
-	if (status == DEVICE_FLASH) {
-        fastboot fb(handle);
+	if (dev->GetDeviceStatus() == DEVICE_FLASH) {
+        fastboot fb(data->usb);
         FlashImageInfo const * image;
         data->SetInfo(PROMPT_TITLE, "fastboot download");
 
@@ -1011,7 +988,7 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
         }
 
         //  fb.fb_queue_reboot();
-        fb.fb_execute_queue(handle, data, img->GetDiagDlImgSize());
+        fb.fb_execute_queue(data->usb, data, img->GetDiagDlImgSize());
         data->SetInfo(FLASH_DONE, NULL);
         dev->SetDeviceStatus(DEVICE_REMOVED);
     }
@@ -1061,6 +1038,7 @@ BOOL UsbWorkData::ShowSubWindow(BOOL show) {
 * the begin of device switch. 
 */
 DWORD  UsbWorkData::WaitForDevSwitchEvt(BOOL changeStatus, DWORD dwMilliseconds) {
+	DWORD waited;
 	if (changeStatus) {
 	  usb_close(usb);
 	  usb = NULL;
@@ -1070,8 +1048,16 @@ DWORD  UsbWorkData::WaitForDevSwitchEvt(BOOL changeStatus, DWORD dwMilliseconds)
 	  /*Set switch timeout*/
 	  //hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);    
 	}
-	
-    return ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);
+	waited = ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);
+	if (waited == WAIT_OBJECT_0)
+		LOGD("Get signaled, device arrived.");
+	else if (waited == WAIT_TIMEOUT)
+		LOGE("WaitForSingleObject FAILED, error is %d", GetLastError());
+	else if (waited == WAIT_ABANDONED)
+		LOGI("WaitForSingleObject return WAIT_ABANDONED ");
+	else if (waited == WAIT_TIMEOUT)
+		LOGI("WaitForSingleObject return WAIT_TIMEOUT");
+    return waited;
 }
 
 /*

@@ -392,6 +392,7 @@ class TelnetClient {
                     ssize_t count);              /* Number of bytes received */
      CURLcode send_telnet_data(const char *buffer, ssize_t len);
      int send_command(const char *buffer, string &result, bool trim = true);
+     BOOL get_command_output(string &result) ;
      int set_nbio(bool nbio);
      int set_keepalive(bool keepalive);
      BOOL register_callback(PVOID data, TelnetCmdMessage func, u_short port);

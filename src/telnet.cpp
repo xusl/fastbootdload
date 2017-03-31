@@ -1034,6 +1034,40 @@ int TelnetClient::set_keepalive(bool keepalive) {
 	return 0;
 }
 
+
+BOOL TelnetClient::get_command_output(string &result) {
+	CURLcode code;
+    ssize_t nread;
+    char buf[BUFSIZE] = {0};
+	BOOL more = TRUE;
+		
+	//    result.clear();
+	
+	    code = Curl_read(sockfd, buf, BUFSIZE - 1, &nread);
+
+        /* read would've blocked. Loop again */
+        if( nread > 0 ) {			
+	size_t found;
+	    result += buf;
+        //use printf to handle \b (backspace) in the result data;
+        while((found = result.find('\b')) != string::npos) {
+            if(found > 0)
+                result.erase(found - 1, 2);
+            else
+                result.erase(0, 1);
+        }
+		
+        } else if (code != CURLE_AGAIN) {
+            /* returned not-zero, this an error */
+			return FALSE;
+        } else if(nread <= 0) { //code == CURLE_OK
+            /* returned zero but actually received 0 or less here,
+               the server closed the connection and we bail out */            
+        }
+		
+		return TRUE;
+}
+
 int TelnetClient::receive_telnet_data(char *buffer, ssize_t len) {
     CURLcode code;
     ssize_t nread;
@@ -1729,10 +1763,21 @@ if (nbio) {
         FD_ZERO(&fdRead);
         FD_SET(sockfd,&fdRead);
         int ret = select(0,&fdRead,NULL,NULL,&TimeOut);
+		
+		if (ret == 0) {
+			if (verbose)
+				LOGD("telnet client read select time out ");
+			break;
+		} else if (ret == SOCKET_ERROR) {  
+			LOGE("select occur %d", WSAGetLastError());
+			break;
+	    }
 
+        WSASetLastError(NOERROR);
         read_byte = sread(sockfd, buf + nread, sizerequested - nread);
          if ( read_byte > 0 ) {
-            LOGD("Bytes received: %d", read_byte);
+		 	if (verbose)
+            	LOGD("Bytes received: %d", read_byte);
             nread += read_byte;
         } else if ( read_byte == 0 ) {
             LOGE("Connection closed");
