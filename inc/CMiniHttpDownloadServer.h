@@ -4,7 +4,7 @@
 using namespace std;
 
 typedef BOOL ( *HttpServerGetFile) (PVOID data, string filename, CString& filePath);
-typedef VOID ( *HttpServerMessage) (PVOID data, int uiPort, CString message);
+typedef VOID ( *HttpServerMessage) (PVOID data, int uiPort, string message);
 
 class CMiniHttpDownloadServer {
 public:

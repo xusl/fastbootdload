@@ -1151,12 +1151,25 @@ BOOL NicManager::UpdateNic() {
     return TRUE;
 }
 
+
+
 BOOL NicManager::WaitAddrChanged()
 {
   OVERLAPPED overlap;
   DWORD ret;
 
   HANDLE hand = NULL;
+
+#if 0
+    for (;;) {
+        nicManager->UpdateNic(nic);
+        if (nic.mGateway.GetLength() == 0) {        
+            break;
+        }
+        Sleep(1000);
+    }
+#endif
+  
   overlap.hEvent = WSACreateEvent();
 
   ret = NotifyAddrChange(&hand, &overlap);

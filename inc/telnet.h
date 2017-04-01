@@ -365,7 +365,7 @@ struct curl_slist {
   struct curl_slist *next;
 };
 
-typedef VOID ( *TelnetCmdMessage) (PVOID data, int uiPort, CString message);
+typedef VOID ( *TelnetCmdMessage) (PVOID data, int uiPort, string message);
 
 class TelnetClient {
   public:

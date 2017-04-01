@@ -237,7 +237,6 @@ class DeviceInterfaces {
   VOID SetAdbHandle(usb_handle* handle)  { mAdbHandle = handle;};
   VOID SetFastbootHandle(usb_handle* handle)  { mFbHandle = handle;};
   BOOL SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf=TRUE);
-  BOOL IsBindDiagAdb();
   VOID DeleteMemory(VOID);
   int GetDevId();
   CPacket* GetPacket();

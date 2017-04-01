@@ -21,12 +21,13 @@ CMiniHttpDownloadServer::~CMiniHttpDownloadServer() {
 }
 
 void CMiniHttpDownloadServer::UpdateMessage(int uiPort, CString errormsg) {
-      if (m_GetFileCB == NULL || m_CallBackData == NULL) {
+    string prompt;
+    if (m_GetFileCB == NULL || m_CallBackData == NULL) {
         LOGE("NULL PARAMETER");
         return ;
     }
-
-    return m_SetMsgCB(m_CallBackData, uiPort, errormsg);
+	CStringToString(errormsg, prompt);
+    return m_SetMsgCB(m_CallBackData, uiPort, prompt);
 }
 
 #if 1

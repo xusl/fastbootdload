@@ -40,6 +40,7 @@
 #define FB_RESPONSE_SZ 64
 #define VERSION_STR_LEN 16
 
+typedef VOID ( *FastbootClientMessage) (PVOID data, int type, string message);
 
 typedef struct Action
 {
@@ -83,6 +84,7 @@ private:
    Action *action_list;
    Action *action_last;
    char ERRBUF[128];
+   FastbootClientMessage messageCallback;
 
    Action *queue_action(unsigned op, const char *fmt, ...);
 	 void remove_action();

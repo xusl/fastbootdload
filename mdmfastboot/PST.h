@@ -88,13 +88,12 @@ class UsbWorkData{
     DWORD  WaitForDevSwitchEvt(BOOL changeStatus, DWORD dwMilliseconds = INFINITE);
     DWORD  SetDevSwitchEvt(BOOL flashdirect);
     BOOL SetInfo(UI_INFO_TYPE info_type, PCCH msg);
-    BOOL SetDevicePortText(UI_INFO_TYPE infoType, CString strInfo);
     BOOL AddDevInfo(CString name, CString value);
     UINT SetProgress(int progress);
     BOOL SetPromptMsg(PCCH msg) { return SetInfo(PROMPT_TEXT, msg);};
     const char *GetDevTag() { return mActiveDevIntf->GetDevTag();};
     float GetElapseSeconds();
-    BOOL Log(const char * msg);
+    BOOL RebootFastboot();
     int GetStatus() { return stat;};
     VOID SetStatus(int status) { stat = status;};
     VOID SetParallelMode(BOOL on) {m_ParallelMode = on;}
@@ -183,7 +182,7 @@ public:
   UINT CPEModemPST(UsbWorkData *workData);
 
   static BOOL HttpServerGetFileCB (PVOID data, string filename, CString& filePath);
-  static VOID HttpServerMessageCB (PVOID data, int uiPort, CString message);
+  static VOID HttpServerMessageCB (PVOID data, int uiPort, string message);
 private:
     static UINT RunMiFiPST(LPVOID wParam);
     static UINT RunTelnetServer(LPVOID wParam);
@@ -198,7 +197,8 @@ private:
   vector<CDevLabel>     m_WorkDev;
   DeviceCoordinator     mDevCoordinator;
   NicManager            mNicManager;
-  CMiniHttpDownloadServer mHttpServer;
+  CMiniHttpDownloadServer mHttpServer;  
+  CWinThread            *mTelnetClientThread;
   HANDLE                mScheduleEvt;
   AFX_THREADPROC        mThreadProc;
   volatile BOOL         m_bWork;

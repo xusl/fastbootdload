@@ -16,6 +16,10 @@
 #include "telnet.h"
 #include <sstream>
 
+
+#define CPE_SKIP_DIAG_PORT
+
+
 PSTManager::PSTManager( AFX_THREADPROC pfnThreadProc):
     mThreadProc(pfnThreadProc),
 	mDevCoordinator(),
@@ -158,7 +162,7 @@ VOID PSTManager::SetWork(BOOL work, BOOL schedule) {
 
   if (mAppConf.GetPlatformType() == PLATFORM_CPE) {
       AfxBeginThread(CMiniHttpDownloadServer::StartHttpServer, (LPVOID)&mHttpServer);
-      AfxBeginThread(RunTelnetServer, this);
+      mTelnetClientThread = AfxBeginThread(RunTelnetServer, this);
    } else if(mAppConf.IsUseAdbShell()) {
         RejectCDROM();
         HandleComDevice(FALSE);
@@ -534,7 +538,7 @@ BOOL PSTManager::HandleDeviceRemoved(PDEV_BROADCAST_DEVICEINTERFACE pDevInf, WPA
         if (data->work != NULL)
             data->work->PostThreadMessage( WM_QUIT, NULL, NULL );
 
-        data->hWnd->KillTimer( (UINT_PTR)data);
+        //data->hWnd->KillTimer( (UINT_PTR)data);
         usb_close(data->usb);
     } else if (stat == USB_STAT_FINISH) {
         if (!mAppConf.GetPortDevFixedFlag()) {
@@ -571,13 +575,13 @@ BOOL PSTManager::HttpServerGetFileCB (PVOID data, string filename, CString& file
     return TRUE;
 }
 
-VOID PSTManager::HttpServerMessageCB (PVOID data, int uiPort, CString message) {
+VOID PSTManager::HttpServerMessageCB (PVOID data, int uiPort, string message) {
     PSTManager *m_PSTManager =  (PSTManager *)data;
       UsbWorkData *workData = m_PSTManager->GetWorkData(uiPort);
       if (workData == NULL) {
         return;
       }
-      workData->SetDevicePortText(PROMPT_TEXT, message);
+      workData->SetPromptMsg(message.c_str());
 }
 
 UINT PSTManager::RunTelnetServer(LPVOID wParam){
@@ -638,7 +642,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     workData->AddDevInfo(_T("Host Connection"), nic.mConnectionName);
     workData->AddDevInfo(_T("Device IP Address"), nic.mGateway);
 
-    workData->SetDevicePortText(PROMPT_TITLE, _T("Connect to device"));
+    workData->SetInfo(PROMPT_TITLE, "Connect to device");
     SOCKET socket = ConnectServer(gateway.c_str(), TELNET_PORT);
     if (socket == INVALID_SOCKET) {
         workData->SetInfo(OPENWRT_UPDATED, "Can not connect to device");
@@ -650,7 +654,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     tn.set_nbio(true);
     tn.register_callback(wParam, HttpServerMessageCB, workData->GetIndex());
 
-    workData->SetDevicePortText(PROMPT_TEXT, _T("receive welcome message"));
+    workData->SetPromptMsg("receive welcome message");
 	
 	Sleep(2000);
 	error = tn.send_command(NULL, result);
@@ -658,7 +662,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
 	
 #ifdef DESKTOP_TEST
     LOGE("User Login, enter user ");
-    workData->SetDevicePortText(PROMPT_TEXT, _T("telent: auto user login"));
+    workData->SetPromptMsg("telent: auto user login");
     tn.send_command("zen", result, false);
     LOGE("Send password ");
     tn.send_command("zen", result, false);
@@ -671,9 +675,9 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     tn.send_command("echo $PATH", result);
     //workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
 
-    workData->SetDevicePortText(PROMPT_TITLE, _T("Update Modem Image"));
+    workData->SetInfo(PROMPT_TITLE, "Update Modem Image");
     tn.send_command("/bin/usb_switch_to IPQ", result);
-    workData->SetDevicePortText(PROMPT_TEXT, _T("switch usb to PC"));
+    workData->SetPromptMsg("switch usb to PC");
     //tn.send_command("send_data 254 0 0 8 1 0 0", result);
     tn.send_command("/bin/usb_switch_to PC", result);
 
@@ -690,7 +694,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     }
 
     //tn.set_nbio(false);
-    workData->SetDevicePortText(PROMPT_TITLE, _T("Update Router Image"));
+    workData->SetInfo(PROMPT_TITLE, "Update Router Image");
     //  m_MmiDevInfo = nic.mConnectionName;
     //for (map<string, CString>::iterator it=openwrtFiles.begin(); it != openwrtFiles.end(); it ++) {
     //tn.send_command("cd /tmp/", result);
@@ -715,9 +719,8 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     tn.send_command(ossPort.str().c_str(), result, FALSE);
     //}
 
-    //    workData->SetDevicePortText(PROMPT_TITLE, _T("execute sysupgrade, please wait ..."));
     //tn.set_receive_timeout(1000);
-    //tn.set_verbose(true);
+    tn.set_verbose(false);
     command = "sysupgrade -n -v /tmp/";
     command.append(openwrtFiles.begin()->first);
     tn.send_command(command.c_str(), result, FALSE);
@@ -727,7 +730,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     BOOL done = FALSE;
 	BOOL receivedData = result.size() > 0;
 	/*for nbio, timeout is 0.2, and erase a partition may cosume 20+s.*/
-    while (i < 300) {
+    while (i < 500) {
         if (!receivedData) {
             LOGD("(%d) empty message", i);
 			if (i++ > 0)
@@ -755,7 +758,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
 		if (found != string::npos) {
             result.erase(0, found + 1);
         }				
-        workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
+        workData->SetPromptMsg(result.c_str());
 
 RCV_NEXT_DATA:
         receivedData = tn.get_command_output(result);	
@@ -766,27 +769,20 @@ RCV_NEXT_DATA:
 	    workData->SetInfo(OPENWRT_UPDATED,  "Update main board failed");
     } else {
 		//tn.send_command("halt"/* "poweroff", not use "reboot"*/, result, FALSE);
-		workData->AddDevInfo(_T("Router updated"), _T("Please remove USB & power, attach power cable again"));
-	    workData->SetDevicePortText(PROMPT_TITLE, _T("Device updated"));
-	    workData->SetInfo(OPENWRT_UPDATED,  "Please reboot device .");		
-    }
-#if 0
-    for (;;) {
-        nicManager->UpdateNic(nic);
-        if (nic.mGateway.GetLength() == 0) {
-            workData->SetInfo(FLASH_DONE, _T("Device Update"));
-            break;
-        }
-        Sleep(1000);
-    }
-#endif
+		workData->AddDevInfo(_T("Router updated"), _T(""));
 
-    //nicManager->WaitAddrChanged();
+	    nicManager->WaitAddrChanged();
+		workData->SetInfo(PROMPT_TITLE, "Device updated");
+		
+		if (workData->RebootFastboot())
+	    workData->SetInfo(OPENWRT_UPDATED,  "Please wait for device reboot.");		
+		else
+		workData->SetInfo(OPENWRT_UPDATED,  "When reboot device, please remove both USB & power cable.");		
+    }
     
     return 0;
 }
 
-#define CPE_SKIP_DIAG_PORT
 UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
     DeviceInterfaces * dev;
     //BOOL testFastboot = FALSE;
@@ -846,10 +842,10 @@ UINT PSTManager::CPEModemPST(UsbWorkData *workData) {
         }
 
         //::WaitForSingleObject(mScheduleEvt, 10 * 1000);
-        CString text = _T("Waiting for usb devices");
+        string text = "Waiting for usb devices";
         for(int k = 0; k <= i % 3; k++)
-            text.Append(_T(" ..."));
-        workData->SetDevicePortText(PROMPT_TEXT, text);
+            text += " ...";
+        workData->SetPromptMsg(text.c_str());
         workData->WaitForDevSwitchEvt(FALSE, 2 * 1000);
     };
     //     SLEEP(15000);
@@ -876,7 +872,12 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
     BOOL flashdirect = TRUE;
     AppConfig      *config;
 
-    if (data == NULL ||  !data->CheckValid()) {
+	if (data == NULL ) {
+		LOGE("Null parameter, no work data");
+		return -2;
+	}
+
+    if (!data->CheckValid()) {
         data->SetInfo(FLASH_DONE, "Bad parameter");
         return -1;
     }
@@ -1209,12 +1210,6 @@ BOOL UsbWorkData::SetInfo(UI_INFO_TYPE info_type, PCCH msg) {
   return TRUE;
 }
 
-/*invoke in UI thread.*/
-BOOL UsbWorkData::SetDevicePortText(UI_INFO_TYPE infoType, CString strInfo)
-{
-    pCtl->SetInfo(infoType, strInfo);
-    return TRUE;
-};
 
 BOOL UsbWorkData::AddDevInfo(CString name, CString value) {
   UIInfo* info = new UIInfo;
@@ -1248,9 +1243,28 @@ float UsbWorkData::GetElapseSeconds() {
 */
      return ((float)(now() - start_time_tick)) / MILLS_SECONDS;
 }
-BOOL UsbWorkData::Log(const char * msg) {
-    LOGI("%s::%s", GetDevTag() , msg);
-    return TRUE;
+
+BOOL UsbWorkData::RebootFastboot() {
+   fastboot fb(NULL);
+   if (mActiveDevIntf == NULL) {
+   	LOGE("None active usb device");
+	return FALSE;
+   	}
+
+   if (mActiveDevIntf->GetFastbootHandle() == NULL) {
+   	LOGE("None fastboot device");
+	return FALSE;
+   }
+   
+   if (usb == NULL) {
+   	LOGE("USB handle is already close");
+   	return FALSE;
+   }
+   
+   fb.fb_queue_reboot();
+   fb.fb_execute_queue(usb, this, 0);
+   
+   SetPromptMsg("reboot modem.");
+	
+   return TRUE;
 }
-
-

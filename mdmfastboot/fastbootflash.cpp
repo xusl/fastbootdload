@@ -180,6 +180,7 @@ fastboot::~fastboot() {
 }
 
 fastboot::fastboot(usb_handle * handle):action_list(0), action_last(0) {
+	messageCallback = NULL;
 }
 
 char *fastboot::mkmsg(const char *fmt, ...)
@@ -362,12 +363,9 @@ void fastboot::fb_execute_queue(usb_handle *usb, void* data, int pad_size)
 			if (status)
 				bIsBreak = true;
 
-            if (total_size == 0) {
-              CRITICAL("Error total_size is 0");
-              return;
-            }
-
-            ((UsbWorkData*)data)->SetProgress((int) (100.0 * (double) flashed_size / total_size ));
+            if (total_size != 0) {
+            	((UsbWorkData*)data)->SetProgress((int) (100.0 * (double) flashed_size / total_size ));
+			}
         } else if (a->op == OP_QUERY) {
             status = fb_command_response(usb, a->cmd, resp);
 			status = a->func(data, a, status, status ? fb_get_error() : resp);

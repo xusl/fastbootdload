@@ -974,8 +974,8 @@ BOOL TelnetClient::register_callback(PVOID data, TelnetCmdMessage func, u_short 
 BOOL TelnetClient::ui_notify(const char *buffer) {
 	if (m_CallBackData == NULL || m_CmdMsgCB == NULL || m_DevicePort == -1)
 		return FALSE;
-	CString msg(buffer);
-	m_CmdMsgCB(m_CallBackData, m_DevicePort, msg);
+	//CString msg(buffer);
+	m_CmdMsgCB(m_CallBackData, m_DevicePort, buffer);
 	return TRUE;
 }
 

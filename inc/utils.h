@@ -34,8 +34,9 @@
 using namespace std;
 
 #  define DEFAULT_ADB_PORT 5037
-#  define MILLS_SECONDS (1000LL * 1000LL)
-#  define MICRO_SECONDS 1000LL
+#  define MILLS_SECONDS  (1000LL * 1000LL)
+#  define MICRO_SECONDS  1000LL
+#  define MILLS_PER_MICRO 1000LL
 
 #define __inline__
 typedef int socklen_t;
