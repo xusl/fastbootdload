@@ -942,10 +942,10 @@ TelnetClient::TelnetClient(curl_socket_t sock, int to, bool verb) {
     subend = NULL;
 
     /* Set the options we want by default */
-    us_preferred[CURL_TELOPT_BINARY] = CURL_YES;
+    //us_preferred[CURL_TELOPT_BINARY] = CURL_YES;
     us_preferred[CURL_TELOPT_SGA] = CURL_YES;
-    him_preferred[CURL_TELOPT_BINARY] = CURL_YES;
-    him_preferred[CURL_TELOPT_SGA] = CURL_YES;
+    //him_preferred[CURL_TELOPT_BINARY] = CURL_YES;
+    //him_preferred[CURL_TELOPT_SGA] = CURL_YES;
     //him_preferred[CURL_TELOPT_ECHO] = CURL_YES;
 
     already_negotiated = 0;
@@ -1080,7 +1080,7 @@ int TelnetClient::receive_telnet_data(char *buffer, ssize_t len) {
         /* read data from network */
         memset(buf, 0, sizeof buf);
 
-if (true/*!nbio*/) {
+#if 1
         code = Curl_read(sockfd, buf, CURLMIN(BUFSIZE, len) - 1, &nread);
         //LOGD("read %d bytes", nread);
         /* read would've blocked. Loop again */
@@ -1094,7 +1094,7 @@ if (true/*!nbio*/) {
                the server closed the connection and we bail out */
             break;
         }
-} else {
+#else
       nread = 0;
       do {
         fd_set fdRead;
@@ -1118,7 +1118,7 @@ if (true/*!nbio*/) {
       } while( read_byte > 0 && (sizeof buf - nread) > 0);
       if (nread <= 0)
         break;
-}
+#endif
 
         if (telnet_cmd_negotiate){
 			if (verbose)
@@ -1135,6 +1135,7 @@ if (true/*!nbio*/) {
             if(code) {
                 LOGD("telnet_cmd_negotiate read:: %s", buf);
                 telnet_cmd_negotiate = 1;
+#if 0
                 if (len > 0)
                 {
                     int rl = CURLMIN(nread, len);
@@ -1143,12 +1144,11 @@ if (true/*!nbio*/) {
                     buffer += rl;
                 }
                 break;
+#endif
             }
         }
 
-        /* Negotiate if the peer has started negotiating,
-           otherwise don't. We don't want to speak telnet with
-           non-telnet servers, like POP or SMTP. */
+        /* Negotiate if the peer has started negotiating, otherwise don't.  */
         if(please_negotiate && !already_negotiated) {
             LOGD("Do negotiate");
             negotiate();
@@ -1175,7 +1175,7 @@ int TelnetClient::send_command(const char *cmd, string &result, bool trim) {
         enterCmd = cmd;
 
         if(strrchr(cmd, '\n') == NULL)
-            enterCmd.append(1, '\n');
+			enterCmd.append("\r\n");    //enterCmd.append(1, '\n');
         send_telnet_data(enterCmd.c_str(), enterCmd.size());
 		msg = "execute command ";
 		msg += cmd;
@@ -1752,43 +1752,45 @@ CURLcode TelnetClient::Curl_read(/* connection data */
 
   *n=0; /* reset amount to zero */
 
-if (nbio) {
-    memset(buf, 0, sizerequested);
-      do {
-        fd_set fdRead;
-        timeval TimeOut;
-        TimeOut.tv_sec=0;
-        TimeOut.tv_usec=200000;  //microsecond, 1/1000 000 s, 0.2
+	if (nbio) {
+	    memset(buf, 0, sizerequested);
+	      do {
+	        fd_set fdRead;
+	        timeval TimeOut;
+	        TimeOut.tv_sec=0;
+	        TimeOut.tv_usec=200000;  //microsecond, 1/1000 000 s, 0.2
 
-        FD_ZERO(&fdRead);
-        FD_SET(sockfd,&fdRead);
-        int ret = select(0,&fdRead,NULL,NULL,&TimeOut);
-		
-		if (ret == 0) {
-			if (verbose)
-				LOGD("telnet client read select time out ");
-			break;
-		} else if (ret == SOCKET_ERROR) {  
-			LOGE("select occur %d", WSAGetLastError());
-			break;
-	    }
+	        FD_ZERO(&fdRead);
+	        FD_SET(sockfd,&fdRead);
+	        int ret = select(0,&fdRead,NULL,NULL,&TimeOut);
+			
+			if (ret == 0) {
+				if (verbose)
+					LOGD("telnet client read select time out ");
+				break;
+			} else if (ret == SOCKET_ERROR) {  
+				LOGE("select occur %d", WSAGetLastError());
+				break;
+		    }
 
-        WSASetLastError(NOERROR);
-        read_byte = sread(sockfd, buf + nread, sizerequested - nread);
-         if ( read_byte > 0 ) {
-		 	if (verbose)
-            	LOGD("Bytes received: %d", read_byte);
-            nread += read_byte;
-        } else if ( read_byte == 0 ) {
-            LOGE("Connection closed");
-        } else {
-            LOGE("recv failed: %d", WSAGetLastError());
-        }
-      } while( read_byte > 0 && (sizerequested - nread) > 0);
-}else {
-  nread = sread(sockfd, buf, sizerequested);
-  read_byte = nread;
-}
+	        WSASetLastError(NOERROR);
+	        read_byte = sread(sockfd, buf + nread, sizerequested - nread);
+	         if ( read_byte > 0 ) {
+			 	if (verbose)
+	            	LOGD("Bytes received: %d", read_byte);
+	            nread += read_byte;
+	        } else if ( read_byte == 0 ) {
+	            LOGE("Connection closed");
+	        } else {
+	            LOGE("recv failed: %d", WSAGetLastError());
+	        }
+			//TODO:: xusl
+	      } while( FALSE);
+//	      } while( read_byte > 0 && (sizerequested - nread) > 0);
+	}else {
+	  nread = sread(sockfd, buf, sizerequested);
+	  read_byte = nread;
+	}
 
   curlcode = CURLE_OK;
   if(-1 == read_byte) {

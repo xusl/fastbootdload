@@ -55,7 +55,7 @@ BOOL AdbPST::DoPST(UsbWorkData* data, flash_image* img, DeviceInterfaces *dev) {
         }
 
         adb.sync_push(conf_file_char, "/tmp/config.xml");
-        data->SetInfo(PROMPT_TEXT, "Copy config.xml to /tmp/config.xml.");
+        data->SetPromptMsg("Copy config.xml to /tmp/config.xml.");
         delete conf_file_char;
 
         result = adb_hw_check(adb,data);
@@ -92,7 +92,7 @@ BOOL AdbPST::DoPST(UsbWorkData* data, flash_image* img, DeviceInterfaces *dev) {
 			return adb.shell("reboot-bootloader", NULL, NULL);
 		}		
 	
-        data->SetInfo(REBOOT_DEVICE, "reboot bootloader");
+        data->SetPromptMsg("reboot bootloader");
     } else {
         // that is mean just update qcn
         data->SetInfo(FLASH_DONE, "Finish. QCN updated.");
@@ -110,10 +110,10 @@ UINT AdbPST::adb_shell_command(adbhost& adb,
     ret = adb.shell(command, (void **)&resp, &resp_len);
     if (ret ==0 && resp != NULL) {
         if (UI_DEFAULT == info_type) {
-            data->SetInfo(PROMPT_TITLE, command);
-            data->SetInfo(PROMPT_TEXT, resp);
+            data->SetPromptMsg(command, PROMPT_TITLE);
+            data->SetPromptMsg(resp);
         } else {
-            data->SetInfo(info_type, resp);
+            data->SetPromptMsg(resp, info_type);
         }
         free(resp);
         return 0;
@@ -182,10 +182,10 @@ UINT AdbPST::adb_hw_check(adbhost& adb, UsbWorkData* data) {
     if (ret ==0 && resp != NULL) {
         ret = strcmp(resp, "match");
         if (ret == 0) {
-            data->SetInfo( PROMPT_TEXT, "hardware is match!");
+            data->SetPromptMsg("hardware is match!");
         } else {
-            data->SetInfo(PROMPT_TITLE, "hwinfo_check return ");
-            data->SetInfo(PROMPT_TEXT, resp);
+            data->SetPromptMsg("hwinfo_check return ", PROMPT_TITLE);
+            data->SetPromptMsg(resp);
             WARN("hwinfo_check return \"%s\"", resp);
         }
 
@@ -257,13 +257,13 @@ UINT AdbPST::sw_version_parse(UsbWorkData* data,PCCH key, PCCH value) {
     if (stricmp(key , "a5") == 0) {
         partition = a5_partition;
         count = sizeof(a5_partition)/ sizeof(a5_partition[0]);
-        data->SetInfo(PROMPT_TEXT, "A5 firmware can update");
+        data->SetPromptMsg("A5 firmware can update");
     } else if (stricmp(key , "q6") == 0) {
         partition = q6_partition;
         count = sizeof(q6_partition)/ sizeof(q6_partition[0]);
-        data->SetInfo(PROMPT_TEXT, "Q6 firmware can update.");
+        data->SetPromptMsg("Q6 firmware can update.");
     } else if (stricmp(key , "qcn") == 0) {
-        data->SetInfo(PROMPT_TEXT, "QCN can update.");
+        data->SetPromptMsg("QCN can update.");
         data->update_qcn = TRUE;
         return 1;
     } else {

@@ -593,51 +593,11 @@ BOOL CmdmfastbootDlg::OnDeviceChange(UINT nEventType, DWORD_PTR dwData)
 
 
 LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
-{
-    UsbWorkData* data = (UsbWorkData*)lParam;
-    UIInfo* uiInfo = (UIInfo*)wParam;
-
-    if (uiInfo == NULL) {
-        ERROR("Invalid wParam");
-        return -1;
-    }
-
-    if (data == NULL ) {
-        ERROR("Invalid lParam");
-        delete uiInfo;
-        return -1;
-    }
-
-    switch(uiInfo->infoType ) {
-    case ADB_CHK_ABORT:
-        // WHEN ABORT, the device need remove manually, do not schedule next device into this UI port.
-        data->Abort();
-        data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
-        break;
-
-    case REBOOT_DEVICE:
-        //data->SwitchDev(switch_timeout);
-        data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
-        //data->pCtl->SetInfo(PROMPT_TITLE, CString(""));
-        break;
-
-    case FLASH_DONE:
-        if (!uiInfo->sVal.IsEmpty()) {
-            data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
-            data->pCtl->SetInfo(PROMPT_TITLE, CString(""));
-        } else {
-            CString prompt;
-	        if (mPSTManager.GetAppConfig()->GetPlatformType() == PLATFORM_CPE) {
-	            prompt.Format(_T("elapse %.3f Seconds"), data->GetElapseSeconds());
-		        data->pCtl->AddDevInfo(_T("Modem updated"), prompt);
-				data->pCtl->SetProgressVisible(FALSE);
-        	} else {
-	            prompt.Format(_T("Update device sucessfully, elapse %.3f Seconds"), data->GetElapseSeconds());
-	            data->pCtl->SetInfo(PROMPT_TITLE, prompt);
-    		}
-        }
+{  
+    switch(static_cast<UI_INFO_TYPE>(wParam )) {
+    case FLASH_DONE:        
         m_updated_number ++;
-        mPSTManager.FlashDeviceDone(data);
+        mPSTManager.FlashDeviceDone();
 		break;
 
 	case OPENWRT_UPDATED:
@@ -645,28 +605,9 @@ LRESULT CmdmfastbootDlg::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
 		LOGE("Openwrt updated");
 	    mPSTManager.SetWork(FALSE);
 		SetWorkStatus(FALSE, TRUE);
-		data->Finish();
-		data->pCtl->SetInfo(PROMPT_TEXT, uiInfo->sVal);
-        //mPSTManager.Reset();
+		//mPSTManager.Reset();
         break;
-
-    case TITLE:
-        data->pCtl->SetTitle(uiInfo->sVal);
-        break;
-
-    case PROGRESS_VAL:
-        data->pCtl->SetProgress(uiInfo->iVal);
-        break;
-
-    case PORTUI_DEVINFO:
-        data->pCtl->AddDevInfo(uiInfo->mInfoName, uiInfo->sVal);
-        break;
-
-    default:
-        data->pCtl->SetInfo(uiInfo->infoType, uiInfo->sVal);
     }
-
-    delete uiInfo;
     return 0;
 }
 

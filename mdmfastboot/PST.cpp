@@ -227,17 +227,12 @@ BOOL PSTManager::IsHaveUsbWork(void) {
   return FALSE;
 }
 
-BOOL PSTManager::FlashDeviceDone(UsbWorkData * data) {
-    if (data == NULL) {
-        LOGE("error, null parameter");
-        return FALSE;
-    }
+BOOL PSTManager::FlashDeviceDone() {
 	if (mAppConf.GetPlatformType() == PLATFORM_CPE)  {
 		LOGD("CPE platform now donot support automatically schedule mechaism.");
 		return TRUE;
 	}
 
-    data->Finish();
     if (NULL == mDevCoordinator.IsEmpty()) {
        // AfxMessageBox(L"All devices is updated!");
     }
@@ -642,7 +637,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     workData->AddDevInfo(_T("Host Connection"), nic.mConnectionName);
     workData->AddDevInfo(_T("Device IP Address"), nic.mGateway);
 
-    workData->SetInfo(PROMPT_TITLE, "Connect to device");
+    workData->SetPromptMsg("Connect to device", PROMPT_TITLE);
     SOCKET socket = ConnectServer(gateway.c_str(), TELNET_PORT);
     if (socket == INVALID_SOCKET) {
         workData->SetInfo(OPENWRT_UPDATED, "Can not connect to device");
@@ -675,7 +670,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     tn.send_command("echo $PATH", result);
     //workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
 
-    workData->SetInfo(PROMPT_TITLE, "Update Modem Image");
+    workData->SetPromptMsg("Update Modem Image", PROMPT_TITLE);
     tn.send_command("/bin/usb_switch_to IPQ", result);
     workData->SetPromptMsg("switch usb to PC");
     //tn.send_command("send_data 254 0 0 8 1 0 0", result);
@@ -694,7 +689,7 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     }
 
     //tn.set_nbio(false);
-    workData->SetInfo(PROMPT_TITLE, "Update Router Image");
+    workData->SetPromptMsg("Update Router Image", PROMPT_TITLE);
     //  m_MmiDevInfo = nic.mConnectionName;
     //for (map<string, CString>::iterator it=openwrtFiles.begin(); it != openwrtFiles.end(); it ++) {
     //tn.send_command("cd /tmp/", result);
@@ -770,15 +765,15 @@ RCV_NEXT_DATA:
     } else {
 		//tn.send_command("halt"/* "poweroff", not use "reboot"*/, result, FALSE);
 		workData->AddDevInfo(_T("Router updated"), _T(""));
+	
+		if (workData->RebootFastboot())
+	        workData->SetInfo(OPENWRT_UPDATED,  "Please wait for device reboot.");		
+		else
+	    	workData->SetInfo(OPENWRT_UPDATED,  "Remove both USB and power cable to reboot.");		
 
 	    nicManager->WaitAddrChanged();
-		workData->SetInfo(PROMPT_TITLE, "Device updated");
-		
-		if (workData->RebootFastboot())
-	    workData->SetInfo(OPENWRT_UPDATED,  "Please wait for device reboot.");		
-		else
-		workData->SetInfo(OPENWRT_UPDATED,  "When reboot device, please remove both USB & power cable.");		
-    }
+		workData->SetPromptMsg("Device updated", PROMPT_TITLE);
+	}
     
     return 0;
 }
@@ -888,11 +883,11 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
     useAdb = config->IsUseAdbShell();
     flashdirect = config->GetFlashDirectFlag();
 
-    data->SetInfo(TITLE, dev->GetDevTag());
+    data->SetPromptMsg(dev->GetDevTag(), TITLE);
 
     if (dev->GetDeviceStatus() == DEVICE_PLUGIN) {
         DiagPST pst(data, img->GetFileBuffer());
-        data->SetInfo(PROMPT_TITLE, "Begin download by Diag");
+        data->SetPromptMsg("Begin download by Diag", PROMPT_TITLE);
         bool result = pst.DownloadCheck();
         if(result)
             result = pst.RunTimeDiag(data->mPAppConf);
@@ -928,7 +923,7 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
 
         if(result) {
             dev->SetDeviceStatus(DEVICE_FLASH);
-            data->SetInfo(REBOOT_DEVICE, "Modem enter download state");
+            data->SetPromptMsg("Modem enter download state");
             data->WaitForDevSwitchEvt(TRUE, 100 * 1000);
         } else {
             data->SetInfo(FLASH_DONE, "Diag PST occur error! Please check log");
@@ -948,13 +943,13 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
 //        adbPST.DoPST(data, img, dev);
 
         dev->SetDeviceStatus(DEVICE_FLASH);
-        data->SetInfo(REBOOT_DEVICE, "Modem enter download state");
+        data->SetPromptMsg("Modem enter download state");
         data->WaitForDevSwitchEvt(TRUE, 60 * 1000);
     }
 
 	/*for HH70, sometimes after send reboot-bootloader command, it will enumerate adb device again.*/
     while((data->usb) == NULL) {		
-        data->SetInfo(PROMPT_TITLE, "wait for device enter download state");		
+        data->SetPromptMsg("wait for device enter download state", PROMPT_TITLE);		
 	    if (data->WaitForDevSwitchEvt(TRUE, 60 * 1000) != WAIT_OBJECT_0) {
 			LOGE("No USB handle for fastboot");
 	        data->SetInfo(FLASH_DONE, "No fastboot device");
@@ -965,7 +960,7 @@ UINT PSTManager::RunMiFiPST(LPVOID wParam) {
 	if (dev->GetDeviceStatus() == DEVICE_FLASH) {
         fastboot fb(data->usb);
         FlashImageInfo const * image;
-        data->SetInfo(PROMPT_TITLE, "fastboot download");
+        data->SetPromptMsg("fastboot download", PROMPT_TITLE);
 
         fb.fb_queue_display("product","product");
         fb.fb_queue_display("version","version");
@@ -1053,11 +1048,11 @@ DWORD  UsbWorkData::WaitForDevSwitchEvt(BOOL changeStatus, DWORD dwMilliseconds)
 	if (waited == WAIT_OBJECT_0)
 		LOGD("Get signaled, device arrived.");
 	else if (waited == WAIT_TIMEOUT)
-		LOGE("WaitForSingleObject FAILED, error is %d", GetLastError());
+		LOGI("WaitForSingleObject return WAIT_TIMEOUT");
 	else if (waited == WAIT_ABANDONED)
 		LOGI("WaitForSingleObject return WAIT_ABANDONED ");
-	else if (waited == WAIT_TIMEOUT)
-		LOGI("WaitForSingleObject return WAIT_TIMEOUT");
+	else 
+		LOGE("WaitForSingleObject return %d, error is %d", waited, GetLastError());
     return waited;
 }
 
@@ -1197,39 +1192,71 @@ BOOL UsbWorkData::Finish(VOID) {
 
 /*invoke in work thread*/
 BOOL UsbWorkData::SetInfo(UI_INFO_TYPE info_type, PCCH msg) {
-  UIInfo* info = new UIInfo;
+    CString prompt;
+	
+    switch(info_type) {
+    case ADB_CHK_ABORT:
+        // WHEN ABORT, the device need remove manually, do not schedule next device into this UI port.
+        Abort();
+        return SetPromptMsg(msg);
+        break;
+
+    case FLASH_DONE:
+        if (mPAppConf->GetPlatformType() == PLATFORM_CPE) {
+            prompt.Format(_T("elapse %.3f Seconds"), GetElapseSeconds());
+	        AddDevInfo(_T("Modem updated"), prompt);
+			pCtl->SetProgressVisible(FALSE);
+			return TRUE;
+    	} else {        	
+	        if (msg != NULL) {
+	            SetPromptMsg(msg);
+	            SetPromptMsg("", PROMPT_TITLE);
+	        } else {
+	            //prompt.Format(_T("Update device sucessfully, elapse %.3f Seconds"), GetElapseSeconds());
+	            SetPromptMsg("Device updated", PROMPT_TITLE);
+    		}
+			Finish();				
+        }        
+		break;
+
+	case OPENWRT_UPDATED:
+		//add for HH70 one thread only		
+		Finish();
+		SetPromptMsg(msg);
+        break;
+    }
+
+ // UIInfo* info = new UIInfo(info_type, CString((msg != NULL) ? msg : ""));
 
   //if (FLASH_DONE && data->hWnd->m_fix_port_map)
   //  sleep(1);
-
-  info->infoType = info_type;
-  info->sVal = (msg != NULL) ? msg : "";
-  hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
-                          (WPARAM)info,
-                          (LPARAM)this);
-  return TRUE;
+  return hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                          (WPARAM)info_type,
+                          (LPARAM)NULL);   
 }
 
 
 BOOL UsbWorkData::AddDevInfo(CString name, CString value) {
-  UIInfo* info = new UIInfo;
-  info->infoType = PORTUI_DEVINFO;
-  info->sVal = value;
+  UIInfo* info = new UIInfo(PORTUI_DEVINFO, value);
   info->mInfoName = name;
-  hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+  return pCtl->PostMessage(UI_MESSAGE_DEVICE_INFO,
                           (WPARAM)info,
-                          (LPARAM)this);
-  return TRUE;
+                          (LPARAM)this);  
 }
 
-UINT UsbWorkData::SetProgress(int progress) {
-    UIInfo* info = new UIInfo;
-    info->infoType = PROGRESS_VAL;
+BOOL  UsbWorkData::SetPromptMsg(PCCH msg, UI_INFO_TYPE info_type) { 
+  UIInfo* info = new UIInfo(info_type, CString((msg != NULL) ? msg : ""));
+  return pCtl->PostMessage(UI_MESSAGE_DEVICE_INFO,
+                          (WPARAM)info,
+                          (LPARAM)this);	
+}
+
+BOOL UsbWorkData::SetProgress(int progress) {
+    UIInfo* info = new UIInfo(PROGRESS_VAL);
     info->iVal = progress;
-    hWnd->PostMessage(UI_MESSAGE_DEVICE_INFO,
+    return pCtl->PostMessage(UI_MESSAGE_DEVICE_INFO,
                   (WPARAM)info,
                   (LPARAM)this);
-    return 0;
 }
 
 float UsbWorkData::GetElapseSeconds() {

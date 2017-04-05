@@ -89,8 +89,42 @@ void CPortStateUI::Init(int iPortID)
 BEGIN_MESSAGE_MAP(CPortStateUI, CDialog)
 	ON_WM_SIZE()
 	ON_WM_CTLCOLOR()
+	ON_MESSAGE(UI_MESSAGE_DEVICE_INFO, &CPortStateUI::OnDeviceInfo)
 END_MESSAGE_MAP()
 
+
+
+LRESULT CPortStateUI::OnDeviceInfo(WPARAM wParam, LPARAM lParam)
+{
+    //UsbWorkData* data = (UsbWorkData*)lParam;
+    UIInfo* uiInfo = (UIInfo*)wParam;
+
+    if (uiInfo == NULL) {
+        ERROR("Invalid wParam");
+        return -1;
+    }
+
+    switch(uiInfo->infoType ) {
+    case TITLE:
+        SetTitle(uiInfo->sVal);
+        break;
+
+    case PROGRESS_VAL:
+        SetProgress(uiInfo->iVal);
+        break;
+
+    case PORTUI_DEVINFO:
+        AddDevInfo(uiInfo->mInfoName, uiInfo->sVal);
+        break;
+
+    default:
+        SetInfo(uiInfo->infoType, uiInfo->sVal);
+    }
+
+    delete uiInfo;
+	//Invalidate(TRUE);
+    return 0;
+}
 
 // CPortStateUI 消息处理程序
 

@@ -45,7 +45,6 @@ typedef enum
 	PROMPT_TITLE,
 	PROMPT_TEXT,
 	ADB_CHK_ABORT,
-	REBOOT_DEVICE,
 	FLASH_DONE,
 	PORTUI_DEVINFO,
 	OPENWRT_UPDATED,
@@ -59,8 +58,15 @@ typedef struct _UIInfo_
 	CString			  sVal;
   CString       mInfoName;
 
-  _UIInfo_() {
-    infoType = UI_DEFAULT;
+  _UIInfo_(UI_INFO_TYPE type, CString text) {
+    infoType = type;
+    sVal = text;
+    iVal = -1;
+    mInfoName = "";
+  }
+
+  _UIInfo_(UI_INFO_TYPE type) {
+    infoType = type;
     sVal = "";
     iVal = -1;
     mInfoName = "";
@@ -89,8 +95,8 @@ class UsbWorkData{
     DWORD  SetDevSwitchEvt(BOOL flashdirect);
     BOOL SetInfo(UI_INFO_TYPE info_type, PCCH msg);
     BOOL AddDevInfo(CString name, CString value);
-    UINT SetProgress(int progress);
-    BOOL SetPromptMsg(PCCH msg) { return SetInfo(PROMPT_TEXT, msg);};
+    BOOL SetProgress(int progress);
+    BOOL SetPromptMsg(PCCH msg, UI_INFO_TYPE info_type = PROMPT_TEXT);
     const char *GetDevTag() { return mActiveDevIntf->GetDevTag();};
     float GetElapseSeconds();
     BOOL RebootFastboot();
@@ -144,7 +150,7 @@ public:
 
   UsbWorkData *GetWorkData(UINT index = 0);
   UsbWorkData *FindUsbWorkData(wchar_t *devPath);
-  BOOL FlashDeviceDone(UsbWorkData * data);
+  BOOL FlashDeviceDone();
   BOOL IsInit() { return m_bInit;}
   BOOL IsHaveUsbWork(void);
   BOOL ScheduleDeviceWork();

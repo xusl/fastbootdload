@@ -29,6 +29,8 @@ public:
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV Ö§³Ö
   BOOL OnInitDialog();
+  LRESULT OnDeviceInfo(WPARAM wParam, LPARAM lParam);
+
 	DECLARE_MESSAGE_MAP()
 
 
@@ -39,10 +41,5 @@ public:
 public:
 	int iID;
   CListCtrl m_DevInfoList;
-	UIInfo m_PortFrmVer;
-	UIInfo m_PortQCNVer;
-	UIInfo m_PortLinuxVer;
-	UIInfo m_PortProgressInfo;
-	UIInfo m_PortProgressValue;
   //CBrush m_Brush;
 };

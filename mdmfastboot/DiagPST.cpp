@@ -16,7 +16,7 @@ void DiagPSTDownloadProgress(void *data, int port,uint16 percent) {
 void DiagPSTDownloadState(void *data, int port, string msg) {
     UsbWorkData * worker = (UsbWorkData * )data;
     if(worker != NULL)
-        worker->SetInfo(PROMPT_TEXT, msg.c_str());
+        worker->SetPromptMsg(msg.c_str());
 }
 
 DiagPST::DiagPST(UsbWorkData * worker, map<string,FileBufStruct> & filebuffer):

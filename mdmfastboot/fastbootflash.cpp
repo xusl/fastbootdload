@@ -141,7 +141,7 @@ UINT fastboot::port_text_msg(void* data, const char *fmt,  ... ) {
     va_end(ap);
 
 	UsbWorkData* wd = (UsbWorkData*) data;
-    wd->SetInfo(PROMPT_TEXT, buffer);
+    wd->SetPromptMsg(buffer);
 	INFO("%s: %s", wd->GetDevTag(), buffer);
 
     return 0;
