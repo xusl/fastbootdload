@@ -239,7 +239,10 @@ class DeviceInterfaces {
   BOOL SetIntf(CDevLabel& dev, TDevType type, BOOL updateActiveIntf=TRUE);
   VOID DeleteMemory(VOID);
   int GetDevId();
+#if 0  
   CPacket* GetPacket();
+#endif
+
   VOID UpdateDevTag();
   const char *GetDevTag() const{  return mTag;};
   //long long GetTimeElapse() { return mEndTimeStamp - mBeginTimeStamp;};

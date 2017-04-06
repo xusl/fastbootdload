@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "log.h"
 #include "CMiniHttpDownloadServer.h"
+#include <sstream>
 
 #define MEGABYTE (1024 * 1024)
 #define CLOSE_SERVER "CloseServer"
@@ -181,6 +182,25 @@ BOOL CMiniHttpDownloadServer::BuildHttpHeader(string& header, int file_size) {
     return TRUE;
 }
 
+    
+BOOL CMiniHttpDownloadServer::SendError(SOCKET sock, int error, string error_text) {
+  std::ostringstream ossPort;
+    //use system locale, but numpunct use default , so input number do not add a thounsands separator,
+    //for example, 8081 => 8,081
+    ossPort.imbue(locale::classic()/*std::locale()*/);
+
+    ossPort << "HTTP/1.1 " << error << " " << error_text;
+    
+    ossPort << "\r\n";
+
+    if (send(sock, ossPort.str().c_str(), ossPort.str().size(), 0) == SOCKET_ERROR) {
+		LOGE("Send response error");
+        return FALSE;
+    }
+	
+	return TRUE;
+}
+
 BOOL CMiniHttpDownloadServer::SendFile(SOCKET sock, CString &filePath, int uiPort) {
     HANDLE    file;
     CString msg;
@@ -199,6 +219,7 @@ BOOL CMiniHttpDownloadServer::SendFile(SOCKET sock, CString &filePath, int uiPor
 
     if (file == INVALID_HANDLE_VALUE) {
         LOGE("load_file: file open failed (rc=%ld)\n", GetLastError());
+		SendError(sock, 404, "Not Found");
         return FALSE;
     }
 	LOGD("Send file %S to client", filePath.GetString());
@@ -207,6 +228,7 @@ BOOL CMiniHttpDownloadServer::SendFile(SOCKET sock, CString &filePath, int uiPor
 
     if (file_size <= 0) {
         LOGE("file empty or negative size %ld\n", file_size);
+		SendError(sock, 404, "Not Found");
         CloseHandle(file);
         return FALSE;
     }
@@ -272,28 +294,37 @@ BOOL CMiniHttpDownloadServer::SendFile(SOCKET sock, CString &filePath, int uiPor
     return TRUE;
 }
 
-BOOL CMiniHttpDownloadServer::ParseRequest(string& request, CString &sendFile, int *uiPort) {
+BOOL CMiniHttpDownloadServer::ParseRequest(SOCKET sock, string& request, CString &sendFile, int *uiPort) {
+	BOOL result;
     if (request.size() <= 0) {
         LOGD("empty request");
         return FALSE;
     }
+	
     if (uiPort == NULL) {
+		LOGE("Bad parameter");
         return FALSE;
     }
+	
     char buffer[_MAX_FNAME] = {0};
     int got = sscanf(request.c_str(), "GET /%d/%255s ", uiPort, buffer);
 
     if (got < 2) {
         LOGD("Can not parse request %s", request.c_str());
+		SendError(sock, 400, "Bad Request");
         return FALSE;
     }
     LOGE("request port %d, filename %s", *uiPort, buffer);
     if (m_GetFileCB == NULL || m_CallBackData == NULL) {
         LOGE("NULL PARAMETER");
+		SendError(sock, 500, "Internal Server Error");
         return FALSE;
     }
 
-    return m_GetFileCB(m_CallBackData, buffer, sendFile);
+    result = m_GetFileCB(m_CallBackData, buffer, sendFile);
+	if (!result)		
+		SendError(sock, 404, "Not Found");
+	return result;
 }
 
 UINT CMiniHttpDownloadServer::StartHttpServer(LPVOID wParam) {
@@ -432,7 +463,7 @@ void CMiniHttpDownloadServer::Run() {
             break;
         }
 
-        if (FALSE == ParseRequest(request, path, &uiPort)) {
+        if (FALSE == ParseRequest(sockConn, request, path, &uiPort)) {
             HandleServerException(_T("Bad request!"),
                 sockConn,
                 INVALID_SOCKET,

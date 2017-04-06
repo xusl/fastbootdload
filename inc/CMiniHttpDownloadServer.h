@@ -23,8 +23,9 @@ public:
 
 private:
     BOOL BindPort(SOCKET sock, u_short port);
-    BOOL SendFile(SOCKET sock, CString &file, int uiPort);
-    BOOL ParseRequest(string& request, CString &sendFile, int *uiPort);
+    BOOL SendFile(SOCKET sock, CString &file, int uiPort);    
+    BOOL SendError(SOCKET sock, int error, string error_text);
+    BOOL ParseRequest(SOCKET sock, string& request, CString &sendFile, int *uiPort);
     BOOL BuildHttpHeader(string& header, int dataSize);
     //char const* BuildHttpServerResponse(const char *path, size_t  *contentLength);
     char const* BuildHttpServerResponse(LPCWSTR fn, unsigned *_sz);

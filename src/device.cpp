@@ -50,6 +50,7 @@ CDevLabel* DeviceInterfaces::SetDiagIntf(CDevLabel& intf) {
     return mDiag;
 }
 
+#if 0
 CPacket* DeviceInterfaces::GetPacket() {
     if (mDiag == NULL)
         return NULL;
@@ -59,7 +60,7 @@ CPacket* DeviceInterfaces::GetPacket() {
     return m_packetDll;
 
   }
-
+#endif
 CDevLabel* DeviceInterfaces::SetFastbootIntf(CDevLabel& intf) {
     DELETE_IF(mFastboot);
     mFastboot = new CDevLabel(intf);

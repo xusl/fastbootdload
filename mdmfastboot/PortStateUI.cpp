@@ -61,7 +61,7 @@ void CPortStateUI::SetTitle(CString strInfo)
 
 void CPortStateUI::SetProgress(int iPercent)
 {
-	SetProgressVisible(TRUE);
+	//SetProgressVisible(TRUE);
     ((CProgressCtrl *)GetDlgItem(IDC_PROGRESS1))->SetPos(iPercent);
 	//::SendMessage(GetDlgItem(IDC_PROGRESS1)->m_hWnd, PBM_SETPOS, iPercent, 0);
     //GetDlgItem(IDC_PROGRESS1)->SendMessage(PBM_SETPOS, iPercent, 0);

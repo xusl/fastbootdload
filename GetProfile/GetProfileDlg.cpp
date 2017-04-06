@@ -279,7 +279,7 @@ BOOL CGetProfileDlg::CheckDeviceProfilePath(usb_handle* handle) {
     ERROR("No adb device found.");
     return FALSE;
   }
-  adbhost adb(handle, usb_port_address(handle));
+  adbhost adb(handle, (unsigned int)(handle)/*usb_port_address(handle)*/);
   for (int index = 0; path != NULL; path= candidate[++index])
   {
     memset(buffer, 0, BUFFER_LEN);
@@ -323,7 +323,7 @@ VOID CGetProfileDlg::DoGetProfilesList(usb_handle* handle) {
     ERROR("No adb device found.");
     return;
   }
-  adbhost adb(handle , usb_port_address(handle));
+  adbhost adb(handle ,  (unsigned int)(handle)/*usb_port_address(handle)*/);
   //ret = adb.shell("cat /proc/version", (void **)&resp, &resp_len);
 
   CStringA command = "ls -1 ";
@@ -366,7 +366,7 @@ BOOL CGetProfileDlg::DoPokeProfile(usb_handle* handle, PCHAR profileName, PCHAR 
     return FALSE;
   }
 
-  adbhost adb(handle , usb_port_address(handle));
+  adbhost adb(handle ,  (unsigned int)(handle)/*usb_port_address(handle)*/);
 #if 1
   PCHAR resp = NULL;
   int  resp_len;

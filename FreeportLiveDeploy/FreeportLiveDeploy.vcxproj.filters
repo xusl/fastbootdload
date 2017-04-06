@@ -119,6 +119,9 @@
     <ClCompile Include="..\src\adb_auth_host.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="FreeportLiveDeploy.rc">

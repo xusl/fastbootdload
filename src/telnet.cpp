@@ -1758,7 +1758,7 @@ CURLcode TelnetClient::Curl_read(/* connection data */
 	        fd_set fdRead;
 	        timeval TimeOut;
 	        TimeOut.tv_sec=0;
-	        TimeOut.tv_usec=200000;  //microsecond, 1/1000 000 s, 0.2
+	        TimeOut.tv_usec= 300 * 1000;  //microsecond, 1/1000 000 s, 0.2
 
 	        FD_ZERO(&fdRead);
 	        FD_SET(sockfd,&fdRead);

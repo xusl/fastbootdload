@@ -234,6 +234,7 @@ xcopy /Y $(ProjectDir)patch.ini $(OutDir)</Command>
     <ClCompile Include="..\src\adbhost.cpp" />
     <ClCompile Include="..\src\adb_auth_host.cpp" />
     <ClCompile Include="..\src\adb_dev_register.cpp" />
+    <ClCompile Include="..\src\device.cpp" />
     <ClCompile Include="..\src\list.cpp" />
     <ClCompile Include="..\src\log.cpp" />
     <ClCompile Include="..\src\scsicmd.cpp" />

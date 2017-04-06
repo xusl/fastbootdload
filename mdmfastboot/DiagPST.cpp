@@ -27,7 +27,13 @@ DiagPST::DiagPST(UsbWorkData * worker, map<string,FileBufStruct> & filebuffer):
 {
     DeviceInterfaces *dev =worker->mActiveDevIntf;
     m_Worker = worker;
-    m_DLLPacket = dev->GetPacket();
+	if (dev != NULL && dev->GetDiagIntf() != NULL) {
+	    m_DLLPacket = new CPacket();
+		m_DLLPacket->Init(dev->GetDiagIntf()->GetComPortNum());
+		//dev->GetPacket();
+	} else {
+		m_DLLPacket = NULL;
+	}
     m_DIAGCmd = new CDIAGCmd(m_DLLPacket);
     m_DLPrg = new CDLPrg(m_DLLPacket);
     m_sahara = new SAHARACmd(m_DLLPacket);

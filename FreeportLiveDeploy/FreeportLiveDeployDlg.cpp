@@ -358,7 +358,7 @@ LRESULT CFreeportLiveDeployDlg::LiveDeploy(BOOL bPrompt) {
 
   if (m_hUSBHandle != NULL) {
     //GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
-    adbhost adb(m_hUSBHandle, usb_port_address(m_hUSBHandle));
+    adbhost adb(m_hUSBHandle,  (unsigned int)(m_hUSBHandle)/*usb_port_address(m_hUSBHandle)*/);
     INFO("Get adb interface, now do send files.");
 #ifdef PATCH_CONF
 #ifdef USE_CPP_MAP

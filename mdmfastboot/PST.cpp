@@ -579,6 +579,8 @@ VOID PSTManager::HttpServerMessageCB (PVOID data, int uiPort, string message) {
       workData->SetPromptMsg(message.c_str());
 }
 
+#define USB_SWITCH  "usb_switch_to " //"/bin/usb_switch_to "
+
 UINT PSTManager::RunTelnetServer(LPVOID wParam){
     PSTManager *manager = (PSTManager*)wParam;
     string gateway;
@@ -671,10 +673,10 @@ UINT PSTManager::RunTelnetServer(LPVOID wParam){
     //workData->SetDevicePortText(PROMPT_TEXT, CString(result.c_str()));
 
     workData->SetPromptMsg("Update Modem Image", PROMPT_TITLE);
-    tn.send_command("/bin/usb_switch_to IPQ", result);
+    tn.send_command(USB_SWITCH" IPQ", result);
     workData->SetPromptMsg("switch usb to PC");
     //tn.send_command("send_data 254 0 0 8 1 0 0", result);
-    tn.send_command("/bin/usb_switch_to PC", result);
+    tn.send_command(USB_SWITCH" PC", result);
 
     //begin USB download
     error = manager->CPEModemPST(workData);
@@ -1045,9 +1047,12 @@ DWORD  UsbWorkData::WaitForDevSwitchEvt(BOOL changeStatus, DWORD dwMilliseconds)
 	  //hWnd->SetTimer((UINT_PTR)this, nElapse * 1000, NULL);    
 	}
 	waited = ::WaitForSingleObject(mDevSwitchEvt,dwMilliseconds);
-	if (waited == WAIT_OBJECT_0)
+	if (waited == WAIT_OBJECT_0) {
 		LOGD("Get signaled, device arrived.");
-	else if (waited == WAIT_TIMEOUT)
+		if (mActiveDevIntf->GetDeviceStatus() == DEVICE_FLASH) {
+			pCtl->SetProgressVisible(TRUE);
+		}		
+	} else if (waited == WAIT_TIMEOUT)
 		LOGI("WaitForSingleObject return WAIT_TIMEOUT");
 	else if (waited == WAIT_ABANDONED)
 		LOGI("WaitForSingleObject return WAIT_ABANDONED ");
