@@ -405,9 +405,6 @@ BOOL CDownloadDlg::CleanDevice(const char *const ipAddr, BOOL killSniff, BOOL up
     mNic.FlushArp();
     return TRUE;
 }
-
-DWORD WINAPI CDownloadDlg::CaptureLog(LPVOID lpPARAM)  {
-}
 	
 /*
 * Two important note:

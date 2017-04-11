@@ -408,7 +408,7 @@ BOOL CDevLabel::GetTransferIDs(list<DWORD> &ids) {
 }
 
 BOOL CDevLabel::CheckRemovable() {
-    DWORD timeout = 100000;
+    DWORD timeout = 300000;
     switch (GetStatus()) {
         case DEVICE_FINISH:
             timeout = 10000;
